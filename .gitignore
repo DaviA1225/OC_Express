@@ -1,0 +1,22 @@
+# Credenciais
+.env
+.env.*
+
+# Ambiente virtual
+.venv/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+
+# PDFs gerados
+*.pdf
+
+# OS
+.DS_Store
+Thumbs.db
