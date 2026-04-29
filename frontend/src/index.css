@@ -1,0 +1,77 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* SPEC-FRONTEND seção 2.1 — paleta corporativa */
+    --background: 0 0% 100%;            /* #FFFFFF bg-base */
+    --foreground: 222 47% 11%;          /* #0F172A text-primary */
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+
+    --primary: 224 76% 40%;             /* #1E40AF azul corporativo */
+    --primary-hover: 224 71% 32%;       /* #1E3A8A */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 215 25% 27%;           /* #334155 cinza escuro */
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 210 40% 98%;               /* #F8FAFC bg-muted */
+    --muted-foreground: 215 16% 47%;    /* #64748B text-secondary */
+
+    --accent: 38 92% 50%;                /* #F59E0B âmbar */
+    --accent-foreground: 222 47% 11%;
+
+    --destructive: 0 84% 60%;            /* #EF4444 */
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 160 84% 39%;              /* #10B981 */
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 222 47% 11%;
+
+    --border: 214 32% 91%;               /* #E2E8F0 */
+    --input: 214 32% 91%;
+    --ring: 224 76% 40%;
+
+    --radius: 0.375rem;                  /* 6px botões/inputs */
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html, body, #root {
+    @apply h-full;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-size: 14px;
+    line-height: 1.5;
+    font-feature-settings: 'cv11', 'ss01';
+  }
+}
+
+/* Status badges — SPEC-FRONTEND 2.1 */
+@layer components {
+  .status-recebida          { background-color: #F1F5F9; color: #475569; }
+  .status-em_cadastro       { background-color: #DBEAFE; color: #1E40AF; }
+  .status-instrucao_emitida { background-color: #FEF3C7; color: #92400E; }
+  .status-oc_gerada         { background-color: #DBEAFE; color: #1E3A8A; }
+  .status-oc_enviada        { background-color: #D1FAE5; color: #065F46; }
+  .status-finalizada        { background-color: #A7F3D0; color: #064E3B; }
+  .status-cancelada         { background-color: #FEE2E2; color: #991B1B; }
+
+  .label-uppercase {
+    @apply text-[10px] font-medium uppercase tracking-[0.5px] text-muted-foreground;
+  }
+}
