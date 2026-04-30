@@ -5,7 +5,8 @@ import { z } from 'zod'
 import { Loader2 } from 'lucide-react'
 import { CrudListPage, useCrudListState, type ColumnDef } from '@/components/shared/CrudListPage'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
-import { useCrudList, useActiveCount, useUpsertRow, useToggleActive } from '@/features/crud/useCrudQueries'
+import { useCrudList, useActiveCount, useUpsertRow, useToggleActive, useDeleteRow } from '@/features/crud/useCrudQueries'
+import { useCrudOptions } from '@/features/crud/useCrudOptions'
 import {
   Dialog,
   DialogContent,
@@ -26,29 +27,32 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { Combobox, type ComboboxOption } from '@/components/shared/Combobox'
 import { isValidPlaca } from '@/lib/validators'
 import { formatPlaca } from '@/lib/utils'
 import type { Tables } from '@/types/database.types'
 
 type Row = Tables<'carretas'>
+type Subcontratada = Pick<Tables<'subcontratadas'>, 'id' | 'razao_social'>
 
-const TIPOS = ['Basculante', 'Graneleira', 'Caçamba', 'Prancha', 'Outro'] as const
+const TIPOS = [
+  'Caçamba 3 Eixos',
+  'Caçamba 4 Eixos',
+  'Bi-Trem Caçamba',
+  'Rodo-Trem Caçamba',
+  'Graneleiro LS 3 Eixos',
+  'Graneleiro LS 4 Eixos',
+  'Bi-Trem Graneleiro',
+  'Rodo-Trem Graneleiro',
+] as const
 
 const schema = z.object({
   placa: z.string().refine(isValidPlaca, 'Placa inválida'),
   tipo: z.string().optional(),
-  capacidade_ton: z
-    .string()
-    .optional()
-    .refine((v) => !v || /^\d+([.,]\d+)?$/.test(v.trim()), 'Use apenas números'),
+  subcontratada_id: z.string().nullable().optional(),
   observacoes: z.string().optional(),
 })
 type FormValues = z.infer<typeof schema>
-
-function formatCapacidade(value: number | null): string {
-  if (value == null) return '—'
-  return `${value.toLocaleString('pt-BR', { maximumFractionDigits: 2 })} t`
-}
 
 export default function CarretasPage() {
   const state = useCrudListState()
@@ -64,17 +68,31 @@ export default function CarretasPage() {
   const totalActive = useActiveCount('carretas')
   const upsert = useUpsertRow('carretas', 'Carreta')
   const toggle = useToggleActive('carretas', 'Carreta')
+  const remove = useDeleteRow('carretas', 'Carreta')
+
+  const subOptions = useCrudOptions<Subcontratada>({
+    table: 'subcontratadas',
+    selectColumns: 'id, razao_social',
+    orderBy: 'razao_social',
+  })
+
+  const subById = React.useMemo(() => {
+    const map = new Map<string, string>()
+    subOptions.data?.forEach((s) => map.set(s.id, s.razao_social))
+    return map
+  }, [subOptions.data])
 
   const [editing, setEditing] = React.useState<Row | null>(null)
   const [open, setOpen] = React.useState(false)
   const [confirmRow, setConfirmRow] = React.useState<Row | null>(null)
+  const [deleteRow, setDeleteRow] = React.useState<Row | null>(null)
 
   const columns: ColumnDef<Row>[] = [
     { header: 'Placa', accessor: (r) => r.placa },
     { header: 'Tipo', accessor: (r) => r.tipo ?? '—', className: 'text-muted-foreground' },
     {
-      header: 'Capacidade',
-      accessor: (r) => formatCapacidade(r.capacidade_ton),
+      header: 'Subcontratada',
+      accessor: (r) => (r.subcontratada_id ? subById.get(r.subcontratada_id) ?? '—' : '—'),
       className: 'text-muted-foreground',
     },
   ]
@@ -97,6 +115,7 @@ export default function CarretasPage() {
         rowLabel={(r) => r.placa}
         onEdit={(r) => { setEditing(r); setOpen(true) }}
         onToggleActive={(r) => setConfirmRow(r)}
+        onDelete={(r) => setDeleteRow(r)}
         emptyTitle="Nenhuma carreta cadastrada"
         emptyDescription="Cadastre as carretas que poderão ser indicadas nas OCs."
         page={state.page}
@@ -109,15 +128,15 @@ export default function CarretasPage() {
         open={open}
         onOpenChange={setOpen}
         editing={editing}
+        subOptions={subOptions.data ?? []}
+        subLoading={subOptions.isLoading}
         onSubmit={async (values) => {
           await upsert.mutateAsync({
             id: editing?.id,
             values: {
               placa: formatPlaca(values.placa),
               tipo: values.tipo || null,
-              capacidade_ton: values.capacidade_ton
-                ? Number(values.capacidade_ton.replace(',', '.'))
-                : null,
+              subcontratada_id: values.subcontratada_id || null,
               observacoes: values.observacoes || null,
             },
           })
@@ -141,6 +160,25 @@ export default function CarretasPage() {
           }
         }}
       />
+
+      <ConfirmDialog
+        open={!!deleteRow}
+        onOpenChange={(o) => !o && setDeleteRow(null)}
+        title="Excluir carreta?"
+        description={
+          deleteRow
+            ? `O cadastro da placa "${deleteRow.placa}" será removido permanentemente. Essa ação não pode ser desfeita. Se houver solicitações vinculadas, a exclusão será bloqueada.`
+            : ''
+        }
+        confirmLabel="Sim, excluir"
+        destructive
+        onConfirm={async () => {
+          if (deleteRow) {
+            await remove.mutateAsync({ id: deleteRow.id })
+            setDeleteRow(null)
+          }
+        }}
+      />
     </>
   )
 }
@@ -149,10 +187,12 @@ interface FormProps {
   open: boolean
   onOpenChange: (o: boolean) => void
   editing: Row | null
+  subOptions: Subcontratada[]
+  subLoading: boolean
   onSubmit: (values: FormValues) => Promise<void>
 }
 
-function CarretaForm({ open, onOpenChange, editing, onSubmit }: FormProps) {
+function CarretaForm({ open, onOpenChange, editing, subOptions, subLoading, onSubmit }: FormProps) {
   const {
     handleSubmit,
     reset,
@@ -167,7 +207,7 @@ function CarretaForm({ open, onOpenChange, editing, onSubmit }: FormProps) {
       reset({
         placa: editing?.placa ?? '',
         tipo: editing?.tipo ?? '',
-        capacidade_ton: editing?.capacidade_ton != null ? String(editing.capacidade_ton).replace('.', ',') : '',
+        subcontratada_id: editing?.subcontratada_id ?? null,
         observacoes: editing?.observacoes ?? '',
       })
     }
@@ -175,6 +215,12 @@ function CarretaForm({ open, onOpenChange, editing, onSubmit }: FormProps) {
 
   const placa = watch('placa') ?? ''
   const tipo = watch('tipo') ?? ''
+  const subId = watch('subcontratada_id') ?? null
+
+  const options: ComboboxOption[] = subOptions.map((s) => ({
+    value: s.id,
+    label: s.razao_social,
+  }))
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -220,16 +266,16 @@ function CarretaForm({ open, onOpenChange, editing, onSubmit }: FormProps) {
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="capacidade_ton">Capacidade (toneladas)</Label>
-              <Input
-                id="capacidade_ton"
-                inputMode="decimal"
-                placeholder="Ex.: 30,5"
-                {...register('capacidade_ton')}
+              <Label>Subcontratada</Label>
+              <Combobox
+                options={options}
+                value={subId}
+                onChange={(v) => setValue('subcontratada_id', v, { shouldValidate: true })}
+                placeholder="Selecionar subcontratada"
+                searchPlaceholder="Buscar subcontratada"
+                emptyMessage="Nenhuma subcontratada ativa."
+                loading={subLoading}
               />
-              {errors.capacidade_ton && (
-                <p className="text-[11px] text-destructive">{errors.capacidade_ton.message}</p>
-              )}
             </div>
 
             <div className="space-y-1.5">

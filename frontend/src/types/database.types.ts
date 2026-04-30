@@ -136,6 +136,7 @@ export interface Database {
           placa: string
           tipo: string | null
           capacidade_ton: number | null
+          subcontratada_id: string | null
           observacoes: string | null
           ativo: boolean
           created_at: string
@@ -147,6 +148,7 @@ export interface Database {
           placa: string
           tipo?: string | null
           capacidade_ton?: number | null
+          subcontratada_id?: string | null
           observacoes?: string | null
           ativo?: boolean
           created_at?: string

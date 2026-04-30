@@ -5,7 +5,7 @@ import { z } from 'zod'
 import { Loader2 } from 'lucide-react'
 import { CrudListPage, useCrudListState, type ColumnDef } from '@/components/shared/CrudListPage'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
-import { useCrudList, useActiveCount, useUpsertRow, useToggleActive } from '@/features/crud/useCrudQueries'
+import { useCrudList, useActiveCount, useUpsertRow, useToggleActive, useDeleteRow } from '@/features/crud/useCrudQueries'
 import { useCrudOptions } from '@/features/crud/useCrudOptions'
 import {
   Dialog,
@@ -35,7 +35,7 @@ import type { Tables } from '@/types/database.types'
 type Row = Tables<'veiculos'>
 type Subcontratada = Pick<Tables<'subcontratadas'>, 'id' | 'razao_social'>
 
-const TIPOS = ['Cavalo 6x2', 'Cavalo 6x4', 'Truck', 'Toco', 'Outro'] as const
+const TIPOS = ['Cavalo Trucado 3 Eixos', 'Cavalo Trucado 4 Eixos'] as const
 
 const schema = z.object({
   placa: z.string().refine(isValidPlaca, 'Placa inválida'),
@@ -59,6 +59,7 @@ export default function VeiculosPage() {
   const totalActive = useActiveCount('veiculos')
   const upsert = useUpsertRow('veiculos', 'Veículo')
   const toggle = useToggleActive('veiculos', 'Veículo')
+  const remove = useDeleteRow('veiculos', 'Veículo')
 
   const subOptions = useCrudOptions<Subcontratada>({
     table: 'subcontratadas',
@@ -75,6 +76,7 @@ export default function VeiculosPage() {
   const [editing, setEditing] = React.useState<Row | null>(null)
   const [open, setOpen] = React.useState(false)
   const [confirmRow, setConfirmRow] = React.useState<Row | null>(null)
+  const [deleteRow, setDeleteRow] = React.useState<Row | null>(null)
 
   const columns: ColumnDef<Row>[] = [
     { header: 'Placa', accessor: (r) => r.placa },
@@ -104,6 +106,7 @@ export default function VeiculosPage() {
         rowLabel={(r) => r.placa}
         onEdit={(r) => { setEditing(r); setOpen(true) }}
         onToggleActive={(r) => setConfirmRow(r)}
+        onDelete={(r) => setDeleteRow(r)}
         emptyTitle="Nenhum veículo cadastrado"
         emptyDescription="Cadastre os cavalos mecânicos que poderão ser indicados nas OCs."
         page={state.page}
@@ -145,6 +148,25 @@ export default function VeiculosPage() {
           if (confirmRow) {
             await toggle.mutateAsync({ id: confirmRow.id, ativo: !confirmRow.ativo })
             setConfirmRow(null)
+          }
+        }}
+      />
+
+      <ConfirmDialog
+        open={!!deleteRow}
+        onOpenChange={(o) => !o && setDeleteRow(null)}
+        title="Excluir veículo?"
+        description={
+          deleteRow
+            ? `O cadastro da placa "${deleteRow.placa}" será removido permanentemente. Essa ação não pode ser desfeita. Se houver solicitações vinculadas, a exclusão será bloqueada.`
+            : ''
+        }
+        confirmLabel="Sim, excluir"
+        destructive
+        onConfirm={async () => {
+          if (deleteRow) {
+            await remove.mutateAsync({ id: deleteRow.id })
+            setDeleteRow(null)
           }
         }}
       />

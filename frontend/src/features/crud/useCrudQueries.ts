@@ -100,6 +100,25 @@ export function useUpsertRow<TName extends CrudTableName>(table: TName, friendly
   })
 }
 
+export function useDeleteRow<TName extends CrudTableName>(table: TName, friendlyName: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id }: { id: string }) => {
+      const { error } = await supabase.from(table).delete().eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['crud', table] })
+      qc.invalidateQueries({ queryKey: ['crud-count-active', table] })
+      qc.invalidateQueries({ queryKey: ['crud-options', table] })
+      toast.success(`${friendlyName} excluído`)
+    },
+    onError: (error: unknown) => {
+      toast.error(traduzirErroBanco(error))
+    },
+  })
+}
+
 export function useToggleActive<TName extends CrudTableName>(table: TName, friendlyName: string) {
   const qc = useQueryClient()
   return useMutation({

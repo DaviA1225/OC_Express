@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Plus, Search as SearchIcon, ChevronLeft, ChevronRight, Inbox, Lock, Pencil, Power } from 'lucide-react'
+import { Plus, Search as SearchIcon, ChevronLeft, ChevronRight, Inbox, Lock, Pencil, Power, Trash2 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
@@ -39,6 +39,7 @@ export interface CrudListPageProps<T extends { id: string; ativo: boolean }> {
   rowLabel?: (row: T) => string
   onEdit: (row: T) => void
   onToggleActive: (row: T) => void
+  onDelete?: (row: T) => void
   emptyTitle?: string
   emptyDescription?: string
   page: number
@@ -63,6 +64,7 @@ export function CrudListPage<T extends { id: string; ativo: boolean }>(props: Cr
     columns,
     onEdit,
     onToggleActive,
+    onDelete,
     rowLabel,
     emptyTitle = 'Nada encontrado',
     emptyDescription = 'Ajuste os filtros ou crie um novo registro.',
@@ -118,7 +120,7 @@ export function CrudListPage<T extends { id: string; ativo: boolean }>(props: Cr
               {columns.map((c, i) => (
                 <TableHead key={i} className={c.className}>{c.header}</TableHead>
               ))}
-              <TableHead className="w-[110px] text-right">Ações</TableHead>
+              <TableHead className={cn(onDelete ? 'w-[150px]' : 'w-[110px]')}>Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -129,7 +131,7 @@ export function CrudListPage<T extends { id: string; ativo: boolean }>(props: Cr
                     {columns.map((_c, ci) => (
                       <TableCell key={ci}><Skeleton className="h-4 w-3/4" /></TableCell>
                     ))}
-                    <TableCell><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-16" /></TableCell>
                   </TableRow>
                 ))}
               </>
@@ -152,13 +154,13 @@ export function CrudListPage<T extends { id: string; ativo: boolean }>(props: Cr
                 {columns.map((c, i) => (
                   <TableCell key={i} className={c.className}>
                     {i === 0 && !row.ativo && (
-                      <Lock className="mr-1 inline h-3 w-3 text-muted-foreground" />
+                      <Lock className="mr-1 inline h-3 w-3 text-destructive" />
                     )}
                     {c.accessor(row)}
                   </TableCell>
                 ))}
-                <TableCell className="text-right">
-                  <div className="flex items-center justify-end gap-1">
+                <TableCell>
+                  <div className="flex items-center justify-start gap-1">
                     <Button
                       variant="ghost"
                       size="icon"
@@ -177,6 +179,17 @@ export function CrudListPage<T extends { id: string; ativo: boolean }>(props: Cr
                     >
                       <Power className={cn('h-4 w-4', row.ativo ? 'text-foreground' : 'text-success')} />
                     </Button>
+                    {onDelete && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => onDelete(row)}
+                        aria-label={`Excluir ${rowLabel?.(row) ?? ''}`}
+                        title="Excluir"
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    )}
                   </div>
                 </TableCell>
               </TableRow>

@@ -55,15 +55,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     supabase.auth.getSession().then(async ({ data }) => {
       if (!active) return
       setSession(data.session)
-      await loadProfile(data.session)
-      setLoading(false)
+      try {
+        await loadProfile(data.session)
+      } catch (err) {
+        console.error('[useAuth] loadProfile (getSession) failed', err)
+      } finally {
+        if (active) setLoading(false)
+      }
     })
 
-    const { data: subscription } = supabase.auth.onAuthStateChange(async (_event, s) => {
+    // Supabase recommends NOT awaiting other supabase calls inside
+    // onAuthStateChange — it runs inside an auth lock and can deadlock.
+    // Defer with setTimeout(0) so the lock is released before we query.
+    const { data: subscription } = supabase.auth.onAuthStateChange((_event, s) => {
       if (!active) return
       setSession(s)
-      await loadProfile(s)
-      setLoading(false)
+      setTimeout(() => {
+        if (!active) return
+        loadProfile(s)
+          .catch((err) => console.error('[useAuth] loadProfile (authChange) failed', err))
+          .finally(() => {
+            if (active) setLoading(false)
+          })
+      }, 0)
     })
 
     return () => {

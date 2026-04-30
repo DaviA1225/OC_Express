@@ -5,8 +5,7 @@ import { z } from 'zod'
 import { Loader2 } from 'lucide-react'
 import { CrudListPage, useCrudListState, type ColumnDef } from '@/components/shared/CrudListPage'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
-import { useCrudList, useActiveCount, useUpsertRow, useToggleActive } from '@/features/crud/useCrudQueries'
-import { useCrudOptions } from '@/features/crud/useCrudOptions'
+import { useCrudList, useActiveCount, useUpsertRow, useToggleActive, useDeleteRow } from '@/features/crud/useCrudQueries'
 import {
   Dialog,
   DialogContent,
@@ -20,24 +19,19 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Combobox, type ComboboxOption } from '@/components/shared/Combobox'
 import { isValidCpf, isValidTelefone } from '@/lib/validators'
 import { formatCpf, formatTelefone } from '@/lib/utils'
 import type { Tables } from '@/types/database.types'
 
 type Row = Tables<'motoristas'>
-type Subcontratada = Pick<Tables<'subcontratadas'>, 'id' | 'razao_social'>
 
 const schema = z.object({
   nome_completo: z.string().min(2, 'Informe o nome completo'),
   cpf: z.string().refine(isValidCpf, 'CPF inválido'),
-  rg: z.string().optional(),
-  antt: z.string().optional(),
   telefone: z
     .string()
     .optional()
     .refine((v) => !v || isValidTelefone(v), 'Telefone inválido'),
-  subcontratada_id: z.string().nullable().optional(),
   observacoes: z.string().optional(),
 })
 type FormValues = z.infer<typeof schema>
@@ -49,40 +43,24 @@ export default function MotoristasPage() {
     showInactive: state.showInactive,
     page: state.page,
     pageSize: state.pageSize,
-    searchColumns: ['nome_completo', 'cpf', 'antt', 'telefone'],
+    searchColumns: ['nome_completo', 'cpf'],
     orderBy: 'nome_completo',
     ascending: true,
   })
   const totalActive = useActiveCount('motoristas')
   const upsert = useUpsertRow('motoristas', 'Motorista')
   const toggle = useToggleActive('motoristas', 'Motorista')
-
-  const subOptions = useCrudOptions<Subcontratada>({
-    table: 'subcontratadas',
-    selectColumns: 'id, razao_social',
-    orderBy: 'razao_social',
-  })
-
-  const subById = React.useMemo(() => {
-    const map = new Map<string, string>()
-    subOptions.data?.forEach((s) => map.set(s.id, s.razao_social))
-    return map
-  }, [subOptions.data])
+  const remove = useDeleteRow('motoristas', 'Motorista')
 
   const [editing, setEditing] = React.useState<Row | null>(null)
   const [open, setOpen] = React.useState(false)
   const [confirmRow, setConfirmRow] = React.useState<Row | null>(null)
+  const [deleteRow, setDeleteRow] = React.useState<Row | null>(null)
 
   const columns: ColumnDef<Row>[] = [
     { header: 'Nome', accessor: (r) => r.nome_completo },
     { header: 'CPF', accessor: (r) => r.cpf, className: 'text-muted-foreground' },
-    { header: 'ANTT', accessor: (r) => r.antt ?? '—', className: 'text-muted-foreground' },
     { header: 'Telefone', accessor: (r) => r.telefone ?? '—' },
-    {
-      header: 'Subcontratada',
-      accessor: (r) => (r.subcontratada_id ? subById.get(r.subcontratada_id) ?? '—' : '—'),
-      className: 'text-muted-foreground',
-    },
   ]
 
   return (
@@ -96,13 +74,14 @@ export default function MotoristasPage() {
         totalActive={totalActive.data ?? 0}
         searchValue={state.search}
         onSearchChange={state.setSearch}
-        searchPlaceholder="Buscar por nome, CPF, ANTT ou telefone"
+        searchPlaceholder="Buscar por nome ou CPF"
         showInactive={state.showInactive}
         onShowInactiveChange={state.setShowInactive}
         columns={columns}
         rowLabel={(r) => r.nome_completo}
         onEdit={(r) => { setEditing(r); setOpen(true) }}
         onToggleActive={(r) => setConfirmRow(r)}
+        onDelete={(r) => setDeleteRow(r)}
         emptyTitle="Nenhum motorista cadastrado"
         emptyDescription="Cadastre os motoristas que poderão ser indicados nas OCs."
         page={state.page}
@@ -115,18 +94,13 @@ export default function MotoristasPage() {
         open={open}
         onOpenChange={setOpen}
         editing={editing}
-        subOptions={subOptions.data ?? []}
-        subLoading={subOptions.isLoading}
         onSubmit={async (values) => {
           await upsert.mutateAsync({
             id: editing?.id,
             values: {
               nome_completo: values.nome_completo,
               cpf: formatCpf(values.cpf),
-              rg: values.rg || null,
-              antt: values.antt || null,
               telefone: values.telefone ? formatTelefone(values.telefone) : null,
-              subcontratada_id: values.subcontratada_id || null,
               observacoes: values.observacoes || null,
             },
           })
@@ -150,6 +124,25 @@ export default function MotoristasPage() {
           }
         }}
       />
+
+      <ConfirmDialog
+        open={!!deleteRow}
+        onOpenChange={(o) => !o && setDeleteRow(null)}
+        title="Excluir motorista?"
+        description={
+          deleteRow
+            ? `O cadastro de "${deleteRow.nome_completo}" será removido permanentemente. Essa ação não pode ser desfeita. Se houver solicitações vinculadas, a exclusão será bloqueada.`
+            : ''
+        }
+        confirmLabel="Sim, excluir"
+        destructive
+        onConfirm={async () => {
+          if (deleteRow) {
+            await remove.mutateAsync({ id: deleteRow.id })
+            setDeleteRow(null)
+          }
+        }}
+      />
     </>
   )
 }
@@ -158,12 +151,10 @@ interface FormProps {
   open: boolean
   onOpenChange: (o: boolean) => void
   editing: Row | null
-  subOptions: Subcontratada[]
-  subLoading: boolean
   onSubmit: (values: FormValues) => Promise<void>
 }
 
-function MotoristaForm({ open, onOpenChange, editing, subOptions, subLoading, onSubmit }: FormProps) {
+function MotoristaForm({ open, onOpenChange, editing, onSubmit }: FormProps) {
   const {
     register,
     handleSubmit,
@@ -178,10 +169,7 @@ function MotoristaForm({ open, onOpenChange, editing, subOptions, subLoading, on
       reset({
         nome_completo: editing?.nome_completo ?? '',
         cpf: editing?.cpf ?? '',
-        rg: editing?.rg ?? '',
-        antt: editing?.antt ?? '',
         telefone: editing?.telefone ?? '',
-        subcontratada_id: editing?.subcontratada_id ?? null,
         observacoes: editing?.observacoes ?? '',
       })
     }
@@ -189,12 +177,6 @@ function MotoristaForm({ open, onOpenChange, editing, subOptions, subLoading, on
 
   const cpf = watch('cpf') ?? ''
   const tel = watch('telefone') ?? ''
-  const subId = watch('subcontratada_id') ?? null
-
-  const options: ComboboxOption[] = subOptions.map((s) => ({
-    value: s.id,
-    label: s.razao_social,
-  }))
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -240,30 +222,6 @@ function MotoristaForm({ open, onOpenChange, editing, subOptions, subLoading, on
                   <p className="text-[11px] text-destructive">{errors.telefone.message}</p>
                 )}
               </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="rg">RG</Label>
-                <Input id="rg" {...register('rg')} />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="antt">ANTT</Label>
-                <Input id="antt" {...register('antt')} />
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label>Subcontratada</Label>
-              <Combobox
-                options={options}
-                value={subId}
-                onChange={(v) => setValue('subcontratada_id', v, { shouldValidate: true })}
-                placeholder="Selecionar subcontratada"
-                searchPlaceholder="Buscar subcontratada"
-                emptyMessage="Nenhuma subcontratada ativa."
-                loading={subLoading}
-              />
             </div>
 
             <div className="space-y-1.5">
