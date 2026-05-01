@@ -5,7 +5,7 @@ import { z } from 'zod'
 import { Loader2 } from 'lucide-react'
 import { CrudListPage, useCrudListState, type ColumnDef } from '@/components/shared/CrudListPage'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
-import { useCrudList, useActiveCount, useUpsertRow, useToggleActive } from '@/features/crud/useCrudQueries'
+import { useCrudList, useActiveCount, useUpsertRow, useToggleActive, useDeleteRow } from '@/features/crud/useCrudQueries'
 import {
   Dialog,
   DialogContent,
@@ -18,25 +18,34 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { isValidCnpj, isValidTelefone } from '@/lib/validators'
-import { formatCnpj, formatTelefone } from '@/lib/utils'
+import { isValidDocumento, tipoPessoa } from '@/lib/validators'
+import { formatDocumento, cn } from '@/lib/utils'
 import type { Tables } from '@/types/database.types'
 
 type Row = Tables<'subcontratadas'>
 
 const schema = z.object({
-  razao_social: z.string().min(2, 'Informe a razão social'),
-  cnpj: z
+  razao_social: z.string().min(2, 'Informe a razão social ou nome'),
+  documento: z
     .string()
-    .optional()
-    .refine((v) => !v || isValidCnpj(v), 'CNPJ inválido'),
-  contato_nome: z.string().optional(),
-  contato_telefone: z
-    .string()
-    .optional()
-    .refine((v) => !v || isValidTelefone(v), 'Telefone inválido'),
+    .min(1, 'Informe o CPF ou CNPJ')
+    .refine(isValidDocumento, 'CPF ou CNPJ inválido'),
 })
 type FormValues = z.infer<typeof schema>
+
+function TipoBadge({ tipo }: { tipo: 'PF' | 'PJ' | null }) {
+  if (!tipo) return <span className="text-[12px] text-muted-foreground">—</span>
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium tracking-[0.5px]',
+        tipo === 'PJ' ? 'bg-indigo-100 text-indigo-800' : 'bg-amber-100 text-amber-800',
+      )}
+    >
+      {tipo}
+    </span>
+  )
+}
 
 export default function SubcontratadasPage() {
   const state = useCrudListState()
@@ -45,23 +54,24 @@ export default function SubcontratadasPage() {
     showInactive: state.showInactive,
     page: state.page,
     pageSize: state.pageSize,
-    searchColumns: ['razao_social', 'cnpj', 'contato_nome'],
+    searchColumns: ['razao_social', 'documento'],
     orderBy: 'razao_social',
     ascending: true,
   })
   const totalActive = useActiveCount('subcontratadas')
   const upsert = useUpsertRow('subcontratadas', 'Subcontratada')
   const toggle = useToggleActive('subcontratadas', 'Subcontratada')
+  const remove = useDeleteRow('subcontratadas', 'Subcontratada')
 
   const [editing, setEditing] = React.useState<Row | null>(null)
   const [open, setOpen] = React.useState(false)
   const [confirmRow, setConfirmRow] = React.useState<Row | null>(null)
+  const [deleteRow, setDeleteRow] = React.useState<Row | null>(null)
 
   const columns: ColumnDef<Row>[] = [
-    { header: 'Razão Social', accessor: (r) => r.razao_social },
-    { header: 'CNPJ', accessor: (r) => r.cnpj ?? '—', className: 'text-muted-foreground' },
-    { header: 'Contato', accessor: (r) => r.contato_nome ?? '—' },
-    { header: 'Telefone', accessor: (r) => r.contato_telefone ?? '—' },
+    { header: 'Razão Social / Nome', accessor: (r) => r.razao_social },
+    { header: 'Tipo', accessor: (r) => <TipoBadge tipo={r.tipo_pessoa} /> },
+    { header: 'CPF / CNPJ', accessor: (r) => r.documento ?? '—', className: 'text-muted-foreground' },
   ]
 
   return (
@@ -75,15 +85,16 @@ export default function SubcontratadasPage() {
         totalActive={totalActive.data ?? 0}
         searchValue={state.search}
         onSearchChange={state.setSearch}
-        searchPlaceholder="Buscar por razão social, CNPJ ou contato"
+        searchPlaceholder="Buscar por nome, razão social, CPF ou CNPJ"
         showInactive={state.showInactive}
         onShowInactiveChange={state.setShowInactive}
         columns={columns}
         rowLabel={(r) => r.razao_social}
         onEdit={(r) => { setEditing(r); setOpen(true) }}
         onToggleActive={(r) => setConfirmRow(r)}
+        onDelete={(r) => setDeleteRow(r)}
         emptyTitle="Nenhuma subcontratada cadastrada"
-        emptyDescription="Cadastre as transportadoras que atuam para você."
+        emptyDescription="Cadastre as transportadoras (PJ) ou autônomos (PF) que atuam para você."
         page={state.page}
         pageSize={state.pageSize}
         totalCount={list.data?.count ?? 0}
@@ -95,13 +106,13 @@ export default function SubcontratadasPage() {
         onOpenChange={setOpen}
         editing={editing}
         onSubmit={async (values) => {
+          const docFormatado = formatDocumento(values.documento)
           await upsert.mutateAsync({
             id: editing?.id,
             values: {
               razao_social: values.razao_social,
-              cnpj: values.cnpj ? formatCnpj(values.cnpj) : null,
-              contato_nome: values.contato_nome || null,
-              contato_telefone: values.contato_telefone ? formatTelefone(values.contato_telefone) : null,
+              documento: docFormatado,
+              tipo_pessoa: tipoPessoa(values.documento),
             },
           })
           setOpen(false)
@@ -121,6 +132,25 @@ export default function SubcontratadasPage() {
           if (confirmRow) {
             await toggle.mutateAsync({ id: confirmRow.id, ativo: !confirmRow.ativo })
             setConfirmRow(null)
+          }
+        }}
+      />
+
+      <ConfirmDialog
+        open={!!deleteRow}
+        onOpenChange={(o) => !o && setDeleteRow(null)}
+        title="Excluir subcontratada?"
+        description={
+          deleteRow
+            ? `O cadastro de "${deleteRow.razao_social}" será removido permanentemente. Essa ação não pode ser desfeita. Se houver veículos, carretas ou solicitações vinculadas, a exclusão será bloqueada.`
+            : ''
+        }
+        confirmLabel="Sim, excluir"
+        destructive
+        onConfirm={async () => {
+          if (deleteRow) {
+            await remove.mutateAsync({ id: deleteRow.id })
+            setDeleteRow(null)
           }
         }}
       />
@@ -149,15 +179,13 @@ function SubcontratadaForm({ open, onOpenChange, editing, onSubmit }: FormProps)
     if (open) {
       reset({
         razao_social: editing?.razao_social ?? '',
-        cnpj: editing?.cnpj ?? '',
-        contato_nome: editing?.contato_nome ?? '',
-        contato_telefone: editing?.contato_telefone ?? '',
+        documento: editing?.documento ?? '',
       })
     }
   }, [open, editing, reset])
 
-  const cnpj = watch('cnpj') ?? ''
-  const tel = watch('contato_telefone') ?? ''
+  const documento = watch('documento') ?? ''
+  const tipoAtual = tipoPessoa(documento)
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -166,48 +194,33 @@ function SubcontratadaForm({ open, onOpenChange, editing, onSubmit }: FormProps)
           <DialogHeader>
             <DialogTitle>{editing ? 'Editar subcontratada' : 'Nova subcontratada'}</DialogTitle>
             <DialogDescription>
-              Cadastre transportadoras que atuam como subcontratadas.
+              Cadastre transportadoras (PJ) ou autônomos (PF). O tipo é detectado automaticamente pelo documento.
             </DialogDescription>
           </DialogHeader>
           <DialogBody className="space-y-4">
             <div className="space-y-1.5">
-              <Label htmlFor="razao_social">Razão social *</Label>
+              <Label htmlFor="razao_social">Razão social ou nome *</Label>
               <Input id="razao_social" autoFocus {...register('razao_social')} />
               {errors.razao_social && (
                 <p className="text-[11px] text-destructive">{errors.razao_social.message}</p>
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="cnpj">CNPJ</Label>
-                <Input
-                  id="cnpj"
-                  value={cnpj}
-                  onChange={(e) => setValue('cnpj', formatCnpj(e.target.value), { shouldValidate: true })}
-                  placeholder="00.000.000/0000-00"
-                />
-                {errors.cnpj && (
-                  <p className="text-[11px] text-destructive">{errors.cnpj.message}</p>
-                )}
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="contato_telefone">Telefone</Label>
-                <Input
-                  id="contato_telefone"
-                  value={tel}
-                  onChange={(e) => setValue('contato_telefone', formatTelefone(e.target.value), { shouldValidate: true })}
-                  placeholder="(00) 00000-0000"
-                />
-                {errors.contato_telefone && (
-                  <p className="text-[11px] text-destructive">{errors.contato_telefone.message}</p>
-                )}
-              </div>
-            </div>
-
             <div className="space-y-1.5">
-              <Label htmlFor="contato_nome">Pessoa de contato</Label>
-              <Input id="contato_nome" {...register('contato_nome')} />
+              <Label htmlFor="documento" className="flex items-center justify-between">
+                <span>CPF ou CNPJ *</span>
+                {tipoAtual && <TipoBadge tipo={tipoAtual} />}
+              </Label>
+              <Input
+                id="documento"
+                value={documento}
+                onChange={(e) => setValue('documento', formatDocumento(e.target.value), { shouldValidate: true })}
+                placeholder="CPF ou CNPJ"
+                inputMode="numeric"
+              />
+              {errors.documento && (
+                <p className="text-[11px] text-destructive">{errors.documento.message}</p>
+              )}
             </div>
           </DialogBody>
           <DialogFooter>

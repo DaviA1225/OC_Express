@@ -5,7 +5,7 @@ import { z } from 'zod'
 import { Loader2, MapPin } from 'lucide-react'
 import { CrudListPage, useCrudListState, type ColumnDef } from '@/components/shared/CrudListPage'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
-import { useCrudList, useActiveCount, useUpsertRow, useToggleActive } from '@/features/crud/useCrudQueries'
+import { useCrudList, useActiveCount, useUpsertRow, useToggleActive, useDeleteRow } from '@/features/crud/useCrudQueries'
 import {
   Dialog,
   DialogContent,
@@ -18,9 +18,9 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
-import { isValidCnpj } from '@/lib/validators'
-import { formatCnpj } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 import type { Tables } from '@/types/database.types'
 
 type Row = Tables<'clientes'>
@@ -35,12 +35,13 @@ const numeroOpcional = z
   .optional()
   .refine((v) => !v || /^-?\d+([.,]\d+)?$/.test(v.trim()), 'Use apenas números')
 
+const numeroPositivoOpcional = z
+  .string()
+  .optional()
+  .refine((v) => !v || /^\d+([.,]\d+)?$/.test(v.trim()), 'Use apenas números')
+
 const schema = z.object({
   razao_social: z.string().min(2, 'Informe a razão social'),
-  cnpj: z
-    .string()
-    .optional()
-    .refine((v) => !v || isValidCnpj(v), 'CNPJ inválido'),
   endereco: z.string().optional(),
   cidade: z.string().optional(),
   uf: z.string().optional(),
@@ -50,9 +51,114 @@ const schema = z.object({
 })
 type FormValues = z.infer<typeof schema>
 
+const operacionalSchema = z.object({
+  frete_cacamba: numeroPositivoOpcional,
+  frete_graneleiro: numeroPositivoOpcional,
+  liberado: z.boolean(),
+  aceita_cacamba: z.boolean(),
+  aceita_graneleiro: z.boolean(),
+})
+type OperacionalValues = z.infer<typeof operacionalSchema>
+
 function cidadeUf(r: Row): string {
   if (r.cidade && r.uf) return `${r.cidade}/${r.uf}`
   return r.cidade ?? r.uf ?? '—'
+}
+
+function formatFrete(value: number | null): string {
+  if (value == null) return '—'
+  return value.toLocaleString('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }) + ' /t'
+}
+
+function FreteCell({ row }: { row: Row }) {
+  const items: { label: 'Caçamba' | 'Graneleiro'; value: number | null; className: string }[] = []
+  if (row.aceita_cacamba) {
+    items.push({
+      label: 'Caçamba',
+      value: row.frete_cacamba,
+      className: 'bg-amber-50 text-amber-800 border-amber-200',
+    })
+  }
+  if (row.aceita_graneleiro) {
+    items.push({
+      label: 'Graneleiro',
+      value: row.frete_graneleiro,
+      className: 'bg-sky-50 text-sky-800 border-sky-200',
+    })
+  }
+  if (items.length === 0) {
+    return <span className="text-[12px] text-muted-foreground">—</span>
+  }
+  return (
+    <div className="flex flex-col gap-1">
+      {items.map((it) => (
+        <span
+          key={it.label}
+          className={cn(
+            'inline-flex items-center justify-between gap-2 rounded-md border px-2 py-0.5 text-[11px] font-medium leading-tight',
+            it.className,
+          )}
+        >
+          <span>{it.label}</span>
+          <span className="tabular-nums">{formatFrete(it.value)}</span>
+        </span>
+      ))}
+    </div>
+  )
+}
+
+function CarretaBadge({ cacamba, graneleiro }: { cacamba: boolean; graneleiro: boolean }) {
+  let label: string
+  let className: string
+  if (cacamba && graneleiro) {
+    label = 'Caçamba + Graneleiro'
+    className = 'bg-indigo-100 text-indigo-800'
+  } else if (cacamba) {
+    label = 'Caçamba'
+    className = 'bg-amber-100 text-amber-800'
+  } else if (graneleiro) {
+    label = 'Graneleiro'
+    className = 'bg-sky-100 text-sky-800'
+  } else {
+    label = 'Não definido'
+    className = 'bg-slate-100 text-slate-600'
+  }
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium',
+        className,
+      )}
+    >
+      {label}
+    </span>
+  )
+}
+
+function StatusBadge({ liberado }: { liberado: boolean }) {
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium',
+        liberado
+          ? 'bg-emerald-100 text-emerald-800'
+          : 'bg-red-100 text-red-800',
+      )}
+    >
+      <span
+        className={cn(
+          'h-1.5 w-1.5 rounded-full',
+          liberado ? 'bg-emerald-500' : 'bg-red-500',
+        )}
+      />
+      {liberado ? 'Liberado' : 'Bloqueado'}
+    </span>
+  )
 }
 
 function MapaCell({ row }: { row: Row }) {
@@ -81,22 +187,65 @@ export default function ClientesPage() {
     showInactive: state.showInactive,
     page: state.page,
     pageSize: state.pageSize,
-    searchColumns: ['razao_social', 'cnpj', 'cidade'],
+    searchColumns: ['razao_social', 'cidade'],
     orderBy: 'razao_social',
     ascending: true,
   })
   const totalActive = useActiveCount('clientes')
   const upsert = useUpsertRow('clientes', 'Cliente')
   const toggle = useToggleActive('clientes', 'Cliente')
+  const remove = useDeleteRow('clientes', 'Cliente')
 
   const [editing, setEditing] = React.useState<Row | null>(null)
   const [open, setOpen] = React.useState(false)
   const [confirmRow, setConfirmRow] = React.useState<Row | null>(null)
+  const [deleteRow, setDeleteRow] = React.useState<Row | null>(null)
+  const [opRow, setOpRow] = React.useState<Row | null>(null)
+
+  const openOpDialog = (row: Row) => setOpRow(row)
 
   const columns: ColumnDef<Row>[] = [
     { header: 'Razão Social', accessor: (r) => r.razao_social },
-    { header: 'CNPJ', accessor: (r) => r.cnpj ?? '—', className: 'text-muted-foreground' },
     { header: 'Cidade/UF', accessor: cidadeUf, className: 'text-muted-foreground' },
+    {
+      header: 'Frete',
+      accessor: (r) => (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); openOpDialog(r) }}
+          className="rounded-sm p-1 text-left hover:bg-muted"
+          title="Definir frete por tipo"
+        >
+          <FreteCell row={r} />
+        </button>
+      ),
+    },
+    {
+      header: 'Status',
+      accessor: (r) => (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); openOpDialog(r) }}
+          className="rounded-full hover:opacity-80"
+          title="Alterar status de liberação"
+        >
+          <StatusBadge liberado={r.liberado} />
+        </button>
+      ),
+    },
+    {
+      header: 'Carreta',
+      accessor: (r) => (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); openOpDialog(r) }}
+          className="rounded-full hover:opacity-80"
+          title="Alterar tipos de carreta aceitos"
+        >
+          <CarretaBadge cacamba={r.aceita_cacamba} graneleiro={r.aceita_graneleiro} />
+        </button>
+      ),
+    },
     { header: 'Mapa', accessor: (r) => <MapaCell row={r} /> },
   ]
 
@@ -111,13 +260,14 @@ export default function ClientesPage() {
         totalActive={totalActive.data ?? 0}
         searchValue={state.search}
         onSearchChange={state.setSearch}
-        searchPlaceholder="Buscar por razão social, CNPJ ou cidade"
+        searchPlaceholder="Buscar por razão social ou cidade"
         showInactive={state.showInactive}
         onShowInactiveChange={state.setShowInactive}
         columns={columns}
         rowLabel={(r) => r.razao_social}
         onEdit={(r) => { setEditing(r); setOpen(true) }}
         onToggleActive={(r) => setConfirmRow(r)}
+        onDelete={(r) => setDeleteRow(r)}
         emptyTitle="Nenhum cliente cadastrado"
         emptyDescription="Cadastre os destinatários das cargas."
         page={state.page}
@@ -135,7 +285,6 @@ export default function ClientesPage() {
             id: editing?.id,
             values: {
               razao_social: values.razao_social,
-              cnpj: values.cnpj ? formatCnpj(values.cnpj) : null,
               endereco: values.endereco || null,
               cidade: values.cidade || null,
               uf: values.uf || null,
@@ -145,6 +294,25 @@ export default function ClientesPage() {
             },
           })
           setOpen(false)
+        }}
+      />
+
+      <OperacionalDialog
+        row={opRow}
+        onOpenChange={(o) => !o && setOpRow(null)}
+        onSubmit={async (values) => {
+          if (!opRow) return
+          await upsert.mutateAsync({
+            id: opRow.id,
+            values: {
+              frete_cacamba: values.frete_cacamba ? Number(values.frete_cacamba.replace(',', '.')) : null,
+              frete_graneleiro: values.frete_graneleiro ? Number(values.frete_graneleiro.replace(',', '.')) : null,
+              liberado: values.liberado,
+              aceita_cacamba: values.aceita_cacamba,
+              aceita_graneleiro: values.aceita_graneleiro,
+            },
+          })
+          setOpRow(null)
         }}
       />
 
@@ -161,6 +329,25 @@ export default function ClientesPage() {
           if (confirmRow) {
             await toggle.mutateAsync({ id: confirmRow.id, ativo: !confirmRow.ativo })
             setConfirmRow(null)
+          }
+        }}
+      />
+
+      <ConfirmDialog
+        open={!!deleteRow}
+        onOpenChange={(o) => !o && setDeleteRow(null)}
+        title="Excluir cliente?"
+        description={
+          deleteRow
+            ? `O cadastro de "${deleteRow.razao_social}" será removido permanentemente. Essa ação não pode ser desfeita. Se houver solicitações vinculadas, a exclusão será bloqueada.`
+            : ''
+        }
+        confirmLabel="Sim, excluir"
+        destructive
+        onConfirm={async () => {
+          if (deleteRow) {
+            await remove.mutateAsync({ id: deleteRow.id })
+            setDeleteRow(null)
           }
         }}
       />
@@ -189,7 +376,6 @@ function ClienteForm({ open, onOpenChange, editing, onSubmit }: FormProps) {
     if (open) {
       reset({
         razao_social: editing?.razao_social ?? '',
-        cnpj: editing?.cnpj ?? '',
         endereco: editing?.endereco ?? '',
         cidade: editing?.cidade ?? '',
         uf: editing?.uf ?? '',
@@ -200,7 +386,6 @@ function ClienteForm({ open, onOpenChange, editing, onSubmit }: FormProps) {
     }
   }, [open, editing, reset])
 
-  const cnpj = watch('cnpj') ?? ''
   const uf = watch('uf') ?? ''
 
   return (
@@ -210,7 +395,7 @@ function ClienteForm({ open, onOpenChange, editing, onSubmit }: FormProps) {
           <DialogHeader>
             <DialogTitle>{editing ? 'Editar cliente' : 'Novo cliente'}</DialogTitle>
             <DialogDescription>
-              Cadastre os destinatários das cargas. Latitude/longitude habilitam o link "Ver no mapa".
+              Cadastre os destinatários das cargas. Frete e liberação são definidos diretamente na lista.
             </DialogDescription>
           </DialogHeader>
           <DialogBody className="space-y-4">
@@ -222,23 +407,9 @@ function ClienteForm({ open, onOpenChange, editing, onSubmit }: FormProps) {
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="cnpj">CNPJ</Label>
-                <Input
-                  id="cnpj"
-                  value={cnpj}
-                  onChange={(e) => setValue('cnpj', formatCnpj(e.target.value), { shouldValidate: true })}
-                  placeholder="00.000.000/0000-00"
-                />
-                {errors.cnpj && (
-                  <p className="text-[11px] text-destructive">{errors.cnpj.message}</p>
-                )}
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="endereco">Endereço</Label>
-                <Input id="endereco" {...register('endereco')} />
-              </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="endereco">Endereço</Label>
+              <Input id="endereco" {...register('endereco')} />
             </div>
 
             <div className="grid grid-cols-[1fr_120px] gap-3">
@@ -281,6 +452,176 @@ function ClienteForm({ open, onOpenChange, editing, onSubmit }: FormProps) {
             <div className="space-y-1.5">
               <Label htmlFor="observacoes">Observações</Label>
               <Textarea id="observacoes" rows={2} {...register('observacoes')} />
+            </div>
+          </DialogBody>
+          <DialogFooter>
+            <span className="text-[11px] text-muted-foreground/80">
+              Enter para salvar · Esc para cancelar
+            </span>
+            <div className="flex items-center gap-2">
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                Salvar
+              </Button>
+            </div>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+interface OperacionalDialogProps {
+  row: Row | null
+  onOpenChange: (o: boolean) => void
+  onSubmit: (values: OperacionalValues) => Promise<void>
+}
+
+function OperacionalDialog({ row, onOpenChange, onSubmit }: OperacionalDialogProps) {
+  const {
+    register,
+    handleSubmit,
+    reset,
+    setValue,
+    watch,
+    formState: { errors, isSubmitting },
+  } = useForm<OperacionalValues>({ resolver: zodResolver(operacionalSchema) })
+
+  React.useEffect(() => {
+    if (row) {
+      reset({
+        frete_cacamba: row.frete_cacamba != null ? String(row.frete_cacamba).replace('.', ',') : '',
+        frete_graneleiro: row.frete_graneleiro != null ? String(row.frete_graneleiro).replace('.', ',') : '',
+        liberado: row.liberado,
+        aceita_cacamba: row.aceita_cacamba,
+        aceita_graneleiro: row.aceita_graneleiro,
+      })
+    }
+  }, [row, reset])
+
+  const liberado = watch('liberado') ?? true
+  const cacamba = watch('aceita_cacamba') ?? true
+  const graneleiro = watch('aceita_graneleiro') ?? true
+
+  return (
+    <Dialog open={!!row} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-[480px]">
+        <form onSubmit={handleSubmit(onSubmit)} noValidate>
+          <DialogHeader>
+            <DialogTitle>Configurações comerciais</DialogTitle>
+            <DialogDescription>
+              {row?.razao_social ?? ''}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogBody className="space-y-4">
+            <div className="space-y-1.5">
+              <Label className="text-[11px] uppercase tracking-[0.5px] text-muted-foreground">
+                Frete por tipo de carreta (R$ por tonelada)
+              </Label>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="frete_cacamba" className="flex items-center gap-1.5 text-[12px]">
+                    <span className="h-2 w-2 rounded-full bg-amber-500" />
+                    Caçamba
+                  </Label>
+                  <Input
+                    id="frete_cacamba"
+                    inputMode="decimal"
+                    autoFocus
+                    placeholder="Ex.: 120,50"
+                    disabled={!cacamba}
+                    {...register('frete_cacamba')}
+                  />
+                  {errors.frete_cacamba && (
+                    <p className="text-[11px] text-destructive">{errors.frete_cacamba.message}</p>
+                  )}
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="frete_graneleiro" className="flex items-center gap-1.5 text-[12px]">
+                    <span className="h-2 w-2 rounded-full bg-sky-500" />
+                    Graneleiro
+                  </Label>
+                  <Input
+                    id="frete_graneleiro"
+                    inputMode="decimal"
+                    placeholder="Ex.: 140,00"
+                    disabled={!graneleiro}
+                    {...register('frete_graneleiro')}
+                  />
+                  {errors.frete_graneleiro && (
+                    <p className="text-[11px] text-destructive">{errors.frete_graneleiro.message}</p>
+                  )}
+                </div>
+              </div>
+              {(!cacamba || !graneleiro) && (
+                <p className="text-[11px] text-muted-foreground">
+                  Tipos desligados ficam indisponíveis até serem reativados abaixo.
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-[11px] uppercase tracking-[0.5px] text-muted-foreground">
+                Status de liberação
+              </Label>
+              <div
+                className={cn(
+                  'flex h-10 items-center justify-between rounded-md border px-3',
+                  liberado ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200',
+                )}
+              >
+                <span
+                  className={cn(
+                    'inline-flex items-center gap-1.5 text-[13px] font-medium',
+                    liberado ? 'text-emerald-800' : 'text-red-800',
+                  )}
+                >
+                  <span
+                    className={cn(
+                      'h-1.5 w-1.5 rounded-full',
+                      liberado ? 'bg-emerald-500' : 'bg-red-500',
+                    )}
+                  />
+                  {liberado ? 'Liberado para receber carregamentos' : 'Bloqueado'}
+                </span>
+                <Switch
+                  checked={liberado}
+                  onCheckedChange={(v) => setValue('liberado', v, { shouldValidate: true })}
+                  aria-label="Alternar liberação"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-[11px] uppercase tracking-[0.5px] text-muted-foreground">
+                Tipos de carreta aceitos
+              </Label>
+              <div className="space-y-2">
+                <div className="flex h-10 items-center justify-between rounded-md border bg-background px-3">
+                  <span className="text-[13px] text-foreground">Caçamba</span>
+                  <Switch
+                    checked={cacamba}
+                    onCheckedChange={(v) => setValue('aceita_cacamba', v, { shouldValidate: true })}
+                    aria-label="Aceita caçamba"
+                  />
+                </div>
+                <div className="flex h-10 items-center justify-between rounded-md border bg-background px-3">
+                  <span className="text-[13px] text-foreground">Graneleiro</span>
+                  <Switch
+                    checked={graneleiro}
+                    onCheckedChange={(v) => setValue('aceita_graneleiro', v, { shouldValidate: true })}
+                    aria-label="Aceita graneleiro"
+                  />
+                </div>
+                {!cacamba && !graneleiro && (
+                  <p className="text-[11px] text-amber-700">
+                    Atenção: nenhum tipo selecionado — esse cliente não receberá carregamentos.
+                  </p>
+                )}
+              </div>
             </div>
           </DialogBody>
           <DialogFooter>

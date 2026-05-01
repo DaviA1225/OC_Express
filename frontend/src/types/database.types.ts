@@ -53,7 +53,8 @@ export interface Database {
         Row: {
           id: string
           razao_social: string
-          cnpj: string | null
+          documento: string | null
+          tipo_pessoa: 'PF' | 'PJ' | null
           contato_nome: string | null
           contato_telefone: string | null
           ativo: boolean
@@ -64,7 +65,8 @@ export interface Database {
         Insert: {
           id?: string
           razao_social: string
-          cnpj?: string | null
+          documento?: string | null
+          tipo_pessoa?: 'PF' | 'PJ' | null
           contato_nome?: string | null
           contato_telefone?: string | null
           ativo?: boolean
@@ -167,6 +169,12 @@ export interface Database {
           uf: string | null
           latitude: number | null
           longitude: number | null
+          frete_ton: number | null
+          frete_cacamba: number | null
+          frete_graneleiro: number | null
+          liberado: boolean
+          aceita_cacamba: boolean
+          aceita_graneleiro: boolean
           observacoes: string | null
           ativo: boolean
           created_at: string
@@ -182,6 +190,12 @@ export interface Database {
           uf?: string | null
           latitude?: number | null
           longitude?: number | null
+          frete_ton?: number | null
+          frete_cacamba?: number | null
+          frete_graneleiro?: number | null
+          liberado?: boolean
+          aceita_cacamba?: boolean
+          aceita_graneleiro?: boolean
           observacoes?: string | null
           ativo?: boolean
           created_at?: string

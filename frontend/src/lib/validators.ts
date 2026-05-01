@@ -43,6 +43,20 @@ export function isValidPlaca(input: string): boolean {
   return placaAntiga.test(placa) || placaMercosul.test(placa)
 }
 
+export function isValidDocumento(input: string): boolean {
+  const digits = input.replace(/\D/g, '')
+  if (digits.length === 11) return isValidCpf(input)
+  if (digits.length === 14) return isValidCnpj(input)
+  return false
+}
+
+export function tipoPessoa(input: string): 'PF' | 'PJ' | null {
+  const digits = input.replace(/\D/g, '')
+  if (digits.length === 11) return 'PF'
+  if (digits.length === 14) return 'PJ'
+  return null
+}
+
 export function isValidTelefone(input: string): boolean {
   const digits = input.replace(/\D/g, '')
   return digits.length === 10 || digits.length === 11

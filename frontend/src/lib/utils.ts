@@ -26,6 +26,12 @@ export function formatPlaca(value: string): string {
   return value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 7)
 }
 
+export function formatDocumento(value: string): string {
+  const digits = value.replace(/\D/g, '').slice(0, 14)
+  if (digits.length <= 11) return formatCpf(digits)
+  return formatCnpj(digits)
+}
+
 export function formatTelefone(value: string): string {
   const digits = value.replace(/\D/g, '').slice(0, 11)
   if (digits.length <= 10) {

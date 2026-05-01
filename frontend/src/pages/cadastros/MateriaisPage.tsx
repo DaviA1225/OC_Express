@@ -5,7 +5,7 @@ import { z } from 'zod'
 import { Loader2 } from 'lucide-react'
 import { CrudListPage, useCrudListState, type ColumnDef } from '@/components/shared/CrudListPage'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
-import { useCrudList, useActiveCount, useUpsertRow, useToggleActive } from '@/features/crud/useCrudQueries'
+import { useCrudList, useActiveCount, useUpsertRow, useToggleActive, useDeleteRow } from '@/features/crud/useCrudQueries'
 import {
   Dialog,
   DialogContent,
@@ -49,10 +49,12 @@ export default function MateriaisPage() {
   const totalActive = useActiveCount('materiais')
   const upsert = useUpsertRow('materiais', 'Material')
   const toggle = useToggleActive('materiais', 'Material')
+  const remove = useDeleteRow('materiais', 'Material')
 
   const [editing, setEditing] = React.useState<Row | null>(null)
   const [open, setOpen] = React.useState(false)
   const [confirmRow, setConfirmRow] = React.useState<Row | null>(null)
+  const [deleteRow, setDeleteRow] = React.useState<Row | null>(null)
 
   const columns: ColumnDef<Row>[] = [
     { header: 'Nome', accessor: (r) => r.nome },
@@ -79,6 +81,7 @@ export default function MateriaisPage() {
         rowLabel={(r) => r.nome}
         onEdit={(r) => { setEditing(r); setOpen(true) }}
         onToggleActive={(r) => setConfirmRow(r)}
+        onDelete={(r) => setDeleteRow(r)}
         emptyTitle="Nenhum material cadastrado"
         emptyDescription="Cadastre os materiais transportados (minério, pedra etc.)."
         page={state.page}
@@ -120,6 +123,25 @@ export default function MateriaisPage() {
           if (confirmRow) {
             await toggle.mutateAsync({ id: confirmRow.id, ativo: !confirmRow.ativo })
             setConfirmRow(null)
+          }
+        }}
+      />
+
+      <ConfirmDialog
+        open={!!deleteRow}
+        onOpenChange={(o) => !o && setDeleteRow(null)}
+        title="Excluir material?"
+        description={
+          deleteRow
+            ? `O cadastro de "${deleteRow.nome}" será removido permanentemente. Essa ação não pode ser desfeita. Se houver solicitações vinculadas, a exclusão será bloqueada.`
+            : ''
+        }
+        confirmLabel="Sim, excluir"
+        destructive
+        onConfirm={async () => {
+          if (deleteRow) {
+            await remove.mutateAsync({ id: deleteRow.id })
+            setDeleteRow(null)
           }
         }}
       />
