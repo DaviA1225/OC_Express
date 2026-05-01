@@ -4,6 +4,7 @@ import { toast } from 'sonner'
 import { SidebarContent } from './Sidebar'
 import { Header } from './Header'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
+import { NovaSolicitacaoProvider } from '@/features/solicitacoes/NovaSolicitacaoProvider'
 
 const PAGE_TITLES: Record<string, string> = {
   '/dashboard': 'Dashboard',
@@ -52,11 +53,6 @@ export function AppLayout() {
         toast.info('Busca global em desenvolvimento.')
         return
       }
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'n') {
-        e.preventDefault()
-        toast.info('Nova solicitação em desenvolvimento.')
-        return
-      }
       if (e.key === '/' && !isTyping) {
         const search = document.querySelector<HTMLInputElement>(
           '[data-page-search] input, input[data-page-search]',
@@ -97,7 +93,9 @@ export function AppLayout() {
           onOpenSearch={() => toast.info('Busca global em desenvolvimento.')}
         />
         <main className="flex-1 overflow-y-auto bg-muted/30 px-4 py-5 md:px-6 md:py-6">
-          <Outlet />
+          <NovaSolicitacaoProvider>
+            <Outlet />
+          </NovaSolicitacaoProvider>
         </main>
       </div>
     </div>

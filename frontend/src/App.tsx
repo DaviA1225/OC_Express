@@ -14,6 +14,8 @@ import CarretasPage from '@/pages/cadastros/CarretasPage'
 import ClientesPage from '@/pages/cadastros/ClientesPage'
 import MateriaisPage from '@/pages/cadastros/MateriaisPage'
 import UsuariosPage from '@/pages/cadastros/UsuariosPage'
+import { SolicitacoesListPage } from '@/pages/solicitacoes/SolicitacoesListPage'
+import { SolicitacaoDetailPage } from '@/pages/solicitacoes/SolicitacaoDetailPage'
 
 export default function App() {
   return (
@@ -26,10 +28,8 @@ export default function App() {
             <Route element={<AppLayout />}>
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
               <Route path="/dashboard" element={<DashboardPage />} />
-              <Route
-                path="/solicitacoes"
-                element={<PlaceholderPage title="Solicitações" description="Será construída na Fase 4." />}
-              />
+              <Route path="/solicitacoes" element={<SolicitacoesListPage />} />
+              <Route path="/solicitacoes/:id" element={<SolicitacaoDetailPage />} />
               <Route
                 path="/cargas-retorno"
                 element={<PlaceholderPage title="Cargas de Retorno" description="Será construída na Fase 6." />}
