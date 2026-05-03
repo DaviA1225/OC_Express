@@ -13,20 +13,22 @@ import type {
 type Solicitacao = Tables<'solicitacoes'>
 
 export interface SolicitacaoListRow extends Solicitacao {
-  motorista: { nome_completo: string } | null
-  veiculo: { placa: string } | null
+  motorista: { nome_completo: string; cpf: string | null } | null
+  veiculo: { placa: string; subcontratada_id: string | null } | null
   carreta: { placa: string } | null
-  cliente: { razao_social: string } | null
-  material: { nome: string } | null
+  subcontratada: { razao_social: string } | null
+  cliente: { razao_social: string; cidade: string | null; uf: string | null } | null
+  material: { nome: string; origem_padrao: string | null; observacoes_padrao: string | null } | null
 }
 
 const SELECT_WITH_JOINS = `
   *,
-  motorista:motorista_id ( nome_completo ),
-  veiculo:veiculo_id ( placa ),
+  motorista:motorista_id ( nome_completo, cpf ),
+  veiculo:veiculo_id ( placa, subcontratada_id ),
   carreta:carreta_id ( placa ),
-  cliente:cliente_id ( razao_social ),
-  material:material_id ( nome )
+  subcontratada:subcontratada_id ( razao_social ),
+  cliente:cliente_id ( razao_social, cidade, uf ),
+  material:material_id ( nome, origem_padrao, observacoes_padrao )
 `
 
 export type PeriodoFiltro = 'todos' | 'hoje' | '7d' | 'mes'

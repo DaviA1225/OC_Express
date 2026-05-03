@@ -1,7 +1,7 @@
 import * as React from 'react'
 
 interface EmptyStateProps {
-  icon: React.ComponentType<{ className?: string }>
+  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>
   title: string
   description?: string
   action?: React.ReactNode

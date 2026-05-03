@@ -29,13 +29,19 @@ import { QuickCreateMotorista } from '@/components/forms/QuickCreateMotorista'
 import { QuickCreateVeiculo } from '@/components/forms/QuickCreateVeiculo'
 import { QuickCreateCarreta } from '@/components/forms/QuickCreateCarreta'
 import { QuickCreateCliente } from '@/components/forms/QuickCreateCliente'
-import type { SolicitacaoTipo, Tables } from '@/types/database.types'
+import type { MaterialSubtipo, SolicitacaoTipo, Tables } from '@/types/database.types'
+import { isMineralMaterial } from '@/features/solicitacoes/material'
+import { useCargasRetorno } from '@/features/cargas-retorno/useCargasRetorno'
 
 type MotoristaOpt = Pick<Tables<'motoristas'>, 'id' | 'nome_completo' | 'cpf'>
-type VeiculoOpt = Pick<Tables<'veiculos'>, 'id' | 'placa' | 'tipo'>
+type VeiculoOpt = Pick<Tables<'veiculos'>, 'id' | 'placa' | 'tipo' | 'subcontratada_id'>
 type CarretaOpt = Pick<Tables<'carretas'>, 'id' | 'placa' | 'tipo'>
+type SubcontratadaOpt = Pick<Tables<'subcontratadas'>, 'id' | 'razao_social' | 'documento'>
 type ClienteOpt = Pick<Tables<'clientes'>, 'id' | 'razao_social' | 'cidade' | 'uf'>
-type MaterialOpt = Pick<Tables<'materiais'>, 'id' | 'nome' | 'filial'>
+type MaterialOpt = Pick<Tables<'materiais'>, 'id' | 'nome' | 'filial' | 'origem_padrao'>
+
+const SUBTIPOS: MaterialSubtipo[] = ['SINTER', 'HEMATITA', 'LUMP']
+const LOCAIS_CARREGAMENTO = ['TUPACERY', 'URUCUM'] as const
 
 const schema = z
   .object({
@@ -45,8 +51,12 @@ const schema = z
     motorista_id: z.string().min(1, 'Motorista é obrigatório'),
     veiculo_id: z.string().min(1, 'Cavalo é obrigatório'),
     carreta_id: z.string().nullable().optional(),
+    subcontratada_id: z.string().nullable().optional(),
     cliente_id: z.string().min(1, 'Cliente é obrigatório'),
-    material_id: z.string().min(1, 'Material é obrigatório'),
+    material_id: z.string().nullable().optional(),
+    material_subtipo: z.enum(['SINTER', 'HEMATITA', 'LUMP']).nullable().optional(),
+    local_carregamento: z.string().optional(),
+    carga_retorno_id: z.string().nullable().optional(),
     observacoes: z.string().optional(),
   })
   .superRefine((v, ctx) => {
@@ -55,15 +65,38 @@ const schema = z
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['solicitante_telefone'],
-          message: 'Telefone obrigatório para Carregamento',
+          message: 'Telefone obrigatório para Minério',
         })
       }
-    } else if (v.solicitante_telefone && !isValidTelefone(v.solicitante_telefone)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['solicitante_telefone'],
-        message: 'Telefone inválido',
-      })
+      if (!v.material_subtipo) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['material_subtipo'],
+          message: 'Selecione o tipo de minério',
+        })
+      }
+      if (!v.local_carregamento) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['local_carregamento'],
+          message: 'Selecione o local de carregamento',
+        })
+      }
+    } else {
+      if (v.solicitante_telefone && !isValidTelefone(v.solicitante_telefone)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['solicitante_telefone'],
+          message: 'Telefone inválido',
+        })
+      }
+      if (!v.carga_retorno_id) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['carga_retorno_id'],
+          message: 'Selecione a carga de retorno',
+        })
+      }
     }
   })
 
@@ -82,17 +115,21 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, onCreated }: Props) 
     table: 'motoristas', selectColumns: 'id, nome_completo, cpf', orderBy: 'nome_completo',
   })
   const veiculos = useCrudOptions<VeiculoOpt>({
-    table: 'veiculos', selectColumns: 'id, placa, tipo', orderBy: 'placa',
+    table: 'veiculos', selectColumns: 'id, placa, tipo, subcontratada_id', orderBy: 'placa',
   })
   const carretas = useCrudOptions<CarretaOpt>({
     table: 'carretas', selectColumns: 'id, placa, tipo', orderBy: 'placa',
+  })
+  const subcontratadas = useCrudOptions<SubcontratadaOpt>({
+    table: 'subcontratadas', selectColumns: 'id, razao_social, documento', orderBy: 'razao_social',
   })
   const clientes = useCrudOptions<ClienteOpt>({
     table: 'clientes', selectColumns: 'id, razao_social, cidade, uf', orderBy: 'razao_social',
   })
   const materiais = useCrudOptions<MaterialOpt>({
-    table: 'materiais', selectColumns: 'id, nome, filial', orderBy: 'nome',
+    table: 'materiais', selectColumns: 'id, nome, filial, origem_padrao', orderBy: 'nome',
   })
+  const cargasRetorno = useCargasRetorno()
 
   const {
     register,
@@ -112,8 +149,12 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, onCreated }: Props) 
         motorista_id: '',
         veiculo_id: '',
         carreta_id: null,
+        subcontratada_id: null,
         cliente_id: '',
-        material_id: '',
+        material_id: null,
+        material_subtipo: null,
+        local_carregamento: '',
+        carga_retorno_id: null,
         observacoes: '',
       })
     }
@@ -124,8 +165,44 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, onCreated }: Props) 
   const motoristaId = watch('motorista_id')
   const veiculoId = watch('veiculo_id')
   const carretaId = watch('carreta_id') ?? null
-  const clienteId = watch('cliente_id')
-  const materialId = watch('material_id')
+  const subcontratadaId = watch('subcontratada_id') ?? null
+  const materialSubtipo = watch('material_subtipo') ?? null
+  const localCarregamento = watch('local_carregamento') ?? ''
+  const cargaRetornoId = watch('carga_retorno_id') ?? null
+
+  const materialMinerio = React.useMemo(
+    () => (materiais.data ?? []).find((m) => isMineralMaterial(m.nome)) ?? null,
+    [materiais.data],
+  )
+
+  React.useEffect(() => {
+    if (tipo === 'carregamento' && materialMinerio) {
+      setValue('material_id', materialMinerio.id, { shouldValidate: false })
+    } else if (tipo === 'retorno') {
+      setValue('material_id', null, { shouldValidate: false })
+      setValue('material_subtipo', null, { shouldValidate: false })
+    }
+  }, [tipo, materialMinerio, setValue])
+
+  React.useEffect(() => {
+    if (tipo !== 'retorno') return
+    const carga = (cargasRetorno.data ?? []).find((c) => c.id === cargaRetornoId)
+    if (carga) {
+      setValue('cliente_id', carga.cliente_id, { shouldValidate: true })
+      setValue('local_carregamento', carga.local_carregamento, { shouldValidate: true })
+    }
+  }, [tipo, cargaRetornoId, cargasRetorno.data, setValue])
+
+  const veiculoSubAuto = React.useRef<string | null>(null)
+  React.useEffect(() => {
+    const veic = (veiculos.data ?? []).find((v) => v.id === veiculoId)
+    const auto = veic?.subcontratada_id ?? null
+    if (!auto) return
+    if (!subcontratadaId || subcontratadaId === veiculoSubAuto.current) {
+      setValue('subcontratada_id', auto, { shouldValidate: true })
+      veiculoSubAuto.current = auto
+    }
+  }, [veiculoId, veiculos.data, subcontratadaId, setValue])
 
   const [qcMot, setQcMot] = React.useState<{ open: boolean; nome: string }>({ open: false, nome: '' })
   const [qcVeic, setQcVeic] = React.useState<{ open: boolean; placa: string }>({ open: false, placa: '' })
@@ -141,13 +218,23 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, onCreated }: Props) 
   const carretaOptions: ComboboxOption[] = (carretas.data ?? []).map((c) => ({
     value: c.id, label: c.placa, hint: c.tipo ?? undefined,
   }))
+  const subcontratadaOptions: ComboboxOption[] = (subcontratadas.data ?? []).map((s) => ({
+    value: s.id, label: s.razao_social, hint: s.documento ?? undefined,
+  }))
   const clienteOptions: ComboboxOption[] = (clientes.data ?? []).map((c) => ({
     value: c.id,
     label: c.razao_social,
     hint: c.cidade && c.uf ? `${c.cidade}/${c.uf}` : c.cidade ?? c.uf ?? undefined,
   }))
+  const cargaRetornoOptions: ComboboxOption[] = (cargasRetorno.data ?? []).map((c) => ({
+    value: c.id,
+    label: c.cliente?.razao_social ?? '—',
+    hint: [c.local_carregamento, c.cliente?.cidade && c.cliente?.uf ? `${c.cliente.cidade}/${c.cliente.uf}` : null]
+      .filter(Boolean).join(' · '),
+  }))
 
   const onSubmit = async (values: FormValues) => {
+    const isMinerio = values.tipo === 'carregamento'
     const created = await create.mutateAsync({
       tipo: values.tipo as SolicitacaoTipo,
       solicitante_nome: values.solicitante_nome,
@@ -157,8 +244,11 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, onCreated }: Props) 
       motorista_id: values.motorista_id,
       veiculo_id: values.veiculo_id,
       carreta_id: values.carreta_id || null,
+      subcontratada_id: values.subcontratada_id || null,
       cliente_id: values.cliente_id,
-      material_id: values.material_id,
+      material_id: isMinerio ? values.material_id ?? null : null,
+      material_subtipo: isMinerio ? values.material_subtipo ?? null : null,
+      local_carregamento: values.local_carregamento || null,
       observacoes: values.observacoes || null,
     })
     if (created?.id) onCreated?.(created.id)
@@ -187,7 +277,7 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, onCreated }: Props) 
                   >
                     <label className="flex items-center gap-2 text-[13px]">
                       <RadioGroupItem value="carregamento" />
-                      Carregamento
+                      Minério
                     </label>
                     <label className="flex items-center gap-2 text-[13px]">
                       <RadioGroupItem value="retorno" />
@@ -271,48 +361,112 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, onCreated }: Props) 
                     />
                   </div>
                 </div>
+                <div className="space-y-1.5">
+                  <Label>Subcontratada</Label>
+                  <Combobox
+                    options={subcontratadaOptions}
+                    value={subcontratadaId}
+                    onChange={(v) => setValue('subcontratada_id', v, { shouldValidate: true })}
+                    placeholder="Pré-preenchida pelo cavalo"
+                    searchPlaceholder="Buscar subcontratada"
+                    emptyMessage="Nenhuma subcontratada encontrada."
+                    loading={subcontratadas.isLoading}
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    Por padrão usa a subcontratada do cavalo. Pode ser ajustada.
+                  </p>
+                </div>
               </Section>
 
-              <Section label="Destino e material">
-                <div className="space-y-1.5">
-                  <Label>Cliente *</Label>
-                  <Combobox
-                    options={clienteOptions}
-                    value={clienteId || null}
-                    onChange={(v) => setValue('cliente_id', v ?? '', { shouldValidate: true })}
-                    placeholder="Buscar cliente"
-                    searchPlaceholder="Buscar cliente"
-                    emptyMessage="Nenhum cliente encontrado."
-                    loading={clientes.isLoading}
-                    onCreateNew={(s) => setQcCli({ open: true, nome: s })}
-                    createNewLabel="Cadastrar novo cliente"
-                  />
-                  {errors.cliente_id && (
-                    <p className="text-[11px] text-destructive">{errors.cliente_id.message}</p>
-                  )}
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Material *</Label>
-                  <Select
-                    value={materialId || undefined}
-                    onValueChange={(v) => setValue('material_id', v, { shouldValidate: true })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecionar material" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(materiais.data ?? []).map((m) => (
-                        <SelectItem key={m.id} value={m.id}>
-                          {m.nome} <span className="text-muted-foreground">· {m.filial}</span>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {errors.material_id && (
-                    <p className="text-[11px] text-destructive">{errors.material_id.message}</p>
-                  )}
-                </div>
-              </Section>
+              {tipo === 'carregamento' ? (
+                <Section label="Destino e minério">
+                  <div className="space-y-1.5">
+                    <Label>Cliente *</Label>
+                    <Combobox
+                      options={clienteOptions}
+                      value={watch('cliente_id') || null}
+                      onChange={(v) => setValue('cliente_id', v ?? '', { shouldValidate: true })}
+                      placeholder="Buscar cliente"
+                      searchPlaceholder="Buscar cliente"
+                      emptyMessage="Nenhum cliente encontrado."
+                      loading={clientes.isLoading}
+                      onCreateNew={(s) => setQcCli({ open: true, nome: s })}
+                      createNewLabel="Cadastrar novo cliente"
+                    />
+                    {errors.cliente_id && (
+                      <p className="text-[11px] text-destructive">{errors.cliente_id.message}</p>
+                    )}
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Tipo de minério *</Label>
+                    <Select
+                      value={materialSubtipo ?? undefined}
+                      onValueChange={(v) => setValue('material_subtipo', v as MaterialSubtipo, { shouldValidate: true })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="SINTER · HEMATITA · LUMP" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {SUBTIPOS.map((s) => (
+                          <SelectItem key={s} value={s}>{s}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {errors.material_subtipo && (
+                      <p className="text-[11px] text-destructive">{errors.material_subtipo.message}</p>
+                    )}
+                    {!materialMinerio && (
+                      <p className="text-[11px] text-amber-700">
+                        Nenhum material "MINÉRIO" cadastrado — verifique o cadastro de materiais.
+                      </p>
+                    )}
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Local de carregamento *</Label>
+                    <Select
+                      value={localCarregamento || undefined}
+                      onValueChange={(v) => setValue('local_carregamento', v, { shouldValidate: true })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecionar local" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {LOCAIS_CARREGAMENTO.map((l) => (
+                          <SelectItem key={l} value={l}>{l}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {errors.local_carregamento && (
+                      <p className="text-[11px] text-destructive">{errors.local_carregamento.message}</p>
+                    )}
+                  </div>
+                </Section>
+              ) : (
+                <Section label="Carga de retorno">
+                  <div className="space-y-1.5">
+                    <Label>Carga de retorno *</Label>
+                    <Combobox
+                      options={cargaRetornoOptions}
+                      value={cargaRetornoId}
+                      onChange={(v) => setValue('carga_retorno_id', v, { shouldValidate: true })}
+                      placeholder="Buscar carga de retorno"
+                      searchPlaceholder="Buscar por cliente ou local"
+                      emptyMessage={
+                        cargasRetorno.isLoading
+                          ? 'Carregando…'
+                          : 'Nenhuma carga de retorno cadastrada. Cadastre na página "Cargas de Retorno".'
+                      }
+                      loading={cargasRetorno.isLoading}
+                    />
+                    {errors.carga_retorno_id && (
+                      <p className="text-[11px] text-destructive">{errors.carga_retorno_id.message}</p>
+                    )}
+                    <p className="text-[11px] text-muted-foreground">
+                      O cliente e o local de carregamento vêm da carga de retorno selecionada.
+                    </p>
+                  </div>
+                </Section>
+              )}
 
               <Section label="Observações">
                 <Textarea rows={2} {...register('observacoes')} placeholder="Opcional" />

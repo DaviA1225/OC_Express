@@ -19,9 +19,8 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     gap: 8,
   },
-  logo: { width: 80, height: 22, objectFit: 'contain' },
-  empresa: { fontSize: 18, fontFamily: 'Helvetica-Bold', textAlign: 'center' },
-  cnpjEmpresa: { fontSize: 9, textAlign: 'center', marginBottom: 8 },
+  logo: { width: 220, height: 60, objectFit: 'contain', alignSelf: 'center' },
+  cnpjEmpresa: { fontSize: 11, textAlign: 'center', marginTop: 2, marginBottom: 10 },
   titulo: {
     backgroundColor: LARANJA,
     color: 'white',
@@ -35,11 +34,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'flex-end',
     alignItems: 'center',
-    marginBottom: 6,
-    gap: 4,
+    marginBottom: 4,
+    gap: 3,
   },
-  numeroLabel: { fontFamily: 'Helvetica-Bold', fontSize: 12 },
-  numeroVal: { fontFamily: 'Helvetica-Bold', fontSize: 12 },
+  numeroLabel: { fontFamily: 'Helvetica', fontSize: 6, color: '#999999' },
+  numeroVal: { fontFamily: 'Helvetica-Bold', fontSize: 6, color: '#999999' },
   asterisco: { color: VERMELHO, fontFamily: 'Helvetica-Bold' },
 
   tabela: {
@@ -51,7 +50,7 @@ const styles = StyleSheet.create({
   linhaSemBorda: { flexDirection: 'row' },
   cellLabel: {
     backgroundColor: CINZA_CLARO,
-    paddingVertical: 5,
+    paddingVertical: 9,
     paddingHorizontal: 5,
     fontFamily: 'Helvetica-Bold',
     borderRightWidth: 0.5,
@@ -59,20 +58,34 @@ const styles = StyleSheet.create({
   },
   cellAst: {
     width: 14,
-    paddingVertical: 5,
+    paddingVertical: 9,
     textAlign: 'center',
     borderRightWidth: 0.5,
     borderRightColor: '#CCCCCC',
   },
   cellValor: {
-    paddingVertical: 5,
+    paddingVertical: 9,
     paddingHorizontal: 5,
     fontFamily: 'Helvetica-Bold',
   },
-  cellValorBordaDireita: {
-    paddingVertical: 5,
+  cellValorSm: {
+    paddingVertical: 9,
     paddingHorizontal: 5,
     fontFamily: 'Helvetica-Bold',
+    fontSize: 9,
+  },
+  cellValorBordaDireita: {
+    paddingVertical: 9,
+    paddingHorizontal: 5,
+    fontFamily: 'Helvetica-Bold',
+    borderRightWidth: 0.5,
+    borderRightColor: '#CCCCCC',
+  },
+  cellValorBordaDireitaSm: {
+    paddingVertical: 9,
+    paddingHorizontal: 5,
+    fontFamily: 'Helvetica-Bold',
+    fontSize: 9,
     borderRightWidth: 0.5,
     borderRightColor: '#CCCCCC',
   },
@@ -137,10 +150,19 @@ export interface OCData {
 }
 
 export function OCDocument({ data }: { data: OCData }) {
-  const linhas: { label: string; ast?: boolean; valor: string; rightLabel?: string; rightAst?: boolean; rightValor?: string }[] = [
+  const linhas: {
+    label: string
+    ast?: boolean
+    valor: string
+    valorSm?: boolean
+    rightLabel?: string
+    rightAst?: boolean
+    rightValor?: string
+    rightValorSm?: boolean
+  }[] = [
     { label: 'Filial', valor: data.filial },
     { label: 'Subcontratada', ast: true, valor: data.subcontratada ?? '' },
-    { label: 'Motorista', ast: true, valor: data.motorista },
+    { label: 'Motorista', ast: true, valor: data.motorista, valorSm: true },
     {
       label: 'Cavalo', ast: true, valor: data.cavalo_placa,
       rightLabel: 'Última Carreta', rightAst: true, rightValor: data.ultima_carreta ?? '',
@@ -151,7 +173,7 @@ export function OCDocument({ data }: { data: OCData }) {
     },
     {
       label: 'Instrução', valor: data.instrucao ?? '',
-      rightLabel: 'Descarga', rightValor: data.descarga ?? '',
+      rightLabel: 'Descarga', rightValor: data.descarga ?? '', rightValorSm: true,
     },
     { label: 'Material', valor: data.material },
     { label: 'Autorizado', valor: data.autorizado_por },
@@ -168,7 +190,6 @@ export function OCDocument({ data }: { data: OCData }) {
         <View style={styles.header}>
           <Image src={data.logoUrl} style={styles.logo} />
         </View>
-        <Text style={styles.empresa}>{data.empresa}</Text>
         <Text style={styles.cnpjEmpresa}>CNPJ {data.cnpj_filial}</Text>
 
         {/* Título */}
@@ -197,7 +218,13 @@ export function OCDocument({ data }: { data: OCData }) {
                 </View>
                 <View
                   style={[
-                    split ? styles.cellValorBordaDireita : styles.cellValor,
+                    split
+                      ? row.valorSm
+                        ? styles.cellValorBordaDireitaSm
+                        : styles.cellValorBordaDireita
+                      : row.valorSm
+                        ? styles.cellValorSm
+                        : styles.cellValor,
                     { width: split ? '29%' : '79%' },
                   ]}
                 >
@@ -211,7 +238,7 @@ export function OCDocument({ data }: { data: OCData }) {
                     <View style={styles.cellAst}>
                       <Text style={styles.asterisco}>{row.rightAst ? '*' : ''}</Text>
                     </View>
-                    <View style={[styles.cellValor, { width: '29%' }]}>
+                    <View style={[row.rightValorSm ? styles.cellValorSm : styles.cellValor, { width: '29%' }]}>
                       <Text>{row.rightValor || ' '}</Text>
                     </View>
                   </>

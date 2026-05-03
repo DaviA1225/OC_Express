@@ -30,7 +30,7 @@ export function useCrudList<TName extends CrudTableName>(
       let query = supabase.from(table).select(select, { count: 'exact' })
 
       if (!params.showInactive) {
-        query = query.eq('ativo', true)
+        query = query.eq('ativo' as never, true as never)
       }
       if (params.search.trim()) {
         const term = params.search.trim().replace(/[%_]/g, '\\$&')
@@ -59,7 +59,7 @@ export function useActiveCount<TName extends CrudTableName>(table: TName) {
       const { count, error } = await supabase
         .from(table)
         .select('id', { count: 'exact', head: true })
-        .eq('ativo', true)
+        .eq('ativo' as never, true as never)
       if (error) throw error
       return count ?? 0
     },
@@ -74,7 +74,7 @@ export function useUpsertRow<TName extends CrudTableName>(table: TName, friendly
         const { data, error } = await supabase
           .from(table)
           .update(input.values as never)
-          .eq('id', input.id)
+          .eq('id' as never, input.id as never)
           .select()
           .single()
         if (error) throw error
@@ -104,7 +104,7 @@ export function useDeleteRow<TName extends CrudTableName>(table: TName, friendly
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async ({ id }: { id: string }) => {
-      const { error } = await supabase.from(table).delete().eq('id', id)
+      const { error } = await supabase.from(table).delete().eq('id' as never, id as never)
       if (error) throw error
     },
     onSuccess: () => {
@@ -126,7 +126,7 @@ export function useToggleActive<TName extends CrudTableName>(table: TName, frien
       const { error } = await supabase
         .from(table)
         .update({ ativo } as never)
-        .eq('id', id)
+        .eq('id' as never, id as never)
       if (error) throw error
     },
     onSuccess: (_data, vars) => {

@@ -22,13 +22,18 @@ import { supabase } from '@/lib/supabase'
 import { GerarOCDialog } from '@/features/pdf-generator/GerarOCDialog'
 import { formatNumeroOC, formatTelefone } from '@/lib/utils'
 import { isValidTelefone } from '@/lib/validators'
-import type { Tables } from '@/types/database.types'
+import type { MaterialSubtipo, Tables } from '@/types/database.types'
+import { isMineralMaterial } from '@/features/solicitacoes/material'
 
 type MotoristaOpt = Pick<Tables<'motoristas'>, 'id' | 'nome_completo' | 'cpf'>
-type VeiculoOpt = Pick<Tables<'veiculos'>, 'id' | 'placa'>
+type VeiculoOpt = Pick<Tables<'veiculos'>, 'id' | 'placa' | 'subcontratada_id'>
 type CarretaOpt = Pick<Tables<'carretas'>, 'id' | 'placa'>
+type SubcontratadaOpt = Pick<Tables<'subcontratadas'>, 'id' | 'razao_social' | 'documento'>
 type ClienteOpt = Pick<Tables<'clientes'>, 'id' | 'razao_social'>
-type MaterialOpt = Pick<Tables<'materiais'>, 'id' | 'nome' | 'filial'>
+type MaterialOpt = Pick<Tables<'materiais'>, 'id' | 'nome' | 'filial' | 'origem_padrao'>
+
+const SUBTIPOS: MaterialSubtipo[] = ['SINTER', 'HEMATITA', 'LUMP']
+const LOCAIS_CARREGAMENTO = ['TUPACERY', 'URUCUM'] as const
 
 export function SolicitacaoDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -359,23 +364,39 @@ function MotoristaVeiculoCard({ solicitacao, editable, onSave }: CardProps) {
   const [motorista, setMotorista] = React.useState<string | null>(solicitacao.motorista_id)
   const [veiculo, setVeiculo] = React.useState<string | null>(solicitacao.veiculo_id)
   const [carreta, setCarreta] = React.useState<string | null>(solicitacao.carreta_id)
+  const [subcontratada, setSubcontratada] = React.useState<string | null>(solicitacao.subcontratada_id)
   const [saving, setSaving] = React.useState(false)
 
   const motoristas = useCrudOptions<MotoristaOpt>({ table: 'motoristas', selectColumns: 'id, nome_completo, cpf', orderBy: 'nome_completo' })
-  const veiculos = useCrudOptions<VeiculoOpt>({ table: 'veiculos', selectColumns: 'id, placa', orderBy: 'placa' })
+  const veiculos = useCrudOptions<VeiculoOpt>({ table: 'veiculos', selectColumns: 'id, placa, subcontratada_id', orderBy: 'placa' })
   const carretas = useCrudOptions<CarretaOpt>({ table: 'carretas', selectColumns: 'id, placa', orderBy: 'placa' })
+  const subcontratadas = useCrudOptions<SubcontratadaOpt>({ table: 'subcontratadas', selectColumns: 'id, razao_social, documento', orderBy: 'razao_social' })
 
   React.useEffect(() => {
     if (!editing) {
       setMotorista(solicitacao.motorista_id)
       setVeiculo(solicitacao.veiculo_id)
       setCarreta(solicitacao.carreta_id)
+      setSubcontratada(solicitacao.subcontratada_id)
     }
   }, [solicitacao, editing])
+
+  const veiculoSubAuto = React.useRef<string | null>(null)
+  React.useEffect(() => {
+    if (!editing) return
+    const veic = (veiculos.data ?? []).find((v) => v.id === veiculo)
+    const auto = veic?.subcontratada_id ?? null
+    if (!auto) return
+    if (!subcontratada || subcontratada === veiculoSubAuto.current) {
+      setSubcontratada(auto)
+      veiculoSubAuto.current = auto
+    }
+  }, [editing, veiculo, veiculos.data, subcontratada])
 
   const motOpts: ComboboxOption[] = (motoristas.data ?? []).map((m) => ({ value: m.id, label: m.nome_completo, hint: m.cpf }))
   const veicOpts: ComboboxOption[] = (veiculos.data ?? []).map((v) => ({ value: v.id, label: v.placa }))
   const carOpts: ComboboxOption[] = (carretas.data ?? []).map((c) => ({ value: c.id, label: c.placa }))
+  const subOpts: ComboboxOption[] = (subcontratadas.data ?? []).map((s) => ({ value: s.id, label: s.razao_social, hint: s.documento ?? undefined }))
 
   const submit = async () => {
     setSaving(true)
@@ -384,6 +405,7 @@ function MotoristaVeiculoCard({ solicitacao, editable, onSave }: CardProps) {
         motorista_id: motorista,
         veiculo_id: veiculo,
         carreta_id: carreta,
+        subcontratada_id: subcontratada,
       })
       setEditing(false)
     } finally { setSaving(false) }
@@ -392,8 +414,9 @@ function MotoristaVeiculoCard({ solicitacao, editable, onSave }: CardProps) {
   return (
     <CardShell title="Motorista e veículo" editable={editable} isEditing={editing} onEdit={() => setEditing(true)} onCancel={() => setEditing(false)}>
       {!editing ? (
-        <dl className="grid grid-cols-3 gap-x-4 gap-y-3 text-[13px]">
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-[13px]">
           <Field label="Motorista" value={solicitacao.motorista?.nome_completo} />
+          <Field label="Subcontratada" value={solicitacao.subcontratada?.razao_social} />
           <Field label="Cavalo" value={solicitacao.veiculo?.placa} />
           <Field label="Carreta" value={solicitacao.carreta?.placa} />
         </dl>
@@ -416,6 +439,12 @@ function MotoristaVeiculoCard({ solicitacao, editable, onSave }: CardProps) {
                 placeholder="Opcional" loading={carretas.isLoading} />
             </div>
           </div>
+          <div className="space-y-1.5">
+            <Label>Subcontratada</Label>
+            <Combobox options={subOpts} value={subcontratada} onChange={setSubcontratada}
+              placeholder="Pré-preenchida pelo cavalo" loading={subcontratadas.isLoading} />
+            <p className="text-[11px] text-muted-foreground">Por padrão usa a subcontratada do cavalo.</p>
+          </div>
           <div className="flex justify-end gap-2">
             <Button variant="outline" size="sm" onClick={() => setEditing(false)} disabled={saving}>Cancelar</Button>
             <Button size="sm" onClick={submit} disabled={saving}>
@@ -429,38 +458,95 @@ function MotoristaVeiculoCard({ solicitacao, editable, onSave }: CardProps) {
   )
 }
 
+function todayISO(): string {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+function addDaysISO(iso: string, days: number): string {
+  const [y, m, d] = iso.split('-').map(Number)
+  const dt = new Date(y, m - 1, d)
+  dt.setDate(dt.getDate() + days)
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`
+}
+function formatDateBR(iso: string): string {
+  const [y, m, d] = iso.split('-')
+  return `${d}/${m}/${y}`
+}
+
 function DestinoMaterialCard({ solicitacao, editable, onSave }: CardProps) {
   const [editing, setEditing] = React.useState(false)
   const [cliente, setCliente] = React.useState<string | null>(solicitacao.cliente_id)
   const [material, setMaterial] = React.useState<string>(solicitacao.material_id ?? '')
+  const [subtipo, setSubtipo] = React.useState<MaterialSubtipo | null>(solicitacao.material_subtipo)
+  const [localCarreg, setLocalCarreg] = React.useState<string>(solicitacao.local_carregamento ?? '')
+  const [valIni, setValIni] = React.useState<string>(solicitacao.validade_inicio ?? todayISO())
+  const [valFim, setValFim] = React.useState<string>(
+    solicitacao.validade_fim ?? addDaysISO(solicitacao.validade_inicio ?? todayISO(), 1),
+  )
   const [saving, setSaving] = React.useState(false)
 
   const clientes = useCrudOptions<ClienteOpt>({ table: 'clientes', selectColumns: 'id, razao_social', orderBy: 'razao_social' })
-  const materiais = useCrudOptions<MaterialOpt>({ table: 'materiais', selectColumns: 'id, nome, filial', orderBy: 'nome' })
+  const materiais = useCrudOptions<MaterialOpt>({ table: 'materiais', selectColumns: 'id, nome, filial, origem_padrao', orderBy: 'nome' })
 
   React.useEffect(() => {
     if (!editing) {
       setCliente(solicitacao.cliente_id)
       setMaterial(solicitacao.material_id ?? '')
+      setSubtipo(solicitacao.material_subtipo)
+      setLocalCarreg(solicitacao.local_carregamento ?? '')
+      setValIni(solicitacao.validade_inicio ?? todayISO())
+      setValFim(
+        solicitacao.validade_fim ?? addDaysISO(solicitacao.validade_inicio ?? todayISO(), 1),
+      )
     }
   }, [solicitacao, editing])
 
   const cliOpts: ComboboxOption[] = (clientes.data ?? []).map((c) => ({ value: c.id, label: c.razao_social }))
+  const materialAtual = (materiais.data ?? []).find((m) => m.id === material) ?? null
+  const exigeSubtipo = isMineralMaterial(materialAtual?.nome)
+
+  React.useEffect(() => {
+    if (!editing) return
+    if (!exigeSubtipo && subtipo) setSubtipo(null)
+  }, [editing, exigeSubtipo, subtipo])
+
+  const datasInvalidas = !valIni || !valFim || valFim < valIni
 
   const submit = async () => {
+    if (datasInvalidas) return
     setSaving(true)
     try {
-      await onSave({ cliente_id: cliente, material_id: material || null })
+      await onSave({
+        cliente_id: cliente,
+        material_id: material || null,
+        material_subtipo: exigeSubtipo ? subtipo : null,
+        local_carregamento: localCarreg || null,
+        validade_inicio: valIni,
+        validade_fim: valFim,
+      })
       setEditing(false)
     } finally { setSaving(false) }
   }
+
+  const materialDisplay = solicitacao.material?.nome
+    ? solicitacao.material_subtipo
+      ? `${solicitacao.material.nome} - ${solicitacao.material_subtipo}`
+      : solicitacao.material.nome
+    : null
+
+  const validadeDisplay =
+    solicitacao.validade_inicio && solicitacao.validade_fim
+      ? `${formatDateBR(solicitacao.validade_inicio)} a ${formatDateBR(solicitacao.validade_fim)}`
+      : null
 
   return (
     <CardShell title="Destino e material" editable={editable} isEditing={editing} onEdit={() => setEditing(true)} onCancel={() => setEditing(false)}>
       {!editing ? (
         <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-[13px]">
           <Field label="Cliente" value={solicitacao.cliente?.razao_social} />
-          <Field label="Material" value={solicitacao.material?.nome} />
+          <Field label="Material" value={materialDisplay} />
+          <Field label="Local de carregamento" value={solicitacao.local_carregamento ?? solicitacao.material?.origem_padrao ?? null} />
+          <Field label="Validade da OC" value={validadeDisplay} />
         </dl>
       ) : (
         <div className="space-y-3">
@@ -469,20 +555,70 @@ function DestinoMaterialCard({ solicitacao, editable, onSave }: CardProps) {
             <Combobox options={cliOpts} value={cliente} onChange={setCliente}
               placeholder="Selecionar cliente" loading={clientes.isLoading} />
           </div>
+          <div className={`grid gap-3 ${exigeSubtipo ? 'grid-cols-[1.4fr_1fr]' : 'grid-cols-1'}`}>
+            <div className="space-y-1.5">
+              <Label>Material</Label>
+              <Select value={material || undefined} onValueChange={setMaterial}>
+                <SelectTrigger><SelectValue placeholder="Selecionar material" /></SelectTrigger>
+                <SelectContent>
+                  {(materiais.data ?? []).map((m) => (
+                    <SelectItem key={m.id} value={m.id}>{m.nome} <span className="text-muted-foreground">· {m.filial}</span></SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {exigeSubtipo && (
+              <div className="space-y-1.5">
+                <Label>Tipo de minério</Label>
+                <Select value={subtipo ?? undefined} onValueChange={(v) => setSubtipo(v as MaterialSubtipo)}>
+                  <SelectTrigger><SelectValue placeholder="SINTER · HEMATITA · LUMP" /></SelectTrigger>
+                  <SelectContent>
+                    {SUBTIPOS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
           <div className="space-y-1.5">
-            <Label>Material</Label>
-            <Select value={material || undefined} onValueChange={setMaterial}>
-              <SelectTrigger><SelectValue placeholder="Selecionar material" /></SelectTrigger>
+            <Label>Local de carregamento</Label>
+            <Select value={localCarreg || undefined} onValueChange={setLocalCarreg}>
+              <SelectTrigger><SelectValue placeholder="Selecionar local" /></SelectTrigger>
               <SelectContent>
-                {(materiais.data ?? []).map((m) => (
-                  <SelectItem key={m.id} value={m.id}>{m.nome} <span className="text-muted-foreground">· {m.filial}</span></SelectItem>
-                ))}
+                {LOCAIS_CARREGAMENTO.map((l) => <SelectItem key={l} value={l}>{l}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="d-val-ini">Validade início</Label>
+              <Input
+                id="d-val-ini"
+                type="date"
+                value={valIni}
+                onChange={(e) => {
+                  const v = e.target.value
+                  setValIni(v)
+                  if (v && valFim && valFim < v) setValFim(addDaysISO(v, 1))
+                }}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="d-val-fim">Validade fim</Label>
+              <Input
+                id="d-val-fim"
+                type="date"
+                value={valFim}
+                min={valIni}
+                onChange={(e) => setValFim(e.target.value)}
+              />
+            </div>
+          </div>
+          {datasInvalidas && (
+            <p className="text-[11px] text-destructive">Validade fim deve ser igual ou posterior ao início.</p>
+          )}
           <div className="flex justify-end gap-2">
             <Button variant="outline" size="sm" onClick={() => setEditing(false)} disabled={saving}>Cancelar</Button>
-            <Button size="sm" onClick={submit} disabled={saving}>
+            <Button size="sm" onClick={submit} disabled={saving || datasInvalidas}>
               {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
               Salvar
             </Button>

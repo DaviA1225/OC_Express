@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { PDFViewer, pdf, BlobProvider } from '@react-pdf/renderer'
+import { pdf } from '@react-pdf/renderer'
 import { Loader2, Download } from 'lucide-react'
 import { toast } from 'sonner'
 import {
@@ -18,6 +18,7 @@ import { supabase } from '@/lib/supabase'
 import { useTransitStatus } from '@/features/solicitacoes/useSolicitacoes'
 import { traduzirErroBanco } from '@/features/crud/useCrudQueries'
 import { OCDocument, type OCData } from './OCDocument'
+import { LOGO_LHG_DATA_URL } from './logo'
 import type { SolicitacaoListRow } from '@/features/solicitacoes/useSolicitacoes'
 import type { Tables } from '@/types/database.types'
 
@@ -26,11 +27,9 @@ interface Props {
   onOpenChange: (o: boolean) => void
   solicitacao: SolicitacaoListRow
   material: Pick<Tables<'materiais'>, 'cnpj_filial' | 'filial' | 'origem_padrao' | 'observacoes_padrao'> | null
-  subcontratada?: string | null
 }
 
 const EMPRESA_NOME = 'OC EXPRESS TRANSPORTES'
-const LOGO_URL = `${window.location.origin}/Lhg-02.png`
 
 function pad4(n: number): string {
   return String(n).padStart(4, '0')
@@ -38,52 +37,134 @@ function pad4(n: number): string {
 function yyyymmdd(d: Date): string {
   return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`
 }
+function todayISO(): string {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+function addDaysISO(iso: string, days: number): string {
+  const [y, m, d] = iso.split('-').map(Number)
+  const dt = new Date(y, m - 1, d)
+  dt.setDate(dt.getDate() + days)
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`
+}
+function isoToDate(iso: string): Date {
+  const [y, m, d] = iso.split('-').map(Number)
+  return new Date(y, m - 1, d)
+}
 
-export function GerarOCDialog({ open, onOpenChange, solicitacao, material, subcontratada }: Props) {
+export function GerarOCDialog({ open, onOpenChange, solicitacao, material }: Props) {
   const { profile } = useAuth()
   const transit = useTransitStatus()
   const [confirmReplace, setConfirmReplace] = React.useState(false)
   const [saving, setSaving] = React.useState(false)
+  const [blob, setBlob] = React.useState<Blob | null>(null)
+  const [blobUrl, setBlobUrl] = React.useState<string | null>(null)
+  const [building, setBuilding] = React.useState(false)
 
-  const today = React.useMemo(() => new Date(), [])
-  const tomorrow = React.useMemo(() => {
-    const d = new Date()
-    d.setDate(d.getDate() + 1)
-    return d
-  }, [])
+  const validadeInicio = solicitacao.validade_inicio ?? todayISO()
+  const validadeFim = solicitacao.validade_fim ?? addDaysISO(validadeInicio, 1)
+
+  const motoristaNome = solicitacao.motorista?.nome_completo ?? ''
+  const motoristaCpf = solicitacao.motorista?.cpf ?? ''
+  const cavaloPlaca = solicitacao.veiculo?.placa ?? ''
+  const ultimaCarreta = solicitacao.carreta?.placa ?? ''
+  const subcontratadaNome = solicitacao.subcontratada?.razao_social ?? ''
+  const clienteRazao = solicitacao.cliente?.razao_social ?? ''
+  const clienteCidade = solicitacao.cliente?.cidade ?? ''
+  const clienteUf = solicitacao.cliente?.uf ?? ''
+  const materialNome = solicitacao.material?.nome ?? ''
+  const numeroInstrucao = solicitacao.numero_instrucao ?? ''
+  const localCarregamento = solicitacao.local_carregamento ?? material?.origem_padrao ?? ''
+  const subtipo = solicitacao.material_subtipo ?? null
+  const profileNome = profile?.nome_completo ?? ''
+  const matCnpj = material?.cnpj_filial ?? ''
+  const matFilial = material?.filial ?? ''
+  const matObs = material?.observacoes_padrao ?? ''
 
   const data: OCData | null = React.useMemo(() => {
     if (!material) return null
+    const cidadeUf = [clienteCidade, clienteUf].filter(Boolean).join('/')
+    const isMinerio = /MIN[ÉE]RIO/i.test(materialNome)
+    const materialFinal = subtipo
+      ? isMinerio
+        ? subtipo
+        : `${materialNome} - ${subtipo}`
+      : materialNome
+    const motoristaLinha = motoristaCpf
+      ? `${motoristaNome} — CPF ${motoristaCpf}`
+      : motoristaNome
     return {
       numero: pad4(solicitacao.numero_interno),
       empresa: EMPRESA_NOME,
-      cnpj_filial: material.cnpj_filial,
-      filial: material.filial,
-      subcontratada: subcontratada ?? null,
-      motorista: solicitacao.motorista?.nome_completo ?? '',
-      cavalo_placa: solicitacao.veiculo?.placa ?? '',
-      ultima_carreta: solicitacao.carreta?.placa ?? '',
-      carregamento: material.origem_padrao ?? '',
-      destino: solicitacao.cliente?.razao_social ?? '',
-      instrucao: solicitacao.numero_instrucao ?? '',
-      descarga: '',
-      material: solicitacao.material?.nome ?? '',
-      observacoes_padrao: material.observacoes_padrao ?? '',
-      autorizado_por: profile?.nome_completo ?? '',
-      validade_inicio: today,
-      validade_fim: tomorrow,
-      logoUrl: LOGO_URL,
+      cnpj_filial: matCnpj,
+      filial: matFilial,
+      subcontratada: subcontratadaNome || null,
+      motorista: motoristaLinha,
+      cavalo_placa: cavaloPlaca,
+      ultima_carreta: ultimaCarreta,
+      carregamento: localCarregamento,
+      destino: cidadeUf,
+      instrucao: numeroInstrucao,
+      descarga: clienteRazao,
+      material: materialFinal,
+      observacoes_padrao: matObs,
+      autorizado_por: profileNome,
+      validade_inicio: isoToDate(validadeInicio),
+      validade_fim: isoToDate(validadeFim),
+      logoUrl: LOGO_LHG_DATA_URL,
     }
-  }, [solicitacao, material, subcontratada, profile, today, tomorrow])
+  }, [
+    material, solicitacao.numero_interno, subcontratadaNome, motoristaNome, motoristaCpf,
+    cavaloPlaca, ultimaCarreta, clienteRazao, clienteCidade, clienteUf, materialNome,
+    subtipo, numeroInstrucao, localCarregamento, profileNome, matCnpj, matFilial, matObs,
+    validadeInicio, validadeFim,
+  ])
 
-  const filename = `OC_${pad4(solicitacao.numero_interno)}_${yyyymmdd(today)}.pdf`
+  React.useEffect(() => {
+    if (!open || !data) return
+    let cancelled = false
+    setBuilding(true)
+    pdf(<OCDocument data={data} />).toBlob().then((b) => {
+      if (cancelled) return
+      setBlob(b)
+      setBlobUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev)
+        return URL.createObjectURL(b)
+      })
+      setBuilding(false)
+    }).catch((err) => {
+      if (cancelled) return
+      setBuilding(false)
+      toast.error(traduzirErroBanco(err))
+    })
+    return () => { cancelled = true }
+  }, [open, data])
+
+  React.useEffect(() => {
+    if (!open) {
+      setBlob(null)
+      setBlobUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev)
+        return null
+      })
+    }
+  }, [open])
+
+  React.useEffect(() => {
+    return () => {
+      setBlobUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev)
+        return null
+      })
+    }
+  }, [])
+
+  const filename = `OC_${pad4(solicitacao.numero_interno)}_${yyyymmdd(new Date())}.pdf`
 
   const doSave = async () => {
-    if (!data) return
+    if (!blob) return
     setSaving(true)
     try {
-      const blob = await pdf(<OCDocument data={data} />).toBlob()
-
       const { error: upErr } = await supabase.storage
         .from('ocs-pdf')
         .upload(filename, blob, { contentType: 'application/pdf', upsert: true })
@@ -107,6 +188,7 @@ export function GerarOCDialog({ open, onOpenChange, solicitacao, material, subco
   }
 
   const handleConfirmar = () => {
+    if (!blob) return
     if (solicitacao.pdf_url) setConfirmReplace(true)
     else void doSave()
   }
@@ -140,13 +222,17 @@ export function GerarOCDialog({ open, onOpenChange, solicitacao, material, subco
             </DialogDescription>
           </DialogHeader>
           <DialogBody className="max-h-[70vh] p-0">
-            {data && (
-              <PDFViewer
-                showToolbar={false}
+            {blobUrl ? (
+              <iframe
+                src={blobUrl}
+                title="Pré-visualização da OC"
                 style={{ width: '100%', height: '70vh', border: 'none' }}
-              >
-                <OCDocument data={data} />
-              </PDFViewer>
+              />
+            ) : (
+              <div className="flex h-[70vh] items-center justify-center text-[13px] text-muted-foreground">
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Gerando pré-visualização…
+              </div>
             )}
           </DialogBody>
           <DialogFooter>
@@ -154,30 +240,24 @@ export function GerarOCDialog({ open, onOpenChange, solicitacao, material, subco
               Esc para fechar
             </span>
             <div className="flex items-center gap-2">
-              {data && (
-                <BlobProvider document={<OCDocument data={data} />}>
-                  {({ url, loading }) => (
-                    <Button
-                      asChild={!loading && !!url}
-                      variant="outline"
-                      disabled={loading || !url}
-                    >
-                      {loading || !url ? (
-                        <span>
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          Gerando…
-                        </span>
-                      ) : (
-                        <a href={url} download={filename}>
-                          <Download className="h-4 w-4" />
-                          Baixar PDF
-                        </a>
-                      )}
-                    </Button>
-                  )}
-                </BlobProvider>
-              )}
-              <Button onClick={handleConfirmar} disabled={saving}>
+              <Button
+                asChild={!!blobUrl}
+                variant="outline"
+                disabled={!blobUrl || building}
+              >
+                {blobUrl ? (
+                  <a href={blobUrl} download={filename}>
+                    <Download className="h-4 w-4" />
+                    Baixar PDF
+                  </a>
+                ) : (
+                  <span>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Gerando…
+                  </span>
+                )}
+              </Button>
+              <Button onClick={handleConfirmar} disabled={saving || !blob || building}>
                 {saving && <Loader2 className="h-4 w-4 animate-spin" />}
                 Confirmar e salvar
               </Button>

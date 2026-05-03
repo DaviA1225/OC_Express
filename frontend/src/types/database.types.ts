@@ -23,6 +23,8 @@ export type SolicitacaoStatus =
 
 export type SolicitacaoTipo = 'carregamento' | 'retorno'
 
+export type MaterialSubtipo = 'SINTER' | 'HEMATITA' | 'LUMP'
+
 export interface Database {
   public: {
     Tables: {
@@ -244,8 +246,13 @@ export interface Database {
           motorista_id: string | null
           veiculo_id: string | null
           carreta_id: string | null
+          subcontratada_id: string | null
           cliente_id: string | null
           material_id: string | null
+          material_subtipo: MaterialSubtipo | null
+          local_carregamento: string | null
+          validade_inicio: string | null
+          validade_fim: string | null
           numero_instrucao: string | null
           observacoes: string | null
           atendente_id: string | null
@@ -272,8 +279,13 @@ export interface Database {
           motorista_id?: string | null
           veiculo_id?: string | null
           carreta_id?: string | null
+          subcontratada_id?: string | null
           cliente_id?: string | null
           material_id?: string | null
+          material_subtipo?: MaterialSubtipo | null
+          local_carregamento?: string | null
+          validade_inicio?: string | null
+          validade_fim?: string | null
           numero_instrucao?: string | null
           observacoes?: string | null
           atendente_id?: string | null
@@ -291,6 +303,29 @@ export interface Database {
           created_by?: string | null
         }
         Update: Partial<Database['public']['Tables']['solicitacoes']['Insert']>
+      }
+      cargas_retorno: {
+        Row: {
+          id: string
+          cliente_id: string
+          local_carregamento: string
+          observacoes: string | null
+          ativo: boolean
+          created_at: string
+          updated_at: string
+          created_by: string | null
+        }
+        Insert: {
+          id?: string
+          cliente_id: string
+          local_carregamento: string
+          observacoes?: string | null
+          ativo?: boolean
+          created_at?: string
+          updated_at?: string
+          created_by?: string | null
+        }
+        Update: Partial<Database['public']['Tables']['cargas_retorno']['Insert']>
       }
       log_auditoria: {
         Row: {
