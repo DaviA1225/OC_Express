@@ -30,14 +30,15 @@ export function AppLayout() {
     return window.localStorage.getItem(COLLAPSED_KEY) === '1'
   })
   const [mobileOpen, setMobileOpen] = React.useState(false)
+  const [lastPath, setLastPath] = React.useState(location.pathname)
+  if (lastPath !== location.pathname) {
+    setLastPath(location.pathname)
+    if (mobileOpen) setMobileOpen(false)
+  }
 
   React.useEffect(() => {
     window.localStorage.setItem(COLLAPSED_KEY, collapsed ? '1' : '0')
   }, [collapsed])
-
-  React.useEffect(() => {
-    setMobileOpen(false)
-  }, [location.pathname])
 
   // Atalhos globais (SPEC-FRONTEND 1.2)
   React.useEffect(() => {

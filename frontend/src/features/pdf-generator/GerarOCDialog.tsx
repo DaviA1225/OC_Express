@@ -120,10 +120,23 @@ export function GerarOCDialog({ open, onOpenChange, solicitacao, material }: Pro
     validadeInicio, validadeFim,
   ])
 
+  const [lastTrigger, setLastTrigger] = React.useState<{ open: boolean; data: OCData | null }>({ open: false, data: null })
+  if (lastTrigger.open !== open || lastTrigger.data !== data) {
+    const wasOpen = lastTrigger.open
+    setLastTrigger({ open, data })
+    if (open && data && !building) setBuilding(true)
+    if (!open && wasOpen) {
+      if (blob) setBlob(null)
+      setBlobUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev)
+        return null
+      })
+    }
+  }
+
   React.useEffect(() => {
     if (!open || !data) return
     let cancelled = false
-    setBuilding(true)
     pdf(<OCDocument data={data} />).toBlob().then((b) => {
       if (cancelled) return
       setBlob(b)
@@ -139,16 +152,6 @@ export function GerarOCDialog({ open, onOpenChange, solicitacao, material }: Pro
     })
     return () => { cancelled = true }
   }, [open, data])
-
-  React.useEffect(() => {
-    if (!open) {
-      setBlob(null)
-      setBlobUrl((prev) => {
-        if (prev) URL.revokeObjectURL(prev)
-        return null
-      })
-    }
-  }, [open])
 
   React.useEffect(() => {
     return () => {

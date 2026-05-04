@@ -300,13 +300,15 @@ function SolicitanteCard({ solicitacao, editable, onSave }: CardProps) {
   const [saving, setSaving] = React.useState(false)
   const [erroTel, setErroTel] = React.useState<string | null>(null)
 
-  React.useEffect(() => {
+  const [lastSync, setLastSync] = React.useState({ solicitacao, editing })
+  if (lastSync.solicitacao !== solicitacao || lastSync.editing !== editing) {
+    setLastSync({ solicitacao, editing })
     if (!editing) {
       setNome(solicitacao.solicitante_nome ?? '')
       setTel(solicitacao.solicitante_telefone ?? '')
-      setErroTel(null)
+      if (erroTel !== null) setErroTel(null)
     }
-  }, [solicitacao, editing])
+  }
 
   const submit = async () => {
     if (tel && !isValidTelefone(tel)) { setErroTel('Telefone inválido'); return }
@@ -372,14 +374,16 @@ function MotoristaVeiculoCard({ solicitacao, editable, onSave }: CardProps) {
   const carretas = useCrudOptions<CarretaOpt>({ table: 'carretas', selectColumns: 'id, placa', orderBy: 'placa' })
   const subcontratadas = useCrudOptions<SubcontratadaOpt>({ table: 'subcontratadas', selectColumns: 'id, razao_social, documento', orderBy: 'razao_social' })
 
-  React.useEffect(() => {
+  const [lastTransporteSync, setLastTransporteSync] = React.useState({ solicitacao, editing })
+  if (lastTransporteSync.solicitacao !== solicitacao || lastTransporteSync.editing !== editing) {
+    setLastTransporteSync({ solicitacao, editing })
     if (!editing) {
       setMotorista(solicitacao.motorista_id)
       setVeiculo(solicitacao.veiculo_id)
       setCarreta(solicitacao.carreta_id)
       setSubcontratada(solicitacao.subcontratada_id)
     }
-  }, [solicitacao, editing])
+  }
 
   const veiculoSubAuto = React.useRef<string | null>(null)
   React.useEffect(() => {
@@ -488,7 +492,9 @@ function DestinoMaterialCard({ solicitacao, editable, onSave }: CardProps) {
   const clientes = useCrudOptions<ClienteOpt>({ table: 'clientes', selectColumns: 'id, razao_social', orderBy: 'razao_social' })
   const materiais = useCrudOptions<MaterialOpt>({ table: 'materiais', selectColumns: 'id, nome, filial, origem_padrao', orderBy: 'nome' })
 
-  React.useEffect(() => {
+  const [lastDestinoSync, setLastDestinoSync] = React.useState({ solicitacao, editing })
+  if (lastDestinoSync.solicitacao !== solicitacao || lastDestinoSync.editing !== editing) {
+    setLastDestinoSync({ solicitacao, editing })
     if (!editing) {
       setCliente(solicitacao.cliente_id)
       setMaterial(solicitacao.material_id ?? '')
@@ -499,16 +505,15 @@ function DestinoMaterialCard({ solicitacao, editable, onSave }: CardProps) {
         solicitacao.validade_fim ?? addDaysISO(solicitacao.validade_inicio ?? todayISO(), 1),
       )
     }
-  }, [solicitacao, editing])
+  }
 
   const cliOpts: ComboboxOption[] = (clientes.data ?? []).map((c) => ({ value: c.id, label: c.razao_social }))
   const materialAtual = (materiais.data ?? []).find((m) => m.id === material) ?? null
   const exigeSubtipo = isMineralMaterial(materialAtual?.nome)
 
-  React.useEffect(() => {
-    if (!editing) return
-    if (!exigeSubtipo && subtipo) setSubtipo(null)
-  }, [editing, exigeSubtipo, subtipo])
+  if (editing && !exigeSubtipo && subtipo) {
+    setSubtipo(null)
+  }
 
   const datasInvalidas = !valIni || !valFim || valFim < valIni
 
@@ -686,9 +691,11 @@ function ObservacoesCard({ solicitacao, editable, onSave }: CardProps) {
   const [valor, setValor] = React.useState(solicitacao.observacoes ?? '')
   const [saving, setSaving] = React.useState(false)
 
-  React.useEffect(() => {
+  const [lastObsSync, setLastObsSync] = React.useState({ solicitacao, editing })
+  if (lastObsSync.solicitacao !== solicitacao || lastObsSync.editing !== editing) {
+    setLastObsSync({ solicitacao, editing })
     if (!editing) setValor(solicitacao.observacoes ?? '')
-  }, [solicitacao, editing])
+  }
 
   return (
     <CardShell title="Observações" editable={editable} isEditing={editing} onEdit={() => setEditing(true)} onCancel={() => setEditing(false)}>

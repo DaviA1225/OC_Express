@@ -229,15 +229,21 @@ export function CrudListPage<T extends { id: string; ativo: boolean }>(props: Cr
   )
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useCrudListState(initialPageSize = 20) {
   const [search, setSearch] = React.useState('')
   const [showInactive, setShowInactive] = React.useState(false)
   const [page, setPage] = React.useState(1)
   const debouncedSearch = useDebounce(search, 300)
 
-  React.useEffect(() => {
-    setPage(1)
-  }, [debouncedSearch, showInactive])
+  const [lastFilters, setLastFilters] = React.useState({ debouncedSearch, showInactive })
+  if (
+    lastFilters.debouncedSearch !== debouncedSearch ||
+    lastFilters.showInactive !== showInactive
+  ) {
+    setLastFilters({ debouncedSearch, showInactive })
+    if (page !== 1) setPage(1)
+  }
 
   return {
     search,

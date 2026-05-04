@@ -115,12 +115,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth(): AuthContextValue {
   const ctx = React.useContext(AuthContext)
   if (!ctx) throw new Error('useAuth deve ser usado dentro de <AuthProvider>')
   return ctx
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function hasPerfil(profile: PerfilRow | null, ...allowed: PerfilUsuario[]): boolean {
   if (!profile || !profile.ativo) return false
   return allowed.includes(profile.perfil)

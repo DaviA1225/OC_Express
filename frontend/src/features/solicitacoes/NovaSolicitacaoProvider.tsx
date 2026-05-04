@@ -37,6 +37,7 @@ export function NovaSolicitacaoProvider({ children }: { children: React.ReactNod
   )
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useNovaSolicitacao(): Ctx {
   const ctx = React.useContext(NovaSolicitacaoContext)
   if (!ctx) throw new Error('useNovaSolicitacao deve ser usado dentro de <NovaSolicitacaoProvider>')

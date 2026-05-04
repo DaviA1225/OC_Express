@@ -44,7 +44,17 @@ export function SolicitacoesListPage() {
   const [page, setPage] = React.useState(1)
   const pageSize = 30
 
-  React.useEffect(() => { setPage(1) }, [debouncedSearch, statuses, periodo, materialId, tipo])
+  const [lastFilters, setLastFilters] = React.useState({ debouncedSearch, statuses, periodo, materialId, tipo })
+  if (
+    lastFilters.debouncedSearch !== debouncedSearch ||
+    lastFilters.statuses !== statuses ||
+    lastFilters.periodo !== periodo ||
+    lastFilters.materialId !== materialId ||
+    lastFilters.tipo !== tipo
+  ) {
+    setLastFilters({ debouncedSearch, statuses, periodo, materialId, tipo })
+    if (page !== 1) setPage(1)
+  }
 
   const filters: ListFilters = {
     search: debouncedSearch,
