@@ -1,4 +1,5 @@
 import * as React from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import {
@@ -83,15 +84,72 @@ function periodoToDesde(p: Periodo): string | null {
   }
 }
 
+const VALID_PERIODOS: Periodo[] = ['todos', 'hoje', '7d', '30d', 'mes']
+
 export default function AuditoriaPage() {
-  const [periodo, setPeriodo] = React.useState<Periodo>('7d')
-  const [acoes, setAcoes] = React.useState<AuditAcao[]>([])
-  const [tabelas, setTabelas] = React.useState<string[]>([])
-  const [usuarioIds, setUsuarioIds] = React.useState<string[]>([])
-  const [page, setPage] = React.useState(1)
+  const [params, setParams] = useSearchParams()
   const [openLog, setOpenLog] = React.useState<AuditLogRow | null>(null)
 
+  const periodo = (() => {
+    const raw = params.get('periodo')
+    return VALID_PERIODOS.includes(raw as Periodo) ? (raw as Periodo) : '7d'
+  })()
+  const acoes = React.useMemo<AuditAcao[]>(() => {
+    const raw = params.get('acoes')
+    if (!raw) return []
+    return raw.split(',').filter((a): a is AuditAcao => ACAO_OPTS.includes(a as AuditAcao))
+  }, [params])
+  const tabelas = React.useMemo<string[]>(() => {
+    const raw = params.get('tabelas')
+    if (!raw) return []
+    return raw.split(',').filter((t) => (TABELAS_AUDITADAS as readonly string[]).includes(t))
+  }, [params])
+  const usuarioIds = React.useMemo<string[]>(() => {
+    const raw = params.get('usuarios')
+    return raw ? raw.split(',') : []
+  }, [params])
+  const page = Math.max(1, Number(params.get('page')) || 1)
+
   const usuarios = useAuditUsuarios()
+
+  const updateParams = React.useCallback(
+    (mutate: (next: URLSearchParams) => void) => {
+      setParams(
+        (prev) => {
+          const next = new URLSearchParams(prev)
+          mutate(next)
+          return next
+        },
+        { replace: true },
+      )
+    },
+    [setParams],
+  )
+
+  const setPeriodo = (v: Periodo) =>
+    updateParams((n) => {
+      if (v !== '7d') n.set('periodo', v); else n.delete('periodo')
+      n.delete('page')
+    })
+  const setAcoes = (v: AuditAcao[]) =>
+    updateParams((n) => {
+      if (v.length > 0) n.set('acoes', v.join(',')); else n.delete('acoes')
+      n.delete('page')
+    })
+  const setTabelas = (v: string[]) =>
+    updateParams((n) => {
+      if (v.length > 0) n.set('tabelas', v.join(',')); else n.delete('tabelas')
+      n.delete('page')
+    })
+  const setUsuarioIds = (v: string[]) =>
+    updateParams((n) => {
+      if (v.length > 0) n.set('usuarios', v.join(',')); else n.delete('usuarios')
+      n.delete('page')
+    })
+  const setPage = (p: number) =>
+    updateParams((n) => {
+      if (p > 1) n.set('page', String(p)); else n.delete('page')
+    })
 
   const filters: AuditFilters = {
     acoes,
@@ -104,25 +162,17 @@ export default function AuditoriaPage() {
 
   const list = useAuditList(filters)
 
-  const [lastFilters, setLastFilters] = React.useState({ periodo, acoes, tabelas, usuarioIds })
-  if (
-    lastFilters.periodo !== periodo ||
-    lastFilters.acoes !== acoes ||
-    lastFilters.tabelas !== tabelas ||
-    lastFilters.usuarioIds !== usuarioIds
-  ) {
-    setLastFilters({ periodo, acoes, tabelas, usuarioIds })
-    if (page !== 1) setPage(1)
-  }
-
   const totalPages = Math.max(1, Math.ceil((list.data?.count ?? 0) / PAGE_SIZE))
-  const hasFilters = acoes.length > 0 || tabelas.length > 0 || usuarioIds.length > 0 || periodo !== 'todos'
+  const hasFilters = acoes.length > 0 || tabelas.length > 0 || usuarioIds.length > 0 || periodo !== '7d'
 
   const clearFilters = () => {
-    setAcoes([])
-    setTabelas([])
-    setUsuarioIds([])
-    setPeriodo('todos')
+    updateParams((n) => {
+      n.delete('acoes')
+      n.delete('tabelas')
+      n.delete('usuarios')
+      n.delete('periodo')
+      n.delete('page')
+    })
   }
 
   const toggleArr = <T,>(arr: T[], setArr: (v: T[]) => void, item: T) => {

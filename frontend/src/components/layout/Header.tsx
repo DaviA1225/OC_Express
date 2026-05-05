@@ -52,11 +52,21 @@ export function Header({ pageTitle, onOpenMobileMenu, onOpenSearch, realtimeStat
       )}
 
       <div className="flex flex-1 justify-center">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="sm:hidden"
+          onClick={onOpenSearch}
+          aria-label="Buscar (Ctrl+K)"
+        >
+          <Search className="h-5 w-5" />
+        </Button>
         <button
           type="button"
           onClick={onOpenSearch}
           className={cn(
-            'flex h-9 w-full max-w-md items-center gap-2 rounded-md border bg-muted/40 px-3 text-[13px] text-muted-foreground transition-colors hover:bg-muted',
+            'hidden h-9 w-full max-w-md items-center gap-2 rounded-md border bg-muted/40 px-3 text-[13px] text-muted-foreground transition-colors hover:bg-muted sm:flex',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
           )}
         >

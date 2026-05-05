@@ -32,7 +32,7 @@ const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        'fixed left-[50%] top-[50%] z-50 grid w-full max-w-[560px] translate-x-[-50%] translate-y-[-50%] gap-0 rounded-xl border bg-background shadow-overlay duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
+        'fixed left-[50%] top-[50%] z-50 grid w-[calc(100vw-1rem)] max-w-[560px] max-h-[calc(100vh-2rem)] translate-x-[-50%] translate-y-[-50%] gap-0 overflow-hidden rounded-xl border bg-background shadow-overlay duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
         className,
       )}
       {...props}
@@ -48,19 +48,25 @@ const DialogContent = React.forwardRef<
 DialogContent.displayName = DialogPrimitive.Content.displayName
 
 const DialogHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn('flex flex-col gap-1 px-5 py-4 border-b', className)} {...props} />
+  <div className={cn('flex flex-col gap-1 px-4 py-3 border-b sm:px-5 sm:py-4', className)} {...props} />
 )
 DialogHeader.displayName = 'DialogHeader'
 
 const DialogBody = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn('max-h-[460px] overflow-y-auto px-5 py-4', className)} {...props} />
+  <div
+    className={cn(
+      'max-h-[60vh] overflow-y-auto px-4 py-3 sm:max-h-[460px] sm:px-5 sm:py-4',
+      className,
+    )}
+    {...props}
+  />
 )
 DialogBody.displayName = 'DialogBody'
 
 const DialogFooter = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
   <div
     className={cn(
-      'flex items-center justify-between gap-2 border-t bg-muted px-5 py-3',
+      'flex flex-wrap items-center justify-between gap-2 border-t bg-muted px-4 py-3 sm:px-5',
       className,
     )}
     {...props}

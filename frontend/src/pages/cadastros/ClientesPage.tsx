@@ -1,4 +1,5 @@
 import * as React from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -163,15 +164,21 @@ const TIPO_FILTER: Record<TipoCliente, { cliente_minerio: boolean } | { cliente_
 export default function ClientesPage() {
   const { profile } = useAuth()
   const canEdit = canEditClientes(profile)
-  const [tipo, setTipo] = React.useState<TipoCliente>('minerio')
+  const [params, setParams] = useSearchParams()
+  const tipo: TipoCliente = params.get('tab') === 'retorno' ? 'retorno' : 'minerio'
+  const setTipo = (v: TipoCliente) =>
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        if (v === 'retorno') next.set('tab', 'retorno')
+        else next.delete('tab')
+        next.delete('page')
+        return next
+      },
+      { replace: true },
+    )
 
   const state = useCrudListState()
-
-  const [lastTipo, setLastTipo] = React.useState<TipoCliente>(tipo)
-  if (lastTipo !== tipo) {
-    setLastTipo(tipo)
-    if (state.page !== 1) state.setPage(1)
-  }
 
   const equals = TIPO_FILTER[tipo]
   const list = useCrudList('clientes', {

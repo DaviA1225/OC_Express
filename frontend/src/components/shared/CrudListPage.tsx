@@ -1,4 +1,5 @@
 import * as React from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Plus, Search as SearchIcon, ChevronLeft, ChevronRight, Inbox, Lock, Pencil, Power, Trash2 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -242,19 +243,49 @@ export function CrudListPage<T extends { id: string; ativo: boolean }>(props: Cr
 
 // eslint-disable-next-line react-refresh/only-export-components
 export function useCrudListState(initialPageSize = 20) {
-  const [search, setSearch] = React.useState('')
-  const [showInactive, setShowInactive] = React.useState(false)
-  const [page, setPage] = React.useState(1)
+  const [params, setParams] = useSearchParams()
+  const search = params.get('search') ?? ''
+  const showInactive = params.get('inactive') === '1'
+  const page = Math.max(1, Number(params.get('page')) || 1)
   const debouncedSearch = useDebounce(search, 300)
 
-  const [lastFilters, setLastFilters] = React.useState({ debouncedSearch, showInactive })
-  if (
-    lastFilters.debouncedSearch !== debouncedSearch ||
-    lastFilters.showInactive !== showInactive
-  ) {
-    setLastFilters({ debouncedSearch, showInactive })
-    if (page !== 1) setPage(1)
-  }
+  const setSearch = React.useCallback((v: string) => {
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        if (v) next.set('search', v)
+        else next.delete('search')
+        next.delete('page')
+        return next
+      },
+      { replace: true },
+    )
+  }, [setParams])
+
+  const setShowInactive = React.useCallback((v: boolean) => {
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        if (v) next.set('inactive', '1')
+        else next.delete('inactive')
+        next.delete('page')
+        return next
+      },
+      { replace: true },
+    )
+  }, [setParams])
+
+  const setPage = React.useCallback((p: number) => {
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        if (p > 1) next.set('page', String(p))
+        else next.delete('page')
+        return next
+      },
+      { replace: true },
+    )
+  }, [setParams])
 
   return {
     search,

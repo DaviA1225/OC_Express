@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Plus, Search as SearchIcon, Inbox, Eraser, ChevronLeft, ChevronRight } from 'lucide-react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -27,34 +27,79 @@ import type { SolicitacaoStatus, SolicitacaoTipo, Tables } from '@/types/databas
 
 type MaterialOpt = Pick<Tables<'materiais'>, 'id' | 'nome'>
 
-const STATUS_FILTER_OPTIONS: SolicitacaoStatus[] = [
+const VALID_PERIODOS: PeriodoFiltro[] = ['todos', 'hoje', '7d', 'mes']
+const VALID_TIPOS: (SolicitacaoTipo | 'todos')[] = ['todos', 'carregamento', 'retorno']
+const VALID_STATUSES: SolicitacaoStatus[] = [
   'recebida', 'em_cadastro', 'instrucao_emitida', 'oc_gerada', 'oc_enviada', 'finalizada', 'cancelada',
 ]
 
 export function SolicitacoesListPage() {
   const navigate = useNavigate()
   const { open: onNova } = useNovaSolicitacao()
+  const [params, setParams] = useSearchParams()
 
-  const [search, setSearch] = React.useState('')
+  const search = params.get('search') ?? ''
   const debouncedSearch = useDebounce(search, 300)
-  const [statuses, setStatuses] = React.useState<SolicitacaoStatus[]>([])
-  const [periodo, setPeriodo] = React.useState<PeriodoFiltro>('todos')
-  const [materialId, setMaterialId] = React.useState<string | null>(null)
-  const [tipo, setTipo] = React.useState<SolicitacaoTipo | 'todos'>('todos')
-  const [page, setPage] = React.useState(1)
+  const statuses = React.useMemo<SolicitacaoStatus[]>(() => {
+    const raw = params.get('status')
+    if (!raw) return []
+    return raw.split(',').filter((s): s is SolicitacaoStatus => VALID_STATUSES.includes(s as SolicitacaoStatus))
+  }, [params])
+  const periodo = (() => {
+    const raw = params.get('periodo')
+    return VALID_PERIODOS.includes(raw as PeriodoFiltro) ? (raw as PeriodoFiltro) : 'todos'
+  })()
+  const materialId = params.get('material') || null
+  const tipo = (() => {
+    const raw = params.get('tipo')
+    return VALID_TIPOS.includes(raw as SolicitacaoTipo | 'todos') ? (raw as SolicitacaoTipo | 'todos') : 'todos'
+  })()
+  const page = Math.max(1, Number(params.get('page')) || 1)
   const pageSize = 30
 
-  const [lastFilters, setLastFilters] = React.useState({ debouncedSearch, statuses, periodo, materialId, tipo })
-  if (
-    lastFilters.debouncedSearch !== debouncedSearch ||
-    lastFilters.statuses !== statuses ||
-    lastFilters.periodo !== periodo ||
-    lastFilters.materialId !== materialId ||
-    lastFilters.tipo !== tipo
-  ) {
-    setLastFilters({ debouncedSearch, statuses, periodo, materialId, tipo })
-    if (page !== 1) setPage(1)
-  }
+  const updateParams = React.useCallback(
+    (mutate: (next: URLSearchParams) => void) => {
+      setParams(
+        (prev) => {
+          const next = new URLSearchParams(prev)
+          mutate(next)
+          return next
+        },
+        { replace: true },
+      )
+    },
+    [setParams],
+  )
+
+  const setSearch = (v: string) =>
+    updateParams((n) => {
+      if (v) n.set('search', v); else n.delete('search')
+      n.delete('page')
+    })
+  const setStatuses = (v: SolicitacaoStatus[]) =>
+    updateParams((n) => {
+      if (v.length > 0) n.set('status', v.join(',')); else n.delete('status')
+      n.delete('page')
+    })
+  const setPeriodo = (v: PeriodoFiltro) =>
+    updateParams((n) => {
+      if (v !== 'todos') n.set('periodo', v); else n.delete('periodo')
+      n.delete('page')
+    })
+  const setMaterialId = (v: string | null) =>
+    updateParams((n) => {
+      if (v) n.set('material', v); else n.delete('material')
+      n.delete('page')
+    })
+  const setTipo = (v: SolicitacaoTipo | 'todos') =>
+    updateParams((n) => {
+      if (v !== 'todos') n.set('tipo', v); else n.delete('tipo')
+      n.delete('page')
+    })
+  const setPage = (p: number) =>
+    updateParams((n) => {
+      if (p > 1) n.set('page', String(p)); else n.delete('page')
+    })
 
   const filters: ListFilters = {
     search: debouncedSearch,
@@ -81,7 +126,7 @@ export function SolicitacoesListPage() {
   }
 
   const toggleStatus = (s: SolicitacaoStatus) => {
-    setStatuses((prev) => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s])
+    setStatuses(statuses.includes(s) ? statuses.filter((x) => x !== s) : [...statuses, s])
   }
 
   return (
@@ -146,7 +191,7 @@ export function SolicitacoesListPage() {
         </div>
 
         <div className="flex flex-wrap gap-1.5">
-          {STATUS_FILTER_OPTIONS.map((s) => {
+          {VALID_STATUSES.map((s) => {
             const active = statuses.includes(s)
             return (
               <button
