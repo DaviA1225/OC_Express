@@ -57,6 +57,8 @@ export function QuickCreateCliente({ open, onOpenChange, initialNome, onCreated 
         razao_social: values.razao_social,
         cidade: values.cidade || null,
         uf: values.uf || null,
+        cliente_minerio: true,
+        cliente_retorno: false,
       },
     })
     if (created) onCreated(created as Row)

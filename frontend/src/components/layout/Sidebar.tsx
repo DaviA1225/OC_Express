@@ -16,7 +16,8 @@ import {
   ChevronsRight,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { useAuth, hasPerfil } from '@/hooks/useAuth'
+import { useAuth } from '@/hooks/useAuth'
+import { canViewAuditoria, canViewUsuarios } from '@/features/auth/permissions'
 
 interface NavItem {
   to: string
@@ -51,8 +52,8 @@ interface SidebarProps {
 
 export function SidebarContent({ collapsed, onToggleCollapse, onNavigate, className }: SidebarProps) {
   const { profile } = useAuth()
-  const isAdmin = hasPerfil(profile, 'admin')
-  const isAdminOrSupervisor = hasPerfil(profile, 'admin', 'supervisor')
+  const showUsuarios = canViewUsuarios(profile)
+  const showAuditoria = canViewAuditoria(profile)
 
   return (
     <aside
@@ -102,18 +103,18 @@ export function SidebarContent({ collapsed, onToggleCollapse, onNavigate, classN
           ))}
         </ul>
 
-        {(isAdmin || isAdminOrSupervisor) && (
+        {(showUsuarios || showAuditoria) && (
           <>
             <SectionLabel collapsed={collapsed}>Sistema</SectionLabel>
             <ul className="space-y-0.5">
-              {isAdmin && (
+              {showUsuarios && (
                 <NavListItem
                   item={sistemaAdmin}
                   collapsed={collapsed}
                   onNavigate={onNavigate}
                 />
               )}
-              {isAdminOrSupervisor && (
+              {showAuditoria && (
                 <NavListItem
                   item={sistemaAuditoria}
                   collapsed={collapsed}

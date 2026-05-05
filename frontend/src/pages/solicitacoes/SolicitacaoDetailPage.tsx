@@ -19,7 +19,9 @@ import { canCancel, isEditable } from '@/features/solicitacoes/status'
 import { useCrudOptions } from '@/features/crud/useCrudOptions'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
-import { GerarOCDialog } from '@/features/pdf-generator/GerarOCDialog'
+const GerarOCDialog = React.lazy(() =>
+  import('@/features/pdf-generator/GerarOCDialog').then((m) => ({ default: m.GerarOCDialog })),
+)
 import { formatNumeroOC, formatTelefone } from '@/lib/utils'
 import { isValidTelefone } from '@/lib/validators'
 import type { MaterialSubtipo, Tables } from '@/types/database.types'
@@ -181,12 +183,16 @@ export function SolicitacaoDetailPage() {
         }}
       />
 
-      <GerarOCDialog
-        open={openGerarOC}
-        onOpenChange={setOpenGerarOC}
-        solicitacao={s}
-        material={materialDetalhe.data ?? null}
-      />
+      {openGerarOC && (
+        <React.Suspense fallback={null}>
+          <GerarOCDialog
+            open={openGerarOC}
+            onOpenChange={setOpenGerarOC}
+            solicitacao={s}
+            material={materialDetalhe.data ?? null}
+          />
+        </React.Suspense>
+      )}
     </div>
   )
 }

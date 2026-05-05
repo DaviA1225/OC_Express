@@ -47,9 +47,10 @@ type Row = Tables<'perfis_usuarios'>
 
 const PERFIS: { value: PerfilUsuario; label: string }[] = [
   { value: 'admin', label: 'Administrador' },
+  { value: 'gerente', label: 'Gerente' },
   { value: 'supervisor', label: 'Supervisor' },
-  { value: 'atendente', label: 'Atendente' },
-  { value: 'documentacao', label: 'Documentação' },
+  { value: 'analista', label: 'Analista' },
+  { value: 'assistente', label: 'Assistente' },
 ]
 
 const perfilLabel = (p: PerfilUsuario) => PERFIS.find((x) => x.value === p)?.label ?? p
@@ -59,13 +60,13 @@ const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}
 const schema = z.object({
   user_id: z.string().refine((v) => uuidRegex.test(v.trim()), 'UUID inválido'),
   nome_completo: z.string().min(2, 'Informe o nome completo'),
-  perfil: z.enum(['admin', 'supervisor', 'atendente', 'documentacao']),
+  perfil: z.enum(['admin', 'gerente', 'supervisor', 'analista', 'assistente']),
 })
 type FormValues = z.infer<typeof schema>
 
 const editSchema = z.object({
   nome_completo: z.string().min(2, 'Informe o nome completo'),
-  perfil: z.enum(['admin', 'supervisor', 'atendente', 'documentacao']),
+  perfil: z.enum(['admin', 'gerente', 'supervisor', 'analista', 'assistente']),
 })
 type EditFormValues = z.infer<typeof editSchema>
 
@@ -349,7 +350,7 @@ function UsuarioForm({ open, onOpenChange, editing, onCreate, onUpdate }: FormPr
         perfil: editing.perfil,
       })
     } else {
-      createForm.reset({ user_id: '', nome_completo: '', perfil: 'atendente' })
+      createForm.reset({ user_id: '', nome_completo: '', perfil: 'assistente' })
     }
   }, [open, editing, createForm, editForm])
 

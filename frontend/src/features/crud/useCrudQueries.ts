@@ -5,7 +5,7 @@ import type { Database, Tables, TablesInsert, TablesUpdate } from '@/types/datab
 
 type CrudTableName = keyof Pick<
   Database['public']['Tables'],
-  'subcontratadas' | 'motoristas' | 'veiculos' | 'carretas' | 'clientes' | 'materiais'
+  'subcontratadas' | 'motoristas' | 'veiculos' | 'carretas' | 'clientes' | 'materiais' | 'cargas_retorno'
 >
 
 interface ListParams {
@@ -17,6 +17,7 @@ interface ListParams {
   orderBy?: string
   ascending?: boolean
   selectColumns?: string
+  equals?: Record<string, string | number | boolean | null>
 }
 
 export function useCrudList<TName extends CrudTableName>(
@@ -31,6 +32,11 @@ export function useCrudList<TName extends CrudTableName>(
 
       if (!params.showInactive) {
         query = query.eq('ativo' as never, true as never)
+      }
+      if (params.equals) {
+        for (const [col, val] of Object.entries(params.equals)) {
+          query = query.eq(col as never, val as never)
+        }
       }
       if (params.search.trim()) {
         const term = params.search.trim().replace(/[%_]/g, '\\$&')
@@ -52,14 +58,23 @@ export function useCrudList<TName extends CrudTableName>(
   })
 }
 
-export function useActiveCount<TName extends CrudTableName>(table: TName) {
+export function useActiveCount<TName extends CrudTableName>(
+  table: TName,
+  equals?: Record<string, string | number | boolean | null>,
+) {
   return useQuery({
-    queryKey: ['crud-count-active', table],
+    queryKey: ['crud-count-active', table, equals],
     queryFn: async () => {
-      const { count, error } = await supabase
+      let q = supabase
         .from(table)
         .select('id', { count: 'exact', head: true })
         .eq('ativo' as never, true as never)
+      if (equals) {
+        for (const [col, val] of Object.entries(equals)) {
+          q = q.eq(col as never, val as never)
+        }
+      }
+      const { count, error } = await q
       if (error) throw error
       return count ?? 0
     },

@@ -109,9 +109,10 @@ export function Header({ pageTitle, onOpenMobileMenu, onOpenSearch }: HeaderProp
 function labelPerfil(p: string): string {
   switch (p) {
     case 'admin': return 'Administrador'
+    case 'gerente': return 'Gerente'
     case 'supervisor': return 'Supervisor'
-    case 'atendente': return 'Atendente'
-    case 'documentacao': return 'Documentação'
+    case 'analista': return 'Analista'
+    case 'assistente': return 'Assistente'
     default: return p
   }
 }

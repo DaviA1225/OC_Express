@@ -10,7 +10,7 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
-export type PerfilUsuario = 'admin' | 'supervisor' | 'atendente' | 'documentacao'
+export type PerfilUsuario = 'admin' | 'gerente' | 'supervisor' | 'analista' | 'assistente'
 
 export type SolicitacaoStatus =
   | 'recebida'
@@ -177,6 +177,8 @@ export interface Database {
           liberado: boolean
           aceita_cacamba: boolean
           aceita_graneleiro: boolean
+          cliente_minerio: boolean
+          cliente_retorno: boolean
           observacoes: string | null
           ativo: boolean
           created_at: string
@@ -198,6 +200,8 @@ export interface Database {
           liberado?: boolean
           aceita_cacamba?: boolean
           aceita_graneleiro?: boolean
+          cliente_minerio?: boolean
+          cliente_retorno?: boolean
           observacoes?: string | null
           ativo?: boolean
           created_at?: string

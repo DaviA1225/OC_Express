@@ -125,6 +125,7 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, onCreated }: Props) 
   })
   const clientes = useCrudOptions<ClienteOpt>({
     table: 'clientes', selectColumns: 'id, razao_social, cidade, uf', orderBy: 'razao_social',
+    equals: { cliente_minerio: true },
   })
   const materiais = useCrudOptions<MaterialOpt>({
     table: 'materiais', selectColumns: 'id, nome, filial, origem_padrao', orderBy: 'nome',

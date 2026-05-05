@@ -6,6 +6,8 @@ import { Loader2 } from 'lucide-react'
 import { CrudListPage, useCrudListState, type ColumnDef } from '@/components/shared/CrudListPage'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { useCrudList, useActiveCount, useUpsertRow, useToggleActive, useDeleteRow } from '@/features/crud/useCrudQueries'
+import { useAuth } from '@/hooks/useAuth'
+import { canEditMateriais } from '@/features/auth/permissions'
 import {
   Dialog,
   DialogContent,
@@ -36,6 +38,8 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>
 
 export default function MateriaisPage() {
+  const { profile } = useAuth()
+  const canEdit = canEditMateriais(profile)
   const state = useCrudListState()
   const list = useCrudList('materiais', {
     search: state.debouncedSearch,
@@ -67,8 +71,8 @@ export default function MateriaisPage() {
     <>
       <CrudListPage<Row>
         title="Materiais"
-        newButtonLabel="Novo material"
-        onNew={() => { setEditing(null); setOpen(true) }}
+        newButtonLabel={canEdit ? 'Novo material' : undefined}
+        onNew={canEdit ? () => { setEditing(null); setOpen(true) } : undefined}
         rows={list.data?.data}
         isLoading={list.isLoading}
         totalActive={totalActive.data ?? 0}
@@ -79,9 +83,9 @@ export default function MateriaisPage() {
         onShowInactiveChange={state.setShowInactive}
         columns={columns}
         rowLabel={(r) => r.nome}
-        onEdit={(r) => { setEditing(r); setOpen(true) }}
-        onToggleActive={(r) => setConfirmRow(r)}
-        onDelete={(r) => setDeleteRow(r)}
+        onEdit={canEdit ? (r) => { setEditing(r); setOpen(true) } : undefined}
+        onToggleActive={canEdit ? (r) => setConfirmRow(r) : undefined}
+        onDelete={canEdit ? (r) => setDeleteRow(r) : undefined}
         emptyTitle="Nenhum material cadastrado"
         emptyDescription="Cadastre os materiais transportados (minério, pedra etc.)."
         page={state.page}

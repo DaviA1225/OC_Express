@@ -6,6 +6,8 @@ import { Loader2, MapPin } from 'lucide-react'
 import { CrudListPage, useCrudListState, type ColumnDef } from '@/components/shared/CrudListPage'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { useCrudList, useActiveCount, useUpsertRow, useToggleActive, useDeleteRow } from '@/features/crud/useCrudQueries'
+import { useAuth } from '@/hooks/useAuth'
+import { canEditClientes } from '@/features/auth/permissions'
 import {
   Dialog,
   DialogContent,
@@ -24,6 +26,7 @@ import { cn } from '@/lib/utils'
 import type { Tables } from '@/types/database.types'
 
 type Row = Tables<'clientes'>
+type TipoCliente = 'minerio' | 'retorno'
 
 const UFS = [
   'AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR',
@@ -112,34 +115,6 @@ function FreteCell({ row }: { row: Row }) {
   )
 }
 
-function CarretaBadge({ cacamba, graneleiro }: { cacamba: boolean; graneleiro: boolean }) {
-  let label: string
-  let className: string
-  if (cacamba && graneleiro) {
-    label = 'Caçamba + Graneleiro'
-    className = 'bg-indigo-100 text-indigo-800'
-  } else if (cacamba) {
-    label = 'Caçamba'
-    className = 'bg-amber-100 text-amber-800'
-  } else if (graneleiro) {
-    label = 'Graneleiro'
-    className = 'bg-sky-100 text-sky-800'
-  } else {
-    label = 'Não definido'
-    className = 'bg-slate-100 text-slate-600'
-  }
-  return (
-    <span
-      className={cn(
-        'inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium',
-        className,
-      )}
-    >
-      {label}
-    </span>
-  )
-}
-
 function StatusBadge({ liberado }: { liberado: boolean }) {
   return (
     <span
@@ -180,8 +155,25 @@ function MapaCell({ row }: { row: Row }) {
   )
 }
 
+const TIPO_FILTER: Record<TipoCliente, { cliente_minerio: boolean } | { cliente_retorno: boolean }> = {
+  minerio: { cliente_minerio: true },
+  retorno: { cliente_retorno: true },
+}
+
 export default function ClientesPage() {
+  const { profile } = useAuth()
+  const canEdit = canEditClientes(profile)
+  const [tipo, setTipo] = React.useState<TipoCliente>('minerio')
+
   const state = useCrudListState()
+
+  const [lastTipo, setLastTipo] = React.useState<TipoCliente>(tipo)
+  if (lastTipo !== tipo) {
+    setLastTipo(tipo)
+    if (state.page !== 1) state.setPage(1)
+  }
+
+  const equals = TIPO_FILTER[tipo]
   const list = useCrudList('clientes', {
     search: state.debouncedSearch,
     showInactive: state.showInactive,
@@ -190,9 +182,10 @@ export default function ClientesPage() {
     searchColumns: ['razao_social', 'cidade'],
     orderBy: 'razao_social',
     ascending: true,
+    equals,
   })
-  const totalActive = useActiveCount('clientes')
-  const upsert = useUpsertRow('clientes', 'Cliente')
+  const totalActive = useActiveCount('clientes', equals)
+  const upsert = useUpsertRow('clientes', tipo === 'minerio' ? 'Cliente de minério' : 'Cliente de retorno')
   const toggle = useToggleActive('clientes', 'Cliente')
   const remove = useDeleteRow('clientes', 'Cliente')
 
@@ -202,84 +195,103 @@ export default function ClientesPage() {
   const [deleteRow, setDeleteRow] = React.useState<Row | null>(null)
   const [opRow, setOpRow] = React.useState<Row | null>(null)
 
-  const openOpDialog = (row: Row) => setOpRow(row)
+  const openOpDialog = (row: Row) => { if (canEdit) setOpRow(row) }
 
   const columns: ColumnDef<Row>[] = [
     { header: 'Razão Social', accessor: (r) => r.razao_social },
     { header: 'Cidade/UF', accessor: cidadeUf, className: 'text-muted-foreground' },
     {
       header: 'Frete',
-      accessor: (r) => (
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); openOpDialog(r) }}
-          className="rounded-sm p-1 text-left hover:bg-muted"
-          title="Definir frete por tipo"
-        >
-          <FreteCell row={r} />
-        </button>
-      ),
+      accessor: (r) =>
+        canEdit ? (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); openOpDialog(r) }}
+            className="rounded-sm p-1 text-left hover:bg-muted"
+            title="Definir frete por tipo"
+          >
+            <FreteCell row={r} />
+          </button>
+        ) : (
+          <div className="p-1"><FreteCell row={r} /></div>
+        ),
     },
     {
       header: 'Status',
-      accessor: (r) => (
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); openOpDialog(r) }}
-          className="rounded-full hover:opacity-80"
-          title="Alterar status de liberação"
-        >
+      accessor: (r) =>
+        canEdit ? (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); openOpDialog(r) }}
+            className="rounded-full hover:opacity-80"
+            title="Alterar status de liberação"
+          >
+            <StatusBadge liberado={r.liberado} />
+          </button>
+        ) : (
           <StatusBadge liberado={r.liberado} />
-        </button>
-      ),
+        ),
     },
     {
-      header: 'Carreta',
-      accessor: (r) => (
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); openOpDialog(r) }}
-          className="rounded-full hover:opacity-80"
-          title="Alterar tipos de carreta aceitos"
-        >
-          <CarretaBadge cacamba={r.aceita_cacamba} graneleiro={r.aceita_graneleiro} />
-        </button>
-      ),
+      header: 'Observações',
+      accessor: (r) =>
+        r.observacoes ? (
+          <span className="line-clamp-2 max-w-[260px] text-[12px]" title={r.observacoes}>
+            {r.observacoes}
+          </span>
+        ) : (
+          <span className="text-[12px] text-muted-foreground">—</span>
+        ),
+      className: 'text-muted-foreground',
     },
     { header: 'Mapa', accessor: (r) => <MapaCell row={r} /> },
   ]
 
+  const titulo = tipo === 'minerio' ? 'Clientes — Carga de Minério' : 'Clientes — Carga de Retorno'
+  const novoLabel = tipo === 'minerio' ? 'Novo cliente de minério' : 'Novo cliente de retorno'
+  const emptyTitle = tipo === 'minerio'
+    ? 'Nenhum cliente de minério cadastrado'
+    : 'Nenhum cliente de retorno cadastrado'
+  const emptyDescription = tipo === 'minerio'
+    ? 'Cadastre os destinatários das cargas de minério.'
+    : 'Cadastre os clientes das cargas de retorno (origens dos retornos).'
+
   return (
     <>
-      <CrudListPage<Row>
-        title="Clientes"
-        newButtonLabel="Novo cliente"
-        onNew={() => { setEditing(null); setOpen(true) }}
-        rows={list.data?.data}
-        isLoading={list.isLoading}
-        totalActive={totalActive.data ?? 0}
-        searchValue={state.search}
-        onSearchChange={state.setSearch}
-        searchPlaceholder="Buscar por razão social ou cidade"
-        showInactive={state.showInactive}
-        onShowInactiveChange={state.setShowInactive}
-        columns={columns}
-        rowLabel={(r) => r.razao_social}
-        onEdit={(r) => { setEditing(r); setOpen(true) }}
-        onToggleActive={(r) => setConfirmRow(r)}
-        onDelete={(r) => setDeleteRow(r)}
-        emptyTitle="Nenhum cliente cadastrado"
-        emptyDescription="Cadastre os destinatários das cargas."
-        page={state.page}
-        pageSize={state.pageSize}
-        totalCount={list.data?.count ?? 0}
-        onPageChange={state.setPage}
-      />
+      <div className="space-y-4">
+        <Tabs value={tipo} onChange={setTipo} />
+
+        <CrudListPage<Row>
+          title={titulo}
+          newButtonLabel={canEdit ? novoLabel : undefined}
+          onNew={canEdit ? () => { setEditing(null); setOpen(true) } : undefined}
+          rows={list.data?.data}
+          isLoading={list.isLoading}
+          totalActive={totalActive.data ?? 0}
+          searchValue={state.search}
+          onSearchChange={state.setSearch}
+          searchPlaceholder="Buscar por razão social ou cidade"
+          showInactive={state.showInactive}
+          onShowInactiveChange={state.setShowInactive}
+          columns={columns}
+          rowLabel={(r) => r.razao_social}
+          onEdit={canEdit ? (r) => { setEditing(r); setOpen(true) } : undefined}
+          onToggleActive={canEdit ? (r) => setConfirmRow(r) : undefined}
+          onDelete={canEdit ? (r) => setDeleteRow(r) : undefined}
+          emptyTitle={emptyTitle}
+          emptyDescription={emptyDescription}
+          page={state.page}
+          pageSize={state.pageSize}
+          totalCount={list.data?.count ?? 0}
+          onPageChange={state.setPage}
+        />
+      </div>
 
       <ClienteForm
         open={open}
         onOpenChange={setOpen}
         editing={editing}
+        tipo={tipo}
         onSubmit={async (values) => {
           await upsert.mutateAsync({
             id: editing?.id,
@@ -291,6 +303,11 @@ export default function ClientesPage() {
               latitude: values.latitude ? Number(values.latitude.replace(',', '.')) : null,
               longitude: values.longitude ? Number(values.longitude.replace(',', '.')) : null,
               observacoes: values.observacoes || null,
+              ...(editing
+                ? {}
+                : tipo === 'minerio'
+                  ? { cliente_minerio: true, cliente_retorno: false }
+                  : { cliente_minerio: false, cliente_retorno: true }),
             },
           })
           setOpen(false)
@@ -355,14 +372,52 @@ export default function ClientesPage() {
   )
 }
 
+interface TabsProps {
+  value: TipoCliente
+  onChange: (v: TipoCliente) => void
+}
+
+function Tabs({ value, onChange }: TabsProps) {
+  return (
+    <div className="inline-flex rounded-lg border bg-background p-1" role="tablist">
+      <TabButton active={value === 'minerio'} onClick={() => onChange('minerio')}>
+        Carga de Minério
+      </TabButton>
+      <TabButton active={value === 'retorno'} onClick={() => onChange('retorno')}>
+        Carga de Retorno
+      </TabButton>
+    </div>
+  )
+}
+
+function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      onClick={onClick}
+      className={cn(
+        'rounded-md px-3 py-1.5 text-[13px] font-medium transition-colors',
+        active
+          ? 'bg-primary text-primary-foreground shadow-sm'
+          : 'text-foreground/70 hover:bg-muted hover:text-foreground',
+      )}
+    >
+      {children}
+    </button>
+  )
+}
+
 interface FormProps {
   open: boolean
   onOpenChange: (o: boolean) => void
   editing: Row | null
+  tipo: TipoCliente
   onSubmit: (values: FormValues) => Promise<void>
 }
 
-function ClienteForm({ open, onOpenChange, editing, onSubmit }: FormProps) {
+function ClienteForm({ open, onOpenChange, editing, tipo, onSubmit }: FormProps) {
   const {
     register,
     handleSubmit,
@@ -388,15 +443,22 @@ function ClienteForm({ open, onOpenChange, editing, onSubmit }: FormProps) {
 
   const uf = watch('uf') ?? ''
 
+  const titulo = editing
+    ? 'Editar cliente'
+    : tipo === 'minerio'
+      ? 'Novo cliente de minério'
+      : 'Novo cliente de retorno'
+  const descricao = tipo === 'minerio'
+    ? 'Destinatários das cargas de minério. Frete e liberação são definidos diretamente na lista.'
+    : 'Clientes das cargas de retorno (origens dos retornos).'
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[640px]">
         <form onSubmit={handleSubmit(onSubmit)} noValidate>
           <DialogHeader>
-            <DialogTitle>{editing ? 'Editar cliente' : 'Novo cliente'}</DialogTitle>
-            <DialogDescription>
-              Cadastre os destinatários das cargas. Frete e liberação são definidos diretamente na lista.
-            </DialogDescription>
+            <DialogTitle>{titulo}</DialogTitle>
+            <DialogDescription>{descricao}</DialogDescription>
           </DialogHeader>
           <DialogBody className="space-y-4">
             <div className="space-y-1.5">

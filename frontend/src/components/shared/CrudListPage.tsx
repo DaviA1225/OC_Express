@@ -25,8 +25,8 @@ export interface ColumnDef<T> {
 
 export interface CrudListPageProps<T extends { id: string; ativo: boolean }> {
   title: string
-  newButtonLabel: string
-  onNew: () => void
+  newButtonLabel?: string
+  onNew?: () => void
   rows: T[] | undefined
   isLoading: boolean
   totalActive: number
@@ -37,8 +37,8 @@ export interface CrudListPageProps<T extends { id: string; ativo: boolean }> {
   onShowInactiveChange: (v: boolean) => void
   columns: ColumnDef<T>[]
   rowLabel?: (row: T) => string
-  onEdit: (row: T) => void
-  onToggleActive: (row: T) => void
+  onEdit?: (row: T) => void
+  onToggleActive?: (row: T) => void
   onDelete?: (row: T) => void
   emptyTitle?: string
   emptyDescription?: string
@@ -75,6 +75,7 @@ export function CrudListPage<T extends { id: string; ativo: boolean }>(props: Cr
   } = props
 
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize))
+  const hasActions = !!(onEdit || onToggleActive || onDelete)
 
   return (
     <div className="space-y-4">
@@ -85,10 +86,12 @@ export function CrudListPage<T extends { id: string; ativo: boolean }>(props: Cr
             {totalActive} {totalActive === 1 ? 'ativo' : 'ativos'}
           </p>
         </div>
-        <Button onClick={onNew}>
-          <Plus className="h-4 w-4" />
-          {newButtonLabel}
-        </Button>
+        {onNew && newButtonLabel && (
+          <Button onClick={onNew}>
+            <Plus className="h-4 w-4" />
+            {newButtonLabel}
+          </Button>
+        )}
       </div>
 
       <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-background p-3">
@@ -120,7 +123,9 @@ export function CrudListPage<T extends { id: string; ativo: boolean }>(props: Cr
               {columns.map((c, i) => (
                 <TableHead key={i} className={c.className}>{c.header}</TableHead>
               ))}
-              <TableHead className={cn(onDelete ? 'w-[150px]' : 'w-[110px]')}>Ações</TableHead>
+              {hasActions && (
+                <TableHead className={cn(onDelete ? 'w-[150px]' : 'w-[110px]')}>Ações</TableHead>
+              )}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -131,7 +136,7 @@ export function CrudListPage<T extends { id: string; ativo: boolean }>(props: Cr
                     {columns.map((_c, ci) => (
                       <TableCell key={ci}><Skeleton className="h-4 w-3/4" /></TableCell>
                     ))}
-                    <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                    {hasActions && <TableCell><Skeleton className="h-4 w-16" /></TableCell>}
                   </TableRow>
                 ))}
               </>
@@ -139,7 +144,7 @@ export function CrudListPage<T extends { id: string; ativo: boolean }>(props: Cr
 
             {!isLoading && rows && rows.length === 0 && (
               <TableRow>
-                <TableCell colSpan={columns.length + 1} className="py-0">
+                <TableCell colSpan={columns.length + (hasActions ? 1 : 0)} className="py-0">
                   <EmptyState
                     icon={Inbox}
                     title={emptyTitle}
@@ -159,39 +164,45 @@ export function CrudListPage<T extends { id: string; ativo: boolean }>(props: Cr
                     {c.accessor(row)}
                   </TableCell>
                 ))}
-                <TableCell>
-                  <div className="flex items-center justify-start gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => onEdit(row)}
-                      aria-label={`Editar ${rowLabel?.(row) ?? ''}`}
-                      title="Editar"
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => onToggleActive(row)}
-                      aria-label={row.ativo ? 'Desativar' : 'Reativar'}
-                      title={row.ativo ? 'Desativar' : 'Reativar'}
-                    >
-                      <Power className={cn('h-4 w-4', row.ativo ? 'text-foreground' : 'text-success')} />
-                    </Button>
-                    {onDelete && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => onDelete(row)}
-                        aria-label={`Excluir ${rowLabel?.(row) ?? ''}`}
-                        title="Excluir"
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    )}
-                  </div>
-                </TableCell>
+                {hasActions && (
+                  <TableCell>
+                    <div className="flex items-center justify-start gap-1">
+                      {onEdit && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => onEdit(row)}
+                          aria-label={`Editar ${rowLabel?.(row) ?? ''}`}
+                          title="Editar"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {onToggleActive && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => onToggleActive(row)}
+                          aria-label={row.ativo ? 'Desativar' : 'Reativar'}
+                          title={row.ativo ? 'Desativar' : 'Reativar'}
+                        >
+                          <Power className={cn('h-4 w-4', row.ativo ? 'text-foreground' : 'text-success')} />
+                        </Button>
+                      )}
+                      {onDelete && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => onDelete(row)}
+                          aria-label={`Excluir ${rowLabel?.(row) ?? ''}`}
+                          title="Excluir"
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      )}
+                    </div>
+                  </TableCell>
+                )}
               </TableRow>
             ))}
           </TableBody>
