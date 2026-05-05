@@ -27,6 +27,8 @@ interface Props {
   onOpenChange: (o: boolean) => void
   solicitacao: SolicitacaoListRow
   material: Pick<Tables<'materiais'>, 'cnpj_filial' | 'filial' | 'origem_padrao' | 'observacoes_padrao'> | null
+  /** Chamado após upload + transição de status terem sucesso. */
+  onSaved?: () => void
 }
 
 const EMPRESA_NOME = 'OC EXPRESS TRANSPORTES'
@@ -52,7 +54,7 @@ function isoToDate(iso: string): Date {
   return new Date(y, m - 1, d)
 }
 
-export function GerarOCDialog({ open, onOpenChange, solicitacao, material }: Props) {
+export function GerarOCDialog({ open, onOpenChange, solicitacao, material, onSaved }: Props) {
   const { profile } = useAuth()
   const transit = useTransitStatus()
   const [confirmReplace, setConfirmReplace] = React.useState(false)
@@ -181,8 +183,9 @@ export function GerarOCDialog({ open, onOpenChange, solicitacao, material }: Pro
         status: 'oc_gerada',
         extra: { pdf_url: pdfUrl },
       })
-      toast.success('OC salva no Storage e status atualizado')
       onOpenChange(false)
+      if (onSaved) onSaved()
+      else toast.success('OC salva no Storage e status atualizado')
     } catch (err) {
       toast.error(traduzirErroBanco(err))
     } finally {

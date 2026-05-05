@@ -11,14 +11,16 @@ import {
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
+import type { RealtimeStatus } from '@/features/realtime/useRealtimeSubscriptions'
 
 interface HeaderProps {
   pageTitle?: string
   onOpenMobileMenu: () => void
   onOpenSearch: () => void
+  realtimeStatus?: RealtimeStatus
 }
 
-export function Header({ pageTitle, onOpenMobileMenu, onOpenSearch }: HeaderProps) {
+export function Header({ pageTitle, onOpenMobileMenu, onOpenSearch, realtimeStatus = 'idle' }: HeaderProps) {
   const { profile, user, signOut } = useAuth()
   const navigate = useNavigate()
 
@@ -66,6 +68,8 @@ export function Header({ pageTitle, onOpenMobileMenu, onOpenSearch }: HeaderProp
         </button>
       </div>
 
+      <RealtimeIndicator status={realtimeStatus} />
+
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button
@@ -103,6 +107,25 @@ export function Header({ pageTitle, onOpenMobileMenu, onOpenSearch }: HeaderProp
         </DropdownMenuContent>
       </DropdownMenu>
     </header>
+  )
+}
+
+function RealtimeIndicator({ status }: { status: RealtimeStatus }) {
+  const config: Record<RealtimeStatus, { dot: string; label: string }> = {
+    idle: { dot: 'bg-slate-300', label: 'Aguardando…' },
+    connecting: { dot: 'bg-amber-400 animate-pulse', label: 'Conectando…' },
+    live: { dot: 'bg-emerald-500', label: 'Ao vivo · sincronizado entre usuários' },
+    error: { dot: 'bg-red-500', label: 'Sem conexão em tempo real' },
+  }
+  const c = config[status]
+  return (
+    <div
+      className="hidden items-center gap-1.5 rounded-full border bg-muted/40 px-2 py-1 text-[11px] text-muted-foreground sm:flex"
+      title={c.label}
+    >
+      <span className={cn('h-1.5 w-1.5 rounded-full', c.dot)} />
+      <span className="hidden md:inline">{status === 'live' ? 'Ao vivo' : c.label}</span>
+    </div>
   )
 }
 

@@ -13,7 +13,7 @@ import type {
 type Solicitacao = Tables<'solicitacoes'>
 
 export interface SolicitacaoListRow extends Solicitacao {
-  motorista: { nome_completo: string; cpf: string | null } | null
+  motorista: { nome_completo: string; cpf: string | null; telefone: string | null } | null
   veiculo: { placa: string; subcontratada_id: string | null } | null
   carreta: { placa: string } | null
   subcontratada: { razao_social: string } | null
@@ -23,7 +23,7 @@ export interface SolicitacaoListRow extends Solicitacao {
 
 const SELECT_WITH_JOINS = `
   *,
-  motorista:motorista_id ( nome_completo, cpf ),
+  motorista:motorista_id ( nome_completo, cpf, telefone ),
   veiculo:veiculo_id ( placa, subcontratada_id ),
   carreta:carreta_id ( placa ),
   subcontratada:subcontratada_id ( razao_social ),
@@ -151,10 +151,65 @@ export function useCreateSolicitacao() {
   })
 }
 
+interface SolicitacaoOptimisticContext {
+  previousDetail: [unknown, unknown] | null
+  previousLists: [unknown, unknown][]
+}
+
+async function snapshotAndPatchSolicitacao(
+  qc: ReturnType<typeof useQueryClient>,
+  id: string,
+  patch: Partial<SolicitacaoListRow>,
+): Promise<SolicitacaoOptimisticContext> {
+  await qc.cancelQueries({ queryKey: ['solicitacao', id] })
+  await qc.cancelQueries({ queryKey: ['solicitacoes'] })
+
+  const detailKey = ['solicitacao', id] as const
+  const previousDetailValue = qc.getQueryData(detailKey)
+  const previousDetail: [unknown, unknown] | null =
+    previousDetailValue !== undefined ? [detailKey, previousDetailValue] : null
+
+  qc.setQueryData<SolicitacaoListRow | undefined>(detailKey, (old) =>
+    old ? ({ ...old, ...patch } as SolicitacaoListRow) : old,
+  )
+
+  const previousLists = qc.getQueriesData({ queryKey: ['solicitacoes'] })
+  qc.setQueriesData<{ data: SolicitacaoListRow[]; count: number } | undefined>(
+    { queryKey: ['solicitacoes'] },
+    (old) => {
+      if (!old?.data) return old
+      return {
+        ...old,
+        data: old.data.map((row) => (row.id === id ? ({ ...row, ...patch } as SolicitacaoListRow) : row)),
+      }
+    },
+  )
+
+  return { previousDetail, previousLists }
+}
+
+function rollbackSolicitacao(
+  qc: ReturnType<typeof useQueryClient>,
+  ctx: SolicitacaoOptimisticContext | undefined,
+) {
+  if (!ctx) return
+  if (ctx.previousDetail) {
+    qc.setQueryData(ctx.previousDetail[0] as readonly unknown[], ctx.previousDetail[1])
+  }
+  for (const [key, value] of ctx.previousLists) {
+    qc.setQueryData(key as readonly unknown[], value)
+  }
+}
+
 export function useUpdateSolicitacao() {
   const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async ({ id, values }: { id: string; values: TablesUpdate<'solicitacoes'> }) => {
+  return useMutation<
+    SolicitacaoListRow,
+    unknown,
+    { id: string; values: TablesUpdate<'solicitacoes'> },
+    SolicitacaoOptimisticContext
+  >({
+    mutationFn: async ({ id, values }) => {
       const { data, error } = await supabase
         .from('solicitacoes')
         .update(values as never)
@@ -164,22 +219,28 @@ export function useUpdateSolicitacao() {
       if (error) throw error
       return data as unknown as SolicitacaoListRow
     },
-    onSuccess: (data) => {
-      qc.invalidateQueries({ queryKey: ['solicitacoes'] })
-      qc.invalidateQueries({ queryKey: ['solicitacao', data.id] })
+    onMutate: ({ id, values }) =>
+      snapshotAndPatchSolicitacao(qc, id, values as Partial<SolicitacaoListRow>),
+    onError: (e, _vars, ctx) => {
+      rollbackSolicitacao(qc, ctx)
+      toast.error(traduzirErroBanco(e))
     },
-    onError: (e: unknown) => toast.error(traduzirErroBanco(e)),
+    onSettled: (_data, _err, vars) => {
+      qc.invalidateQueries({ queryKey: ['solicitacoes'] })
+      qc.invalidateQueries({ queryKey: ['solicitacao', vars.id] })
+    },
   })
 }
 
 export function useTransitStatus() {
   const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async ({ id, status, extra }: {
-      id: string
-      status: SolicitacaoStatus
-      extra?: Partial<TablesUpdate<'solicitacoes'>>
-    }) => {
+  return useMutation<
+    { id: string; status: SolicitacaoStatus },
+    unknown,
+    { id: string; status: SolicitacaoStatus; extra?: Partial<TablesUpdate<'solicitacoes'>> },
+    SolicitacaoOptimisticContext
+  >({
+    mutationFn: async ({ id, status, extra }) => {
       const { error } = await supabase
         .from('solicitacoes')
         .update({ status, ...(extra ?? {}) } as never)
@@ -187,11 +248,18 @@ export function useTransitStatus() {
       if (error) throw error
       return { id, status }
     },
-    onSuccess: ({ id }) => {
-      qc.invalidateQueries({ queryKey: ['solicitacoes'] })
-      qc.invalidateQueries({ queryKey: ['solicitacao', id] })
+    onMutate: ({ id, status, extra }) =>
+      snapshotAndPatchSolicitacao(qc, id, { status, ...(extra ?? {}) } as Partial<SolicitacaoListRow>),
+    onError: (e, _vars, ctx) => {
+      rollbackSolicitacao(qc, ctx)
+      toast.error(traduzirErroBanco(e))
+    },
+    onSuccess: () => {
       toast.success('Status atualizado')
     },
-    onError: (e: unknown) => toast.error(traduzirErroBanco(e)),
+    onSettled: (_data, _err, vars) => {
+      qc.invalidateQueries({ queryKey: ['solicitacoes'] })
+      qc.invalidateQueries({ queryKey: ['solicitacao', vars.id] })
+    },
   })
 }

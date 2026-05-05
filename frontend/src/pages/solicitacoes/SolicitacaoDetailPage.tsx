@@ -3,6 +3,7 @@ import { useNavigate, useParams, Link } from 'react-router-dom'
 import { ArrowLeft, ChevronRight, Loader2, Pencil, X } from 'lucide-react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -21,6 +22,9 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 const GerarOCDialog = React.lazy(() =>
   import('@/features/pdf-generator/GerarOCDialog').then((m) => ({ default: m.GerarOCDialog })),
+)
+const WhatsAppEnvioDialog = React.lazy(() =>
+  import('@/features/whatsapp/WhatsAppEnvioDialog').then((m) => ({ default: m.WhatsAppEnvioDialog })),
 )
 import { formatNumeroOC, formatTelefone } from '@/lib/utils'
 import { isValidTelefone } from '@/lib/validators'
@@ -48,6 +52,7 @@ export function SolicitacaoDetailPage() {
   const [instrInput, setInstrInput] = React.useState('')
   const [showInstrForm, setShowInstrForm] = React.useState(false)
   const [openGerarOC, setOpenGerarOC] = React.useState(false)
+  const [openWhats, setOpenWhats] = React.useState(false)
 
   const materialDetalhe = useQuery({
     enabled: !!detail.data?.material_id,
@@ -127,6 +132,7 @@ export function SolicitacaoDetailPage() {
               if (id) transit.mutate({ id, status: 'em_cadastro' })
             }}
             onGerarOC={() => setOpenGerarOC(true)}
+            onEnviarWhats={() => setOpenWhats(true)}
             disabled={transit.isPending}
           />
           {canCancel(s.status) && (
@@ -190,6 +196,24 @@ export function SolicitacaoDetailPage() {
             onOpenChange={setOpenGerarOC}
             solicitacao={s}
             material={materialDetalhe.data ?? null}
+            onSaved={() => {
+              toast.success('OC salva no Storage', {
+                action: {
+                  label: 'Enviar WhatsApp',
+                  onClick: () => setOpenWhats(true),
+                },
+              })
+            }}
+          />
+        </React.Suspense>
+      )}
+
+      {openWhats && (
+        <React.Suspense fallback={null}>
+          <WhatsAppEnvioDialog
+            open={openWhats}
+            onOpenChange={setOpenWhats}
+            solicitacao={s}
           />
         </React.Suspense>
       )}
@@ -204,10 +228,11 @@ interface ActionsProps {
   onAdvanceFinalizar: () => void
   onMarcarEmCadastro: () => void
   onGerarOC: () => void
+  onEnviarWhats: () => void
   disabled: boolean
 }
 
-function StatusActions({ status, hasInstrucao, onAdvanceInstrucao, onAdvanceFinalizar, onMarcarEmCadastro, onGerarOC, disabled }: ActionsProps) {
+function StatusActions({ status, hasInstrucao, onAdvanceInstrucao, onAdvanceFinalizar, onMarcarEmCadastro, onGerarOC, onEnviarWhats, disabled }: ActionsProps) {
   if (status === 'recebida') {
     return (
       <Button size="sm" variant="outline" onClick={onMarcarEmCadastro} disabled={disabled}>
@@ -240,7 +265,7 @@ function StatusActions({ status, hasInstrucao, onAdvanceInstrucao, onAdvanceFina
         <Button size="sm" variant="outline" onClick={onGerarOC} disabled={disabled}>
           Regerar OC
         </Button>
-        <Button size="sm" disabled title="Envio WhatsApp: Fase 6">
+        <Button size="sm" onClick={onEnviarWhats} disabled={disabled}>
           Enviar WhatsApp
         </Button>
       </div>
@@ -248,9 +273,14 @@ function StatusActions({ status, hasInstrucao, onAdvanceInstrucao, onAdvanceFina
   }
   if (status === 'oc_enviada') {
     return (
-      <Button size="sm" variant="outline" onClick={onAdvanceFinalizar} disabled={disabled}>
-        Finalizar
-      </Button>
+      <div className="flex items-center gap-2">
+        <Button size="sm" variant="outline" onClick={onEnviarWhats} disabled={disabled}>
+          Reenviar WhatsApp
+        </Button>
+        <Button size="sm" onClick={onAdvanceFinalizar} disabled={disabled}>
+          Finalizar
+        </Button>
+      </div>
     )
   }
   if (!hasInstrucao && status !== 'cancelada' && status !== 'finalizada') {

@@ -134,24 +134,60 @@ export function useDeleteRow<TName extends CrudTableName>(table: TName, friendly
   })
 }
 
+interface ToggleContext {
+  previousLists: [unknown, unknown][]
+  previousCount: [unknown, unknown][]
+}
+
 export function useToggleActive<TName extends CrudTableName>(table: TName, friendlyName: string) {
   const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async ({ id, ativo }: { id: string; ativo: boolean }) => {
+  return useMutation<void, unknown, { id: string; ativo: boolean }, ToggleContext>({
+    mutationFn: async ({ id, ativo }) => {
       const { error } = await supabase
         .from(table)
         .update({ ativo } as never)
         .eq('id' as never, id as never)
       if (error) throw error
     },
+    onMutate: async ({ id, ativo }) => {
+      await qc.cancelQueries({ queryKey: ['crud', table] })
+      await qc.cancelQueries({ queryKey: ['crud-count-active', table] })
+
+      const previousLists = qc.getQueriesData({ queryKey: ['crud', table] })
+      const previousCount = qc.getQueriesData({ queryKey: ['crud-count-active', table] })
+
+      qc.setQueriesData<{ data: { id: string; ativo: boolean }[]; count: number } | undefined>(
+        { queryKey: ['crud', table] },
+        (old) => {
+          if (!old?.data) return old
+          return { ...old, data: old.data.map((row) => row.id === id ? { ...row, ativo } : row) }
+        },
+      )
+      qc.setQueriesData<number | undefined>(
+        { queryKey: ['crud-count-active', table] },
+        (old) => (typeof old === 'number' ? old + (ativo ? 1 : -1) : old),
+      )
+
+      return { previousLists, previousCount }
+    },
+    onError: (error, _vars, ctx) => {
+      if (ctx) {
+        for (const [key, value] of ctx.previousLists) {
+          qc.setQueryData(key as readonly unknown[], value)
+        }
+        for (const [key, value] of ctx.previousCount) {
+          qc.setQueryData(key as readonly unknown[], value)
+        }
+      }
+      toast.error(traduzirErroBanco(error))
+    },
     onSuccess: (_data, vars) => {
+      toast.success(vars.ativo ? `${friendlyName} reativado` : `${friendlyName} desativado`)
+    },
+    onSettled: () => {
       qc.invalidateQueries({ queryKey: ['crud', table] })
       qc.invalidateQueries({ queryKey: ['crud-count-active', table] })
       qc.invalidateQueries({ queryKey: ['crud-options', table] })
-      toast.success(vars.ativo ? `${friendlyName} reativado` : `${friendlyName} desativado`)
-    },
-    onError: (error: unknown) => {
-      toast.error(traduzirErroBanco(error))
     },
   })
 }

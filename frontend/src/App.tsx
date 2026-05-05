@@ -7,7 +7,6 @@ import { PerfilRoute } from '@/components/shared/PerfilRoute'
 import { AppLayout } from '@/components/layout/AppLayout'
 import LoginPage from '@/pages/auth/LoginPage'
 import DashboardPage from '@/pages/dashboard/DashboardPage'
-import PlaceholderPage from '@/pages/shared/PlaceholderPage'
 
 const SubcontratadasPage = lazy(() => import('@/pages/cadastros/SubcontratadasPage'))
 const MotoristasPage = lazy(() => import('@/pages/cadastros/MotoristasPage'))
@@ -24,6 +23,7 @@ const SolicitacaoDetailPage = lazy(() =>
 )
 const CargasRetornoPage = lazy(() => import('@/pages/cargas-retorno/CargasRetornoPage'))
 const AuditoriaPage = lazy(() => import('@/pages/auditoria/AuditoriaPage'))
+const PerfilPage = lazy(() => import('@/pages/perfil/PerfilPage'))
 
 function PageFallback() {
   return (
@@ -63,10 +63,7 @@ export default function App() {
                   <Route path="/auditoria" element={<AuditoriaPage />} />
                 </Route>
 
-                <Route
-                  path="/perfil"
-                  element={<PlaceholderPage title="Meu perfil" description="Em desenvolvimento." />}
-                />
+                <Route path="/perfil" element={<PerfilPage />} />
                 <Route path="*" element={<Navigate to="/dashboard" replace />} />
               </Route>
             </Route>

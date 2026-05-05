@@ -5,6 +5,7 @@ import { SidebarContent } from './Sidebar'
 import { Header } from './Header'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { NovaSolicitacaoProvider } from '@/features/solicitacoes/NovaSolicitacaoProvider'
+import { useRealtimeSubscriptions } from '@/features/realtime/useRealtimeSubscriptions'
 
 const PAGE_TITLES: Record<string, string> = {
   '/dashboard': 'Dashboard',
@@ -25,6 +26,7 @@ const COLLAPSED_KEY = 'sislog.sidebar.collapsed'
 
 export function AppLayout() {
   const location = useLocation()
+  const realtimeStatus = useRealtimeSubscriptions()
   const [collapsed, setCollapsed] = React.useState(() => {
     if (typeof window === 'undefined') return false
     return window.localStorage.getItem(COLLAPSED_KEY) === '1'
@@ -92,6 +94,7 @@ export function AppLayout() {
           pageTitle={pageTitle}
           onOpenMobileMenu={() => setMobileOpen(true)}
           onOpenSearch={() => toast.info('Busca global em desenvolvimento.')}
+          realtimeStatus={realtimeStatus}
         />
         <main className="flex-1 overflow-y-auto bg-muted/30 px-4 py-5 md:px-6 md:py-6">
           <NovaSolicitacaoProvider>
