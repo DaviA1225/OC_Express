@@ -12,6 +12,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
 import type { RealtimeStatus } from '@/features/realtime/useRealtimeSubscriptions'
+import { NotificationsBell } from '@/features/notifications/NotificationsBell'
 
 interface HeaderProps {
   pageTitle?: string
@@ -79,6 +80,8 @@ export function Header({ pageTitle, onOpenMobileMenu, onOpenSearch, realtimeStat
       </div>
 
       <RealtimeIndicator status={realtimeStatus} />
+
+      <NotificationsBell />
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
