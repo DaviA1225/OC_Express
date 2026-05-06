@@ -14,6 +14,11 @@ export function canViewAuditoria(p: PerfilRow | null): boolean {
   return is(p, 'admin', 'gerente', 'supervisor', 'analista')
 }
 
+/** Relatórios de produção: todos exceto assistente. */
+export function canViewRelatorios(p: PerfilRow | null): boolean {
+  return is(p, 'admin', 'gerente', 'supervisor', 'analista')
+}
+
 /** Usuários: somente admin. */
 export function canViewUsuarios(p: PerfilRow | null): boolean {
   return is(p, 'admin')

@@ -23,6 +23,7 @@ const SolicitacaoDetailPage = lazy(() =>
 )
 const CargasRetornoPage = lazy(() => import('@/pages/cargas-retorno/CargasRetornoPage'))
 const AuditoriaPage = lazy(() => import('@/pages/auditoria/AuditoriaPage'))
+const RelatoriosPage = lazy(() => import('@/pages/relatorios/RelatoriosPage'))
 const PerfilPage = lazy(() => import('@/pages/perfil/PerfilPage'))
 
 function PageFallback() {
@@ -60,6 +61,7 @@ export default function App() {
                 </Route>
 
                 <Route element={<PerfilRoute allowed={['admin', 'gerente', 'supervisor', 'analista']} />}>
+                  <Route path="/relatorios" element={<RelatoriosPage />} />
                   <Route path="/auditoria" element={<AuditoriaPage />} />
                 </Route>
 

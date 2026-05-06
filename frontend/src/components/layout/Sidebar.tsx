@@ -12,12 +12,13 @@ import {
   Handshake,
   Users,
   Search,
+  BarChart3,
   ChevronsLeft,
   ChevronsRight,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
-import { canViewAuditoria, canViewUsuarios } from '@/features/auth/permissions'
+import { canViewAuditoria, canViewUsuarios, canViewRelatorios } from '@/features/auth/permissions'
 
 interface NavItem {
   to: string
@@ -41,6 +42,7 @@ const cadastros: NavItem[] = [
 ]
 
 const sistemaAdmin: NavItem = { to: '/cadastros/usuarios', label: 'Usuários', icon: Users }
+const sistemaRelatorios: NavItem = { to: '/relatorios', label: 'Relatórios', icon: BarChart3 }
 const sistemaAuditoria: NavItem = { to: '/auditoria', label: 'Auditoria', icon: Search }
 
 interface SidebarProps {
@@ -54,6 +56,7 @@ export function SidebarContent({ collapsed, onToggleCollapse, onNavigate, classN
   const { profile } = useAuth()
   const showUsuarios = canViewUsuarios(profile)
   const showAuditoria = canViewAuditoria(profile)
+  const showRelatorios = canViewRelatorios(profile)
 
   return (
     <aside
@@ -103,10 +106,17 @@ export function SidebarContent({ collapsed, onToggleCollapse, onNavigate, classN
           ))}
         </ul>
 
-        {(showUsuarios || showAuditoria) && (
+        {(showUsuarios || showAuditoria || showRelatorios) && (
           <>
             <SectionLabel collapsed={collapsed}>Sistema</SectionLabel>
             <ul className="space-y-0.5">
+              {showRelatorios && (
+                <NavListItem
+                  item={sistemaRelatorios}
+                  collapsed={collapsed}
+                  onNavigate={onNavigate}
+                />
+              )}
               {showUsuarios && (
                 <NavListItem
                   item={sistemaAdmin}
