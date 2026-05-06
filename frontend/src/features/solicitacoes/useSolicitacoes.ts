@@ -62,6 +62,37 @@ function periodoToISO(periodo: PeriodoFiltro): string | null {
   return null
 }
 
+/**
+ * Carrega TODAS as solicitações que casam com os filtros (ignora paginação).
+ * Usado na exportação para CSV. Limite de 10k para evitar abusos.
+ */
+export async function fetchSolicitacoesParaExport(
+  filters: Omit<ListFilters, 'page' | 'pageSize'>,
+): Promise<SolicitacaoListRow[]> {
+  let query = supabase.from('solicitacoes').select(SELECT_WITH_JOINS)
+  if (filters.statuses.length > 0) query = query.in('status', filters.statuses)
+  if (filters.materialId) query = query.eq('material_id', filters.materialId)
+  if (filters.atendenteId) query = query.eq('atendente_id', filters.atendenteId)
+  if (filters.tipo !== 'todos') query = query.eq('tipo', filters.tipo)
+  const since = periodoToISO(filters.periodo)
+  if (since) query = query.gte('created_at', since)
+
+  if (filters.search.trim()) {
+    const t = filters.search.trim().replace(/[%_]/g, '\\$&')
+    const asNumber = Number(t.replace(/\D/g, ''))
+    if (Number.isFinite(asNumber) && asNumber > 0) {
+      query = query.or(`solicitante_nome.ilike.%${t}%,numero_interno.eq.${asNumber}`)
+    } else {
+      query = query.ilike('solicitante_nome', `%${t}%`)
+    }
+  }
+
+  query = query.order('created_at', { ascending: false }).range(0, 9999)
+  const { data, error } = await query
+  if (error) throw error
+  return (data ?? []) as unknown as SolicitacaoListRow[]
+}
+
 export function useSolicitacoesList(filters: ListFilters) {
   return useQuery({
     queryKey: ['solicitacoes', filters],
@@ -260,6 +291,74 @@ export function useTransitStatus() {
     onSettled: (_data, _err, vars) => {
       qc.invalidateQueries({ queryKey: ['solicitacoes'] })
       qc.invalidateQueries({ queryKey: ['solicitacao', vars.id] })
+    },
+  })
+}
+
+interface BulkContext {
+  previousLists: [unknown, unknown][]
+}
+
+export function useBulkTransitStatus() {
+  const qc = useQueryClient()
+  return useMutation<
+    { ids: string[]; status: SolicitacaoStatus },
+    unknown,
+    { ids: string[]; status: SolicitacaoStatus; extra?: Partial<TablesUpdate<'solicitacoes'>> },
+    BulkContext
+  >({
+    mutationFn: async ({ ids, status, extra }) => {
+      const { error } = await supabase
+        .from('solicitacoes')
+        .update({ status, ...(extra ?? {}) } as never)
+        .in('id', ids)
+      if (error) throw error
+      return { ids, status }
+    },
+    onMutate: async ({ ids, status, extra }) => {
+      await qc.cancelQueries({ queryKey: ['solicitacoes'] })
+      const previousLists = qc.getQueriesData({ queryKey: ['solicitacoes'] })
+      const idSet = new Set(ids)
+      const patch = { status, ...(extra ?? {}) } as Partial<SolicitacaoListRow>
+      qc.setQueriesData<{ data: SolicitacaoListRow[]; count: number } | undefined>(
+        { queryKey: ['solicitacoes'] },
+        (old) => {
+          if (!old?.data) return old
+          return {
+            ...old,
+            data: old.data.map((row) =>
+              idSet.has(row.id) ? ({ ...row, ...patch } as SolicitacaoListRow) : row,
+            ),
+          }
+        },
+      )
+      for (const id of ids) {
+        const detailKey = ['solicitacao', id] as const
+        qc.setQueryData<SolicitacaoListRow | undefined>(detailKey, (old) =>
+          old ? ({ ...old, ...patch } as SolicitacaoListRow) : old,
+        )
+      }
+      return { previousLists }
+    },
+    onError: (e, _vars, ctx) => {
+      if (ctx) {
+        for (const [key, value] of ctx.previousLists) {
+          qc.setQueryData(key as readonly unknown[], value)
+        }
+      }
+      toast.error(traduzirErroBanco(e))
+    },
+    onSuccess: ({ ids }) => {
+      toast.success(`${ids.length} ${ids.length === 1 ? 'solicitação atualizada' : 'solicitações atualizadas'}`)
+    },
+    onSettled: (_data, _err, vars) => {
+      qc.invalidateQueries({ queryKey: ['solicitacoes'] })
+      for (const id of vars.ids) {
+        qc.invalidateQueries({ queryKey: ['solicitacao', id] })
+      }
+      qc.invalidateQueries({ queryKey: ['dashboard-counts'] })
+      qc.invalidateQueries({ queryKey: ['dashboard-status-breakdown'] })
+      qc.invalidateQueries({ queryKey: ['dashboard-oldest-pending'] })
     },
   })
 }

@@ -107,6 +107,39 @@ export function useAuditList(filters: AuditFilters) {
   })
 }
 
+/** Carrega TODAS as linhas que casam com os filtros (ignora paginação). Usado em export. */
+export async function fetchAuditoriaParaExport(
+  filters: Omit<AuditFilters, 'page' | 'pageSize'>,
+): Promise<AuditLogRow[]> {
+  let q = supabase.from('log_auditoria').select('*')
+  if (filters.acoes.length > 0) q = q.in('acao', filters.acoes)
+  if (filters.tabelas.length > 0) q = q.in('tabela', filters.tabelas)
+  if (filters.usuarioIds.length > 0) q = q.in('usuario_id', filters.usuarioIds)
+  if (filters.periodo.desde) q = q.gte('created_at', filters.periodo.desde)
+  if (filters.periodo.ate) q = q.lte('created_at', filters.periodo.ate)
+  q = q.order('created_at', { ascending: false }).range(0, 9999)
+
+  const { data, error } = await q
+  if (error) throw error
+  const rows = (data ?? []) as Omit<AuditLogRow, 'usuario_nome'>[]
+
+  const userIds = Array.from(new Set(rows.map((r) => r.usuario_id).filter(Boolean) as string[]))
+  const nomeMap = new Map<string, string>()
+  if (userIds.length > 0) {
+    const { data: perfis } = await supabase
+      .from('perfis_usuarios')
+      .select('user_id, nome_completo')
+      .in('user_id', userIds)
+    for (const p of (perfis ?? []) as { user_id: string; nome_completo: string }[]) {
+      nomeMap.set(p.user_id, p.nome_completo)
+    }
+  }
+  return rows.map((r) => ({
+    ...r,
+    usuario_nome: r.usuario_id ? nomeMap.get(r.usuario_id) ?? null : null,
+  }))
+}
+
 export function useAuditUsuarios() {
   return useQuery({
     queryKey: ['auditoria-usuarios'],

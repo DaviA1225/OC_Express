@@ -11,7 +11,10 @@ import {
   Trash2,
   Inbox,
   ChevronDown,
+  Download,
+  Loader2,
 } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Label } from '@/components/ui/label'
@@ -36,6 +39,7 @@ import { cn } from '@/lib/utils'
 import {
   useAuditList,
   useAuditUsuarios,
+  fetchAuditoriaParaExport,
   diffJson,
   formatJsonValue,
   TABELAS_AUDITADAS,
@@ -45,6 +49,7 @@ import {
   type AuditFilters,
   type AuditLogRow,
 } from '@/features/auditoria/useAuditoria'
+import { buildCsv, downloadCsv, type CsvColumn } from '@/lib/csv'
 
 const PAGE_SIZE = 30
 
@@ -179,6 +184,51 @@ export default function AuditoriaPage() {
     setArr(arr.includes(item) ? arr.filter((x) => x !== item) : [...arr, item])
   }
 
+  const [exporting, setExporting] = React.useState(false)
+  const exportCsv = async () => {
+    setExporting(true)
+    try {
+      const rows = await fetchAuditoriaParaExport({
+        acoes,
+        tabelas,
+        usuarioIds,
+        periodo: { desde: periodoToDesde(periodo), ate: null },
+      })
+      if (rows.length === 0) {
+        toast.info('Nenhum registro para exportar com os filtros atuais.')
+        return
+      }
+      const cols: CsvColumn<AuditLogRow>[] = [
+        { header: 'Data/hora', accessor: (r) => r.created_at },
+        { header: 'Ação', accessor: (r) => ACAO_LABELS[r.acao as AuditAcao] ?? r.acao },
+        { header: 'Entidade', accessor: (r) => TABELA_LABELS[r.tabela] ?? r.tabela },
+        { header: 'Usuário', accessor: (r) => r.usuario_nome },
+        { header: 'ID do registro', accessor: (r) => r.registro_id },
+        {
+          header: 'Resumo',
+          accessor: (r) => {
+            if (r.acao === 'INSERT') return pickNome(r.dados_depois) ?? ''
+            if (r.acao === 'DELETE') return pickNome(r.dados_antes) ?? ''
+            const diff = diffJson(r.dados_antes, r.dados_depois)
+            return diff.length > 0 ? `${diff.length} campo(s): ${diff.map((d) => d.campo).join(', ')}` : ''
+          },
+        },
+        { header: 'Dados antes', accessor: (r) => r.dados_antes ? JSON.stringify(r.dados_antes) : '' },
+        { header: 'Dados depois', accessor: (r) => r.dados_depois ? JSON.stringify(r.dados_depois) : '' },
+      ]
+      const csv = buildCsv(rows, cols)
+      const ts = new Date()
+      const stamp = `${ts.getFullYear()}${String(ts.getMonth() + 1).padStart(2, '0')}${String(ts.getDate()).padStart(2, '0')}_${String(ts.getHours()).padStart(2, '0')}${String(ts.getMinutes()).padStart(2, '0')}`
+      downloadCsv(`auditoria_${stamp}.csv`, csv)
+      toast.success(`${rows.length} ${rows.length === 1 ? 'registro exportado' : 'registros exportados'}`)
+    } catch (err) {
+      toast.error('Falha ao exportar. Tente novamente.')
+      console.error('export auditoria csv error', err)
+    } finally {
+      setExporting(false)
+    }
+  }
+
   return (
     <>
       <div className="space-y-4">
@@ -189,6 +239,16 @@ export default function AuditoriaPage() {
               Histórico de criação, edição e exclusão dos registros do sistema.
             </p>
           </div>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={exportCsv}
+            disabled={exporting || list.isLoading}
+            title="Exportar resultados filtrados em CSV"
+          >
+            {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            <span className="hidden sm:inline">Exportar CSV</span>
+          </Button>
         </div>
 
         <div className="space-y-3 rounded-lg border bg-background p-3">

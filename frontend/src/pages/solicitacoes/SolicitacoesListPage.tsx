@@ -1,25 +1,31 @@
 import * as React from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Plus, Search as SearchIcon, Inbox, Eraser, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Plus, Search as SearchIcon, Inbox, Eraser, ChevronLeft, ChevronRight, X, CheckSquare, Square, Download, Loader2 } from 'lucide-react'
+import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/shared/EmptyState'
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { SolicitacaoStatusBadge } from '@/components/shared/SolicitacaoStatusBadge'
 import { useDebounce } from '@/hooks/useDebounce'
 import { useNovaSolicitacao } from '@/features/solicitacoes/NovaSolicitacaoProvider'
 import { useCrudOptions } from '@/features/crud/useCrudOptions'
 import {
   useSolicitacoesList,
+  useBulkTransitStatus,
+  fetchSolicitacoesParaExport,
   type ListFilters,
   type PeriodoFiltro,
   type SolicitacaoListRow,
 } from '@/features/solicitacoes/useSolicitacoes'
+import { buildCsv, downloadCsv, type CsvColumn } from '@/lib/csv'
 import { STATUS_LABELS } from '@/features/solicitacoes/status'
 import { formatNumeroOC } from '@/lib/utils'
 import { cn } from '@/lib/utils'
@@ -116,6 +122,115 @@ export function SolicitacoesListPage() {
   const materiais = useCrudOptions<MaterialOpt>({
     table: 'materiais', selectColumns: 'id, nome', orderBy: 'nome',
   })
+  const bulkTransit = useBulkTransitStatus()
+
+  const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set())
+  const [bulkConfirm, setBulkConfirm] = React.useState<{ status: SolicitacaoStatus; label: string } | null>(null)
+
+  const visibleIds = React.useMemo(
+    () => (list.data?.data ?? []).map((r) => r.id),
+    [list.data],
+  )
+
+  const [lastVisible, setLastVisible] = React.useState<string>('')
+  const visibleKey = visibleIds.join(',')
+  if (lastVisible !== visibleKey) {
+    setLastVisible(visibleKey)
+    if (selectedIds.size > 0) {
+      const next = new Set<string>()
+      for (const id of selectedIds) {
+        if (visibleIds.includes(id)) next.add(id)
+      }
+      if (next.size !== selectedIds.size) setSelectedIds(next)
+    }
+  }
+
+  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id))
+
+  const toggleId = (id: string) => {
+    const next = new Set(selectedIds)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    setSelectedIds(next)
+  }
+
+  const toggleAll = () => {
+    if (allVisibleSelected) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(visibleIds))
+    }
+  }
+
+  const clearSelection = () => setSelectedIds(new Set())
+
+  const [exporting, setExporting] = React.useState(false)
+
+  const exportCsv = async () => {
+    setExporting(true)
+    try {
+      const rows = await fetchSolicitacoesParaExport({
+        search: debouncedSearch,
+        statuses,
+        periodo,
+        materialId,
+        tipo,
+        atendenteId: null,
+      })
+      if (rows.length === 0) {
+        toast.info('Nenhuma solicitação para exportar com os filtros atuais.')
+        return
+      }
+      const cols: CsvColumn<SolicitacaoListRow>[] = [
+        { header: 'Número', accessor: (r) => `#${String(r.numero_interno).padStart(4, '0')}` },
+        { header: 'Status', accessor: (r) => r.status },
+        { header: 'Tipo', accessor: (r) => r.tipo },
+        { header: 'Solicitante', accessor: (r) => r.solicitante_nome },
+        { header: 'Telefone solicitante', accessor: (r) => r.solicitante_telefone },
+        { header: 'Motorista', accessor: (r) => r.motorista?.nome_completo },
+        { header: 'CPF motorista', accessor: (r) => r.motorista?.cpf },
+        { header: 'Cavalo', accessor: (r) => r.veiculo?.placa },
+        { header: 'Carreta', accessor: (r) => r.carreta?.placa },
+        { header: 'Subcontratada', accessor: (r) => r.subcontratada?.razao_social },
+        { header: 'Cliente', accessor: (r) => r.cliente?.razao_social },
+        { header: 'Cidade/UF', accessor: (r) => [r.cliente?.cidade, r.cliente?.uf].filter(Boolean).join('/') },
+        { header: 'Material', accessor: (r) => r.material?.nome },
+        { header: 'Subtipo', accessor: (r) => r.material_subtipo },
+        { header: 'Local de carregamento', accessor: (r) => r.local_carregamento },
+        { header: 'Validade início', accessor: (r) => r.validade_inicio },
+        { header: 'Validade fim', accessor: (r) => r.validade_fim },
+        { header: 'Nº instrução', accessor: (r) => r.numero_instrucao },
+        { header: 'Observações', accessor: (r) => r.observacoes },
+        { header: 'PDF', accessor: (r) => r.pdf_url },
+        { header: 'Criada em', accessor: (r) => r.created_at },
+        { header: 'Enviada em', accessor: (r) => r.enviada_em },
+        { header: 'Finalizada em', accessor: (r) => r.finalizada_em },
+      ]
+      const csv = buildCsv(rows, cols)
+      const ts = new Date()
+      const stamp = `${ts.getFullYear()}${String(ts.getMonth() + 1).padStart(2, '0')}${String(ts.getDate()).padStart(2, '0')}_${String(ts.getHours()).padStart(2, '0')}${String(ts.getMinutes()).padStart(2, '0')}`
+      downloadCsv(`solicitacoes_${stamp}.csv`, csv)
+      toast.success(`${rows.length} ${rows.length === 1 ? 'registro exportado' : 'registros exportados'}`)
+    } catch (err) {
+      toast.error('Falha ao exportar. Tente novamente.')
+      console.error('export csv error', err)
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  const runBulkTransit = async (status: SolicitacaoStatus) => {
+    const ids = Array.from(selectedIds)
+    if (ids.length === 0) return
+    const extra =
+      status === 'finalizada'
+        ? { finalizada_em: new Date().toISOString() }
+        : status === 'oc_enviada'
+        ? { enviada_em: new Date().toISOString() }
+        : undefined
+    await bulkTransit.mutateAsync({ ids, status, extra })
+    clearSelection()
+  }
 
   const totalPages = Math.max(1, Math.ceil((list.data?.count ?? 0) / pageSize))
   const hasFilters =
@@ -138,11 +253,24 @@ export function SolicitacoesListPage() {
             {list.data?.count ?? 0} {list.data?.count === 1 ? 'registro' : 'registros'}
           </p>
         </div>
-        <Button onClick={onNova} title="Ctrl+N">
-          <Plus className="h-4 w-4" />
-          Nova solicitação
-          <kbd className="ml-1 hidden text-[10px] text-primary-foreground/70 md:inline">Ctrl+N</kbd>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={exportCsv}
+            disabled={exporting || list.isLoading}
+            title="Exportar resultados filtrados em CSV"
+          >
+            {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            <span className="hidden sm:inline">Exportar CSV</span>
+          </Button>
+          <Button onClick={onNova} title="Ctrl+N">
+            <Plus className="h-4 w-4" />
+            <span className="hidden sm:inline">Nova solicitação</span>
+            <span className="sm:hidden">Nova</span>
+            <kbd className="ml-1 hidden text-[10px] text-primary-foreground/70 md:inline">Ctrl+N</kbd>
+          </Button>
+        </div>
       </div>
 
       <div className="space-y-3 rounded-lg border bg-background p-3">
@@ -245,12 +373,67 @@ export function SolicitacoesListPage() {
       )}
 
       {!list.isLoading && (list.data?.data.length ?? 0) > 0 && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {list.data!.data.map((row) => (
-            <SolicitacaoCard key={row.id} row={row} onOpen={() => navigate(`/solicitacoes/${row.id}`)} />
-          ))}
-        </div>
+        <>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={toggleAll}
+              className="text-muted-foreground"
+            >
+              {allVisibleSelected ? <CheckSquare className="h-4 w-4" /> : <Square className="h-4 w-4" />}
+              {allVisibleSelected ? 'Desmarcar página' : 'Selecionar página'}
+            </Button>
+            {selectedIds.size > 0 && (
+              <span className="text-[12px] text-muted-foreground">
+                {selectedIds.size} {selectedIds.size === 1 ? 'selecionada' : 'selecionadas'}
+              </span>
+            )}
+          </div>
+
+          {selectedIds.size > 0 && (
+            <BulkActionsBar
+              count={selectedIds.size}
+              isPending={bulkTransit.isPending}
+              onClear={clearSelection}
+              onAdvanceEmCadastro={() => runBulkTransit('em_cadastro')}
+              onMarkEnviada={() => runBulkTransit('oc_enviada')}
+              onMarkFinalizada={() => runBulkTransit('finalizada')}
+              onCancelarRequest={() =>
+                setBulkConfirm({ status: 'cancelada', label: 'Cancelar' })
+              }
+            />
+          )}
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {list.data!.data.map((row) => (
+              <SolicitacaoCard
+                key={row.id}
+                row={row}
+                selected={selectedIds.has(row.id)}
+                onToggleSelect={() => toggleId(row.id)}
+                onOpen={() => navigate(`/solicitacoes/${row.id}`)}
+              />
+            ))}
+          </div>
+        </>
       )}
+
+      <ConfirmDialog
+        open={!!bulkConfirm}
+        onOpenChange={(o) => !o && setBulkConfirm(null)}
+        title={`${bulkConfirm?.label} ${selectedIds.size} ${selectedIds.size === 1 ? 'solicitação' : 'solicitações'}?`}
+        description="Esta ação afeta todos os registros selecionados. Você pode duplicá-las depois caso precise refazer."
+        confirmLabel={`Sim, ${bulkConfirm?.label.toLowerCase()}`}
+        destructive
+        onConfirm={async () => {
+          if (bulkConfirm) {
+            await runBulkTransit(bulkConfirm.status)
+            setBulkConfirm(null)
+          }
+        }}
+      />
 
       {(list.data?.count ?? 0) > pageSize && (
         <div className="flex items-center justify-between text-[12px] text-muted-foreground">
@@ -269,12 +452,31 @@ export function SolicitacoesListPage() {
   )
 }
 
-function SolicitacaoCard({ row, onOpen }: { row: SolicitacaoListRow; onOpen: () => void }) {
+interface CardProps {
+  row: SolicitacaoListRow
+  selected: boolean
+  onToggleSelect: () => void
+  onOpen: () => void
+}
+
+function SolicitacaoCard({ row, selected, onToggleSelect, onOpen }: CardProps) {
   const created = row.created_at ? new Date(row.created_at) : null
   return (
-    <div className="rounded-lg border bg-background p-4 transition-colors hover:border-primary/40">
-      <div className="flex items-center justify-between">
-        <span className="text-[14px] font-medium text-primary">{formatNumeroOC(row.numero_interno)}</span>
+    <div
+      className={cn(
+        'rounded-lg border bg-background p-4 transition-colors hover:border-primary/40',
+        selected && 'border-primary bg-primary/5',
+      )}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Checkbox
+            checked={selected}
+            onCheckedChange={onToggleSelect}
+            aria-label={`Selecionar ${formatNumeroOC(row.numero_interno)}`}
+          />
+          <span className="text-[14px] font-medium text-primary">{formatNumeroOC(row.numero_interno)}</span>
+        </div>
         <SolicitacaoStatusBadge status={row.status} />
       </div>
       <div className="mt-3 border-t pt-3">
@@ -295,6 +497,58 @@ function SolicitacaoCard({ row, onOpen }: { row: SolicitacaoListRow; onOpen: () 
         </span>
         <Button variant="outline" size="sm" onClick={onOpen}>Abrir</Button>
       </div>
+    </div>
+  )
+}
+
+interface BulkActionsBarProps {
+  count: number
+  isPending: boolean
+  onClear: () => void
+  onAdvanceEmCadastro: () => void
+  onMarkEnviada: () => void
+  onMarkFinalizada: () => void
+  onCancelarRequest: () => void
+}
+
+function BulkActionsBar({
+  count,
+  isPending,
+  onClear,
+  onAdvanceEmCadastro,
+  onMarkEnviada,
+  onMarkFinalizada,
+  onCancelarRequest,
+}: BulkActionsBarProps) {
+  return (
+    <div className="sticky top-2 z-10 flex flex-wrap items-center gap-2 rounded-lg border border-primary/40 bg-primary/5 px-3 py-2 shadow-sm backdrop-blur">
+      <span className="text-[13px] font-medium text-foreground">
+        {count} {count === 1 ? 'selecionada' : 'selecionadas'}
+      </span>
+      <span className="mx-1 h-4 w-px bg-border" />
+      <Button size="sm" variant="outline" disabled={isPending} onClick={onAdvanceEmCadastro}>
+        Marcar em emissão
+      </Button>
+      <Button size="sm" variant="outline" disabled={isPending} onClick={onMarkEnviada}>
+        Marcar enviada
+      </Button>
+      <Button size="sm" variant="outline" disabled={isPending} onClick={onMarkFinalizada}>
+        Finalizar
+      </Button>
+      <Button
+        size="sm"
+        variant="ghost"
+        disabled={isPending}
+        onClick={onCancelarRequest}
+        className="text-destructive hover:text-destructive"
+      >
+        <X className="h-4 w-4" />
+        Cancelar
+      </Button>
+      <span className="ml-auto" />
+      <Button size="sm" variant="ghost" disabled={isPending} onClick={onClear}>
+        Limpar seleção
+      </Button>
     </div>
   )
 }
