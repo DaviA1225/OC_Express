@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   Table,
@@ -15,6 +16,7 @@ import {
   TableCell,
 } from '@/components/ui/table'
 import { EmptyState } from './EmptyState'
+import { ConfirmDialog } from './ConfirmDialog'
 import { useDebounce } from '@/hooks/useDebounce'
 import { cn } from '@/lib/utils'
 
@@ -47,6 +49,8 @@ export interface CrudListPageProps<T extends { id: string; ativo: boolean }> {
   pageSize: number
   onPageChange: (page: number) => void
   totalCount: number
+  onBulkToggleActive?: (ids: string[], ativo: boolean) => Promise<void>
+  onBulkDelete?: (ids: string[]) => Promise<void>
 }
 
 export function CrudListPage<T extends { id: string; ativo: boolean }>(props: CrudListPageProps<T>) {
@@ -73,10 +77,52 @@ export function CrudListPage<T extends { id: string; ativo: boolean }>(props: Cr
     pageSize,
     onPageChange,
     totalCount,
+    onBulkToggleActive,
+    onBulkDelete,
   } = props
 
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize))
   const hasActions = !!(onEdit || onToggleActive || onDelete)
+  const selectable = !!(onBulkToggleActive || onBulkDelete)
+
+  const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set())
+  const [bulkPending, setBulkPending] = React.useState(false)
+  const [confirmBulkDelete, setConfirmBulkDelete] = React.useState(false)
+
+  const visibleIds = React.useMemo(() => (rows ?? []).map((r) => r.id), [rows])
+  const visibleKey = visibleIds.join(',')
+  const [lastVisibleKey, setLastVisibleKey] = React.useState(visibleKey)
+  if (lastVisibleKey !== visibleKey) {
+    setLastVisibleKey(visibleKey)
+    if (selectedIds.size > 0) {
+      const next = new Set<string>()
+      for (const id of selectedIds) if (visibleIds.includes(id)) next.add(id)
+      if (next.size !== selectedIds.size) setSelectedIds(next)
+    }
+  }
+
+  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id))
+  const toggleId = (id: string) => {
+    const next = new Set(selectedIds)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    setSelectedIds(next)
+  }
+  const toggleAllVisible = () => {
+    if (allVisibleSelected) setSelectedIds(new Set())
+    else setSelectedIds(new Set(visibleIds))
+  }
+  const clearSelection = () => setSelectedIds(new Set())
+
+  const runBulk = async (fn: () => Promise<void>) => {
+    setBulkPending(true)
+    try {
+      await fn()
+      clearSelection()
+    } finally {
+      setBulkPending(false)
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -117,10 +163,64 @@ export function CrudListPage<T extends { id: string; ativo: boolean }>(props: Cr
         </div>
       </div>
 
+      {selectable && selectedIds.size > 0 && (
+        <div className="sticky top-2 z-10 flex flex-wrap items-center gap-2 rounded-lg border border-primary/40 bg-primary/5 px-3 py-2 shadow-sm backdrop-blur">
+          <span className="text-[13px] font-medium text-foreground">
+            {selectedIds.size} {selectedIds.size === 1 ? 'selecionado' : 'selecionados'}
+          </span>
+          <span className="mx-1 h-4 w-px bg-border" />
+          {onBulkToggleActive && (
+            <>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={bulkPending}
+                onClick={() => runBulk(() => onBulkToggleActive(Array.from(selectedIds), true))}
+              >
+                Reativar
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={bulkPending}
+                onClick={() => runBulk(() => onBulkToggleActive(Array.from(selectedIds), false))}
+              >
+                Desativar
+              </Button>
+            </>
+          )}
+          {onBulkDelete && (
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={bulkPending}
+              onClick={() => setConfirmBulkDelete(true)}
+              className="text-destructive hover:text-destructive"
+            >
+              <Trash2 className="h-4 w-4" />
+              Excluir
+            </Button>
+          )}
+          <span className="ml-auto" />
+          <Button size="sm" variant="ghost" disabled={bulkPending} onClick={clearSelection}>
+            Limpar seleção
+          </Button>
+        </div>
+      )}
+
       <div className="overflow-hidden rounded-lg border bg-background">
         <Table>
           <TableHeader>
             <TableRow>
+              {selectable && (
+                <TableHead className="w-[40px]">
+                  <Checkbox
+                    checked={allVisibleSelected}
+                    onCheckedChange={toggleAllVisible}
+                    aria-label="Selecionar página"
+                  />
+                </TableHead>
+              )}
               {columns.map((c, i) => (
                 <TableHead key={i} className={c.className}>{c.header}</TableHead>
               ))}
@@ -134,6 +234,7 @@ export function CrudListPage<T extends { id: string; ativo: boolean }>(props: Cr
               <>
                 {Array.from({ length: 6 }).map((_, i) => (
                   <TableRow key={`skeleton-${i}`}>
+                    {selectable && <TableCell><Skeleton className="h-4 w-4" /></TableCell>}
                     {columns.map((_c, ci) => (
                       <TableCell key={ci}><Skeleton className="h-4 w-3/4" /></TableCell>
                     ))}
@@ -145,7 +246,10 @@ export function CrudListPage<T extends { id: string; ativo: boolean }>(props: Cr
 
             {!isLoading && rows && rows.length === 0 && (
               <TableRow>
-                <TableCell colSpan={columns.length + (hasActions ? 1 : 0)} className="py-0">
+                <TableCell
+                  colSpan={columns.length + (hasActions ? 1 : 0) + (selectable ? 1 : 0)}
+                  className="py-0"
+                >
                   <EmptyState
                     icon={Inbox}
                     title={emptyTitle}
@@ -156,7 +260,19 @@ export function CrudListPage<T extends { id: string; ativo: boolean }>(props: Cr
             )}
 
             {!isLoading && rows?.map((row) => (
-              <TableRow key={row.id} className={cn(!row.ativo && 'opacity-60')}>
+              <TableRow
+                key={row.id}
+                className={cn(!row.ativo && 'opacity-60', selectedIds.has(row.id) && 'bg-primary/5')}
+              >
+                {selectable && (
+                  <TableCell>
+                    <Checkbox
+                      checked={selectedIds.has(row.id)}
+                      onCheckedChange={() => toggleId(row.id)}
+                      aria-label={`Selecionar ${rowLabel?.(row) ?? ''}`}
+                    />
+                  </TableCell>
+                )}
                 {columns.map((c, i) => (
                   <TableCell key={i} className={c.className}>
                     {i === 0 && !row.ativo && (
@@ -237,6 +353,21 @@ export function CrudListPage<T extends { id: string; ativo: boolean }>(props: Cr
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmBulkDelete}
+        onOpenChange={setConfirmBulkDelete}
+        title={`Excluir ${selectedIds.size} ${selectedIds.size === 1 ? 'registro' : 'registros'}?`}
+        description="Os cadastros selecionados serão removidos permanentemente. Essa ação não pode ser desfeita. Registros em uso por solicitações terão a exclusão bloqueada."
+        confirmLabel="Sim, excluir"
+        destructive
+        onConfirm={async () => {
+          if (onBulkDelete) {
+            await runBulk(() => onBulkDelete(Array.from(selectedIds)))
+          }
+          setConfirmBulkDelete(false)
+        }}
+      />
     </div>
   )
 }

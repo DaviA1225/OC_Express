@@ -5,9 +5,9 @@ import { z } from 'zod'
 import { Loader2 } from 'lucide-react'
 import { CrudListPage, useCrudListState, type ColumnDef } from '@/components/shared/CrudListPage'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
-import { useCrudList, useActiveCount, useUpsertRow, useToggleActive, useDeleteRow } from '@/features/crud/useCrudQueries'
+import { useCrudList, useActiveCount, useUpsertRow, useToggleActive, useDeleteRow, useBulkToggleActive, useBulkDeleteRows } from '@/features/crud/useCrudQueries'
 import { useAuth } from '@/hooks/useAuth'
-import { canEditMateriais } from '@/features/auth/permissions'
+import { canEditMateriais, canUseBulkActions } from '@/features/auth/permissions'
 import {
   Dialog,
   DialogContent,
@@ -40,6 +40,7 @@ type FormValues = z.infer<typeof schema>
 export default function MateriaisPage() {
   const { profile } = useAuth()
   const canEdit = canEditMateriais(profile)
+  const canBulk = canUseBulkActions(profile)
   const state = useCrudListState()
   const list = useCrudList('materiais', {
     search: state.debouncedSearch,
@@ -54,6 +55,8 @@ export default function MateriaisPage() {
   const upsert = useUpsertRow('materiais', 'Material')
   const toggle = useToggleActive('materiais', 'Material')
   const remove = useDeleteRow('materiais', 'Material')
+  const bulkToggle = useBulkToggleActive('materiais', 'Material')
+  const bulkDelete = useBulkDeleteRows('materiais', 'Material')
 
   const [editing, setEditing] = React.useState<Row | null>(null)
   const [open, setOpen] = React.useState(false)
@@ -86,6 +89,8 @@ export default function MateriaisPage() {
         onEdit={canEdit ? (r) => { setEditing(r); setOpen(true) } : undefined}
         onToggleActive={canEdit ? (r) => setConfirmRow(r) : undefined}
         onDelete={canEdit ? (r) => setDeleteRow(r) : undefined}
+        onBulkToggleActive={canBulk ? async (ids, ativo) => { await bulkToggle.mutateAsync({ ids, ativo }) } : undefined}
+        onBulkDelete={canBulk ? async (ids) => { await bulkDelete.mutateAsync({ ids }) } : undefined}
         emptyTitle="Nenhum material cadastrado"
         emptyDescription="Cadastre os materiais transportados (minério, pedra etc.)."
         page={state.page}

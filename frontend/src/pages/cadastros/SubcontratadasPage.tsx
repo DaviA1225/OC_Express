@@ -5,7 +5,9 @@ import { z } from 'zod'
 import { Loader2 } from 'lucide-react'
 import { CrudListPage, useCrudListState, type ColumnDef } from '@/components/shared/CrudListPage'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
-import { useCrudList, useActiveCount, useUpsertRow, useToggleActive, useDeleteRow } from '@/features/crud/useCrudQueries'
+import { useCrudList, useActiveCount, useUpsertRow, useToggleActive, useDeleteRow, useBulkToggleActive, useBulkDeleteRows } from '@/features/crud/useCrudQueries'
+import { useAuth } from '@/hooks/useAuth'
+import { canEditCadastrosOperacionais, canUseBulkActions } from '@/features/auth/permissions'
 import {
   Dialog,
   DialogContent,
@@ -48,6 +50,9 @@ function TipoBadge({ tipo }: { tipo: 'PF' | 'PJ' | null }) {
 }
 
 export default function SubcontratadasPage() {
+  const { profile } = useAuth()
+  const canEdit = canEditCadastrosOperacionais(profile)
+  const canBulk = canUseBulkActions(profile)
   const state = useCrudListState()
   const list = useCrudList('subcontratadas', {
     search: state.debouncedSearch,
@@ -62,6 +67,8 @@ export default function SubcontratadasPage() {
   const upsert = useUpsertRow('subcontratadas', 'Subcontratada')
   const toggle = useToggleActive('subcontratadas', 'Subcontratada')
   const remove = useDeleteRow('subcontratadas', 'Subcontratada')
+  const bulkToggle = useBulkToggleActive('subcontratadas', 'Subcontratada')
+  const bulkDelete = useBulkDeleteRows('subcontratadas', 'Subcontratada')
 
   const [editing, setEditing] = React.useState<Row | null>(null)
   const [open, setOpen] = React.useState(false)
@@ -78,8 +85,8 @@ export default function SubcontratadasPage() {
     <>
       <CrudListPage<Row>
         title="Subcontratadas"
-        newButtonLabel="Nova subcontratada"
-        onNew={() => { setEditing(null); setOpen(true) }}
+        newButtonLabel={canEdit ? 'Nova subcontratada' : undefined}
+        onNew={canEdit ? () => { setEditing(null); setOpen(true) } : undefined}
         rows={list.data?.data}
         isLoading={list.isLoading}
         totalActive={totalActive.data ?? 0}
@@ -90,15 +97,17 @@ export default function SubcontratadasPage() {
         onShowInactiveChange={state.setShowInactive}
         columns={columns}
         rowLabel={(r) => r.razao_social}
-        onEdit={(r) => { setEditing(r); setOpen(true) }}
-        onToggleActive={(r) => setConfirmRow(r)}
-        onDelete={(r) => setDeleteRow(r)}
+        onEdit={canEdit ? (r) => { setEditing(r); setOpen(true) } : undefined}
+        onToggleActive={canEdit ? (r) => setConfirmRow(r) : undefined}
+        onDelete={canEdit ? (r) => setDeleteRow(r) : undefined}
         emptyTitle="Nenhuma subcontratada cadastrada"
         emptyDescription="Cadastre as transportadoras (PJ) ou autônomos (PF) que atuam para você."
         page={state.page}
         pageSize={state.pageSize}
         totalCount={list.data?.count ?? 0}
         onPageChange={state.setPage}
+        onBulkToggleActive={canBulk ? async (ids, ativo) => { await bulkToggle.mutateAsync({ ids, ativo }) } : undefined}
+        onBulkDelete={canBulk ? async (ids) => { await bulkDelete.mutateAsync({ ids }) } : undefined}
       />
 
       <SubcontratadaForm

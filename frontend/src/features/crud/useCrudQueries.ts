@@ -192,6 +192,93 @@ export function useToggleActive<TName extends CrudTableName>(table: TName, frien
   })
 }
 
+export function useBulkToggleActive<TName extends CrudTableName>(table: TName, friendlyName: string) {
+  const qc = useQueryClient()
+  return useMutation<void, unknown, { ids: string[]; ativo: boolean }, ToggleContext>({
+    mutationFn: async ({ ids, ativo }) => {
+      if (ids.length === 0) return
+      const { error } = await supabase
+        .from(table)
+        .update({ ativo } as never)
+        .in('id' as never, ids as never)
+      if (error) throw error
+    },
+    onMutate: async ({ ids, ativo }) => {
+      await qc.cancelQueries({ queryKey: ['crud', table] })
+      await qc.cancelQueries({ queryKey: ['crud-count-active', table] })
+
+      const previousLists = qc.getQueriesData({ queryKey: ['crud', table] })
+      const previousCount = qc.getQueriesData({ queryKey: ['crud-count-active', table] })
+
+      const idSet = new Set(ids)
+      let activeDelta = 0
+      qc.setQueriesData<{ data: { id: string; ativo: boolean }[]; count: number } | undefined>(
+        { queryKey: ['crud', table] },
+        (old) => {
+          if (!old?.data) return old
+          return {
+            ...old,
+            data: old.data.map((row) => {
+              if (!idSet.has(row.id)) return row
+              if (row.ativo !== ativo) activeDelta += ativo ? 1 : -1
+              return { ...row, ativo }
+            }),
+          }
+        },
+      )
+      qc.setQueriesData<number | undefined>(
+        { queryKey: ['crud-count-active', table] },
+        (old) => (typeof old === 'number' ? Math.max(0, old + activeDelta) : old),
+      )
+
+      return { previousLists, previousCount }
+    },
+    onError: (error, _vars, ctx) => {
+      if (ctx) {
+        for (const [key, value] of ctx.previousLists) qc.setQueryData(key as readonly unknown[], value)
+        for (const [key, value] of ctx.previousCount) qc.setQueryData(key as readonly unknown[], value)
+      }
+      toast.error(traduzirErroBanco(error))
+    },
+    onSuccess: (_data, vars) => {
+      const n = vars.ids.length
+      toast.success(
+        vars.ativo
+          ? `${n} ${n === 1 ? `${friendlyName.toLowerCase()} reativado` : `${friendlyName.toLowerCase()}s reativados`}`
+          : `${n} ${n === 1 ? `${friendlyName.toLowerCase()} desativado` : `${friendlyName.toLowerCase()}s desativados`}`,
+      )
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ['crud', table] })
+      qc.invalidateQueries({ queryKey: ['crud-count-active', table] })
+      qc.invalidateQueries({ queryKey: ['crud-options', table] })
+    },
+  })
+}
+
+export function useBulkDeleteRows<TName extends CrudTableName>(table: TName, friendlyName: string) {
+  const qc = useQueryClient()
+  return useMutation<void, unknown, { ids: string[] }>({
+    mutationFn: async ({ ids }) => {
+      if (ids.length === 0) return
+      const { error } = await supabase.from(table).delete().in('id' as never, ids as never)
+      if (error) throw error
+    },
+    onSuccess: (_data, vars) => {
+      const n = vars.ids.length
+      toast.success(
+        `${n} ${n === 1 ? `${friendlyName.toLowerCase()} excluído` : `${friendlyName.toLowerCase()}s excluídos`}`,
+      )
+    },
+    onError: (error) => toast.error(traduzirErroBanco(error)),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ['crud', table] })
+      qc.invalidateQueries({ queryKey: ['crud-count-active', table] })
+      qc.invalidateQueries({ queryKey: ['crud-options', table] })
+    },
+  })
+}
+
 export function traduzirErroBanco(error: unknown): string {
   const e = error as { code?: string; message?: string; details?: string } | undefined
   if (!e) return 'Algo deu errado. Tente novamente em instantes.'

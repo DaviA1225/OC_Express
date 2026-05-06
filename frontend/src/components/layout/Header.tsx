@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { Menu, Search, ChevronDown, LogOut, UserCircle } from 'lucide-react'
+import { Menu, Search, ChevronDown, LogOut, UserCircle, Sun, Moon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { useAuth } from '@/hooks/useAuth'
+import { useTheme } from '@/hooks/useTheme'
 import { cn } from '@/lib/utils'
 import type { RealtimeStatus } from '@/features/realtime/useRealtimeSubscriptions'
 import { NotificationsBell } from '@/features/notifications/NotificationsBell'
@@ -81,6 +82,8 @@ export function Header({ pageTitle, onOpenMobileMenu, onOpenSearch, realtimeStat
 
       <RealtimeIndicator status={realtimeStatus} />
 
+      <ThemeToggle />
+
       <NotificationsBell />
 
       <DropdownMenu>
@@ -120,6 +123,23 @@ export function Header({ pageTitle, onOpenMobileMenu, onOpenSearch, realtimeStat
         </DropdownMenuContent>
       </DropdownMenu>
     </header>
+  )
+}
+
+function ThemeToggle() {
+  const { theme, toggle } = useTheme()
+  const isDark = theme === 'dark'
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon"
+      onClick={toggle}
+      aria-label={isDark ? 'Mudar para modo claro' : 'Mudar para modo escuro'}
+      title={isDark ? 'Modo claro' : 'Modo escuro'}
+    >
+      {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+    </Button>
   )
 }
 

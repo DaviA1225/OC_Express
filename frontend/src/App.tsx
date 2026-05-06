@@ -62,6 +62,8 @@ export default function App() {
 
                 <Route element={<PerfilRoute allowed={['admin', 'gerente', 'supervisor', 'analista']} />}>
                   <Route path="/relatorios" element={<RelatoriosPage />} />
+                </Route>
+                <Route element={<PerfilRoute allowed={['admin', 'gerente', 'supervisor']} />}>
                   <Route path="/auditoria" element={<AuditoriaPage />} />
                 </Route>
 

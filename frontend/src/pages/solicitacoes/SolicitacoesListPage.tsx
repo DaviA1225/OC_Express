@@ -15,6 +15,8 @@ import { EmptyState } from '@/components/shared/EmptyState'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { SolicitacaoStatusBadge } from '@/components/shared/SolicitacaoStatusBadge'
 import { useDebounce } from '@/hooks/useDebounce'
+import { useAuth } from '@/hooks/useAuth'
+import { canEditSolicitacoes, canUseBulkActions } from '@/features/auth/permissions'
 import { useNovaSolicitacao } from '@/features/solicitacoes/NovaSolicitacaoProvider'
 import { useCrudOptions } from '@/features/crud/useCrudOptions'
 import {
@@ -41,6 +43,9 @@ const VALID_STATUSES: SolicitacaoStatus[] = [
 
 export function SolicitacoesListPage() {
   const navigate = useNavigate()
+  const { profile } = useAuth()
+  const canEdit = canEditSolicitacoes(profile)
+  const canBulk = canUseBulkActions(profile)
   const { open: onNova } = useNovaSolicitacao()
   const [params, setParams] = useSearchParams()
 
@@ -264,12 +269,14 @@ export function SolicitacoesListPage() {
             {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
             <span className="hidden sm:inline">Exportar CSV</span>
           </Button>
-          <Button onClick={onNova} title="Ctrl+N">
-            <Plus className="h-4 w-4" />
-            <span className="hidden sm:inline">Nova solicitação</span>
-            <span className="sm:hidden">Nova</span>
-            <kbd className="ml-1 hidden text-[10px] text-primary-foreground/70 md:inline">Ctrl+N</kbd>
-          </Button>
+          {canEdit && (
+            <Button onClick={onNova} title="Ctrl+N">
+              <Plus className="h-4 w-4" />
+              <span className="hidden sm:inline">Nova solicitação</span>
+              <span className="sm:hidden">Nova</span>
+              <kbd className="ml-1 hidden text-[10px] text-primary-foreground/70 md:inline">Ctrl+N</kbd>
+            </Button>
+          )}
         </div>
       </div>
 
@@ -374,25 +381,27 @@ export function SolicitacoesListPage() {
 
       {!list.isLoading && (list.data?.data.length ?? 0) > 0 && (
         <>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={toggleAll}
-              className="text-muted-foreground"
-            >
-              {allVisibleSelected ? <CheckSquare className="h-4 w-4" /> : <Square className="h-4 w-4" />}
-              {allVisibleSelected ? 'Desmarcar página' : 'Selecionar página'}
-            </Button>
-            {selectedIds.size > 0 && (
-              <span className="text-[12px] text-muted-foreground">
-                {selectedIds.size} {selectedIds.size === 1 ? 'selecionada' : 'selecionadas'}
-              </span>
-            )}
-          </div>
+          {canBulk && (
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={toggleAll}
+                className="text-muted-foreground"
+              >
+                {allVisibleSelected ? <CheckSquare className="h-4 w-4" /> : <Square className="h-4 w-4" />}
+                {allVisibleSelected ? 'Desmarcar página' : 'Selecionar página'}
+              </Button>
+              {selectedIds.size > 0 && (
+                <span className="text-[12px] text-muted-foreground">
+                  {selectedIds.size} {selectedIds.size === 1 ? 'selecionada' : 'selecionadas'}
+                </span>
+              )}
+            </div>
+          )}
 
-          {selectedIds.size > 0 && (
+          {canBulk && selectedIds.size > 0 && (
             <BulkActionsBar
               count={selectedIds.size}
               isPending={bulkTransit.isPending}
@@ -411,6 +420,7 @@ export function SolicitacoesListPage() {
               <SolicitacaoCard
                 key={row.id}
                 row={row}
+                selectable={canBulk}
                 selected={selectedIds.has(row.id)}
                 onToggleSelect={() => toggleId(row.id)}
                 onOpen={() => navigate(`/solicitacoes/${row.id}`)}
@@ -454,27 +464,30 @@ export function SolicitacoesListPage() {
 
 interface CardProps {
   row: SolicitacaoListRow
+  selectable: boolean
   selected: boolean
   onToggleSelect: () => void
   onOpen: () => void
 }
 
-function SolicitacaoCard({ row, selected, onToggleSelect, onOpen }: CardProps) {
+function SolicitacaoCard({ row, selectable, selected, onToggleSelect, onOpen }: CardProps) {
   const created = row.created_at ? new Date(row.created_at) : null
   return (
     <div
       className={cn(
         'rounded-lg border bg-background p-4 transition-colors hover:border-primary/40',
-        selected && 'border-primary bg-primary/5',
+        selectable && selected && 'border-primary bg-primary/5',
       )}
     >
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
+          {selectable && (
           <Checkbox
             checked={selected}
             onCheckedChange={onToggleSelect}
             aria-label={`Selecionar ${formatNumeroOC(row.numero_interno)}`}
           />
+          )}
           <span className="text-[14px] font-medium text-primary">{formatNumeroOC(row.numero_interno)}</span>
         </div>
         <SolicitacaoStatusBadge status={row.status} />

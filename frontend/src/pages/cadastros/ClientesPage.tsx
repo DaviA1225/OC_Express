@@ -6,9 +6,9 @@ import { z } from 'zod'
 import { Loader2, MapPin } from 'lucide-react'
 import { CrudListPage, useCrudListState, type ColumnDef } from '@/components/shared/CrudListPage'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
-import { useCrudList, useActiveCount, useUpsertRow, useToggleActive, useDeleteRow } from '@/features/crud/useCrudQueries'
+import { useCrudList, useActiveCount, useUpsertRow, useToggleActive, useDeleteRow, useBulkToggleActive, useBulkDeleteRows } from '@/features/crud/useCrudQueries'
 import { useAuth } from '@/hooks/useAuth'
-import { canEditClientes } from '@/features/auth/permissions'
+import { canEditClientes, canUseBulkActions } from '@/features/auth/permissions'
 import {
   Dialog,
   DialogContent,
@@ -164,6 +164,7 @@ const TIPO_FILTER: Record<TipoCliente, { cliente_minerio: boolean } | { cliente_
 export default function ClientesPage() {
   const { profile } = useAuth()
   const canEdit = canEditClientes(profile)
+  const canBulk = canUseBulkActions(profile)
   const [params, setParams] = useSearchParams()
   const tipo: TipoCliente = params.get('tab') === 'retorno' ? 'retorno' : 'minerio'
   const setTipo = (v: TipoCliente) =>
@@ -195,6 +196,8 @@ export default function ClientesPage() {
   const upsert = useUpsertRow('clientes', tipo === 'minerio' ? 'Cliente de minério' : 'Cliente de retorno')
   const toggle = useToggleActive('clientes', 'Cliente')
   const remove = useDeleteRow('clientes', 'Cliente')
+  const bulkToggle = useBulkToggleActive('clientes', 'Cliente')
+  const bulkDelete = useBulkDeleteRows('clientes', 'Cliente')
 
   const [editing, setEditing] = React.useState<Row | null>(null)
   const [open, setOpen] = React.useState(false)
@@ -285,6 +288,8 @@ export default function ClientesPage() {
           onEdit={canEdit ? (r) => { setEditing(r); setOpen(true) } : undefined}
           onToggleActive={canEdit ? (r) => setConfirmRow(r) : undefined}
           onDelete={canEdit ? (r) => setDeleteRow(r) : undefined}
+          onBulkToggleActive={canBulk ? async (ids, ativo) => { await bulkToggle.mutateAsync({ ids, ativo }) } : undefined}
+          onBulkDelete={canBulk ? async (ids) => { await bulkDelete.mutateAsync({ ids }) } : undefined}
           emptyTitle={emptyTitle}
           emptyDescription={emptyDescription}
           page={state.page}

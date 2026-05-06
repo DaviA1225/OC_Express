@@ -44,6 +44,43 @@
 
     --radius: 0.375rem;                  /* 6px botões/inputs */
   }
+
+  .dark {
+    --background: 222 47% 7%;            /* #0B1020 bg base escuro */
+    --foreground: 210 40% 96%;           /* #F1F5F9 texto claro */
+
+    --card: 222 39% 11%;                 /* #131A2B */
+    --card-foreground: 210 40% 96%;
+
+    --popover: 222 39% 11%;
+    --popover-foreground: 210 40% 96%;
+
+    --primary: 217 91% 60%;              /* #3B82F6 mais luminoso pra dark */
+    --primary-hover: 217 91% 68%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 215 19% 35%;
+    --secondary-foreground: 210 40% 96%;
+
+    --muted: 222 28% 14%;                /* #1A2236 */
+    --muted-foreground: 215 20% 65%;
+
+    --accent: 38 92% 55%;
+    --accent-foreground: 222 47% 11%;
+
+    --destructive: 0 72% 55%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 160 70% 45%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 92% 55%;
+    --warning-foreground: 222 47% 11%;
+
+    --border: 215 27% 18%;               /* #25324A */
+    --input: 215 27% 18%;
+    --ring: 217 91% 60%;
+  }
 }
 
 @layer base {

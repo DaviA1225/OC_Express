@@ -1,10 +1,31 @@
 import * as React from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Bell, Hourglass, FileX, CalendarClock } from 'lucide-react'
+import { Bell, Hourglass, FileX, CalendarClock, CheckCheck } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useNotifications, NOTIFICATION_LABELS, type NotificationKind, type NotificationItem } from './useNotifications'
 import { formatNumeroOC } from '@/lib/utils'
 import { cn } from '@/lib/utils'
+
+const DISMISSED_KEY = 'sislog.notifications.dismissed'
+
+function loadDismissed(): Set<string> {
+  if (typeof window === 'undefined') return new Set()
+  try {
+    const raw = window.localStorage.getItem(DISMISSED_KEY)
+    return new Set(raw ? (JSON.parse(raw) as string[]) : [])
+  } catch {
+    return new Set()
+  }
+}
+
+function saveDismissed(s: Set<string>) {
+  try {
+    window.localStorage.setItem(DISMISSED_KEY, JSON.stringify(Array.from(s)))
+  } catch {
+    // sem espaço/desabilitado — silencioso
+  }
+}
 
 const KIND_ORDER: NotificationKind[] = ['validade_vencendo', 'sem_oc', 'pendente']
 
@@ -17,19 +38,33 @@ const KIND_STYLES: Record<NotificationKind, { dot: string; icon: React.Component
 export function NotificationsBell() {
   const navigate = useNavigate()
   const [open, setOpen] = React.useState(false)
+  const [dismissed, setDismissed] = React.useState<Set<string>>(() => loadDismissed())
   const { data, isLoading } = useNotifications()
-  const total = data?.length ?? 0
+
+  const keyOf = (i: NotificationItem) => `${i.kind}:${i.id}`
+  const visible = React.useMemo(
+    () => (data ?? []).filter((i) => !dismissed.has(keyOf(i))),
+    [data, dismissed],
+  )
+  const total = visible.length
 
   const grouped: Record<NotificationKind, NotificationItem[]> = {
     pendente: [],
     sem_oc: [],
     validade_vencendo: [],
   }
-  for (const item of data ?? []) grouped[item.kind].push(item)
+  for (const item of visible) grouped[item.kind].push(item)
 
   const handleSelect = (id: string) => {
     setOpen(false)
     navigate(`/solicitacoes/${id}`)
+  }
+
+  const handleDismissAll = () => {
+    const next = new Set(dismissed)
+    for (const item of data ?? []) next.add(keyOf(item))
+    saveDismissed(next)
+    setDismissed(next)
   }
 
   return (
@@ -50,14 +85,24 @@ export function NotificationsBell() {
         </button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-[360px] p-0">
-        <header className="flex items-center justify-between border-b px-3 py-2">
-          <div>
+        <header className="flex items-center justify-between gap-2 border-b px-3 py-2">
+          <div className="min-w-0">
             <p className="text-[13px] font-medium text-foreground">Alertas operacionais</p>
-            <p className="text-[10px] text-muted-foreground">Atualiza automaticamente a cada minuto</p>
+            <p className="text-[10px] text-muted-foreground">Atualiza a cada minuto · {total} {total === 1 ? 'item' : 'itens'}</p>
           </div>
-          <span className="text-[11px] text-muted-foreground">
-            {total} {total === 1 ? 'item' : 'itens'}
-          </span>
+          {total > 0 && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 shrink-0 text-[11px]"
+              onClick={handleDismissAll}
+              title="Marcar todos como lidos e ocultar"
+            >
+              <CheckCheck className="h-3.5 w-3.5" />
+              Limpar tudo
+            </Button>
+          )}
         </header>
 
         <div className="max-h-[400px] overflow-y-auto">

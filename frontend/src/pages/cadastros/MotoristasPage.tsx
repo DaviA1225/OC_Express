@@ -5,7 +5,9 @@ import { z } from 'zod'
 import { Loader2 } from 'lucide-react'
 import { CrudListPage, useCrudListState, type ColumnDef } from '@/components/shared/CrudListPage'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
-import { useCrudList, useActiveCount, useUpsertRow, useToggleActive, useDeleteRow } from '@/features/crud/useCrudQueries'
+import { useCrudList, useActiveCount, useUpsertRow, useToggleActive, useDeleteRow, useBulkToggleActive, useBulkDeleteRows } from '@/features/crud/useCrudQueries'
+import { useAuth } from '@/hooks/useAuth'
+import { canEditCadastrosOperacionais, canUseBulkActions } from '@/features/auth/permissions'
 import {
   Dialog,
   DialogContent,
@@ -37,6 +39,9 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>
 
 export default function MotoristasPage() {
+  const { profile } = useAuth()
+  const canEdit = canEditCadastrosOperacionais(profile)
+  const canBulk = canUseBulkActions(profile)
   const state = useCrudListState()
   const list = useCrudList('motoristas', {
     search: state.debouncedSearch,
@@ -51,6 +56,8 @@ export default function MotoristasPage() {
   const upsert = useUpsertRow('motoristas', 'Motorista')
   const toggle = useToggleActive('motoristas', 'Motorista')
   const remove = useDeleteRow('motoristas', 'Motorista')
+  const bulkToggle = useBulkToggleActive('motoristas', 'Motorista')
+  const bulkDelete = useBulkDeleteRows('motoristas', 'Motorista')
 
   const [editing, setEditing] = React.useState<Row | null>(null)
   const [open, setOpen] = React.useState(false)
@@ -67,8 +74,8 @@ export default function MotoristasPage() {
     <>
       <CrudListPage<Row>
         title="Motoristas"
-        newButtonLabel="Novo motorista"
-        onNew={() => { setEditing(null); setOpen(true) }}
+        newButtonLabel={canEdit ? 'Novo motorista' : undefined}
+        onNew={canEdit ? () => { setEditing(null); setOpen(true) } : undefined}
         rows={list.data?.data}
         isLoading={list.isLoading}
         totalActive={totalActive.data ?? 0}
@@ -79,15 +86,17 @@ export default function MotoristasPage() {
         onShowInactiveChange={state.setShowInactive}
         columns={columns}
         rowLabel={(r) => r.nome_completo}
-        onEdit={(r) => { setEditing(r); setOpen(true) }}
-        onToggleActive={(r) => setConfirmRow(r)}
-        onDelete={(r) => setDeleteRow(r)}
+        onEdit={canEdit ? (r) => { setEditing(r); setOpen(true) } : undefined}
+        onToggleActive={canEdit ? (r) => setConfirmRow(r) : undefined}
+        onDelete={canEdit ? (r) => setDeleteRow(r) : undefined}
         emptyTitle="Nenhum motorista cadastrado"
         emptyDescription="Cadastre os motoristas que poderão ser indicados nas OCs."
         page={state.page}
         pageSize={state.pageSize}
         totalCount={list.data?.count ?? 0}
         onPageChange={state.setPage}
+        onBulkToggleActive={canBulk ? async (ids, ativo) => { await bulkToggle.mutateAsync({ ids, ativo }) } : undefined}
+        onBulkDelete={canBulk ? async (ids) => { await bulkDelete.mutateAsync({ ids }) } : undefined}
       />
 
       <MotoristaForm

@@ -5,7 +5,9 @@ import { z } from 'zod'
 import { Loader2 } from 'lucide-react'
 import { CrudListPage, useCrudListState, type ColumnDef } from '@/components/shared/CrudListPage'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
-import { useCrudList, useActiveCount, useUpsertRow, useToggleActive, useDeleteRow } from '@/features/crud/useCrudQueries'
+import { useCrudList, useActiveCount, useUpsertRow, useToggleActive, useDeleteRow, useBulkToggleActive, useBulkDeleteRows } from '@/features/crud/useCrudQueries'
+import { useAuth } from '@/hooks/useAuth'
+import { canEditCadastrosOperacionais, canUseBulkActions } from '@/features/auth/permissions'
 import { useCrudOptions } from '@/features/crud/useCrudOptions'
 import {
   Dialog,
@@ -55,6 +57,9 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>
 
 export default function CarretasPage() {
+  const { profile } = useAuth()
+  const canEdit = canEditCadastrosOperacionais(profile)
+  const canBulk = canUseBulkActions(profile)
   const state = useCrudListState()
   const list = useCrudList('carretas', {
     search: state.debouncedSearch,
@@ -69,6 +74,8 @@ export default function CarretasPage() {
   const upsert = useUpsertRow('carretas', 'Carreta')
   const toggle = useToggleActive('carretas', 'Carreta')
   const remove = useDeleteRow('carretas', 'Carreta')
+  const bulkToggle = useBulkToggleActive('carretas', 'Carreta')
+  const bulkDelete = useBulkDeleteRows('carretas', 'Carreta')
 
   const subOptions = useCrudOptions<Subcontratada>({
     table: 'subcontratadas',
@@ -101,8 +108,8 @@ export default function CarretasPage() {
     <>
       <CrudListPage<Row>
         title="Carretas"
-        newButtonLabel="Nova carreta"
-        onNew={() => { setEditing(null); setOpen(true) }}
+        newButtonLabel={canEdit ? 'Nova carreta' : undefined}
+        onNew={canEdit ? () => { setEditing(null); setOpen(true) } : undefined}
         rows={list.data?.data}
         isLoading={list.isLoading}
         totalActive={totalActive.data ?? 0}
@@ -113,15 +120,17 @@ export default function CarretasPage() {
         onShowInactiveChange={state.setShowInactive}
         columns={columns}
         rowLabel={(r) => r.placa}
-        onEdit={(r) => { setEditing(r); setOpen(true) }}
-        onToggleActive={(r) => setConfirmRow(r)}
-        onDelete={(r) => setDeleteRow(r)}
+        onEdit={canEdit ? (r) => { setEditing(r); setOpen(true) } : undefined}
+        onToggleActive={canEdit ? (r) => setConfirmRow(r) : undefined}
+        onDelete={canEdit ? (r) => setDeleteRow(r) : undefined}
         emptyTitle="Nenhuma carreta cadastrada"
         emptyDescription="Cadastre as carretas que poderão ser indicadas nas OCs."
         page={state.page}
         pageSize={state.pageSize}
         totalCount={list.data?.count ?? 0}
         onPageChange={state.setPage}
+        onBulkToggleActive={canBulk ? async (ids, ativo) => { await bulkToggle.mutateAsync({ ids, ativo }) } : undefined}
+        onBulkDelete={canBulk ? async (ids) => { await bulkDelete.mutateAsync({ ids }) } : undefined}
       />
 
       <CarretaForm

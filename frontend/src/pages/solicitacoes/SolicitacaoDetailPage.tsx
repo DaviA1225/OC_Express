@@ -17,6 +17,8 @@ import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { SolicitacaoStatusBadge } from '@/components/shared/SolicitacaoStatusBadge'
 import { useSolicitacao, useUpdateSolicitacao, useTransitStatus } from '@/features/solicitacoes/useSolicitacoes'
 import { canCancel, isEditable } from '@/features/solicitacoes/status'
+import { useAuth } from '@/hooks/useAuth'
+import { canEditSolicitacoes } from '@/features/auth/permissions'
 import { useCrudOptions } from '@/features/crud/useCrudOptions'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
@@ -44,6 +46,8 @@ const LOCAIS_CARREGAMENTO = ['TUPACERY', 'URUCUM'] as const
 export function SolicitacaoDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { profile } = useAuth()
+  const canEdit = canEditSolicitacoes(profile)
   const detail = useSolicitacao(id)
   const update = useUpdateSolicitacao()
   const transit = useTransitStatus()
@@ -92,7 +96,7 @@ export function SolicitacaoDetailPage() {
   }
 
   const s = detail.data
-  const editable = isEditable(s.status)
+  const editable = isEditable(s.status) && canEdit
 
   return (
     <div className="space-y-4">
@@ -114,28 +118,30 @@ export function SolicitacaoDetailPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <StatusActions
-            status={s.status}
-            hasInstrucao={!!s.numero_instrucao}
-            onAdvanceInstrucao={() => {
-              setInstrInput(s.numero_instrucao ?? '')
-              setShowInstrForm(true)
-            }}
-            onAdvanceFinalizar={() => {
-              if (id) transit.mutate({
-                id,
-                status: 'finalizada',
-                extra: { finalizada_em: new Date().toISOString() },
-              })
-            }}
-            onMarcarEmCadastro={() => {
-              if (id) transit.mutate({ id, status: 'em_cadastro' })
-            }}
-            onGerarOC={() => setOpenGerarOC(true)}
-            onEnviarWhats={() => setOpenWhats(true)}
-            disabled={transit.isPending}
-          />
-          {canCancel(s.status) && (
+          {canEdit && (
+            <StatusActions
+              status={s.status}
+              hasInstrucao={!!s.numero_instrucao}
+              onAdvanceInstrucao={() => {
+                setInstrInput(s.numero_instrucao ?? '')
+                setShowInstrForm(true)
+              }}
+              onAdvanceFinalizar={() => {
+                if (id) transit.mutate({
+                  id,
+                  status: 'finalizada',
+                  extra: { finalizada_em: new Date().toISOString() },
+                })
+              }}
+              onMarcarEmCadastro={() => {
+                if (id) transit.mutate({ id, status: 'em_cadastro' })
+              }}
+              onGerarOC={() => setOpenGerarOC(true)}
+              onEnviarWhats={() => setOpenWhats(true)}
+              disabled={transit.isPending}
+            />
+          )}
+          {canEdit && canCancel(s.status) && (
             <Button variant="ghost" size="sm" onClick={() => setConfirmCancel(true)} className="text-destructive hover:text-destructive">
               <X className="h-4 w-4" />
               Cancelar

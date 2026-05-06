@@ -12,10 +12,12 @@ import {
   useUpsertRow,
   useToggleActive,
   useDeleteRow,
+  useBulkToggleActive,
+  useBulkDeleteRows,
 } from '@/features/crud/useCrudQueries'
 import { useCrudOptions } from '@/features/crud/useCrudOptions'
 import { useAuth } from '@/hooks/useAuth'
-import { canEditCargasRetorno } from '@/features/auth/permissions'
+import { canEditCargasRetorno, canUseBulkActions } from '@/features/auth/permissions'
 import {
   Dialog,
   DialogContent,
@@ -44,6 +46,7 @@ type FormValues = z.infer<typeof schema>
 export default function CargasRetornoPage() {
   const { profile } = useAuth()
   const canEdit = canEditCargasRetorno(profile)
+  const canBulk = canUseBulkActions(profile)
   const state = useCrudListState()
   const list = useCrudList('cargas_retorno', {
     search: state.debouncedSearch,
@@ -58,6 +61,8 @@ export default function CargasRetornoPage() {
   const upsert = useUpsertRow('cargas_retorno', 'Carga de retorno')
   const toggle = useToggleActive('cargas_retorno', 'Carga de retorno')
   const remove = useDeleteRow('cargas_retorno', 'Carga de retorno')
+  const bulkToggle = useBulkToggleActive('cargas_retorno', 'Carga de retorno')
+  const bulkDelete = useBulkDeleteRows('cargas_retorno', 'Carga de retorno')
 
   const clientes = useCrudOptions<ClienteOpt>({
     table: 'clientes',
@@ -127,6 +132,8 @@ export default function CargasRetornoPage() {
         onEdit={canEdit ? (r) => { setEditing(r); setOpen(true) } : undefined}
         onToggleActive={canEdit ? (r) => setConfirmRow(r) : undefined}
         onDelete={canEdit ? (r) => setDeleteRow(r) : undefined}
+        onBulkToggleActive={canBulk ? async (ids, ativo) => { await bulkToggle.mutateAsync({ ids, ativo }) } : undefined}
+        onBulkDelete={canBulk ? async (ids) => { await bulkDelete.mutateAsync({ ids }) } : undefined}
         emptyTitle="Nenhuma carga de retorno cadastrada"
         emptyDescription="Cadastre pares cliente + local de carregamento que serão usados em solicitações tipo retorno."
         page={state.page}
