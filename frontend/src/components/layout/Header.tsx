@@ -20,7 +20,7 @@ interface HeaderProps {
   realtimeStatus?: RealtimeStatus
 }
 
-export function Header({ pageTitle, onOpenMobileMenu, onOpenSearch, realtimeStatus = 'idle' }: HeaderProps) {
+export function Header({ pageTitle, onOpenMobileMenu, onOpenSearch, realtimeStatus = 'connecting' }: HeaderProps) {
   const { profile, user, signOut } = useAuth()
   const navigate = useNavigate()
 
@@ -122,7 +122,6 @@ export function Header({ pageTitle, onOpenMobileMenu, onOpenSearch, realtimeStat
 
 function RealtimeIndicator({ status }: { status: RealtimeStatus }) {
   const config: Record<RealtimeStatus, { dot: string; label: string }> = {
-    idle: { dot: 'bg-slate-300', label: 'Aguardando…' },
     connecting: { dot: 'bg-amber-400 animate-pulse', label: 'Conectando…' },
     live: { dot: 'bg-emerald-500', label: 'Ao vivo · sincronizado entre usuários' },
     error: { dot: 'bg-red-500', label: 'Sem conexão em tempo real' },

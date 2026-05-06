@@ -2,7 +2,7 @@ import * as React from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 
-export type RealtimeStatus = 'idle' | 'connecting' | 'live' | 'error'
+export type RealtimeStatus = 'connecting' | 'live' | 'error'
 
 /**
  * Subscribe once (per logged-in app session) to changes on solicitacoes and
@@ -13,10 +13,9 @@ export type RealtimeStatus = 'idle' | 'connecting' | 'live' | 'error'
  */
 export function useRealtimeSubscriptions(): RealtimeStatus {
   const qc = useQueryClient()
-  const [status, setStatus] = React.useState<RealtimeStatus>('idle')
+  const [status, setStatus] = React.useState<RealtimeStatus>('connecting')
 
   React.useEffect(() => {
-    setStatus('connecting')
     const channel = supabase
       .channel('app-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'solicitacoes' }, () => {
