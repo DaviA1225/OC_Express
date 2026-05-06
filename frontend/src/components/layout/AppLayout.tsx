@@ -2,6 +2,7 @@ import * as React from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { SidebarContent } from './Sidebar'
 import { Header } from './Header'
+import { GlobalProgressBar } from './GlobalProgressBar'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { NovaSolicitacaoProvider } from '@/features/solicitacoes/NovaSolicitacaoProvider'
 import { useRealtimeSubscriptions } from '@/features/realtime/useRealtimeSubscriptions'
@@ -79,6 +80,7 @@ export function AppLayout() {
 
   return (
     <div className="flex h-full">
+      <GlobalProgressBar />
       {/* Sidebar desktop */}
       <div className="hidden md:flex">
         <SidebarContent

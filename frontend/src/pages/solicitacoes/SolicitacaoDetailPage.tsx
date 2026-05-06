@@ -294,19 +294,28 @@ function StatusActions({ status, hasInstrucao, onAdvanceInstrucao, onAdvanceFina
 }
 
 function CardShell({
-  title, editable, isEditing, onEdit, onCancel, children,
+  title, editable, isEditing, onEdit, onCancel, saving, children,
 }: {
   title: string
   editable: boolean
   isEditing: boolean
   onEdit: () => void
   onCancel: () => void
+  saving?: boolean
   children: React.ReactNode
 }) {
   return (
     <section className="rounded-lg border bg-background">
       <header className="flex items-center justify-between border-b px-4 py-2">
-        <h2 className="text-[14px] font-medium text-foreground">{title}</h2>
+        <div className="flex items-center gap-2">
+          <h2 className="text-[14px] font-medium text-foreground">{title}</h2>
+          {saving && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-800">
+              <Loader2 className="h-2.5 w-2.5 animate-spin" />
+              Salvando…
+            </span>
+          )}
+        </div>
         {editable && !isEditing && (
           <Button variant="ghost" size="sm" onClick={onEdit} aria-label={`Editar ${title}`}>
             <Pencil className="h-4 w-4" />
@@ -360,7 +369,7 @@ function SolicitanteCard({ solicitacao, editable, onSave }: CardProps) {
   }
 
   return (
-    <CardShell title="Solicitante" editable={editable} isEditing={editing} onEdit={() => setEditing(true)} onCancel={() => setEditing(false)}>
+    <CardShell title="Solicitante" editable={editable} isEditing={editing} onEdit={() => setEditing(true)} onCancel={() => setEditing(false)} saving={saving}>
       {!editing ? (
         <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-[13px]">
           <Field label="Nome" value={solicitacao.solicitante_nome} />
@@ -452,7 +461,7 @@ function MotoristaVeiculoCard({ solicitacao, editable, onSave }: CardProps) {
   }
 
   return (
-    <CardShell title="Motorista e veículo" editable={editable} isEditing={editing} onEdit={() => setEditing(true)} onCancel={() => setEditing(false)}>
+    <CardShell title="Motorista e veículo" editable={editable} isEditing={editing} onEdit={() => setEditing(true)} onCancel={() => setEditing(false)} saving={saving}>
       {!editing ? (
         <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-[13px]">
           <Field label="Motorista" value={solicitacao.motorista?.nome_completo} />
@@ -581,7 +590,7 @@ function DestinoMaterialCard({ solicitacao, editable, onSave }: CardProps) {
       : null
 
   return (
-    <CardShell title="Destino e material" editable={editable} isEditing={editing} onEdit={() => setEditing(true)} onCancel={() => setEditing(false)}>
+    <CardShell title="Destino e material" editable={editable} isEditing={editing} onEdit={() => setEditing(true)} onCancel={() => setEditing(false)} saving={saving}>
       {!editing ? (
         <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-[13px]">
           <Field label="Cliente" value={solicitacao.cliente?.razao_social} />
@@ -734,7 +743,7 @@ function ObservacoesCard({ solicitacao, editable, onSave }: CardProps) {
   }
 
   return (
-    <CardShell title="Observações" editable={editable} isEditing={editing} onEdit={() => setEditing(true)} onCancel={() => setEditing(false)}>
+    <CardShell title="Observações" editable={editable} isEditing={editing} onEdit={() => setEditing(true)} onCancel={() => setEditing(false)} saving={saving}>
       {!editing ? (
         <p className="whitespace-pre-wrap text-[13px] text-foreground">
           {solicitacao.observacoes ?? <span className="text-muted-foreground">Sem observações.</span>}
