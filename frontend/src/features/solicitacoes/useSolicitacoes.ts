@@ -362,3 +362,60 @@ export function useBulkTransitStatus() {
     },
   })
 }
+
+export function useBulkDeleteSolicitacoes() {
+  const qc = useQueryClient()
+  return useMutation<
+    { ids: string[] },
+    unknown,
+    { ids: string[] },
+    BulkContext
+  >({
+    mutationFn: async ({ ids }) => {
+      const { error } = await supabase
+        .from('solicitacoes')
+        .delete()
+        .in('id', ids)
+      if (error) throw error
+      return { ids }
+    },
+    onMutate: async ({ ids }) => {
+      await qc.cancelQueries({ queryKey: ['solicitacoes'] })
+      const previousLists = qc.getQueriesData({ queryKey: ['solicitacoes'] })
+      const idSet = new Set(ids)
+      qc.setQueriesData<{ data: SolicitacaoListRow[]; count: number } | undefined>(
+        { queryKey: ['solicitacoes'] },
+        (old) => {
+          if (!old?.data) return old
+          const filtered = old.data.filter((row) => !idSet.has(row.id))
+          return {
+            ...old,
+            data: filtered,
+            count: Math.max(0, old.count - (old.data.length - filtered.length)),
+          }
+        },
+      )
+      for (const id of ids) {
+        qc.removeQueries({ queryKey: ['solicitacao', id] })
+      }
+      return { previousLists }
+    },
+    onError: (e, _vars, ctx) => {
+      if (ctx) {
+        for (const [key, value] of ctx.previousLists) {
+          qc.setQueryData(key as readonly unknown[], value)
+        }
+      }
+      toast.error(traduzirErroBanco(e))
+    },
+    onSuccess: ({ ids }) => {
+      toast.success(`${ids.length} ${ids.length === 1 ? 'solicitação excluída' : 'solicitações excluídas'}`)
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ['solicitacoes'] })
+      qc.invalidateQueries({ queryKey: ['dashboard-counts'] })
+      qc.invalidateQueries({ queryKey: ['dashboard-status-breakdown'] })
+      qc.invalidateQueries({ queryKey: ['dashboard-oldest-pending'] })
+    },
+  })
+}

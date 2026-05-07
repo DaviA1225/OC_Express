@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Plus, Search as SearchIcon, Inbox, Eraser, ChevronLeft, ChevronRight, X, CheckSquare, Square, Download, Loader2 } from 'lucide-react'
+import { Plus, Search as SearchIcon, Inbox, Eraser, ChevronLeft, ChevronRight, X, CheckSquare, Square, Download, Loader2, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -22,6 +22,7 @@ import { useCrudOptions } from '@/features/crud/useCrudOptions'
 import {
   useSolicitacoesList,
   useBulkTransitStatus,
+  useBulkDeleteSolicitacoes,
   fetchSolicitacoesParaExport,
   type ListFilters,
   type PeriodoFiltro,
@@ -128,9 +129,11 @@ export function SolicitacoesListPage() {
     table: 'materiais', selectColumns: 'id, nome', orderBy: 'nome',
   })
   const bulkTransit = useBulkTransitStatus()
+  const bulkDelete = useBulkDeleteSolicitacoes()
 
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set())
   const [bulkConfirm, setBulkConfirm] = React.useState<{ status: SolicitacaoStatus; label: string } | null>(null)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = React.useState(false)
 
   const visibleIds = React.useMemo(
     () => (list.data?.data ?? []).map((r) => r.id),
@@ -234,6 +237,13 @@ export function SolicitacoesListPage() {
         ? { enviada_em: new Date().toISOString() }
         : undefined
     await bulkTransit.mutateAsync({ ids, status, extra })
+    clearSelection()
+  }
+
+  const runBulkDelete = async () => {
+    const ids = Array.from(selectedIds)
+    if (ids.length === 0) return
+    await bulkDelete.mutateAsync({ ids })
     clearSelection()
   }
 
@@ -404,7 +414,7 @@ export function SolicitacoesListPage() {
           {canBulk && selectedIds.size > 0 && (
             <BulkActionsBar
               count={selectedIds.size}
-              isPending={bulkTransit.isPending}
+              isPending={bulkTransit.isPending || bulkDelete.isPending}
               onClear={clearSelection}
               onAdvanceEmCadastro={() => runBulkTransit('em_cadastro')}
               onMarkEnviada={() => runBulkTransit('oc_enviada')}
@@ -412,6 +422,7 @@ export function SolicitacoesListPage() {
               onCancelarRequest={() =>
                 setBulkConfirm({ status: 'cancelada', label: 'Cancelar' })
               }
+              onDeleteRequest={() => setDeleteConfirmOpen(true)}
             />
           )}
 
@@ -442,6 +453,19 @@ export function SolicitacoesListPage() {
             await runBulkTransit(bulkConfirm.status)
             setBulkConfirm(null)
           }
+        }}
+      />
+
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        onOpenChange={setDeleteConfirmOpen}
+        title={`Excluir ${selectedIds.size} ${selectedIds.size === 1 ? 'solicitação' : 'solicitações'}?`}
+        description="Esta ação é irreversível. Os registros selecionados e seus dados associados serão removidos permanentemente."
+        confirmLabel="Sim, excluir"
+        destructive
+        onConfirm={async () => {
+          await runBulkDelete()
+          setDeleteConfirmOpen(false)
         }}
       />
 
@@ -522,6 +546,7 @@ interface BulkActionsBarProps {
   onMarkEnviada: () => void
   onMarkFinalizada: () => void
   onCancelarRequest: () => void
+  onDeleteRequest: () => void
 }
 
 function BulkActionsBar({
@@ -532,6 +557,7 @@ function BulkActionsBar({
   onMarkEnviada,
   onMarkFinalizada,
   onCancelarRequest,
+  onDeleteRequest,
 }: BulkActionsBarProps) {
   return (
     <div className="sticky top-2 z-10 flex flex-wrap items-center gap-2 rounded-lg border border-primary/40 bg-primary/5 px-3 py-2 shadow-sm backdrop-blur">
@@ -557,6 +583,16 @@ function BulkActionsBar({
       >
         <X className="h-4 w-4" />
         Cancelar
+      </Button>
+      <Button
+        size="sm"
+        variant="ghost"
+        disabled={isPending}
+        onClick={onDeleteRequest}
+        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+      >
+        <Trash2 className="h-4 w-4" />
+        Excluir
       </Button>
       <span className="ml-auto" />
       <Button size="sm" variant="ghost" disabled={isPending} onClick={onClear}>
