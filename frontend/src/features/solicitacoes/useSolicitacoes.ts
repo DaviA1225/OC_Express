@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { traduzirErroBanco } from '@/features/crud/useCrudQueries'
+import { SLA_ALERT_HOURS, SLA_PENDING_STATUSES } from '@/features/solicitacoes/status'
 import type {
   Tables,
   TablesInsert,
@@ -40,8 +41,13 @@ export interface ListFilters {
   materialId: string | null
   tipo: SolicitacaoTipo | 'todos'
   atendenteId: string | null
+  apenasAtrasadas?: boolean
   page: number
   pageSize: number
+}
+
+function slaThresholdISO(): string {
+  return new Date(Date.now() - SLA_ALERT_HOURS * 3_600_000).toISOString()
 }
 
 function periodoToISO(periodo: PeriodoFiltro): string | null {
@@ -74,6 +80,11 @@ export async function fetchSolicitacoesParaExport(
   if (filters.materialId) query = query.eq('material_id', filters.materialId)
   if (filters.atendenteId) query = query.eq('atendente_id', filters.atendenteId)
   if (filters.tipo !== 'todos') query = query.eq('tipo', filters.tipo)
+  if (filters.apenasAtrasadas) {
+    query = query
+      .in('status', SLA_PENDING_STATUSES)
+      .lt('created_at', slaThresholdISO())
+  }
   const since = periodoToISO(filters.periodo)
   if (since) query = query.gte('created_at', since)
 
@@ -112,6 +123,11 @@ export function useSolicitacoesList(filters: ListFilters) {
       }
       if (filters.tipo !== 'todos') {
         query = query.eq('tipo', filters.tipo)
+      }
+      if (filters.apenasAtrasadas) {
+        query = query
+          .in('status', SLA_PENDING_STATUSES)
+          .lt('created_at', slaThresholdISO())
       }
       const since = periodoToISO(filters.periodo)
       if (since) query = query.gte('created_at', since)

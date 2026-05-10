@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Plus, Search as SearchIcon, Inbox, Eraser, ChevronLeft, ChevronRight, X, CheckSquare, Square, Download, Loader2, Trash2 } from 'lucide-react'
+import { Plus, Search as SearchIcon, Inbox, Eraser, ChevronLeft, ChevronRight, X, CheckSquare, Square, Download, Loader2, Trash2, Clock } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -29,7 +29,7 @@ import {
   type SolicitacaoListRow,
 } from '@/features/solicitacoes/useSolicitacoes'
 import { buildCsv, downloadCsv, type CsvColumn } from '@/lib/csv'
-import { STATUS_LABELS } from '@/features/solicitacoes/status'
+import { STATUS_LABELS, getSlaInfo, type SlaInfo } from '@/features/solicitacoes/status'
 import { formatNumeroOC } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 import type { SolicitacaoStatus, SolicitacaoTipo, Tables } from '@/types/database.types'
@@ -66,6 +66,7 @@ export function SolicitacoesListPage() {
     const raw = params.get('tipo')
     return VALID_TIPOS.includes(raw as SolicitacaoTipo | 'todos') ? (raw as SolicitacaoTipo | 'todos') : 'todos'
   })()
+  const apenasAtrasadas = params.get('atrasadas') === '1'
   const page = Math.max(1, Number(params.get('page')) || 1)
   const pageSize = 30
 
@@ -108,6 +109,11 @@ export function SolicitacoesListPage() {
       if (v !== 'todos') n.set('tipo', v); else n.delete('tipo')
       n.delete('page')
     })
+  const setApenasAtrasadas = (v: boolean) =>
+    updateParams((n) => {
+      if (v) n.set('atrasadas', '1'); else n.delete('atrasadas')
+      n.delete('page')
+    })
   const setPage = (p: number) =>
     updateParams((n) => {
       if (p > 1) n.set('page', String(p)); else n.delete('page')
@@ -120,6 +126,7 @@ export function SolicitacoesListPage() {
     materialId,
     tipo,
     atendenteId: null,
+    apenasAtrasadas,
     page,
     pageSize,
   }
@@ -249,10 +256,10 @@ export function SolicitacoesListPage() {
 
   const totalPages = Math.max(1, Math.ceil((list.data?.count ?? 0) / pageSize))
   const hasFilters =
-    search.trim() !== '' || statuses.length > 0 || periodo !== 'todos' || !!materialId || tipo !== 'todos'
+    search.trim() !== '' || statuses.length > 0 || periodo !== 'todos' || !!materialId || tipo !== 'todos' || apenasAtrasadas
 
   const clearFilters = () => {
-    setSearch(''); setStatuses([]); setPeriodo('todos'); setMaterialId(null); setTipo('todos')
+    setSearch(''); setStatuses([]); setPeriodo('todos'); setMaterialId(null); setTipo('todos'); setApenasAtrasadas(false)
   }
 
   const toggleStatus = (s: SolicitacaoStatus) => {
@@ -336,6 +343,20 @@ export function SolicitacoesListPage() {
         </div>
 
         <div className="flex flex-wrap gap-1.5">
+          <button
+            type="button"
+            onClick={() => setApenasAtrasadas(!apenasAtrasadas)}
+            className={cn(
+              'inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] transition-colors',
+              apenasAtrasadas
+                ? 'border-red-500 bg-red-500 text-white'
+                : 'border-red-300 bg-red-50 text-red-700 hover:bg-red-100 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300',
+            )}
+            title={`Pendentes há mais de ${8}h`}
+          >
+            <Clock className="h-3 w-3" />
+            Atrasadas
+          </button>
           {VALID_STATUSES.map((s) => {
             const active = statuses.includes(s)
             return (
@@ -496,11 +517,14 @@ interface CardProps {
 
 function SolicitacaoCard({ row, selectable, selected, onToggleSelect, onOpen }: CardProps) {
   const created = row.created_at ? new Date(row.created_at) : null
+  const sla = getSlaInfo(row.status, row.created_at)
   return (
     <div
       className={cn(
         'rounded-lg border bg-background p-4 transition-colors hover:border-primary/40',
         selectable && selected && 'border-primary bg-primary/5',
+        !selected && sla?.severity === 'alert' && 'border-red-300 dark:border-red-900/60',
+        !selected && sla?.severity === 'warning' && 'border-amber-300 dark:border-amber-900/60',
       )}
     >
       <div className="flex items-center justify-between gap-2">
@@ -519,7 +543,10 @@ function SolicitacaoCard({ row, selectable, selected, onToggleSelect, onOpen }: 
             </span>
           )}
         </div>
-        <SolicitacaoStatusBadge status={row.status} />
+        <div className="flex shrink-0 items-center gap-1.5">
+          {sla && <SlaBadge sla={sla} />}
+          <SolicitacaoStatusBadge status={row.status} />
+        </div>
       </div>
       <div className="mt-3 border-t pt-3">
         <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-[13px]">
@@ -604,6 +631,23 @@ function BulkActionsBar({
         Limpar seleção
       </Button>
     </div>
+  )
+}
+
+function SlaBadge({ sla }: { sla: SlaInfo }) {
+  const cls =
+    sla.severity === 'alert'
+      ? 'bg-red-100 text-red-800 dark:bg-red-950/60 dark:text-red-300'
+      : 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
+  const titulo = sla.severity === 'alert' ? 'Atrasada' : 'Atenção'
+  return (
+    <span
+      className={cn('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium', cls)}
+      title={`${titulo} — pendente ${sla.label}`}
+    >
+      <Clock className="h-3 w-3" />
+      {sla.label}
+    </span>
   )
 }
 
