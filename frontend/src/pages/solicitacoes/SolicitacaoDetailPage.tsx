@@ -28,6 +28,7 @@ import { useCrudOptions } from '@/features/crud/useCrudOptions'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { AnexosCard } from '@/features/anexos/AnexosCard'
+import { HistoricoCard } from '@/features/solicitacoes/HistoricoCard'
 const GerarOCDialog = React.lazy(() =>
   import('@/features/pdf-generator/GerarOCDialog').then((m) => ({ default: m.GerarOCDialog })),
 )
@@ -198,6 +199,14 @@ export function SolicitacaoDetailPage() {
         </div>
 
         <div className="space-y-4">
+          <HistoricoCard
+            solicitacaoId={s.id}
+            motoristaId={s.motorista_id}
+            veiculoId={s.veiculo_id}
+            clienteId={s.cliente_id}
+            motoristaNome={s.motorista?.nome_completo ?? null}
+            veiculoPlaca={s.veiculo?.placa ?? null}
+          />
           <ObservacoesCard solicitacao={s} editable={editable} onSave={(values) => update.mutateAsync({ id: s.id, values })} />
           <TimelineCard solicitacao={s} />
         </div>
