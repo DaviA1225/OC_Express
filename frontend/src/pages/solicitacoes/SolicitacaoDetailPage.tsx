@@ -27,6 +27,7 @@ import { canEditSolicitacoes } from '@/features/auth/permissions'
 import { useCrudOptions } from '@/features/crud/useCrudOptions'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
+import { AnexosCard } from '@/features/anexos/AnexosCard'
 const GerarOCDialog = React.lazy(() =>
   import('@/features/pdf-generator/GerarOCDialog').then((m) => ({ default: m.GerarOCDialog })),
 )
@@ -193,6 +194,7 @@ export function SolicitacaoDetailPage() {
             />
           )}
           <InstrucaoPdfCard solicitacao={s} />
+          <AnexosCard solicitacaoId={s.id} editable={editable} />
         </div>
 
         <div className="space-y-4">

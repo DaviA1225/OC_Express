@@ -331,6 +331,31 @@ export interface Database {
         }
         Update: Partial<Database['public']['Tables']['cargas_retorno']['Insert']>
       }
+      solicitacao_anexos: {
+        Row: {
+          id: string
+          solicitacao_id: string
+          filename: string
+          storage_path: string
+          mime_type: string | null
+          size_bytes: number | null
+          uploaded_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          solicitacao_id: string
+          filename: string
+          storage_path: string
+          mime_type?: string | null
+          size_bytes?: number | null
+          uploaded_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['solicitacao_anexos']['Insert']>
+      }
       log_auditoria: {
         Row: {
           id: string
