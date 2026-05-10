@@ -236,12 +236,13 @@ export function useDuplicateSolicitacao() {
   const qc = useQueryClient()
   return useMutation<SolicitacaoListRow, unknown, { sourceId: string }>({
     mutationFn: async ({ sourceId }) => {
-      const { data: source, error: fetchErr } = await supabase
+      const { data: rawSource, error: fetchErr } = await supabase
         .from('solicitacoes')
         .select('*')
         .eq('id', sourceId)
         .single()
       if (fetchErr) throw fetchErr
+      const source = rawSource as unknown as Solicitacao
 
       const { data: userData } = await supabase.auth.getUser()
       const atendente_id = userData.user?.id ?? null

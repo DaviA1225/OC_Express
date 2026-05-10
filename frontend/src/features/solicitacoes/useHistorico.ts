@@ -73,8 +73,17 @@ export function useHistoricoOperacional({
             .gte('created_at', desde)
         : Promise.resolve({ count: 0, error: null })
 
-      const ultimaClientePromise = clienteId
-        ? supabase
+      type UltimaRow = {
+        id: string
+        numero_interno: number
+        status: string
+        created_at: string
+      }
+      const ultimaClientePromise: Promise<{
+        data: UltimaRow | null
+        error: { message: string } | null
+      }> = clienteId
+        ? (supabase
             .from('solicitacoes')
             .select('id, numero_interno, status, created_at')
             .eq('motorista_id', motoristaId!)
@@ -82,7 +91,10 @@ export function useHistoricoOperacional({
             .neq('id', currentId)
             .order('created_at', { ascending: false })
             .limit(1)
-            .maybeSingle()
+            .maybeSingle() as unknown as Promise<{
+            data: UltimaRow | null
+            error: { message: string } | null
+          }>)
         : Promise.resolve({ data: null, error: null })
 
       const [recentesRes, veicRes, ultimaRes] = await Promise.all([
