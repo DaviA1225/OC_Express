@@ -716,7 +716,7 @@ function InstrucaoPdfCard({ solicitacao }: { solicitacao: CardProps['solicitacao
                 Abrir PDF
               </a>
             ) : (
-              <span className="text-muted-foreground">— (geração na Fase 5)</span>
+              <span className="text-muted-foreground">—</span>
             )}
           </dd>
         </div>
