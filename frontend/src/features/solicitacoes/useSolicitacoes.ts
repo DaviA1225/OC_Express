@@ -182,6 +182,56 @@ export function useCreateSolicitacao() {
   })
 }
 
+export function useDuplicateSolicitacao() {
+  const qc = useQueryClient()
+  return useMutation<SolicitacaoListRow, unknown, { sourceId: string }>({
+    mutationFn: async ({ sourceId }) => {
+      const { data: source, error: fetchErr } = await supabase
+        .from('solicitacoes')
+        .select('*')
+        .eq('id', sourceId)
+        .single()
+      if (fetchErr) throw fetchErr
+
+      const { data: userData } = await supabase.auth.getUser()
+      const atendente_id = userData.user?.id ?? null
+
+      const payload: TablesInsert<'solicitacoes'> = {
+        tipo: source.tipo,
+        status: 'recebida',
+        solicitante_nome: source.solicitante_nome,
+        solicitante_telefone: source.solicitante_telefone,
+        motorista_id: source.motorista_id,
+        veiculo_id: source.veiculo_id,
+        carreta_id: source.carreta_id,
+        subcontratada_id: source.subcontratada_id,
+        cliente_id: source.cliente_id,
+        material_id: source.material_id,
+        material_subtipo: source.material_subtipo,
+        local_carregamento: source.local_carregamento,
+        observacoes: source.observacoes,
+        atendente_id,
+      }
+
+      const { data, error } = await supabase
+        .from('solicitacoes')
+        .insert(payload as never)
+        .select(SELECT_WITH_JOINS)
+        .single()
+      if (error) throw error
+      return data as unknown as SolicitacaoListRow
+    },
+    onSuccess: (created) => {
+      qc.invalidateQueries({ queryKey: ['solicitacoes'] })
+      qc.invalidateQueries({ queryKey: ['dashboard-counts'] })
+      qc.invalidateQueries({ queryKey: ['dashboard-status-breakdown'] })
+      qc.invalidateQueries({ queryKey: ['dashboard-oldest-pending'] })
+      toast.success(`Solicitação duplicada como #${String(created.numero_interno).padStart(4, '0')}`)
+    },
+    onError: (e: unknown) => toast.error(traduzirErroBanco(e)),
+  })
+}
+
 interface SolicitacaoOptimisticContext {
   previousDetail: [unknown, unknown] | null
   previousLists: [unknown, unknown][]

@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
-import { ArrowLeft, ChevronRight, Loader2, Pencil, X } from 'lucide-react'
+import { ArrowLeft, ChevronRight, Copy, Loader2, Pencil, X } from 'lucide-react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { toast } from 'sonner'
@@ -15,7 +15,12 @@ import {
 } from '@/components/ui/select'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { SolicitacaoStatusBadge } from '@/components/shared/SolicitacaoStatusBadge'
-import { useSolicitacao, useUpdateSolicitacao, useTransitStatus } from '@/features/solicitacoes/useSolicitacoes'
+import {
+  useSolicitacao,
+  useUpdateSolicitacao,
+  useTransitStatus,
+  useDuplicateSolicitacao,
+} from '@/features/solicitacoes/useSolicitacoes'
 import { canCancel, isEditable } from '@/features/solicitacoes/status'
 import { useAuth } from '@/hooks/useAuth'
 import { canEditSolicitacoes } from '@/features/auth/permissions'
@@ -51,8 +56,10 @@ export function SolicitacaoDetailPage() {
   const detail = useSolicitacao(id)
   const update = useUpdateSolicitacao()
   const transit = useTransitStatus()
+  const duplicate = useDuplicateSolicitacao()
 
   const [confirmCancel, setConfirmCancel] = React.useState(false)
+  const [confirmDuplicate, setConfirmDuplicate] = React.useState(false)
   const [instrInput, setInstrInput] = React.useState('')
   const [showInstrForm, setShowInstrForm] = React.useState(false)
   const [openGerarOC, setOpenGerarOC] = React.useState(false)
@@ -147,6 +154,18 @@ export function SolicitacaoDetailPage() {
               Cancelar
             </Button>
           )}
+          {canEdit && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setConfirmDuplicate(true)}
+              disabled={duplicate.isPending}
+              title="Duplicar solicitação"
+            >
+              {duplicate.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Copy className="h-4 w-4" />}
+              Duplicar
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={() => navigate('/solicitacoes')}>
             <ArrowLeft className="h-4 w-4" />
             Voltar
@@ -192,6 +211,19 @@ export function SolicitacaoDetailPage() {
         onConfirm={async () => {
           await transit.mutateAsync({ id: s.id, status: 'cancelada' })
           setConfirmCancel(false)
+        }}
+      />
+
+      <ConfirmDialog
+        open={confirmDuplicate}
+        onOpenChange={setConfirmDuplicate}
+        title="Duplicar solicitação?"
+        description={`Será criada uma nova solicitação com os mesmos dados de ${formatNumeroOC(s.numero_interno)} (motorista, veículo, cliente, material e observações). O status volta para "Recebida" e o número da instrução, PDF e datas de envio são limpos.`}
+        confirmLabel="Sim, duplicar"
+        onConfirm={async () => {
+          const created = await duplicate.mutateAsync({ sourceId: s.id })
+          setConfirmDuplicate(false)
+          navigate(`/solicitacoes/${created.id}`)
         }}
       />
 
