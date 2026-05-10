@@ -561,6 +561,7 @@ function DestinoMaterialCard({ solicitacao, editable, onSave }: CardProps) {
   const cliOpts: ComboboxOption[] = (clientes.data ?? []).map((c) => ({ value: c.id, label: c.razao_social }))
   const materialAtual = (materiais.data ?? []).find((m) => m.id === material) ?? null
   const exigeSubtipo = isMineralMaterial(materialAtual?.nome)
+  const isRetorno = solicitacao.tipo === 'retorno'
 
   if (editing && !exigeSubtipo && subtipo) {
     setSubtipo(null)
@@ -609,7 +610,13 @@ function DestinoMaterialCard({ solicitacao, editable, onSave }: CardProps) {
           <div className="space-y-1.5">
             <Label>Cliente</Label>
             <Combobox options={cliOpts} value={cliente} onChange={setCliente}
-              placeholder="Selecionar cliente" loading={clientes.isLoading} />
+              placeholder="Selecionar cliente" loading={clientes.isLoading}
+              disabled={isRetorno} />
+            {isRetorno && (
+              <p className="text-[11px] text-muted-foreground">
+                Definido pela carga de retorno — não pode ser alterado aqui.
+              </p>
+            )}
           </div>
           <div className={`grid gap-3 ${exigeSubtipo ? 'grid-cols-[1.4fr_1fr]' : 'grid-cols-1'}`}>
             <div className="space-y-1.5">
@@ -637,12 +644,23 @@ function DestinoMaterialCard({ solicitacao, editable, onSave }: CardProps) {
           </div>
           <div className="space-y-1.5">
             <Label>Local de carregamento</Label>
-            <Select value={localCarreg || undefined} onValueChange={setLocalCarreg}>
-              <SelectTrigger><SelectValue placeholder="Selecionar local" /></SelectTrigger>
+            <Select
+              value={localCarreg || undefined}
+              onValueChange={setLocalCarreg}
+              disabled={isRetorno}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder={isRetorno ? '—' : 'Selecionar local'} />
+              </SelectTrigger>
               <SelectContent>
                 {LOCAIS_CARREGAMENTO.map((l) => <SelectItem key={l} value={l}>{l}</SelectItem>)}
               </SelectContent>
             </Select>
+            {isRetorno && (
+              <p className="text-[11px] text-muted-foreground">
+                Definido pela carga de retorno — não pode ser alterado aqui.
+              </p>
+            )}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
