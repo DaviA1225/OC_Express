@@ -74,10 +74,10 @@ export function SidebarContent({ collapsed, onToggleCollapse, onNavigate, classN
       >
         <div className="flex items-center gap-2">
           <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary text-[12px] font-semibold text-primary-foreground">
-            LH
+            SL
           </div>
           {!collapsed && (
-            <span className="text-[14px] font-medium text-foreground">SisLog LHG</span>
+            <span className="text-[14px] font-medium text-foreground">SisLog</span>
           )}
         </div>
       </div>

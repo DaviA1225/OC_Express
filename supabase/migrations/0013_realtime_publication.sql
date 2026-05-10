@@ -1,5 +1,5 @@
 -- =============================================
--- SisLog LHG — Realtime: habilitar publicação para colaboração ao vivo
+-- SisLog — Realtime: habilitar publicação para colaboração ao vivo
 -- =============================================
 -- Garante que solicitacoes e cargas_retorno disparam eventos via supabase_realtime
 -- para que mudanças apareçam em todas as sessões abertas em tempo real.

@@ -1,5 +1,5 @@
 -- =============================================
--- SisLog LHG — Campos extras para geração da OC
+-- SisLog — Campos extras para geração da OC
 -- =============================================
 -- Solicitações ganham subtipo de material (SINTER/HEMATITA/LUMP),
 -- local de carregamento override e datas de validade da OC.

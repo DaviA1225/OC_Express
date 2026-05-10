@@ -1,5 +1,5 @@
 -- =============================================
--- SisLog LHG — Perfis: nova hierarquia (5 níveis)
+-- SisLog — Perfis: nova hierarquia (5 níveis)
 -- =============================================
 -- Renomeia atendente→assistente e documentacao→analista, adiciona gerente.
 -- Hierarquia final: admin > gerente > supervisor > analista > assistente.

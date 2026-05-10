@@ -49,7 +49,7 @@ function DeactivatedAccount() {
       <div className="w-full max-w-md rounded-xl border bg-background p-6 text-center shadow-overlay">
         <h2 className="text-[18px] font-medium text-foreground">Conta desativada</h2>
         <p className="mt-2 text-[13px] text-muted-foreground">
-          Seu acesso ao SisLog LHG foi desativado. Procure o administrador.
+          Seu acesso ao SisLog foi desativado. Procure o administrador.
         </p>
       </div>
     </div>

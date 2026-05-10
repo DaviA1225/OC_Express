@@ -1,5 +1,5 @@
 -- =============================================
--- SisLog LHG — Subcontratada na solicitação
+-- SisLog — Subcontratada na solicitação
 -- =============================================
 -- Solicitações ganham subcontratada_id (override do padrão "subcontratada do cavalo").
 

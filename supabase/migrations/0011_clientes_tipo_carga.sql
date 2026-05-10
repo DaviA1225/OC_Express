@@ -1,5 +1,5 @@
 -- =============================================
--- SisLog LHG — Clientes: tipo de carga (Minério / Retorno)
+-- SisLog — Clientes: tipo de carga (Minério / Retorno)
 -- =============================================
 -- Divide a lista de clientes em duas categorias para evitar mistura na UI.
 -- Os clientes existentes são todos da carga de minério (default true).

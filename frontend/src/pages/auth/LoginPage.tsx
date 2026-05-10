@@ -51,7 +51,7 @@ export default function LoginPage() {
     <div className="flex min-h-full items-center justify-center bg-muted px-4">
       <div className="w-[400px] rounded-xl border bg-background p-6 shadow-overlay">
         <div className="mb-6 text-center">
-          <h1 className="text-[22px] font-medium text-foreground">SisLog LHG</h1>
+          <h1 className="text-[22px] font-medium text-foreground">SisLog</h1>
           <p className="mt-1 text-[13px] text-muted-foreground">
             Sistema de Gestão de Carregamentos
           </p>
@@ -117,7 +117,7 @@ export default function LoginPage() {
         </form>
 
         <p className="mt-6 text-center text-[11px] text-muted-foreground/80">
-          v1.0.0 · LHG Logística
+          v1.0.0 · SisLog
         </p>
       </div>
     </div>

@@ -1,6 +1,6 @@
-# SisLog LHG — Pacote inicial do projeto
+# SisLog — Pacote inicial do projeto
 
-Este é o pacote de partida para construir o sistema SisLog LHG usando Claude Code.
+Este é o pacote de partida para construir o sistema SisLog usando Claude Code.
 
 ## Arquivos deste pacote
 
@@ -53,7 +53,7 @@ Antes de rodar o Claude Code, você precisa:
 6. Cole o prompt inicial abaixo no Claude Code:
 
 ```
-Olá. Você vai construir um sistema web completo chamado SisLog LHG seguindo
+Olá. Você vai construir um sistema web completo chamado SisLog seguindo
 rigorosamente as especificações técnicas em SPEC.md e SPEC-FRONTEND.md.
 
 Antes de começar, leia SPEC.md do início ao fim e confirme que entendeu.

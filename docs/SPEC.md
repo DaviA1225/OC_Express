@@ -1,4 +1,4 @@
-# SisLog LHG — Especificação Técnica do MVP
+# SisLog — Especificação Técnica do MVP
 
 ## 1. Visão geral
 

@@ -1,4 +1,4 @@
-// Tipos do banco SisLog LHG (espelha supabase/migrations/0001_initial_schema.sql).
+// Tipos do banco SisLog (espelha supabase/migrations/0001_initial_schema.sql).
 // Para regenerar a partir do banco real, instale Docker Desktop e rode:
 //   npx supabase gen types typescript --db-url "<DB_URL>" --schema public
 

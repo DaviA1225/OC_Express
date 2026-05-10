@@ -1,5 +1,5 @@
 -- =============================================
--- SisLog LHG — Schema completo (SPEC.md seção 5)
+-- SisLog — Schema completo (SPEC.md seção 5)
 -- =============================================
 -- Atenção: as tabelas legadas (subcontratadas, motoristas, veiculos, ordens)
 -- do backend FastAPI antigo serão substituídas pelas versões do SPEC.

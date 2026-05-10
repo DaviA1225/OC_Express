@@ -1,5 +1,5 @@
 -- =============================================
--- SisLog LHG — Seed inicial (SPEC.md seção 5.10/5.11)
+-- SisLog — Seed inicial (SPEC.md seção 5.10/5.11)
 -- =============================================
 
 -- ---------- 9 Materiais (exatos da seção 5.11) ----------

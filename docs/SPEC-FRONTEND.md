@@ -1,4 +1,4 @@
-# SisLog LHG — Especificação de Front-End
+# SisLog — Especificação de Front-End
 
 Este documento complementa SPEC.md. Onde SPEC.md descreve modelo de dados, fluxos
 de negócio e fases de execução, este documento descreve padrões visuais, layout
@@ -354,12 +354,12 @@ Comportamento por breakpoint:
 ### 6.1 Login (/login)
 - Página fullscreen, fundo bg-muted
 - Card centralizado, 400px de largura, sombra sutil
-- Topo do card: nome "SisLog LHG" em 22px peso 500
+- Topo do card: nome "SisLog" em 22px peso 500
 - Subtítulo: "Sistema de Gestão de Carregamentos" em 13px secondary
 - Campos: email + senha (com botão olho para mostrar/ocultar)
 - Link "Esqueci minha senha" alinhado à direita, 12px primary
 - Botão "Entrar" 100% de largura, primary azul
-- Rodapé do card: "v1.0.0 · LHG Logística" em 11px tertiary
+- Rodapé do card: "v1.0.0 · SisLog" em 11px tertiary
 
 ### 6.2 Dashboard (/dashboard)
 Conforme descrito na seção 4 (padrão de tela), com layout específico:

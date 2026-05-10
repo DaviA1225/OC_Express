@@ -1,5 +1,5 @@
 -- =============================================
--- SisLog LHG — Anexos por solicitação
+-- SisLog — Anexos por solicitação
 -- =============================================
 -- Permite anexar arquivos (prints de WhatsApp, fotos do CRLV, comprovantes
 -- de pesagem, etc.) a uma solicitação. Bucket privado (URLs assinadas)

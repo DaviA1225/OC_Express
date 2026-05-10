@@ -1,5 +1,5 @@
 -- =============================================
--- SisLog LHG — Tabela cargas_retorno
+-- SisLog — Tabela cargas_retorno
 -- =============================================
 -- Cargas de retorno: pares (cliente, local de carregamento) que serão
 -- consumidos na criação de solicitações tipo 'retorno'.
