@@ -20,6 +20,7 @@ export interface RelatorioRow {
   material_id: string | null
   veiculo_id: string | null
   subcontratada_id: string | null
+  atendente_id: string | null
 }
 
 export interface ClienteRef { razao_social: string }
@@ -27,6 +28,7 @@ export interface MotoristaRef { nome_completo: string }
 export interface MaterialRef { nome: string }
 export interface VeiculoRef { placa: string }
 export interface SubcontratadaRef { razao_social: string }
+export interface AtendenteRef { nome_completo: string; perfil: string }
 
 export interface RelatorioDataset {
   rows: RelatorioRow[]
@@ -35,6 +37,7 @@ export interface RelatorioDataset {
   materiais: Map<string, MaterialRef>
   veiculos: Map<string, VeiculoRef>
   subcontratadas: Map<string, SubcontratadaRef>
+  atendentes: Map<string, AtendenteRef>
 }
 
 /** Busca todas as solicitações criadas no período + dicionários para resolver IDs. */
@@ -46,7 +49,7 @@ export function useRelatorioDataset(periodo: PeriodoRelatorio) {
       const { data, error } = await supabase
         .from('solicitacoes')
         .select(
-          'id, numero_interno, status, tipo, created_at, finalizada_em, enviada_em, cliente_id, motorista_id, material_id, veiculo_id, subcontratada_id',
+          'id, numero_interno, status, tipo, created_at, finalizada_em, enviada_em, cliente_id, motorista_id, material_id, veiculo_id, subcontratada_id, atendente_id',
         )
         .gte('created_at', periodo.desde)
         .lt('created_at', periodo.ate)
@@ -60,8 +63,9 @@ export function useRelatorioDataset(periodo: PeriodoRelatorio) {
       const materialIds = Array.from(new Set(rows.map((r) => r.material_id).filter(Boolean) as string[]))
       const veiculoIds = Array.from(new Set(rows.map((r) => r.veiculo_id).filter(Boolean) as string[]))
       const subcontratadaIds = Array.from(new Set(rows.map((r) => r.subcontratada_id).filter(Boolean) as string[]))
+      const atendenteIds = Array.from(new Set(rows.map((r) => r.atendente_id).filter(Boolean) as string[]))
 
-      const [clientesData, motoristasData, materiaisData, veiculosData, subsData] = await Promise.all([
+      const [clientesData, motoristasData, materiaisData, veiculosData, subsData, atendentesData] = await Promise.all([
         clienteIds.length > 0
           ? supabase.from('clientes').select('id, razao_social').in('id', clienteIds)
           : Promise.resolve({ data: [] as { id: string; razao_social: string }[], error: null }),
@@ -77,6 +81,9 @@ export function useRelatorioDataset(periodo: PeriodoRelatorio) {
         subcontratadaIds.length > 0
           ? supabase.from('subcontratadas').select('id, razao_social').in('id', subcontratadaIds)
           : Promise.resolve({ data: [] as { id: string; razao_social: string }[], error: null }),
+        atendenteIds.length > 0
+          ? supabase.from('perfis_usuarios').select('user_id, nome_completo, perfil').in('user_id', atendenteIds)
+          : Promise.resolve({ data: [] as { user_id: string; nome_completo: string; perfil: string }[], error: null }),
       ])
 
       const clientes = new Map<string, ClienteRef>()
@@ -99,10 +106,134 @@ export function useRelatorioDataset(periodo: PeriodoRelatorio) {
       for (const s of (subsData.data ?? []) as { id: string; razao_social: string }[]) {
         subcontratadas.set(s.id, { razao_social: s.razao_social })
       }
+      const atendentes = new Map<string, AtendenteRef>()
+      for (const a of (atendentesData.data ?? []) as { user_id: string; nome_completo: string; perfil: string }[]) {
+        atendentes.set(a.user_id, { nome_completo: a.nome_completo, perfil: a.perfil })
+      }
 
-      return { rows, clientes, motoristas, materiais, veiculos, subcontratadas }
+      return { rows, clientes, motoristas, materiais, veiculos, subcontratadas, atendentes }
     },
   })
+}
+
+// ── TMA por status (via log_auditoria) ─────────────────────────────────────
+
+export interface StatusTransition {
+  registro_id: string
+  from_status: string | null
+  to_status: string
+  at: string
+}
+
+/**
+ * Busca todas as transições de status das solicitações no período.
+ * Reconstrói a linha do tempo a partir do log de auditoria + created_at.
+ */
+export function useStatusTransitions(periodo: PeriodoRelatorio, solicitacaoIds: string[]) {
+  return useQuery({
+    enabled: solicitacaoIds.length > 0,
+    queryKey: ['relatorio-transicoes', periodo.desde, periodo.ate, solicitacaoIds.length],
+    staleTime: 60_000,
+    queryFn: async (): Promise<StatusTransition[]> => {
+      // Supabase aceita listas grandes em .in(); fragmentamos em chunks de 200 só por segurança.
+      const chunks: string[][] = []
+      for (let i = 0; i < solicitacaoIds.length; i += 200) {
+        chunks.push(solicitacaoIds.slice(i, i + 200))
+      }
+      const all: StatusTransition[] = []
+      for (const ch of chunks) {
+        const { data, error } = await supabase
+          .from('log_auditoria')
+          .select('registro_id, dados_antes, dados_depois, created_at')
+          .eq('tabela', 'solicitacoes')
+          .eq('acao', 'UPDATE')
+          .in('registro_id', ch)
+          .order('created_at', { ascending: true })
+          .limit(20_000)
+        if (error) throw error
+        for (const l of (data ?? []) as Array<{
+          registro_id: string
+          dados_antes: { status?: string } | null
+          dados_depois: { status?: string } | null
+          created_at: string
+        }>) {
+          const prev = l.dados_antes?.status ?? null
+          const next = l.dados_depois?.status
+          if (!next || prev === next) continue
+          all.push({
+            registro_id: l.registro_id,
+            from_status: prev,
+            to_status: next,
+            at: l.created_at,
+          })
+        }
+      }
+      return all
+    },
+  })
+}
+
+export interface TmaStatusEntry {
+  status: string
+  avgHours: number
+  medianHours: number
+  count: number
+}
+
+const TMA_STATUS_ORDER = ['recebida', 'em_cadastro', 'instrucao_emitida', 'oc_gerada', 'oc_enviada']
+
+/**
+ * Para cada solicitação, reconstrói a linha do tempo (created_at → ... transições)
+ * e calcula o tempo passado em cada status. Retorna média e mediana por status,
+ * considerando apenas intervalos fechados (status que já foi superado).
+ */
+export function tmaPorStatus(rows: RelatorioRow[], transitions: StatusTransition[]): TmaStatusEntry[] {
+  const byId = new Map<string, StatusTransition[]>()
+  for (const t of transitions) {
+    const arr = byId.get(t.registro_id)
+    if (arr) arr.push(t)
+    else byId.set(t.registro_id, [t])
+  }
+  for (const arr of byId.values()) {
+    arr.sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime())
+  }
+
+  const buckets = new Map<string, number[]>()
+  for (const r of rows) {
+    const transArr = byId.get(r.id) ?? []
+    let cursorTime = new Date(r.created_at).getTime()
+    let cursorStatus = 'recebida'
+    for (const t of transArr) {
+      const at = new Date(t.at).getTime()
+      const hours = (at - cursorTime) / 3_600_000
+      if (hours >= 0) {
+        const list = buckets.get(cursorStatus) ?? []
+        list.push(hours)
+        buckets.set(cursorStatus, list)
+      }
+      cursorTime = at
+      cursorStatus = t.to_status
+    }
+    // intervalo aberto (em curso) é ignorado; só medimos etapas concluídas
+  }
+
+  const order = [...TMA_STATUS_ORDER]
+  for (const status of buckets.keys()) {
+    if (!order.includes(status)) order.push(status)
+  }
+  const out: TmaStatusEntry[] = []
+  for (const status of order) {
+    const arr = buckets.get(status)
+    if (!arr || arr.length === 0) continue
+    const sorted = [...arr].sort((a, b) => a - b)
+    const median =
+      sorted.length % 2 === 1
+        ? sorted[Math.floor(sorted.length / 2)]
+        : (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2
+    const avg = arr.reduce((a, b) => a + b, 0) / arr.length
+    out.push({ status, avgHours: avg, medianHours: median, count: arr.length })
+  }
+  return out
 }
 
 // ── Agregações puras (não tocam o DB) ──────────────────────────────────────
@@ -201,6 +332,15 @@ export function topVeiculos(ds: RelatorioDataset, limit = 10): TopItem[] {
     counts.set(r.veiculo_id, (counts.get(r.veiculo_id) ?? 0) + 1)
   }
   return entriesToTopItems(counts, ds.veiculos, (v) => v.placa, limit)
+}
+
+export function topAtendentes(ds: RelatorioDataset, limit = 10): TopItem[] {
+  const counts = new Map<string, number>()
+  for (const r of ds.rows) {
+    if (!r.atendente_id) continue
+    counts.set(r.atendente_id, (counts.get(r.atendente_id) ?? 0) + 1)
+  }
+  return entriesToTopItems(counts, ds.atendentes, (v) => v.nome_completo, limit)
 }
 
 export function topSubcontratadas(ds: RelatorioDataset, limit = 10): TopItem[] {

@@ -11,6 +11,8 @@ import {
   PieChart,
   Pie,
   Cell,
+  BarChart,
+  Bar,
 } from 'recharts'
 import { ClipboardCheck, ClipboardList, Hourglass, Percent, Download, Loader2 } from 'lucide-react'
 import { format } from 'date-fns'
@@ -20,18 +22,23 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   useRelatorioDataset,
+  useStatusTransitions,
   calcKPIs,
   calcPorDia,
   topClientes,
   topMotoristas,
   topVeiculos,
   topSubcontratadas,
+  topAtendentes,
   porMaterial,
+  tmaPorStatus,
   periodoFromPreset,
   type PeriodoPreset,
   type PeriodoRelatorio,
   type TopItem,
+  type TmaStatusEntry,
 } from '@/features/relatorios/useRelatorios'
+import { STATUS_LABELS } from '@/features/solicitacoes/status'
 import { buildCsv, downloadCsv, type CsvColumn } from '@/lib/csv'
 import { cn } from '@/lib/utils'
 
@@ -67,13 +74,18 @@ export default function RelatoriosPage() {
 
   const ds = useRelatorioDataset(periodo)
 
+  const solicitacaoIds = React.useMemo(() => (ds.data?.rows ?? []).map((r) => r.id), [ds.data])
+  const transitions = useStatusTransitions(periodo, solicitacaoIds)
+
   const kpis = ds.data ? calcKPIs(ds.data.rows) : null
   const porDia = ds.data ? calcPorDia(ds.data.rows, periodo) : []
   const top10Clientes = ds.data ? topClientes(ds.data, 10) : []
   const top10Motoristas = ds.data ? topMotoristas(ds.data, 10) : []
   const top10Veiculos = ds.data ? topVeiculos(ds.data, 10) : []
   const top10Subcontratadas = ds.data ? topSubcontratadas(ds.data, 10) : []
+  const top10Atendentes = ds.data ? topAtendentes(ds.data, 10) : []
   const distribMaterial = ds.data ? porMaterial(ds.data) : []
+  const tmaEntries = ds.data && transitions.data ? tmaPorStatus(ds.data.rows, transitions.data) : []
 
   const [exporting, setExporting] = React.useState(false)
   const exportCsv = () => {
@@ -113,8 +125,18 @@ export default function RelatoriosPage() {
       for (const s of top10Subcontratadas) {
         linhas.push({ secao: 'Top subcontratadas', titulo: s.label, valor: String(s.total) })
       }
+      for (const a of top10Atendentes) {
+        linhas.push({ secao: 'Top atendentes', titulo: a.label, valor: String(a.total) })
+      }
       for (const m of distribMaterial) {
         linhas.push({ secao: 'Por material', titulo: m.label, valor: String(m.total) })
+      }
+      for (const t of tmaEntries) {
+        linhas.push({
+          secao: 'TMA por status',
+          titulo: STATUS_LABELS[t.status as keyof typeof STATUS_LABELS] ?? t.status,
+          valor: `média ${t.avgHours.toFixed(1)}h · mediana ${t.medianHours.toFixed(1)}h · n=${t.count}`,
+        })
       }
       const csv = buildCsv(linhas, cols)
       const ts = new Date()
@@ -190,6 +212,13 @@ export default function RelatoriosPage() {
         <VolumeChart data={porDia} isLoading={ds.isLoading} />
       </Card>
 
+      <Card
+        title="TMA por status"
+        subtitle="Tempo médio até sair de cada etapa (intervalos concluídos)"
+      >
+        <TmaChart entries={tmaEntries} isLoading={ds.isLoading || transitions.isLoading} />
+      </Card>
+
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card title="Top 10 clientes" subtitle="Por número de OCs no período">
           <TopList items={top10Clientes} isLoading={ds.isLoading} emptyText="Nenhum cliente no período." />
@@ -202,6 +231,9 @@ export default function RelatoriosPage() {
         </Card>
         <Card title="Top 10 veículos" subtitle="Por número de OCs no período">
           <TopList items={top10Veiculos} isLoading={ds.isLoading} emptyText="Nenhum veículo no período." />
+        </Card>
+        <Card title="Ranking de atendentes" subtitle="Por número de OCs no período">
+          <TopList items={top10Atendentes} isLoading={ds.isLoading} emptyText="Nenhum atendente atribuído no período." />
         </Card>
       </div>
 
@@ -395,6 +427,69 @@ function TopList({ items, isLoading, emptyText }: TopListProps) {
         )
       })}
     </ul>
+  )
+}
+
+interface TmaChartProps {
+  entries: TmaStatusEntry[]
+  isLoading: boolean
+}
+
+function TmaChart({ entries, isLoading }: TmaChartProps) {
+  if (isLoading) return <Skeleton className="h-[260px] w-full" />
+  if (entries.length === 0) {
+    return (
+      <div className="flex h-[200px] items-center justify-center text-[13px] text-muted-foreground">
+        Sem transições suficientes para calcular TMA. Aumente o período.
+      </div>
+    )
+  }
+  const data = entries.map((e) => ({
+    label: STATUS_LABELS[e.status as keyof typeof STATUS_LABELS] ?? e.status,
+    media: Number(e.avgHours.toFixed(2)),
+    mediana: Number(e.medianHours.toFixed(2)),
+    count: e.count,
+  }))
+  return (
+    <div className="space-y-3">
+      <div className="h-[240px] w-full">
+        <ResponsiveContainer>
+          <BarChart data={data} margin={{ top: 8, right: 16, left: -10, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+            <XAxis dataKey="label" tick={{ fontSize: 11 }} interval={0} />
+            <YAxis
+              tick={{ fontSize: 11 }}
+              label={{ value: 'horas', angle: -90, position: 'insideLeft', fontSize: 11, fill: '#64748b' }}
+            />
+            <Tooltip
+              contentStyle={{ fontSize: 12, borderRadius: 6 }}
+              formatter={(value, name) => [`${Number(value).toFixed(1)} h`, name === 'media' ? 'Média' : 'Mediana']}
+            />
+            <Bar dataKey="media" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="mediana" fill="#94a3b8" radius={[4, 4, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+      <div className="flex items-center justify-center gap-4 text-[11px] text-muted-foreground">
+        <span className="flex items-center gap-1.5">
+          <span className="h-1.5 w-3 rounded-full bg-[#3b82f6]" /> Média
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="h-1.5 w-3 rounded-full bg-[#94a3b8]" /> Mediana
+        </span>
+      </div>
+      <ul className="grid grid-cols-1 gap-1 text-[11px] text-muted-foreground sm:grid-cols-2 md:grid-cols-3">
+        {entries.map((e) => (
+          <li key={e.status} className="truncate">
+            <span className="text-foreground">
+              {STATUS_LABELS[e.status as keyof typeof STATUS_LABELS] ?? e.status}
+            </span>
+            {' · '}
+            {e.count} {e.count === 1 ? 'transição' : 'transições'}
+          </li>
+        ))}
+      </ul>
+    </div>
   )
 }
 
