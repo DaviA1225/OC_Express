@@ -198,6 +198,40 @@ export function useCreateSolicitacao() {
   })
 }
 
+export interface DuplicateCheckCriteria {
+  motoristaId: string
+  veiculoId: string
+  clienteId: string
+}
+
+export interface PossibleDuplicate {
+  id: string
+  numero_interno: number
+  status: SolicitacaoStatus
+  created_at: string
+}
+
+const DUPLICATE_WINDOW_HOURS = 12
+
+export async function findPossibleDuplicate(
+  c: DuplicateCheckCriteria,
+): Promise<PossibleDuplicate | null> {
+  const since = new Date(Date.now() - DUPLICATE_WINDOW_HOURS * 3_600_000).toISOString()
+  const { data, error } = await supabase
+    .from('solicitacoes')
+    .select('id, numero_interno, status, created_at')
+    .eq('motorista_id', c.motoristaId)
+    .eq('veiculo_id', c.veiculoId)
+    .eq('cliente_id', c.clienteId)
+    .not('status', 'in', '("cancelada","finalizada")')
+    .gte('created_at', since)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (error) throw error
+  return (data ?? null) as PossibleDuplicate | null
+}
+
 export function useDuplicateSolicitacao() {
   const qc = useQueryClient()
   return useMutation<SolicitacaoListRow, unknown, { sourceId: string }>({

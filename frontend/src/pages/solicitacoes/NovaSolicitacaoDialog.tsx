@@ -22,7 +22,16 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Combobox, type ComboboxOption } from '@/components/shared/Combobox'
 import { useCrudOptions } from '@/features/crud/useCrudOptions'
-import { useCreateSolicitacao } from '@/features/solicitacoes/useSolicitacoes'
+import {
+  useCreateSolicitacao,
+  findPossibleDuplicate,
+  type PossibleDuplicate,
+} from '@/features/solicitacoes/useSolicitacoes'
+import { STATUS_LABELS } from '@/features/solicitacoes/status'
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
+import { formatNumeroOC } from '@/lib/utils'
+import { formatDistanceToNowStrict } from 'date-fns'
+import { ptBR } from 'date-fns/locale'
 import { isValidTelefone } from '@/lib/validators'
 import { formatTelefone } from '@/lib/utils'
 import { QuickCreateMotorista } from '@/components/forms/QuickCreateMotorista'
@@ -209,6 +218,11 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, onCreated }: Props) 
   const [qcVeic, setQcVeic] = React.useState<{ open: boolean; placa: string }>({ open: false, placa: '' })
   const [qcCar, setQcCar] = React.useState<{ open: boolean; placa: string }>({ open: false, placa: '' })
   const [qcCli, setQcCli] = React.useState<{ open: boolean; nome: string }>({ open: false, nome: '' })
+  const [pendingDup, setPendingDup] = React.useState<{ values: FormValues; dup: PossibleDuplicate } | null>(null)
+
+  React.useEffect(() => {
+    if (!open) setPendingDup(null)
+  }, [open])
 
   const motoristaOptions: ComboboxOption[] = (motoristas.data ?? []).map((m) => ({
     value: m.id, label: m.nome_completo, hint: m.cpf,
@@ -234,7 +248,7 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, onCreated }: Props) 
       .filter(Boolean).join(' · '),
   }))
 
-  const onSubmit = async (values: FormValues) => {
+  const persistSolicitacao = async (values: FormValues) => {
     const isMinerio = values.tipo === 'carregamento'
     const created = await create.mutateAsync({
       tipo: values.tipo as SolicitacaoTipo,
@@ -254,6 +268,28 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, onCreated }: Props) 
     })
     if (created?.id) onCreated?.(created.id)
     onOpenChange(false)
+  }
+
+  const onSubmit = async (values: FormValues) => {
+    if (values.motorista_id && values.veiculo_id && values.cliente_id) {
+      const dup = await findPossibleDuplicate({
+        motoristaId: values.motorista_id,
+        veiculoId: values.veiculo_id,
+        clienteId: values.cliente_id,
+      })
+      if (dup) {
+        setPendingDup({ values, dup })
+        return
+      }
+    }
+    await persistSolicitacao(values)
+  }
+
+  const proceedAnyway = async () => {
+    if (!pendingDup) return
+    const values = pendingDup.values
+    setPendingDup(null)
+    await persistSolicitacao(values)
   }
 
   return (
@@ -527,6 +563,23 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, onCreated }: Props) 
           clientes.refetch()
         }}
       />
+
+      {pendingDup && (
+        <ConfirmDialog
+          open
+          onOpenChange={(o) => !o && setPendingDup(null)}
+          title="Possível solicitação duplicada"
+          description={
+            `Já existe ${formatNumeroOC(pendingDup.dup.numero_interno)} ` +
+            `(${STATUS_LABELS[pendingDup.dup.status]}) com este motorista, veículo e cliente, ` +
+            `criada ${formatDistanceToNowStrict(new Date(pendingDup.dup.created_at), { addSuffix: true, locale: ptBR })}. ` +
+            `Deseja criar uma nova solicitação mesmo assim?`
+          }
+          confirmLabel="Sim, criar mesmo assim"
+          cancelLabel="Voltar para revisar"
+          onConfirm={proceedAnyway}
+        />
+      )}
     </>
   )
 }
