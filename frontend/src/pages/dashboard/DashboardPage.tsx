@@ -1,30 +1,60 @@
 import * as React from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
+import { Link, useSearchParams } from 'react-router-dom'
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  PieChart,
+  Pie,
+  Cell,
+  BarChart,
+  Bar,
+} from 'recharts'
 import {
   ClipboardList,
+  ClipboardCheck,
   Hourglass,
-  FileText,
-  Send,
-  ArrowRight,
+  TrendingUp,
+  TrendingDown,
+  Minus,
+  AlertTriangle,
   Inbox,
+  ArrowRight,
+  Truck,
   RotateCcw,
-  Building2,
 } from 'lucide-react'
-import { formatDistanceToNowStrict } from 'date-fns'
+import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { useAuth } from '@/hooks/useAuth'
 import { Skeleton } from '@/components/ui/skeleton'
-import { SolicitacaoStatusBadge } from '@/components/shared/SolicitacaoStatusBadge'
 import {
-  useDashboardCounts,
-  useStatusBreakdown,
-  useOldestPending,
-  type StatusBreakdownItem,
-} from '@/features/dashboard/useDashboard'
+  useRelatorioDataset,
+  calcKPIs,
+  calcPorDia,
+  topClientes,
+  porTipo,
+  periodoFromPreset,
+  previousPeriod,
+  type PeriodoPreset,
+  type PeriodoRelatorio,
+  type TopItem,
+} from '@/features/relatorios/useRelatorios'
+import { useEstadoAtual, useStatusBreakdown, type StatusBreakdownItem } from '@/features/dashboard/useDashboard'
 import { STATUS_LABELS } from '@/features/solicitacoes/status'
-import { formatNumeroOC } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 import type { SolicitacaoStatus } from '@/types/database.types'
+
+const PRESETS: { value: PeriodoPreset; label: string }[] = [
+  { value: 'hoje', label: 'Hoje' },
+  { value: '7d', label: '7 dias' },
+  { value: '30d', label: '30 dias' },
+  { value: 'mes', label: 'Mês' },
+]
+const VALID_PRESETS = PRESETS.map((p) => p.value) as string[]
 
 const STATUS_HEX: Record<SolicitacaoStatus, string> = {
   recebida: '#94a3b8',
@@ -38,114 +68,266 @@ const STATUS_HEX: Record<SolicitacaoStatus, string> = {
 
 export default function DashboardPage() {
   const { profile } = useAuth()
-  const counts = useDashboardCounts()
+  const [params, setParams] = useSearchParams()
+  const presetRaw = params.get('p')
+  const preset: PeriodoPreset = VALID_PRESETS.includes(presetRaw ?? '')
+    ? (presetRaw as PeriodoPreset)
+    : 'hoje'
+  const periodo = React.useMemo<PeriodoRelatorio>(() => periodoFromPreset(preset), [preset])
+  const periodoAnterior = React.useMemo(() => previousPeriod(periodo), [periodo])
+
+  const ds = useRelatorioDataset(periodo)
+  const dsAnterior = useRelatorioDataset(periodoAnterior)
+  const estado = useEstadoAtual()
   const breakdown = useStatusBreakdown()
-  const oldest = useOldestPending(5)
+
+  const setPreset = (p: PeriodoPreset) => {
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        if (p === 'hoje') next.delete('p')
+        else next.set('p', p)
+        return next
+      },
+      { replace: true },
+    )
+  }
+
+  const kpis = ds.data ? calcKPIs(ds.data.rows) : null
+  const kpisAnt = dsAnterior.data ? calcKPIs(dsAnterior.data.rows) : null
+  const porDia = ds.data ? calcPorDia(ds.data.rows, periodo) : []
+  const top10Clientes = ds.data ? topClientes(ds.data, 5) : []
+  const tipos = ds.data ? porTipo(ds.data.rows) : []
 
   const saudacao = saudar()
   const nome = profile?.nome_completo?.split(' ')[0] ?? 'usuário'
+  const atrasadas = estado.data?.atrasadas ?? 0
+  const pendentesAtuais = estado.data?.pendentes ?? 0
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-[22px] font-medium text-foreground">
-          {saudacao}, {nome}.
-        </h1>
-        <p className="text-[13px] text-muted-foreground">
-          Aqui está o resumo do dia.
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-[24px] font-medium tracking-tight text-foreground">
+            {saudacao}, {nome}.
+          </h1>
+          <p className="text-[12px] text-muted-foreground">
+            {periodo.label} ·{' '}
+            {format(new Date(periodo.desde), 'dd MMM', { locale: ptBR })} a{' '}
+            {format(addDays(new Date(periodo.ate), -1), 'dd MMM yyyy', { locale: ptBR })}
+          </p>
+        </div>
+        <PeriodoTabs value={preset} onChange={setPreset} />
       </div>
+
+      {atrasadas > 0 && (
+        <Link
+          to="/solicitacoes?atrasadas=1"
+          className="flex items-center gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-[13px] transition-colors hover:bg-red-100 dark:border-red-900/60 dark:bg-red-950/40 dark:hover:bg-red-950/60"
+        >
+          <AlertTriangle className="h-4 w-4 shrink-0 text-red-600 dark:text-red-400" />
+          <div className="min-w-0 flex-1">
+            <p className="font-medium text-red-800 dark:text-red-200">
+              {atrasadas} {atrasadas === 1 ? 'solicitação atrasada' : 'solicitações atrasadas'}
+            </p>
+            <p className="text-[11px] text-red-700/80 dark:text-red-300/80">
+              Pendentes há mais de 8 horas — atender com prioridade.
+            </p>
+          </div>
+          <ArrowRight className="h-4 w-4 shrink-0 text-red-600 dark:text-red-400" />
+        </Link>
+      )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Metric
-          label="Criadas hoje"
-          value={counts.data?.criadasHoje}
-          isLoading={counts.isLoading}
-          icon={<ClipboardList className="h-4 w-4 text-blue-600" />}
-          accent="bg-blue-50"
+        <KpiCard
+          label="Total de OCs"
+          value={kpis?.total}
+          previous={kpisAnt?.total}
+          icon={<ClipboardList className="h-4 w-4" />}
+          accent="text-blue-600 bg-blue-50 dark:bg-blue-950/40"
+          isLoading={ds.isLoading}
+          higherIsBetter
         />
-        <Metric
-          label="Pendentes (em aberto)"
-          value={counts.data?.pendentes}
-          isLoading={counts.isLoading}
-          icon={<Hourglass className="h-4 w-4 text-amber-600" />}
-          accent="bg-amber-50"
+        <KpiCard
+          label="Finalizadas"
+          value={kpis?.finalizadas}
+          subValue={kpis ? `${(kpis.taxaFinalizacao * 100).toFixed(0)}% de conclusão` : undefined}
+          previous={kpisAnt?.finalizadas}
+          icon={<ClipboardCheck className="h-4 w-4" />}
+          accent="text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40"
+          isLoading={ds.isLoading}
+          higherIsBetter
         />
-        <Metric
-          label="OCs geradas hoje"
-          value={counts.data?.ocsGeradasHoje}
-          isLoading={counts.isLoading}
-          icon={<FileText className="h-4 w-4 text-indigo-600" />}
-          accent="bg-indigo-50"
+        <KpiCard
+          label="Tempo médio"
+          value={kpis?.tempoMedioHoras != null ? Number(kpis.tempoMedioHoras.toFixed(1)) : null}
+          unit="h"
+          subValue="Criada → finalizada"
+          previous={kpisAnt?.tempoMedioHoras ?? null}
+          icon={<Hourglass className="h-4 w-4" />}
+          accent="text-amber-600 bg-amber-50 dark:bg-amber-950/40"
+          isLoading={ds.isLoading}
+          higherIsBetter={false}
         />
-        <Metric
-          label="OCs enviadas hoje"
-          value={counts.data?.ocsEnviadasHoje}
-          isLoading={counts.isLoading}
-          icon={<Send className="h-4 w-4 text-emerald-600" />}
-          accent="bg-emerald-50"
+        <KpiCard
+          label="Pendentes em aberto"
+          value={pendentesAtuais}
+          subValue="Estado atual da fila"
+          icon={<Inbox className="h-4 w-4" />}
+          accent="text-indigo-600 bg-indigo-50 dark:bg-indigo-950/40"
+          isLoading={estado.isLoading}
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[2fr_3fr]">
+      <Card title="Volume de OCs" subtitle={periodo.label}>
+        <VolumeChart data={porDia} isLoading={ds.isLoading} />
+      </Card>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card title="Solicitações por status" subtitle="Total acumulado">
           <StatusDonut data={breakdown.data ?? []} isLoading={breakdown.isLoading} />
         </Card>
-
+        <Card title="Carregamento × Retorno" subtitle={periodo.label}>
+          <TipoBreakdown data={tipos} isLoading={ds.isLoading} />
+        </Card>
         <Card
-          title="Mais antigas pendentes"
-          subtitle="Atender primeiro"
+          title="Top clientes"
+          subtitle={periodo.label}
           action={
             <Link
-              to="/solicitacoes"
+              to="/relatorios"
               className="inline-flex items-center gap-1 text-[12px] font-medium text-primary hover:underline"
             >
-              Ver todas
+              Ver relatórios
               <ArrowRight className="h-3 w-3" />
             </Link>
           }
         >
-          <OldestList isLoading={oldest.isLoading} rows={oldest.data ?? []} />
+          <TopClientes items={top10Clientes} isLoading={ds.isLoading} />
         </Card>
       </div>
-
-      <Card title="Atalhos rápidos">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <Shortcut to="/solicitacoes" icon={<Inbox className="h-4 w-4" />} title="Solicitações" desc="Ver fila completa" />
-          <Shortcut to="/cargas-retorno" icon={<RotateCcw className="h-4 w-4" />} title="Cargas de Retorno" desc="Cadastros de retorno" />
-          <Shortcut to="/cadastros/clientes" icon={<Building2 className="h-4 w-4" />} title="Clientes" desc="Minério & retorno" />
-        </div>
-      </Card>
     </div>
   )
 }
 
-interface MetricProps {
-  label: string
-  value: number | undefined
-  isLoading: boolean
-  icon: React.ReactNode
-  accent: string
+function addDays(d: Date, days: number): Date {
+  const r = new Date(d)
+  r.setDate(r.getDate() + days)
+  return r
 }
 
-function Metric({ label, value, isLoading, icon, accent }: MetricProps) {
+function PeriodoTabs({ value, onChange }: { value: PeriodoPreset; onChange: (v: PeriodoPreset) => void }) {
   return (
-    <div className="rounded-lg border bg-background p-4">
-      <div className="flex items-center justify-between">
+    <div className="inline-flex rounded-lg border bg-background p-1" role="tablist">
+      {PRESETS.map((p) => (
+        <button
+          key={p.value}
+          type="button"
+          role="tab"
+          aria-selected={value === p.value}
+          onClick={() => onChange(p.value)}
+          className={cn(
+            'rounded-md px-3 py-1 text-[12px] font-medium transition-colors',
+            value === p.value
+              ? 'bg-primary text-primary-foreground shadow-sm'
+              : 'text-foreground/70 hover:bg-muted hover:text-foreground',
+          )}
+        >
+          {p.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+interface KpiCardProps {
+  label: string
+  value: number | null | undefined
+  unit?: string
+  subValue?: string
+  previous?: number | null | undefined
+  icon: React.ReactNode
+  accent: string
+  isLoading: boolean
+  higherIsBetter?: boolean
+}
+
+function KpiCard({
+  label, value, unit, subValue, previous, icon, accent, isLoading, higherIsBetter,
+}: KpiCardProps) {
+  const delta = computeDelta(value, previous)
+  return (
+    <div className="rounded-lg border bg-background p-5 transition-shadow hover:shadow-sm">
+      <div className="flex items-start justify-between gap-2">
         <p className="text-[11px] font-medium uppercase tracking-[0.5px] text-muted-foreground">
           {label}
         </p>
-        <span className={`flex h-7 w-7 items-center justify-center rounded-md ${accent}`}>
+        <span className={cn('flex h-8 w-8 items-center justify-center rounded-md', accent)}>
           {icon}
         </span>
       </div>
       {isLoading ? (
-        <Skeleton className="mt-2 h-8 w-16" />
+        <Skeleton className="mt-3 h-9 w-24" />
       ) : (
-        <p className="mt-1 text-[26px] font-medium tabular-nums text-foreground">
-          {value ?? 0}
-        </p>
+        <div className="mt-2 flex items-baseline gap-1">
+          <span className="text-[28px] font-medium tabular-nums leading-none text-foreground">
+            {value == null ? '—' : value}
+          </span>
+          {unit && value != null && (
+            <span className="text-[14px] text-muted-foreground">{unit}</span>
+          )}
+        </div>
       )}
+      {!isLoading && subValue && (
+        <p className="mt-1.5 text-[11px] text-muted-foreground">{subValue}</p>
+      )}
+      {!isLoading && delta != null && higherIsBetter !== undefined && (
+        <DeltaPill delta={delta} higherIsBetter={higherIsBetter} />
+      )}
+    </div>
+  )
+}
+
+function computeDelta(current: number | null | undefined, previous: number | null | undefined): {
+  pct: number
+  abs: number
+  hasBaseline: boolean
+} | null {
+  if (current == null || previous == null) return null
+  if (!Number.isFinite(current) || !Number.isFinite(previous)) return null
+  const abs = current - previous
+  if (previous === 0) {
+    return { pct: current === 0 ? 0 : 100, abs, hasBaseline: false }
+  }
+  return { pct: ((current - previous) / previous) * 100, abs, hasBaseline: true }
+}
+
+function DeltaPill({
+  delta,
+  higherIsBetter,
+}: {
+  delta: { pct: number; abs: number; hasBaseline: boolean }
+  higherIsBetter: boolean
+}) {
+  const isUp = delta.pct > 0.5
+  const isDown = delta.pct < -0.5
+  const isFlat = !isUp && !isDown
+  const positive = isUp ? higherIsBetter : isDown ? !higherIsBetter : null
+  const Icon = isUp ? TrendingUp : isDown ? TrendingDown : Minus
+  const cls =
+    positive == null
+      ? 'text-muted-foreground'
+      : positive
+      ? 'text-emerald-600 dark:text-emerald-400'
+      : 'text-red-600 dark:text-red-400'
+  const sign = isUp ? '+' : ''
+  return (
+    <div className={cn('mt-3 flex items-center gap-1 text-[11px] font-medium', cls)}>
+      <Icon className="h-3 w-3" />
+      <span>
+        {isFlat ? 'Sem variação' : `${sign}${delta.pct.toFixed(1)}%`}
+      </span>
+      <span className="text-muted-foreground">vs período anterior</span>
     </div>
   )
 }
@@ -172,10 +354,60 @@ function Card({ title, subtitle, action, children }: CardProps) {
   )
 }
 
-function StatusDonut({ data, isLoading }: { data: StatusBreakdownItem[]; isLoading: boolean }) {
-  if (isLoading) {
-    return <Skeleton className="h-[220px] w-full" />
+interface VolumeChartProps {
+  data: { dia: string; total: number; finalizadas: number }[]
+  isLoading: boolean
+}
+
+function VolumeChart({ data, isLoading }: VolumeChartProps) {
+  if (isLoading) return <Skeleton className="h-[260px] w-full" />
+  if (data.length === 0) {
+    return (
+      <div className="flex h-[240px] items-center justify-center text-[13px] text-muted-foreground">
+        Sem dados no período.
+      </div>
+    )
   }
+  const formatted = data.map((d) => ({
+    ...d,
+    label: format(new Date(d.dia), 'dd/MM', { locale: ptBR }),
+  }))
+  return (
+    <div className="h-[260px] w-full">
+      <ResponsiveContainer>
+        <LineChart data={formatted} margin={{ top: 8, right: 16, left: -10, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+          <XAxis dataKey="label" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
+          <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+          <Tooltip
+            contentStyle={{ fontSize: 12, borderRadius: 6 }}
+            labelFormatter={(_, p) => {
+              const item = p?.[0]?.payload as { dia: string } | undefined
+              return item?.dia ? format(new Date(item.dia), "dd 'de' MMMM", { locale: ptBR }) : ''
+            }}
+            formatter={(value, name) => [
+              `${value ?? 0}`,
+              String(name) === 'total' ? 'Criadas' : 'Finalizadas',
+            ]}
+          />
+          <Line type="monotone" dataKey="total" stroke="#3b82f6" strokeWidth={2} dot={{ r: 2 }} activeDot={{ r: 4 }} />
+          <Line type="monotone" dataKey="finalizadas" stroke="#10b981" strokeWidth={2} dot={{ r: 2 }} activeDot={{ r: 4 }} />
+        </LineChart>
+      </ResponsiveContainer>
+      <div className="mt-2 flex items-center justify-center gap-4 text-[11px] text-muted-foreground">
+        <span className="flex items-center gap-1.5">
+          <span className="h-1.5 w-3 rounded-full bg-[#3b82f6]" /> Criadas
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="h-1.5 w-3 rounded-full bg-[#10b981]" /> Finalizadas
+        </span>
+      </div>
+    </div>
+  )
+}
+
+function StatusDonut({ data, isLoading }: { data: StatusBreakdownItem[]; isLoading: boolean }) {
+  if (isLoading) return <Skeleton className="h-[220px] w-full" />
   if (data.length === 0) {
     return (
       <div className="flex h-[220px] items-center justify-center text-[13px] text-muted-foreground">
@@ -184,16 +416,11 @@ function StatusDonut({ data, isLoading }: { data: StatusBreakdownItem[]; isLoadi
     )
   }
   const total = data.reduce((acc, d) => acc + d.count, 0)
-  const chartData = data.map((d) => ({
-    name: STATUS_LABELS[d.status],
-    value: d.count,
-    status: d.status,
-  }))
-
+  const chartData = data.map((d) => ({ name: STATUS_LABELS[d.status], value: d.count, status: d.status }))
   return (
-    <div className="grid grid-cols-1 items-center gap-4 sm:grid-cols-[180px_1fr]">
+    <div className="space-y-3">
       <div className="relative h-[180px]">
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer>
           <PieChart>
             <Pie
               data={chartData}
@@ -219,20 +446,16 @@ function StatusDonut({ data, isLoading }: { data: StatusBreakdownItem[]; isLoadi
           <span className="text-[20px] font-medium tabular-nums text-foreground">{total}</span>
         </div>
       </div>
-
-      <ul className="space-y-1.5">
-        {chartData.map((d) => {
+      <ul className="space-y-1">
+        {chartData.slice(0, 5).map((d) => {
           const pct = total > 0 ? Math.round((d.value / total) * 100) : 0
           return (
             <li key={d.status} className="flex items-center justify-between text-[12px]">
-              <div className="flex items-center gap-2">
-                <span
-                  className="h-2 w-2 rounded-full"
-                  style={{ backgroundColor: STATUS_HEX[d.status] }}
-                />
-                <span className="text-foreground">{d.name}</span>
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: STATUS_HEX[d.status] }} />
+                <span className="truncate text-foreground">{d.name}</span>
               </div>
-              <span className="text-muted-foreground tabular-nums">
+              <span className="ml-2 shrink-0 text-muted-foreground tabular-nums">
                 {d.value} <span className="text-[10px]">({pct}%)</span>
               </span>
             </li>
@@ -243,81 +466,100 @@ function StatusDonut({ data, isLoading }: { data: StatusBreakdownItem[]; isLoadi
   )
 }
 
-interface OldestListProps {
+interface TipoBreakdownProps {
+  data: { tipo: string; total: number }[]
   isLoading: boolean
-  rows: ReturnType<typeof useOldestPending>['data'] extends infer T ? T : never
 }
 
-function OldestList({ isLoading, rows }: OldestListProps) {
-  const navigate = useNavigate()
+function TipoBreakdown({ data, isLoading }: TipoBreakdownProps) {
+  if (isLoading) return <Skeleton className="h-[220px] w-full" />
+  if (data.length === 0) {
+    return (
+      <div className="flex h-[220px] items-center justify-center text-[13px] text-muted-foreground">
+        Sem dados no período.
+      </div>
+    )
+  }
+  const total = data.reduce((a, d) => a + d.total, 0)
+  const chartData = data.map((d) => ({
+    label: d.tipo === 'carregamento' ? 'Carregamento' : 'Retorno',
+    total: d.total,
+  }))
+  return (
+    <div className="space-y-4">
+      <div className="h-[140px] w-full">
+        <ResponsiveContainer>
+          <BarChart data={chartData} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+            <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+            <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+            <Tooltip contentStyle={{ fontSize: 12, borderRadius: 6 }} formatter={(v) => [`${v}`, 'OCs']} />
+            <Bar dataKey="total" radius={[4, 4, 0, 0]}>
+              {chartData.map((d, i) => (
+                <Cell key={i} fill={d.label === 'Carregamento' ? '#3b82f6' : '#a855f7'} />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+      <ul className="space-y-1">
+        {chartData.map((d) => {
+          const pct = total > 0 ? Math.round((d.total / total) * 100) : 0
+          const Icon = d.label === 'Carregamento' ? Truck : RotateCcw
+          const color = d.label === 'Carregamento' ? '#3b82f6' : '#a855f7'
+          return (
+            <li key={d.label} className="flex items-center justify-between text-[12px]">
+              <div className="flex items-center gap-2">
+                <Icon className="h-3 w-3" style={{ color }} />
+                <span className="text-foreground">{d.label}</span>
+              </div>
+              <span className="text-muted-foreground tabular-nums">
+                {d.total} <span className="text-[10px]">({pct}%)</span>
+              </span>
+            </li>
+          )
+        })}
+      </ul>
+    </div>
+  )
+}
+
+function TopClientes({ items, isLoading }: { items: TopItem[]; isLoading: boolean }) {
   if (isLoading) {
     return (
       <div className="space-y-2">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <Skeleton key={i} className="h-12 w-full" />
+        {Array.from({ length: 5 }).map((_, i) => (
+          <Skeleton key={i} className="h-7 w-full" />
         ))}
       </div>
     )
   }
-  if (!rows || rows.length === 0) {
+  if (items.length === 0) {
     return (
       <div className="flex h-[180px] items-center justify-center text-[13px] text-muted-foreground">
-        Nenhuma solicitação pendente. 🎉
+        Sem clientes no período.
       </div>
     )
   }
+  const max = items[0]?.total ?? 1
   return (
-    <ul className="divide-y">
-      {rows.map((r) => {
-        const idade = formatDistanceToNowStrict(new Date(r.created_at), {
-          locale: ptBR,
-          addSuffix: false,
-        })
-        const titulo = r.cliente?.razao_social ?? r.material?.nome ?? r.solicitante_nome ?? 'Sem destino'
+    <ul className="space-y-1.5">
+      {items.map((it, i) => {
+        const pct = (it.total / max) * 100
         return (
-          <li
-            key={r.id}
-            className="flex cursor-pointer items-center gap-3 py-2.5 hover:bg-muted/50"
-            onClick={() => navigate(`/solicitacoes/${r.id}`)}
-          >
-            <span className="text-[12px] font-medium tabular-nums text-muted-foreground">
-              {formatNumeroOC(r.numero_interno)}
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-[13px] font-medium text-foreground">{titulo}</p>
-              <p className="truncate text-[11px] text-muted-foreground">
-                {r.tipo === 'retorno' ? 'Retorno' : 'Carregamento'} · há {idade}
-              </p>
+          <li key={it.id} className="flex items-center gap-2 text-[12px]">
+            <span className="w-4 text-right tabular-nums text-muted-foreground">{i + 1}.</span>
+            <div className="relative min-w-0 flex-1 rounded bg-muted">
+              <div className="h-6 rounded bg-primary/15" style={{ width: `${pct}%` }} />
+              <span className="absolute inset-0 flex items-center px-2 text-foreground">
+                <span className="truncate">{it.label}</span>
+              </span>
             </div>
-            <SolicitacaoStatusBadge status={r.status} />
+            <span className="w-8 text-right tabular-nums font-medium text-foreground">{it.total}</span>
           </li>
         )
       })}
     </ul>
-  )
-}
-
-interface ShortcutProps {
-  to: string
-  icon: React.ReactNode
-  title: string
-  desc: string
-}
-
-function Shortcut({ to, icon, title, desc }: ShortcutProps) {
-  return (
-    <Link
-      to={to}
-      className="group flex items-center gap-3 rounded-md border bg-background p-3 transition-colors hover:bg-muted"
-    >
-      <span className="flex h-9 w-9 items-center justify-center rounded-md bg-muted text-foreground/80 group-hover:bg-background">
-        {icon}
-      </span>
-      <div className="min-w-0">
-        <p className="truncate text-[13px] font-medium text-foreground">{title}</p>
-        <p className="truncate text-[11px] text-muted-foreground">{desc}</p>
-      </div>
-    </Link>
   )
 }
 

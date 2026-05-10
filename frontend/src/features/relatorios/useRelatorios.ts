@@ -352,6 +352,16 @@ export function topSubcontratadas(ds: RelatorioDataset, limit = 10): TopItem[] {
   return entriesToTopItems(counts, ds.subcontratadas, (v) => v.razao_social, limit)
 }
 
+export interface TipoBreakdownItem { tipo: string; total: number }
+
+export function porTipo(rows: RelatorioRow[]): TipoBreakdownItem[] {
+  const counts = new Map<string, number>()
+  for (const r of rows) {
+    counts.set(r.tipo, (counts.get(r.tipo) ?? 0) + 1)
+  }
+  return Array.from(counts.entries()).map(([tipo, total]) => ({ tipo, total }))
+}
+
 export function porMaterial(ds: RelatorioDataset): TopItem[] {
   const counts = new Map<string, number>()
   for (const r of ds.rows) {
@@ -378,10 +388,20 @@ function entriesToTopItems<T>(
 
 // ── Períodos pré-configurados ──────────────────────────────────────────────
 
-export type PeriodoPreset = 'mes' | 'mes_anterior' | '30d' | '90d'
+export type PeriodoPreset = 'hoje' | '7d' | 'mes' | 'mes_anterior' | '30d' | '90d'
 
 export function periodoFromPreset(preset: PeriodoPreset): PeriodoRelatorio {
   const now = new Date()
+  if (preset === 'hoje') {
+    const desde = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const ate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
+    return { desde: desde.toISOString(), ate: ate.toISOString(), label: 'Hoje' }
+  }
+  if (preset === '7d') {
+    const ate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
+    const desde = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6)
+    return { desde: desde.toISOString(), ate: ate.toISOString(), label: 'Últimos 7 dias' }
+  }
   if (preset === 'mes') {
     const desde = new Date(now.getFullYear(), now.getMonth(), 1)
     const ate = new Date(now.getFullYear(), now.getMonth() + 1, 1)
@@ -401,4 +421,14 @@ export function periodoFromPreset(preset: PeriodoPreset): PeriodoRelatorio {
   const ate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
   const desde = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 89)
   return { desde: desde.toISOString(), ate: ate.toISOString(), label: 'Últimos 90 dias' }
+}
+
+/** Retorna o mesmo intervalo do período anterior (mesma duração, deslocado pra trás). */
+export function previousPeriod(periodo: PeriodoRelatorio): PeriodoRelatorio {
+  const desde = new Date(periodo.desde).getTime()
+  const ate = new Date(periodo.ate).getTime()
+  const dur = ate - desde
+  const prevDesde = new Date(desde - dur)
+  const prevAte = new Date(desde)
+  return { desde: prevDesde.toISOString(), ate: prevAte.toISOString(), label: 'Período anterior' }
 }

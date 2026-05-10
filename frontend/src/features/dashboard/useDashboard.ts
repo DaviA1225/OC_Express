@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
+import { SLA_ALERT_HOURS, SLA_PENDING_STATUSES } from '@/features/solicitacoes/status'
 import type { SolicitacaoStatus, Tables } from '@/types/database.types'
 
 export interface DashboardCounts {
@@ -79,6 +80,21 @@ type Sol = Tables<'solicitacoes'>
 export interface OldestPendingRow extends Pick<Sol, 'id' | 'numero_interno' | 'status' | 'tipo' | 'created_at' | 'solicitante_nome'> {
   cliente: { razao_social: string } | null
   material: { nome: string } | null
+}
+
+export function useEstadoAtual() {
+  return useQuery({
+    queryKey: ['dashboard-estado-atual'],
+    staleTime: 30_000,
+    queryFn: async (): Promise<{ pendentes: number; atrasadas: number }> => {
+      const slaThreshold = new Date(Date.now() - SLA_ALERT_HOURS * 3_600_000).toISOString()
+      const [pendentes, atrasadas] = await Promise.all([
+        unwrap(baseCount().in('status', PENDING_STATUSES)),
+        unwrap(baseCount().in('status', SLA_PENDING_STATUSES).lt('created_at', slaThreshold)),
+      ])
+      return { pendentes, atrasadas }
+    },
+  })
 }
 
 export function useOldestPending(limit = 5) {
