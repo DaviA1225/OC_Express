@@ -504,7 +504,7 @@ function SolicitacaoCard({ row, selectable, selected, onToggleSelect, onOpen }: 
       )}
     >
       <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 items-center gap-2">
           {selectable && (
           <Checkbox
             checked={selected}
@@ -512,7 +512,12 @@ function SolicitacaoCard({ row, selectable, selected, onToggleSelect, onOpen }: 
             aria-label={`Selecionar ${formatNumeroOC(row.numero_interno)}`}
           />
           )}
-          <span className="text-[14px] font-medium text-primary">{formatNumeroOC(row.numero_interno)}</span>
+          <span className="text-[14px] font-medium text-primary shrink-0">{formatNumeroOC(row.numero_interno)}</span>
+          {row.solicitante_nome && (
+            <span className="truncate text-[13px] text-muted-foreground" title={row.solicitante_nome}>
+              · Solicitante: <span className="text-foreground">{row.solicitante_nome}</span>
+            </span>
+          )}
         </div>
         <SolicitacaoStatusBadge status={row.status} />
       </div>
