@@ -31,7 +31,7 @@ interface Props {
   onSaved?: () => void
 }
 
-const EMPRESA_NOME = 'OC EXPRESS TRANSPORTES'
+const EMPRESA_NOME = 'SISLOG'
 
 function pad4(n: number): string {
   return String(n).padStart(4, '0')
