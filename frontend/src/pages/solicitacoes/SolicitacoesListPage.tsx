@@ -550,7 +550,11 @@ function SolicitacaoCard({ row, selectable, selected, onToggleSelect, onOpen }: 
       </div>
       <div className="mt-3 border-t pt-3">
         <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-[13px]">
-          <Field label="Motorista" value={row.motorista?.nome_completo} />
+          <Field
+            label="Motorista"
+            value={row.motorista?.nome_completo}
+            extra={row.motorista?.cpf}
+          />
           <Field
             label="Veículo"
             value={[row.veiculo?.placa, row.carreta?.placa].filter(Boolean).join(' / ') || null}
@@ -651,11 +655,24 @@ function SlaBadge({ sla }: { sla: SlaInfo }) {
   )
 }
 
-function Field({ label, value }: { label: string; value: string | null | undefined }) {
+function Field({
+  label,
+  value,
+  extra,
+}: {
+  label: string
+  value: string | null | undefined
+  extra?: string | null | undefined
+}) {
   return (
     <div>
       <dt className="text-[10px] uppercase tracking-[0.5px] text-muted-foreground">{label}</dt>
-      <dd className="text-foreground">{value ?? '—'}</dd>
+      <dd className="text-foreground">
+        {value ?? '—'}
+        {value && extra ? (
+          <span className="text-muted-foreground"> · {extra}</span>
+        ) : null}
+      </dd>
     </div>
   )
 }

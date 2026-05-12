@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
-import { ArrowLeft, ChevronRight, Copy, Loader2, Pencil, X } from 'lucide-react'
+import { ArrowLeft, ChevronRight, Copy, Loader2, Pencil, RotateCcw, X } from 'lucide-react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { toast } from 'sonner'
@@ -62,6 +62,7 @@ export function SolicitacaoDetailPage() {
 
   const [confirmCancel, setConfirmCancel] = React.useState(false)
   const [confirmDuplicate, setConfirmDuplicate] = React.useState(false)
+  const [confirmReabrir, setConfirmReabrir] = React.useState(false)
   const [instrInput, setInstrInput] = React.useState('')
   const [showInstrForm, setShowInstrForm] = React.useState(false)
   const [openGerarOC, setOpenGerarOC] = React.useState(false)
@@ -156,6 +157,18 @@ export function SolicitacaoDetailPage() {
               Cancelar
             </Button>
           )}
+          {canEdit && s.status === 'finalizada' && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setConfirmReabrir(true)}
+              disabled={transit.isPending}
+              title="Voltar status para 'Em emissão' para corrigir dados"
+            >
+              <RotateCcw className="h-4 w-4" />
+              Reabrir para correção
+            </Button>
+          )}
           {canEdit && (
             <Button
               variant="ghost"
@@ -222,6 +235,23 @@ export function SolicitacaoDetailPage() {
         onConfirm={async () => {
           await transit.mutateAsync({ id: s.id, status: 'cancelada' })
           setConfirmCancel(false)
+        }}
+      />
+
+      <ConfirmDialog
+        open={confirmReabrir}
+        onOpenChange={setConfirmReabrir}
+        title="Reabrir solicitação para correção?"
+        description={`A solicitação ${formatNumeroOC(s.numero_interno)} volta para o status "Em emissão" para permitir ajustes. O PDF e o número da instrução ficam preservados. Após corrigir, finalize novamente.`}
+        confirmLabel="Sim, reabrir"
+        onConfirm={async () => {
+          await transit.mutateAsync({
+            id: s.id,
+            status: 'em_cadastro',
+            extra: { finalizada_em: null },
+          })
+          setConfirmReabrir(false)
+          toast.success('Solicitação reaberta. Faça as correções e finalize novamente.')
         }}
       />
 
@@ -513,7 +543,11 @@ function MotoristaVeiculoCard({ solicitacao, editable, onSave }: CardProps) {
     <CardShell title="Motorista e veículo" editable={editable} isEditing={editing} onEdit={() => setEditing(true)} onCancel={() => setEditing(false)} saving={saving}>
       {!editing ? (
         <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-[13px]">
-          <Field label="Motorista" value={solicitacao.motorista?.nome_completo} />
+          <Field
+            label="Motorista"
+            value={solicitacao.motorista?.nome_completo}
+            extra={solicitacao.motorista?.cpf}
+          />
           <Field label="Subcontratada" value={solicitacao.subcontratada?.razao_social} />
           <Field label="Cavalo" value={solicitacao.veiculo?.placa} />
           <Field label="Carreta" value={solicitacao.carreta?.placa} />
@@ -873,11 +907,24 @@ function TimelineCard({ solicitacao }: { solicitacao: CardProps['solicitacao'] }
   )
 }
 
-function Field({ label, value }: { label: string; value: string | null | undefined }) {
+function Field({
+  label,
+  value,
+  extra,
+}: {
+  label: string
+  value: string | null | undefined
+  extra?: string | null | undefined
+}) {
   return (
     <div>
       <dt className="text-[10px] uppercase tracking-[0.5px] text-muted-foreground">{label}</dt>
-      <dd className="text-foreground">{value ?? '—'}</dd>
+      <dd className="text-foreground">
+        {value ?? '—'}
+        {value && extra ? (
+          <span className="text-muted-foreground"> · {extra}</span>
+        ) : null}
+      </dd>
     </div>
   )
 }

@@ -29,6 +29,7 @@ import {
 } from '@/features/solicitacoes/useSolicitacoes'
 import { STATUS_LABELS } from '@/features/solicitacoes/status'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
+import { toast } from 'sonner'
 import { formatNumeroOC } from '@/lib/utils'
 import { formatDistanceToNowStrict } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -250,6 +251,18 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, onCreated }: Props) 
 
   const persistSolicitacao = async (values: FormValues) => {
     const isMinerio = values.tipo === 'carregamento'
+    let resolvedMaterialId: string | null = isMinerio
+      ? values.material_id ?? materialMinerio?.id ?? null
+      : null
+    if (isMinerio && !resolvedMaterialId) {
+      const refetched = await materiais.refetch()
+      const found = (refetched.data ?? []).find((m) => isMineralMaterial(m.nome))
+      if (!found) {
+        toast.error('Material "MINÉRIO" não encontrado no cadastro. Cadastre o material antes de continuar.')
+        return
+      }
+      resolvedMaterialId = found.id
+    }
     const created = await create.mutateAsync({
       tipo: values.tipo as SolicitacaoTipo,
       solicitante_nome: values.solicitante_nome,
@@ -261,7 +274,7 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, onCreated }: Props) 
       carreta_id: values.carreta_id || null,
       subcontratada_id: values.subcontratada_id || null,
       cliente_id: values.cliente_id,
-      material_id: isMinerio ? values.material_id ?? null : null,
+      material_id: resolvedMaterialId,
       material_subtipo: isMinerio ? values.material_subtipo ?? null : null,
       local_carregamento: values.local_carregamento || null,
       observacoes: values.observacoes || null,
