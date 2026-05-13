@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Bell, Hourglass, FileX, CalendarClock, CheckCheck } from 'lucide-react'
+import { Bell, Hourglass, FileX, Send, CalendarClock, CheckCheck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useNotifications, NOTIFICATION_LABELS, type NotificationKind, type NotificationItem } from './useNotifications'
@@ -8,37 +8,56 @@ import { formatNumeroOC } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 
 const DISMISSED_KEY = 'sislog.notifications.dismissed'
+const DISMISSAL_TTL_MS = 24 * 3_600_000
 
-function loadDismissed(): Set<string> {
-  if (typeof window === 'undefined') return new Set()
+type DismissalMap = Map<string, number>
+
+function loadDismissed(): DismissalMap {
+  if (typeof window === 'undefined') return new Map()
   try {
     const raw = window.localStorage.getItem(DISMISSED_KEY)
-    return new Set(raw ? (JSON.parse(raw) as string[]) : [])
+    if (!raw) return new Map()
+    const parsed = JSON.parse(raw) as unknown
+    const now = Date.now()
+    const out: DismissalMap = new Map()
+    if (Array.isArray(parsed)) {
+      // formato antigo: array de keys sem timestamp — descarta para forçar reaparição
+      return out
+    }
+    if (parsed && typeof parsed === 'object') {
+      for (const [key, ts] of Object.entries(parsed as Record<string, unknown>)) {
+        if (typeof ts === 'number' && now - ts < DISMISSAL_TTL_MS) {
+          out.set(key, ts)
+        }
+      }
+    }
+    return out
   } catch {
-    return new Set()
+    return new Map()
   }
 }
 
-function saveDismissed(s: Set<string>) {
+function saveDismissed(m: DismissalMap) {
   try {
-    window.localStorage.setItem(DISMISSED_KEY, JSON.stringify(Array.from(s)))
+    window.localStorage.setItem(DISMISSED_KEY, JSON.stringify(Object.fromEntries(m)))
   } catch {
     // sem espaço/desabilitado — silencioso
   }
 }
 
-const KIND_ORDER: NotificationKind[] = ['validade_vencendo', 'sem_oc', 'pendente']
+const KIND_ORDER: NotificationKind[] = ['validade_vencendo', 'sem_oc', 'oc_nao_enviada', 'pendente']
 
 const KIND_STYLES: Record<NotificationKind, { dot: string; icon: React.ComponentType<{ className?: string }> }> = {
   validade_vencendo: { dot: 'bg-red-500', icon: CalendarClock },
   sem_oc: { dot: 'bg-orange-500', icon: FileX },
+  oc_nao_enviada: { dot: 'bg-orange-400', icon: Send },
   pendente: { dot: 'bg-amber-500', icon: Hourglass },
 }
 
 export function NotificationsBell() {
   const navigate = useNavigate()
   const [open, setOpen] = React.useState(false)
-  const [dismissed, setDismissed] = React.useState<Set<string>>(() => loadDismissed())
+  const [dismissed, setDismissed] = React.useState<DismissalMap>(() => loadDismissed())
   const { data, isLoading } = useNotifications()
 
   const keyOf = (i: NotificationItem) => `${i.kind}:${i.id}`
@@ -51,6 +70,7 @@ export function NotificationsBell() {
   const grouped: Record<NotificationKind, NotificationItem[]> = {
     pendente: [],
     sem_oc: [],
+    oc_nao_enviada: [],
     validade_vencendo: [],
   }
   for (const item of visible) grouped[item.kind].push(item)
@@ -61,8 +81,9 @@ export function NotificationsBell() {
   }
 
   const handleDismissAll = () => {
-    const next = new Set(dismissed)
-    for (const item of data ?? []) next.add(keyOf(item))
+    const next = new Map(dismissed)
+    const now = Date.now()
+    for (const item of data ?? []) next.set(keyOf(item), now)
     saveDismissed(next)
     setDismissed(next)
   }
@@ -72,13 +93,13 @@ export function NotificationsBell() {
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="relative rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="relative rounded-md p-1.5 text-primary-foreground transition-colors hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
           aria-label={total > 0 ? `${total} notificações` : 'Notificações'}
           title={total > 0 ? `${total} alerta${total === 1 ? '' : 's'} operacional${total === 1 ? '' : 'is'}` : 'Sem alertas'}
         >
           <Bell className="h-5 w-5" />
           {total > 0 && (
-            <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-medium text-white">
+            <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-white px-1 text-[10px] font-semibold text-primary ring-1 ring-primary">
               {total > 99 ? '99+' : total}
             </span>
           )}
@@ -163,6 +184,7 @@ function kindIconColor(kind: NotificationKind): string {
   switch (kind) {
     case 'validade_vencendo': return 'text-red-500'
     case 'sem_oc': return 'text-orange-500'
+    case 'oc_nao_enviada': return 'text-orange-400'
     case 'pendente': return 'text-amber-500'
   }
 }

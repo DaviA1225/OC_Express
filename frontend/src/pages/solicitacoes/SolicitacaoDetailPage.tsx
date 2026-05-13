@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
-import { ArrowLeft, ChevronRight, Copy, Loader2, Pencil, RotateCcw, X } from 'lucide-react'
+import { AlertCircle, ArrowLeft, ChevronLeft, ChevronRight, Copy, Loader2, Pencil, RotateCcw, X } from 'lucide-react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { toast } from 'sonner'
@@ -63,6 +63,7 @@ export function SolicitacaoDetailPage() {
   const [confirmCancel, setConfirmCancel] = React.useState(false)
   const [confirmDuplicate, setConfirmDuplicate] = React.useState(false)
   const [confirmReabrir, setConfirmReabrir] = React.useState(false)
+  const [confirmReativar, setConfirmReativar] = React.useState(false)
   const [instrInput, setInstrInput] = React.useState('')
   const [showInstrForm, setShowInstrForm] = React.useState(false)
   const [openGerarOC, setOpenGerarOC] = React.useState(false)
@@ -116,10 +117,36 @@ export function SolicitacaoDetailPage() {
         <span className="text-foreground">{formatNumeroOC(s.numero_interno)}</span>
       </nav>
 
+      {s.status === 'cancelada' && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3">
+          <div className="flex items-start gap-2 text-[13px] text-red-900">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
+            <div>
+              <p className="font-medium">Esta solicitação está cancelada.</p>
+              <p className="text-[12px] text-red-800">
+                Você ainda pode editar os dados, mas ela não aparece no fluxo ativo. Reative para voltar ao status "Recebida".
+              </p>
+            </div>
+          </div>
+          {canEdit && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setConfirmReativar(true)}
+              disabled={transit.isPending}
+              className="border-red-300 bg-background hover:bg-red-100"
+            >
+              <RotateCcw className="h-4 w-4" />
+              Reativar
+            </Button>
+          )}
+        </div>
+      )}
+
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="text-[22px] font-medium text-foreground">{formatNumeroOC(s.numero_interno)}</h1>
+            <h1 className="text-[22px] font-semibold tracking-tight text-foreground">{formatNumeroOC(s.numero_interno)}</h1>
             <SolicitacaoStatusBadge status={s.status} />
             <span className="text-[12px] uppercase tracking-[0.5px] text-muted-foreground">{s.tipo}</span>
           </div>
@@ -146,6 +173,9 @@ export function SolicitacaoDetailPage() {
               onMarcarEmCadastro={() => {
                 if (id) transit.mutate({ id, status: 'em_cadastro' })
               }}
+              onVoltarRecebida={() => {
+                if (id) transit.mutate({ id, status: 'recebida' })
+              }}
               onGerarOC={() => setOpenGerarOC(true)}
               onEnviarWhats={() => setOpenWhats(true)}
               disabled={transit.isPending}
@@ -167,6 +197,18 @@ export function SolicitacaoDetailPage() {
             >
               <RotateCcw className="h-4 w-4" />
               Reabrir para correção
+            </Button>
+          )}
+          {canEdit && s.status === 'cancelada' && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setConfirmReativar(true)}
+              disabled={transit.isPending}
+              title="Voltar status para 'Recebida' para retomar o fluxo"
+            >
+              <RotateCcw className="h-4 w-4" />
+              Reativar
             </Button>
           )}
           {canEdit && (
@@ -256,6 +298,19 @@ export function SolicitacaoDetailPage() {
       />
 
       <ConfirmDialog
+        open={confirmReativar}
+        onOpenChange={setConfirmReativar}
+        title="Reativar solicitação?"
+        description={`A solicitação ${formatNumeroOC(s.numero_interno)} volta para o status "Recebida" e retorna ao fluxo normal.`}
+        confirmLabel="Sim, reativar"
+        onConfirm={async () => {
+          await transit.mutateAsync({ id: s.id, status: 'recebida' })
+          setConfirmReativar(false)
+          toast.success('Solicitação reativada.')
+        }}
+      />
+
+      <ConfirmDialog
         open={confirmDuplicate}
         onOpenChange={setConfirmDuplicate}
         title="Duplicar solicitação?"
@@ -306,12 +361,13 @@ interface ActionsProps {
   onAdvanceInstrucao: () => void
   onAdvanceFinalizar: () => void
   onMarcarEmCadastro: () => void
+  onVoltarRecebida: () => void
   onGerarOC: () => void
   onEnviarWhats: () => void
   disabled: boolean
 }
 
-function StatusActions({ status, hasInstrucao, onAdvanceInstrucao, onAdvanceFinalizar, onMarcarEmCadastro, onGerarOC, onEnviarWhats, disabled }: ActionsProps) {
+function StatusActions({ status, hasInstrucao, onAdvanceInstrucao, onAdvanceFinalizar, onMarcarEmCadastro, onVoltarRecebida, onGerarOC, onEnviarWhats, disabled }: ActionsProps) {
   if (status === 'recebida') {
     return (
       <Button size="sm" variant="outline" onClick={onMarcarEmCadastro} disabled={disabled}>
@@ -321,9 +377,15 @@ function StatusActions({ status, hasInstrucao, onAdvanceInstrucao, onAdvanceFina
   }
   if (status === 'em_cadastro') {
     return (
-      <Button size="sm" onClick={onAdvanceInstrucao} disabled={disabled}>
-        + Adicionar instrução
-      </Button>
+      <div className="flex items-center gap-2">
+        <Button size="sm" variant="ghost" onClick={onVoltarRecebida} disabled={disabled} title="Voltar status para 'Recebida'">
+          <ChevronLeft className="h-4 w-4" />
+          Voltar para Recebida
+        </Button>
+        <Button size="sm" onClick={onAdvanceInstrucao} disabled={disabled}>
+          + Adicionar instrução
+        </Button>
+      </div>
     )
   }
   if (status === 'instrucao_emitida') {

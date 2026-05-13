@@ -270,7 +270,7 @@ export function SolicitacoesListPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-[22px] font-medium text-foreground">Solicitações</h1>
+          <h1 className="text-[22px] font-semibold tracking-tight text-foreground">Solicitações</h1>
           <p className="text-[12px] text-muted-foreground">
             {list.data?.count ?? 0} {list.data?.count === 1 ? 'registro' : 'registros'}
           </p>

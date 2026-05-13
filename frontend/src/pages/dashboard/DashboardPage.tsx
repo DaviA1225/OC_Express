@@ -11,8 +11,6 @@ import {
   PieChart,
   Pie,
   Cell,
-  BarChart,
-  Bar,
 } from 'recharts'
 import {
   ClipboardList,
@@ -24,8 +22,6 @@ import {
   AlertTriangle,
   Inbox,
   ArrowRight,
-  Truck,
-  RotateCcw,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -36,7 +32,8 @@ import {
   calcKPIs,
   calcPorDia,
   topClientes,
-  porTipo,
+  topMotoristas,
+  topSubcontratadas,
   periodoFromPreset,
   previousPeriod,
   type PeriodoPreset,
@@ -58,13 +55,16 @@ const VALID_PRESETS = PRESETS.map((p) => p.value) as string[]
 
 const STATUS_HEX: Record<SolicitacaoStatus, string> = {
   recebida: '#94a3b8',
-  em_cadastro: '#3b82f6',
+  em_cadastro: '#FF8A50',       // laranja LHG claro
   instrucao_emitida: '#f59e0b',
-  oc_gerada: '#6366f1',
+  oc_gerada: '#C44612',          // laranja LHG queimado
   oc_enviada: '#10b981',
   finalizada: '#059669',
   cancelada: '#ef4444',
 }
+
+const CHART_PRIMARY = '#FF5100'  // laranja LHG
+const CHART_SECONDARY = '#10b981'// emerald (mantido como sinal universal de "concluído")
 
 export default function DashboardPage() {
   const { profile } = useAuth()
@@ -96,8 +96,9 @@ export default function DashboardPage() {
   const kpis = ds.data ? calcKPIs(ds.data.rows) : null
   const kpisAnt = dsAnterior.data ? calcKPIs(dsAnterior.data.rows) : null
   const porDia = ds.data ? calcPorDia(ds.data.rows, periodo) : []
-  const top10Clientes = ds.data ? topClientes(ds.data, 5) : []
-  const tipos = ds.data ? porTipo(ds.data.rows) : []
+  const topClientesItems = ds.data ? topClientes(ds.data, 5) : []
+  const topMotoristasItems = ds.data ? topMotoristas(ds.data, 5) : []
+  const topSubcontratadasItems = ds.data ? topSubcontratadas(ds.data, 5) : []
 
   const saudacao = saudar()
   const nome = profile?.nome_completo?.split(' ')[0] ?? 'usuário'
@@ -108,7 +109,7 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-[24px] font-medium tracking-tight text-foreground">
+          <h1 className="text-[24px] font-semibold tracking-tight text-foreground">
             {saudacao}, {nome}.
           </h1>
           <p className="text-[12px] text-muted-foreground">
@@ -144,7 +145,7 @@ export default function DashboardPage() {
           value={kpis?.total}
           previous={kpisAnt?.total}
           icon={<ClipboardList className="h-4 w-4" />}
-          accent="text-blue-600 bg-blue-50 dark:bg-blue-950/40"
+          accent="text-primary bg-primary/10 dark:bg-primary/15"
           isLoading={ds.isLoading}
           higherIsBetter
         />
@@ -174,7 +175,7 @@ export default function DashboardPage() {
           value={pendentesAtuais}
           subValue="Estado atual da fila"
           icon={<Inbox className="h-4 w-4" />}
-          accent="text-indigo-600 bg-indigo-50 dark:bg-indigo-950/40"
+          accent="text-foreground bg-muted dark:bg-muted/50"
           isLoading={estado.isLoading}
         />
       </div>
@@ -183,12 +184,9 @@ export default function DashboardPage() {
         <VolumeChart data={porDia} isLoading={ds.isLoading} />
       </Card>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card title="Solicitações por status" subtitle="Total acumulado">
           <StatusDonut data={breakdown.data ?? []} isLoading={breakdown.isLoading} />
-        </Card>
-        <Card title="Carregamento × Retorno" subtitle={periodo.label}>
-          <TipoBreakdown data={tipos} isLoading={ds.isLoading} />
         </Card>
         <Card
           title="Top clientes"
@@ -203,7 +201,16 @@ export default function DashboardPage() {
             </Link>
           }
         >
-          <TopClientes items={top10Clientes} isLoading={ds.isLoading} />
+          <TopList items={topClientesItems} isLoading={ds.isLoading} emptyMessage="Sem clientes no período." />
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <Card title="Top motoristas" subtitle={periodo.label}>
+          <TopList items={topMotoristasItems} isLoading={ds.isLoading} emptyMessage="Sem motoristas no período." />
+        </Card>
+        <Card title="Top subcontratadas" subtitle={periodo.label}>
+          <TopList items={topSubcontratadasItems} isLoading={ds.isLoading} emptyMessage="Sem subcontratadas no período." />
         </Card>
       </div>
     </div>
@@ -390,16 +397,16 @@ function VolumeChart({ data, isLoading }: VolumeChartProps) {
               String(name) === 'total' ? 'Criadas' : 'Finalizadas',
             ]}
           />
-          <Line type="monotone" dataKey="total" stroke="#3b82f6" strokeWidth={2} dot={{ r: 2 }} activeDot={{ r: 4 }} />
-          <Line type="monotone" dataKey="finalizadas" stroke="#10b981" strokeWidth={2} dot={{ r: 2 }} activeDot={{ r: 4 }} />
+          <Line type="monotone" dataKey="total" stroke={CHART_PRIMARY} strokeWidth={2} dot={{ r: 2 }} activeDot={{ r: 4 }} />
+          <Line type="monotone" dataKey="finalizadas" stroke={CHART_SECONDARY} strokeWidth={2} dot={{ r: 2 }} activeDot={{ r: 4 }} />
         </LineChart>
       </ResponsiveContainer>
       <div className="mt-2 flex items-center justify-center gap-4 text-[11px] text-muted-foreground">
         <span className="flex items-center gap-1.5">
-          <span className="h-1.5 w-3 rounded-full bg-[#3b82f6]" /> Criadas
+          <span className="h-1.5 w-3 rounded-full" style={{ backgroundColor: CHART_PRIMARY }} /> Criadas
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="h-1.5 w-3 rounded-full bg-[#10b981]" /> Finalizadas
+          <span className="h-1.5 w-3 rounded-full" style={{ backgroundColor: CHART_SECONDARY }} /> Finalizadas
         </span>
       </div>
     </div>
@@ -466,65 +473,16 @@ function StatusDonut({ data, isLoading }: { data: StatusBreakdownItem[]; isLoadi
   )
 }
 
-interface TipoBreakdownProps {
-  data: { tipo: string; total: number }[]
+
+function TopList({
+  items,
+  isLoading,
+  emptyMessage,
+}: {
+  items: TopItem[]
   isLoading: boolean
-}
-
-function TipoBreakdown({ data, isLoading }: TipoBreakdownProps) {
-  if (isLoading) return <Skeleton className="h-[220px] w-full" />
-  if (data.length === 0) {
-    return (
-      <div className="flex h-[220px] items-center justify-center text-[13px] text-muted-foreground">
-        Sem dados no período.
-      </div>
-    )
-  }
-  const total = data.reduce((a, d) => a + d.total, 0)
-  const chartData = data.map((d) => ({
-    label: d.tipo === 'carregamento' ? 'Carregamento' : 'Retorno',
-    total: d.total,
-  }))
-  return (
-    <div className="space-y-4">
-      <div className="h-[140px] w-full">
-        <ResponsiveContainer>
-          <BarChart data={chartData} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-            <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-            <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-            <Tooltip contentStyle={{ fontSize: 12, borderRadius: 6 }} formatter={(v) => [`${v}`, 'OCs']} />
-            <Bar dataKey="total" radius={[4, 4, 0, 0]}>
-              {chartData.map((d, i) => (
-                <Cell key={i} fill={d.label === 'Carregamento' ? '#3b82f6' : '#a855f7'} />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-      <ul className="space-y-1">
-        {chartData.map((d) => {
-          const pct = total > 0 ? Math.round((d.total / total) * 100) : 0
-          const Icon = d.label === 'Carregamento' ? Truck : RotateCcw
-          const color = d.label === 'Carregamento' ? '#3b82f6' : '#a855f7'
-          return (
-            <li key={d.label} className="flex items-center justify-between text-[12px]">
-              <div className="flex items-center gap-2">
-                <Icon className="h-3 w-3" style={{ color }} />
-                <span className="text-foreground">{d.label}</span>
-              </div>
-              <span className="text-muted-foreground tabular-nums">
-                {d.total} <span className="text-[10px]">({pct}%)</span>
-              </span>
-            </li>
-          )
-        })}
-      </ul>
-    </div>
-  )
-}
-
-function TopClientes({ items, isLoading }: { items: TopItem[]; isLoading: boolean }) {
+  emptyMessage: string
+}) {
   if (isLoading) {
     return (
       <div className="space-y-2">
@@ -537,7 +495,7 @@ function TopClientes({ items, isLoading }: { items: TopItem[]; isLoading: boolea
   if (items.length === 0) {
     return (
       <div className="flex h-[180px] items-center justify-center text-[13px] text-muted-foreground">
-        Sem clientes no período.
+        {emptyMessage}
       </div>
     )
   }

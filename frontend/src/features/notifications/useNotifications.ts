@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
+import { SLA_ALERT_HOURS } from '@/features/solicitacoes/status'
 
-export type NotificationKind = 'pendente' | 'sem_oc' | 'validade_vencendo'
+export type NotificationKind = 'pendente' | 'sem_oc' | 'oc_nao_enviada' | 'validade_vencendo'
 
 export interface NotificationItem {
   id: string
@@ -15,8 +16,7 @@ export interface NotificationItem {
   age_label: string
 }
 
-const PENDING_THRESHOLD_H = 24
-const INSTRUCAO_THRESHOLD_H = 4
+const STUCK_THRESHOLD_H = 4
 const VALIDADE_LIMIT_H = 24
 
 function isoNowMinusHours(h: number): string {
@@ -57,23 +57,30 @@ export function useNotifications() {
     refetchIntervalInBackground: true,
     staleTime: 30_000,
     queryFn: async (): Promise<NotificationItem[]> => {
-      const cutoffPending = isoNowMinusHours(PENDING_THRESHOLD_H)
-      const cutoffInstrucao = isoNowMinusHours(INSTRUCAO_THRESHOLD_H)
+      const cutoffSlaAtraso = isoNowMinusHours(SLA_ALERT_HOURS)
+      const cutoffStuck = isoNowMinusHours(STUCK_THRESHOLD_H)
       const validadeLimit = isoNowPlusHours(VALIDADE_LIMIT_H)
 
-      const [pendentes, semOc, validade] = await Promise.all([
+      const [atrasadas, semOc, ocNaoEnviada, validade] = await Promise.all([
         supabase
           .from('solicitacoes')
           .select(SELECT)
-          .in('status', ['recebida', 'em_cadastro'])
-          .lt('created_at', cutoffPending)
+          .in('status', ['recebida', 'em_cadastro', 'instrucao_emitida', 'oc_gerada'])
+          .lt('created_at', cutoffSlaAtraso)
           .order('created_at', { ascending: true })
-          .limit(20),
+          .limit(40),
         supabase
           .from('solicitacoes')
           .select(SELECT)
           .eq('status', 'instrucao_emitida')
-          .lt('updated_at', cutoffInstrucao)
+          .lt('updated_at', cutoffStuck)
+          .order('updated_at', { ascending: true })
+          .limit(20),
+        supabase
+          .from('solicitacoes')
+          .select(SELECT)
+          .eq('status', 'oc_gerada')
+          .lt('updated_at', cutoffStuck)
           .order('updated_at', { ascending: true })
           .limit(20),
         supabase
@@ -91,10 +98,9 @@ export function useNotifications() {
       const seen = new Set<string>()
       const push = (kind: NotificationKind, rows: unknown) => {
         for (const r of (rows ?? []) as RawRow[]) {
-          const key = `${kind}:${r.id}`
-          if (seen.has(key)) continue
-          seen.add(key)
-          const refDate = kind === 'sem_oc' ? r.updated_at : r.created_at
+          if (seen.has(r.id)) continue
+          seen.add(r.id)
+          const refDate = kind === 'pendente' || kind === 'validade_vencendo' ? r.created_at : r.updated_at
           out.push({
             id: r.id,
             kind,
@@ -109,8 +115,9 @@ export function useNotifications() {
         }
       }
 
-      push('pendente', pendentes.data)
       push('sem_oc', semOc.data)
+      push('oc_nao_enviada', ocNaoEnviada.data)
+      push('pendente', atrasadas.data)
       push('validade_vencendo', validade.data)
       return out
     },
@@ -118,7 +125,8 @@ export function useNotifications() {
 }
 
 export const NOTIFICATION_LABELS: Record<NotificationKind, string> = {
-  pendente: 'Pendente há mais de 24h',
+  pendente: `Atrasada (mais de ${SLA_ALERT_HOURS}h)`,
   sem_oc: 'Instrução emitida sem OC',
+  oc_nao_enviada: 'OC gerada · não enviada',
   validade_vencendo: 'OC sem CT-e · validade vencendo',
 }

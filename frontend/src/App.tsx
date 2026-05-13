@@ -25,6 +25,7 @@ const CargasRetornoPage = lazy(() => import('@/pages/cargas-retorno/CargasRetorn
 const AuditoriaPage = lazy(() => import('@/pages/auditoria/AuditoriaPage'))
 const RelatoriosPage = lazy(() => import('@/pages/relatorios/RelatoriosPage'))
 const PerfilPage = lazy(() => import('@/pages/perfil/PerfilPage'))
+const NotFoundPage = lazy(() => import('@/pages/errors/NotFoundPage'))
 
 function PageFallback() {
   return (
@@ -68,7 +69,7 @@ export default function App() {
                 </Route>
 
                 <Route path="/perfil" element={<PerfilPage />} />
-                <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                <Route path="*" element={<NotFoundPage />} />
               </Route>
             </Route>
           </Routes>

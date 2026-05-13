@@ -5,17 +5,35 @@ interface EmptyStateProps {
   title: string
   description?: string
   action?: React.ReactNode
+  size?: 'sm' | 'md'
 }
 
-export function EmptyState({ icon: Icon, title, description, action }: EmptyStateProps) {
+export function EmptyState({ icon: Icon, title, description, action, size = 'md' }: EmptyStateProps) {
+  const isCompact = size === 'sm'
   return (
-    <div className="flex flex-col items-center justify-center py-12 text-center">
-      <Icon className="mb-3 h-12 w-12 text-muted-foreground/60" strokeWidth={1.4} />
-      <p className="text-[14px] font-medium text-foreground">{title}</p>
+    <div className={isCompact ? 'flex flex-col items-center justify-center py-8 text-center' : 'flex flex-col items-center justify-center py-16 text-center'}>
+      <div
+        aria-hidden
+        className={
+          isCompact
+            ? 'mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-primary/5 ring-1 ring-primary/15'
+            : 'mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-primary/5 ring-1 ring-primary/15'
+        }
+      >
+        <Icon
+          className={isCompact ? 'h-6 w-6 text-primary/60' : 'h-9 w-9 text-primary/60'}
+          strokeWidth={1.5}
+        />
+      </div>
+      <p className={isCompact ? 'text-[14px] font-semibold text-foreground' : 'text-[15px] font-semibold tracking-tight text-foreground'}>
+        {title}
+      </p>
       {description && (
-        <p className="mt-1 max-w-xs text-[12px] text-muted-foreground">{description}</p>
+        <p className={isCompact ? 'mt-1 max-w-xs text-[12px] leading-relaxed text-muted-foreground' : 'mt-1.5 max-w-sm text-[13px] leading-relaxed text-muted-foreground'}>
+          {description}
+        </p>
       )}
-      {action && <div className="mt-4">{action}</div>}
+      {action && <div className="mt-5">{action}</div>}
     </div>
   )
 }

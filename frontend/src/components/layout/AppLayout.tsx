@@ -80,10 +80,10 @@ export function AppLayout() {
   const pageTitle = PAGE_TITLES[location.pathname] ?? ''
 
   return (
-    <div className="flex h-full">
+    <div className="flex h-full print:block print:h-auto">
       <GlobalProgressBar />
       {/* Sidebar desktop */}
-      <div className="hidden md:flex">
+      <div className="hidden md:flex print:hidden">
         <SidebarContent
           collapsed={collapsed}
           onToggleCollapse={() => setCollapsed((v) => !v)}
@@ -97,14 +97,16 @@ export function AppLayout() {
         </SheetContent>
       </Sheet>
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <Header
-          pageTitle={pageTitle}
-          onOpenMobileMenu={() => setMobileOpen(true)}
-          onOpenSearch={() => setSearchOpen(true)}
-          realtimeStatus={realtimeStatus}
-        />
-        <main className="flex-1 overflow-y-auto bg-muted/30 px-3 py-4 sm:px-4 sm:py-5 md:px-6 md:py-6">
+      <div className="flex min-w-0 flex-1 flex-col print:block">
+        <div className="print:hidden">
+          <Header
+            pageTitle={pageTitle}
+            onOpenMobileMenu={() => setMobileOpen(true)}
+            onOpenSearch={() => setSearchOpen(true)}
+            realtimeStatus={realtimeStatus}
+          />
+        </div>
+        <main className="flex-1 overflow-y-auto bg-muted/30 px-3 py-4 print:overflow-visible print:bg-transparent print:p-0 sm:px-4 sm:py-5 md:px-6 md:py-6">
           <NovaSolicitacaoProvider>
             <Outlet />
           </NovaSolicitacaoProvider>

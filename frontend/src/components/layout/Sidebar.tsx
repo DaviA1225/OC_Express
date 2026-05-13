@@ -196,9 +196,10 @@ function NavListItem({
         onClick={onNavigate}
         className={({ isActive }) =>
           cn(
-            'group flex h-9 items-center gap-2 rounded-md px-2 text-[13px] font-medium transition-colors',
+            'group relative flex h-9 items-center gap-2 rounded-md px-2 text-[13px] font-medium transition-colors',
             isActive
-              ? 'bg-primary text-primary-foreground'
+              ? 'bg-primary/10 text-primary before:absolute before:left-0 before:top-1/2 before:h-5 before:-translate-y-1/2 before:rounded-r-full before:bg-primary before:content-[""] ' +
+                (collapsed ? 'before:w-0.5' : 'before:w-1')
               : 'text-foreground/80 hover:bg-muted hover:text-foreground',
             collapsed && 'justify-center px-0',
           )

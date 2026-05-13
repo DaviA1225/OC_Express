@@ -155,7 +155,7 @@ export default function RelatoriosPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-[22px] font-medium text-foreground">Relatórios</h1>
+          <h1 className="text-[22px] font-semibold tracking-tight text-foreground">Relatórios</h1>
           <p className="text-[12px] text-muted-foreground">
             {periodo.label} · {format(new Date(periodo.desde), "dd/MM/yyyy", { locale: ptBR })}
             {' a '}

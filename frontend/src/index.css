@@ -6,67 +6,70 @@
 
 @layer base {
   :root {
-    /* SPEC-FRONTEND seção 2.1 — paleta corporativa */
-    --background: 0 0% 100%;            /* #FFFFFF bg-base */
-    --foreground: 222 47% 11%;          /* #0F172A text-primary */
+    /* Paleta LHG Mining/Logística — manual oficial
+       Primária: laranja #FF5100  ·  preto #1D1E1B  ·  cinza #6F7271
+       Secundárias: bege #F4D4BD · cinza-claro #E5E5E5 · laranja-escuro #D3641A */
+
+    --background: 0 0% 100%;             /* #FFFFFF */
+    --foreground: 80 7% 11%;             /* #1D1E1B preto LHG */
 
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    --card-foreground: 80 7% 11%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
+    --popover-foreground: 80 7% 11%;
 
-    --primary: 224 76% 40%;             /* #1E40AF azul corporativo */
-    --primary-hover: 224 71% 32%;       /* #1E3A8A */
+    --primary: 19 100% 50%;              /* #FF5100 laranja LHG */
+    --primary-hover: 21 79% 47%;         /* #D3641A laranja queimado */
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 215 25% 27%;           /* #334155 cinza escuro */
+    --secondary: 80 7% 18%;              /* tom escuro derivado do preto LHG */
     --secondary-foreground: 0 0% 100%;
 
-    --muted: 210 40% 98%;               /* #F8FAFC bg-muted */
-    --muted-foreground: 215 16% 47%;    /* #64748B text-secondary */
+    --muted: 30 25% 97%;                 /* bege bem clarinho (warm white) */
+    --muted-foreground: 180 1% 44%;      /* #6F7271 cinza LHG */
 
-    --accent: 38 92% 50%;                /* #F59E0B âmbar */
-    --accent-foreground: 222 47% 11%;
+    --accent: 26 73% 85%;                /* #F4D4BD bege secundário */
+    --accent-foreground: 80 7% 11%;
 
     --destructive: 0 84% 60%;            /* #EF4444 */
     --destructive-foreground: 0 0% 100%;
 
-    --success: 160 84% 39%;              /* #10B981 */
+    --success: 160 84% 36%;              /* verde corporativo */
     --success-foreground: 0 0% 100%;
 
     --warning: 38 92% 50%;
-    --warning-foreground: 222 47% 11%;
+    --warning-foreground: 80 7% 11%;
 
-    --border: 214 32% 91%;               /* #E2E8F0 */
-    --input: 214 32% 91%;
-    --ring: 224 76% 40%;
+    --border: 30 12% 89%;                /* cinza ligeiramente quente */
+    --input: 30 12% 89%;
+    --ring: 19 100% 50%;                 /* foco em laranja LHG */
 
-    --radius: 0.375rem;                  /* 6px botões/inputs */
+    --radius: 0.375rem;
   }
 
   .dark {
-    --background: 222 47% 7%;            /* #0B1020 bg base escuro */
-    --foreground: 210 40% 96%;           /* #F1F5F9 texto claro */
+    --background: 80 6% 9%;              /* near-black com leve calor */
+    --foreground: 30 15% 96%;            /* off-white quente */
 
-    --card: 222 39% 11%;                 /* #131A2B */
-    --card-foreground: 210 40% 96%;
+    --card: 80 6% 12%;                   /* card um tom acima do bg */
+    --card-foreground: 30 15% 96%;
 
-    --popover: 222 39% 11%;
-    --popover-foreground: 210 40% 96%;
+    --popover: 80 6% 13%;
+    --popover-foreground: 30 15% 96%;
 
-    --primary: 217 91% 60%;              /* #3B82F6 mais luminoso pra dark */
-    --primary-hover: 217 91% 68%;
+    --primary: 21 100% 60%;              /* laranja luminoso para dark */
+    --primary-hover: 19 100% 52%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 215 19% 35%;
-    --secondary-foreground: 210 40% 96%;
+    --secondary: 180 1% 30%;
+    --secondary-foreground: 30 15% 96%;
 
-    --muted: 222 28% 14%;                /* #1A2236 */
-    --muted-foreground: 215 20% 65%;
+    --muted: 80 6% 15%;
+    --muted-foreground: 30 8% 68%;
 
-    --accent: 38 92% 55%;
-    --accent-foreground: 222 47% 11%;
+    --accent: 21 55% 22%;                /* laranja escuro queimado pra accent */
+    --accent-foreground: 30 15% 96%;
 
     --destructive: 0 72% 55%;
     --destructive-foreground: 0 0% 100%;
@@ -75,11 +78,11 @@
     --success-foreground: 0 0% 100%;
 
     --warning: 38 92% 55%;
-    --warning-foreground: 222 47% 11%;
+    --warning-foreground: 80 7% 11%;
 
-    --border: 215 27% 18%;               /* #25324A */
-    --input: 215 27% 18%;
-    --ring: 217 91% 60%;
+    --border: 80 6% 20%;                 /* contraste de borda um pouco mais visível */
+    --input: 80 6% 20%;
+    --ring: 21 100% 60%;
   }
 }
 
@@ -94,19 +97,66 @@
     @apply bg-background text-foreground font-sans antialiased;
     font-size: 14px;
     line-height: 1.5;
-    font-feature-settings: 'cv11', 'ss01';
+    /* cv11 = single-storey "a", ss01 = open digits/tnum-friendly; mantém visual técnico/limpo */
+    font-feature-settings: 'cv11', 'ss01', 'ss03';
+  }
+  /* Headings com tracking ligeiramente apertado — peso institucional */
+  h1, h2, h3 {
+    @apply tracking-tight font-semibold;
+  }
+  /* Números em tabelas/listas alinham coluna a coluna */
+  table, .tabular-nums {
+    font-variant-numeric: tabular-nums;
   }
 }
 
-/* Status badges — SPEC-FRONTEND 2.1 */
+/* Modo compacto — aperta espaçamento de tabelas/listas; opt-in via body.density-compact */
+body.density-compact table th,
+body.density-compact table td {
+  padding-top: 0.35rem;
+  padding-bottom: 0.35rem;
+}
+body.density-compact ul.divide-y > li {
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+}
+
+/* Otimizações para impressão — sidebar/header já são ocultados via print:hidden no AppLayout */
+@media print {
+  html, body { background: #fff !important; color: #000 !important; }
+  body { font-size: 12px; }
+  /* Remove sombras, anima, borda colorida em modo print */
+  * { box-shadow: none !important; text-shadow: none !important; }
+  /* Bordas mais discretas pra economizar tinta */
+  .border, .border-b, .border-t, .border-l, .border-r { border-color: #cbd5e1 !important; }
+  /* Evita quebra dentro de cards */
+  section, .rounded-lg { break-inside: avoid; page-break-inside: avoid; }
+  /* Esconde botões e elementos interativos não relevantes na impressão */
+  button, [role="button"], .no-print { display: none !important; }
+  /* Links viram texto preto */
+  a { color: #000 !important; text-decoration: none !important; }
+  /* Garante que conteúdo lazy não fique cortado */
+  main { overflow: visible !important; }
+}
+
+/* Status badges — paleta LHG: cinza → laranja → verde como gradiente de progresso */
 @layer components {
   .status-recebida          { background-color: #F1F5F9; color: #475569; }
-  .status-em_cadastro       { background-color: #DBEAFE; color: #1E40AF; }
+  .status-em_cadastro       { background-color: #FFE8D6; color: #C44612; }
   .status-instrucao_emitida { background-color: #FEF3C7; color: #92400E; }
-  .status-oc_gerada         { background-color: #DBEAFE; color: #1E3A8A; }
+  .status-oc_gerada         { background-color: #F4D4BD; color: #8F3700; }
   .status-oc_enviada        { background-color: #D1FAE5; color: #065F46; }
   .status-finalizada        { background-color: #A7F3D0; color: #064E3B; }
   .status-cancelada         { background-color: #FEE2E2; color: #991B1B; }
+
+  /* Dark mode — variantes com fundos translúcidos / textos clareados */
+  .dark .status-recebida          { background-color: rgba(148, 163, 184, 0.18); color: #cbd5e1; }
+  .dark .status-em_cadastro       { background-color: rgba(255, 81, 0, 0.18);    color: #FFA877; }
+  .dark .status-instrucao_emitida { background-color: rgba(245, 158, 11, 0.18);  color: #fcd34d; }
+  .dark .status-oc_gerada         { background-color: rgba(196, 70, 18, 0.22);   color: #FFB37A; }
+  .dark .status-oc_enviada        { background-color: rgba(16, 185, 129, 0.18);  color: #6ee7b7; }
+  .dark .status-finalizada        { background-color: rgba(5, 150, 105, 0.28);   color: #a7f3d0; }
+  .dark .status-cancelada         { background-color: rgba(239, 68, 68, 0.18);   color: #fca5a5; }
 
   .label-uppercase {
     @apply text-[10px] font-medium uppercase tracking-[0.5px] text-muted-foreground;

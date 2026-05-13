@@ -66,7 +66,7 @@ export default function PerfilPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-[22px] font-medium text-foreground">Meu perfil</h1>
+        <h1 className="text-[22px] font-semibold tracking-tight text-foreground">Meu perfil</h1>
         <p className="text-[12px] text-muted-foreground">
           Gerencie seus dados pessoais e segurança da conta.
         </p>

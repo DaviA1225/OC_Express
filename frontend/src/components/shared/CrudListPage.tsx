@@ -128,7 +128,7 @@ export function CrudListPage<T extends { id: string; ativo: boolean }>(props: Cr
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-[22px] font-medium text-foreground">{title}</h1>
+          <h1 className="text-[22px] font-semibold tracking-tight text-foreground">{title}</h1>
           <p className="text-[12px] text-muted-foreground">
             {totalActive} {totalActive === 1 ? 'ativo' : 'ativos'}
           </p>

@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { Menu, Search, ChevronDown, LogOut, UserCircle, Sun, Moon } from 'lucide-react'
+import { Menu, Search, ChevronDown, LogOut, UserCircle, Sun, Moon, Rows3, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -11,6 +11,7 @@ import {
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { useAuth } from '@/hooks/useAuth'
 import { useTheme } from '@/hooks/useTheme'
+import { useDensity } from '@/hooks/useDensity'
 import { cn } from '@/lib/utils'
 import type { RealtimeStatus } from '@/features/realtime/useRealtimeSubscriptions'
 import { NotificationsBell } from '@/features/notifications/NotificationsBell'
@@ -25,6 +26,7 @@ interface HeaderProps {
 export function Header({ pageTitle, onOpenMobileMenu, onOpenSearch, realtimeStatus = 'connecting' }: HeaderProps) {
   const { profile, user, signOut } = useAuth()
   const navigate = useNavigate()
+  const { density, toggle: toggleDensity } = useDensity()
 
   const nome = profile?.nome_completo ?? user?.email ?? 'Usuário'
   const inicial = nome.trim().charAt(0).toUpperCase() || '?'
@@ -35,12 +37,12 @@ export function Header({ pageTitle, onOpenMobileMenu, onOpenSearch, realtimeStat
   }
 
   return (
-    <header className="flex h-14 shrink-0 items-center gap-3 border-b bg-background px-4">
+    <header className="flex h-14 shrink-0 items-center gap-3 border-b border-black/30 bg-gradient-to-r from-[#C44612] from-0% via-[#3A1E10] via-15% to-[#1D1E1B] to-100% px-4 text-primary-foreground shadow-sm">
       <Button
         type="button"
         variant="ghost"
         size="icon"
-        className="md:hidden"
+        className="md:hidden text-primary-foreground hover:bg-white/15 hover:text-primary-foreground"
         onClick={onOpenMobileMenu}
         aria-label="Abrir menu"
       >
@@ -48,7 +50,7 @@ export function Header({ pageTitle, onOpenMobileMenu, onOpenSearch, realtimeStat
       </Button>
 
       {pageTitle && (
-        <h1 className="hidden truncate text-[15px] font-medium text-foreground md:block">
+        <h1 className="hidden truncate text-[15px] font-semibold text-primary-foreground md:block">
           {pageTitle}
         </h1>
       )}
@@ -58,7 +60,7 @@ export function Header({ pageTitle, onOpenMobileMenu, onOpenSearch, realtimeStat
           type="button"
           variant="ghost"
           size="icon"
-          className="sm:hidden"
+          className="sm:hidden text-primary-foreground hover:bg-white/15 hover:text-primary-foreground"
           onClick={onOpenSearch}
           aria-label="Buscar (Ctrl+K)"
         >
@@ -68,13 +70,13 @@ export function Header({ pageTitle, onOpenMobileMenu, onOpenSearch, realtimeStat
           type="button"
           onClick={onOpenSearch}
           className={cn(
-            'hidden h-9 w-full max-w-md items-center gap-2 rounded-md border bg-muted/40 px-3 text-[13px] text-muted-foreground transition-colors hover:bg-muted sm:flex',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+            'hidden h-9 w-full max-w-md items-center gap-2 rounded-md border border-white/20 bg-white/10 px-3 text-[13px] text-primary-foreground/90 transition-colors hover:bg-white/20 sm:flex',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60',
           )}
         >
           <Search className="h-4 w-4" />
           <span className="flex-1 text-left">Buscar (Ctrl+K)</span>
-          <kbd className="hidden rounded border bg-background px-1.5 py-0.5 text-[10px] text-muted-foreground sm:inline">
+          <kbd className="hidden rounded border border-white/30 bg-white/10 px-1.5 py-0.5 text-[10px] text-primary-foreground/90 sm:inline">
             Ctrl K
           </kbd>
         </button>
@@ -90,15 +92,15 @@ export function Header({ pageTitle, onOpenMobileMenu, onOpenSearch, realtimeStat
         <DropdownMenuTrigger asChild>
           <button
             type="button"
-            className="flex items-center gap-2 rounded-md px-1.5 py-1 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="flex items-center gap-2 rounded-md px-1.5 py-1 hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
           >
-            <Avatar className="h-8 w-8">
-              <AvatarFallback>{inicial}</AvatarFallback>
+            <Avatar className="h-8 w-8 border border-white/30">
+              <AvatarFallback className="bg-white/15 text-primary-foreground">{inicial}</AvatarFallback>
             </Avatar>
-            <span className="hidden text-[13px] font-medium text-foreground md:inline">
+            <span className="hidden text-[13px] font-medium text-primary-foreground md:inline">
               {nome.split(' ')[0]}
             </span>
-            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+            <ChevronDown className="h-3.5 w-3.5 text-primary-foreground/80" />
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-52">
@@ -114,6 +116,11 @@ export function Header({ pageTitle, onOpenMobileMenu, onOpenSearch, realtimeStat
           <DropdownMenuItem onClick={() => navigate('/perfil')}>
             <UserCircle className="mr-2 h-4 w-4" />
             Meu perfil
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={(e) => { e.preventDefault(); toggleDensity() }}>
+            <Rows3 className="mr-2 h-4 w-4" />
+            <span className="flex-1">Densidade compacta</span>
+            {density === 'compact' && <Check className="ml-2 h-3.5 w-3.5 text-primary" />}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={handleSignOut} className="text-destructive focus:text-destructive">
@@ -137,6 +144,7 @@ function ThemeToggle() {
       onClick={toggle}
       aria-label={isDark ? 'Mudar para modo claro' : 'Mudar para modo escuro'}
       title={isDark ? 'Modo claro' : 'Modo escuro'}
+      className="text-primary-foreground hover:bg-white/15 hover:text-primary-foreground"
     >
       {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
     </Button>
@@ -145,14 +153,14 @@ function ThemeToggle() {
 
 function RealtimeIndicator({ status }: { status: RealtimeStatus }) {
   const config: Record<RealtimeStatus, { dot: string; label: string }> = {
-    connecting: { dot: 'bg-amber-400 animate-pulse', label: 'Conectando…' },
-    live: { dot: 'bg-emerald-500', label: 'Ao vivo · sincronizado entre usuários' },
-    error: { dot: 'bg-red-500', label: 'Sem conexão em tempo real' },
+    connecting: { dot: 'bg-amber-300 animate-pulse', label: 'Conectando…' },
+    live: { dot: 'bg-emerald-300', label: 'Ao vivo · sincronizado entre usuários' },
+    error: { dot: 'bg-red-300', label: 'Sem conexão em tempo real' },
   }
   const c = config[status]
   return (
     <div
-      className="hidden items-center gap-1.5 rounded-full border bg-muted/40 px-2 py-1 text-[11px] text-muted-foreground sm:flex"
+      className="hidden items-center gap-1.5 rounded-full border border-white/25 bg-white/10 px-2 py-1 text-[11px] text-primary-foreground/90 sm:flex"
       title={c.label}
     >
       <span className={cn('h-1.5 w-1.5 rounded-full', c.dot)} />

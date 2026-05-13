@@ -21,9 +21,9 @@ export const STATUS_LABELS: Record<SolicitacaoStatus, string> = {
 
 export const STATUS_CLASSES: Record<SolicitacaoStatus, string> = {
   recebida: 'bg-slate-100 text-slate-700',
-  em_cadastro: 'bg-blue-100 text-blue-800',
+  em_cadastro: 'status-em_cadastro',
   instrucao_emitida: 'bg-amber-100 text-amber-800',
-  oc_gerada: 'bg-indigo-100 text-indigo-900',
+  oc_gerada: 'status-oc_gerada',
   oc_enviada: 'bg-emerald-100 text-emerald-800',
   finalizada: 'bg-emerald-200 text-emerald-900',
   cancelada: 'bg-red-100 text-red-800',
@@ -40,7 +40,7 @@ export function canCancel(current: SolicitacaoStatus): boolean {
 }
 
 export function isEditable(current: SolicitacaoStatus): boolean {
-  return current !== 'cancelada' && current !== 'finalizada'
+  return current !== 'finalizada'
 }
 
 export const SLA_PENDING_STATUSES: SolicitacaoStatus[] = [

@@ -234,7 +234,7 @@ export default function AuditoriaPage() {
       <div className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-[22px] font-medium text-foreground">Auditoria</h1>
+            <h1 className="text-[22px] font-semibold tracking-tight text-foreground">Auditoria</h1>
             <p className="text-[12px] text-muted-foreground">
               Histórico de criação, edição e exclusão dos registros do sistema.
             </p>

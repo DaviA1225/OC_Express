@@ -4,10 +4,54 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#1D1E1B" />
     <title>SisLog · Sistema de Gestão de Carregamentos</title>
+    <style>
+      /* Splash exibido antes de o React montar — evita flash branco */
+      html, body { margin: 0; padding: 0; height: 100%; background: #1D1E1B; }
+      body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+      #app-splash {
+        position: fixed; inset: 0;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        gap: 18px;
+        background: radial-gradient(circle at 25% 25%, rgba(255,81,0,0.18), transparent 45%), #1D1E1B;
+        color: #fff;
+      }
+      #app-splash .mark {
+        width: 56px; height: 56px;
+        border-radius: 14px;
+        display: flex; align-items: center; justify-content: center;
+        font-weight: 600; font-size: 18px; letter-spacing: -0.02em;
+        background: linear-gradient(135deg, #FF5100 0%, #B83D0A 60%, #1D1E1B 100%);
+        box-shadow: 0 8px 24px rgba(255, 81, 0, 0.25);
+      }
+      #app-splash .wordmark {
+        font-size: 13px; letter-spacing: 2px; text-transform: uppercase;
+        color: rgba(255,255,255,0.65);
+      }
+      #app-splash .dots { display: inline-flex; gap: 6px; margin-top: 4px; }
+      #app-splash .dots span {
+        width: 6px; height: 6px; border-radius: 50%;
+        background: #FF5100;
+        opacity: 0.35;
+        animation: splash-pulse 1.2s ease-in-out infinite;
+      }
+      #app-splash .dots span:nth-child(2) { animation-delay: 0.15s; }
+      #app-splash .dots span:nth-child(3) { animation-delay: 0.3s; }
+      @keyframes splash-pulse {
+        0%, 80%, 100% { opacity: 0.25; transform: scale(0.85); }
+        40% { opacity: 1; transform: scale(1.1); }
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div id="app-splash" role="status" aria-live="polite" aria-label="Carregando SisLog">
+        <div class="mark">SL</div>
+        <div class="wordmark">SisLog</div>
+        <div class="dots"><span></span><span></span><span></span></div>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

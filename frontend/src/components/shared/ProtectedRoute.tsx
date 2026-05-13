@@ -1,17 +1,13 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
-import { Loader2 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
+import { BrandedLoader } from '@/components/shared/BrandedLoader'
 
 export function ProtectedRoute() {
   const { session, profile, loading } = useAuth()
   const location = useLocation()
 
   if (loading) {
-    return (
-      <div className="flex min-h-full items-center justify-center bg-background">
-        <Loader2 className="h-6 w-6 animate-spin text-primary" />
-      </div>
-    )
+    return <BrandedLoader />
   }
 
   if (!session) {
