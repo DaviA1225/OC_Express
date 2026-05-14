@@ -21,6 +21,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { Checkbox } from '@/components/ui/checkbox'
 import { isValidCnpj } from '@/lib/validators'
 import { formatCnpj } from '@/lib/utils'
 import type { Tables } from '@/types/database.types'
@@ -34,6 +35,7 @@ const schema = z.object({
   origem_padrao: z.string().optional(),
   destino_padrao: z.string().optional(),
   observacoes_padrao: z.string().optional(),
+  requer_instrucao: z.boolean(),
 })
 type FormValues = z.infer<typeof schema>
 
@@ -68,6 +70,21 @@ export default function MateriaisPage() {
     { header: 'Filial', accessor: (r) => r.filial, className: 'text-muted-foreground' },
     { header: 'Origem padrão', accessor: (r) => r.origem_padrao ?? '—', className: 'text-muted-foreground' },
     { header: 'Destino padrão', accessor: (r) => r.destino_padrao ?? '—', className: 'text-muted-foreground' },
+    {
+      header: 'Instrução',
+      accessor: (r) => (
+        <span
+          className={
+            r.requer_instrucao
+              ? 'inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800'
+              : 'inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground'
+          }
+          title={r.requer_instrucao ? 'Exige nº de instrução antes de gerar a OC' : 'Não exige instrução — gera OC direto'}
+        >
+          {r.requer_instrucao ? 'Exige' : 'Dispensa'}
+        </span>
+      ),
+    },
   ]
 
   return (
@@ -113,6 +130,7 @@ export default function MateriaisPage() {
               origem_padrao: values.origem_padrao || null,
               destino_padrao: values.destino_padrao || null,
               observacoes_padrao: values.observacoes_padrao || null,
+              requer_instrucao: values.requer_instrucao,
             },
           })
           setOpen(false)
@@ -184,12 +202,14 @@ function MaterialForm({ open, onOpenChange, editing, onSubmit }: FormProps) {
         origem_padrao: editing?.origem_padrao ?? '',
         destino_padrao: editing?.destino_padrao ?? '',
         observacoes_padrao: editing?.observacoes_padrao ?? '',
+        requer_instrucao: editing?.requer_instrucao ?? true,
       })
     }
   }, [open, editing, reset])
 
   const cnpj = watch('cnpj_filial') ?? ''
   const obs = watch('observacoes_padrao') ?? ''
+  const requerInstrucao = watch('requer_instrucao')
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -261,6 +281,24 @@ function MaterialForm({ open, onOpenChange, editing, onSubmit }: FormProps) {
                   </pre>
                 </div>
               )}
+            </div>
+
+            <div className="rounded-md border bg-background px-3 py-2.5">
+              <label className="flex items-start gap-2.5 cursor-pointer">
+                <Checkbox
+                  checked={!!requerInstrucao}
+                  onCheckedChange={(v) => setValue('requer_instrucao', v === true, { shouldValidate: true })}
+                  className="mt-0.5"
+                />
+                <span className="space-y-0.5">
+                  <span className="block text-[13px] font-medium leading-none">
+                    Exige nº de instrução para gerar a OC
+                  </span>
+                  <span className="block text-[11px] text-muted-foreground">
+                    Marque se a OC desse material precisa de instrução ou número de pedido.
+                  </span>
+                </span>
+              </label>
             </div>
           </DialogBody>
           <DialogFooter>

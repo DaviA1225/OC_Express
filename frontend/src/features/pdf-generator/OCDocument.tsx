@@ -172,7 +172,7 @@ export function OCDocument({ data }: { data: OCData }) {
       rightLabel: 'Destino', rightValor: data.destino,
     },
     {
-      label: 'Instrução', valor: data.instrucao ?? '',
+      label: 'Instrução', valor: (data.instrucao ?? '').trim() || '-',
       rightLabel: 'Descarga', rightValor: data.descarga ?? '', rightValorSm: true,
     },
     { label: 'Material', valor: data.material },

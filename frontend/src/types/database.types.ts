@@ -219,6 +219,7 @@ export interface Database {
           origem_padrao: string | null
           destino_padrao: string | null
           observacoes_padrao: string | null
+          requer_instrucao: boolean
           ativo: boolean
           created_at: string
           updated_at: string
@@ -232,6 +233,7 @@ export interface Database {
           origem_padrao?: string | null
           destino_padrao?: string | null
           observacoes_padrao?: string | null
+          requer_instrucao?: boolean
           ativo?: boolean
           created_at?: string
           updated_at?: string

@@ -159,6 +159,7 @@ export function SolicitacaoDetailPage() {
             <StatusActions
               status={s.status}
               hasInstrucao={!!s.numero_instrucao}
+              requerInstrucao={s.material?.requer_instrucao ?? true}
               onAdvanceInstrucao={() => {
                 setInstrInput(s.numero_instrucao ?? '')
                 setShowInstrForm(true)
@@ -358,6 +359,7 @@ export function SolicitacaoDetailPage() {
 interface ActionsProps {
   status: Tables<'solicitacoes'>['status']
   hasInstrucao: boolean
+  requerInstrucao: boolean
   onAdvanceInstrucao: () => void
   onAdvanceFinalizar: () => void
   onMarcarEmCadastro: () => void
@@ -367,7 +369,7 @@ interface ActionsProps {
   disabled: boolean
 }
 
-function StatusActions({ status, hasInstrucao, onAdvanceInstrucao, onAdvanceFinalizar, onMarcarEmCadastro, onVoltarRecebida, onGerarOC, onEnviarWhats, disabled }: ActionsProps) {
+function StatusActions({ status, hasInstrucao, requerInstrucao, onAdvanceInstrucao, onAdvanceFinalizar, onMarcarEmCadastro, onVoltarRecebida, onGerarOC, onEnviarWhats, disabled }: ActionsProps) {
   if (status === 'recebida') {
     return (
       <Button size="sm" variant="outline" onClick={onMarcarEmCadastro} disabled={disabled}>
@@ -382,9 +384,15 @@ function StatusActions({ status, hasInstrucao, onAdvanceInstrucao, onAdvanceFina
           <ChevronLeft className="h-4 w-4" />
           Voltar para Recebida
         </Button>
-        <Button size="sm" onClick={onAdvanceInstrucao} disabled={disabled}>
-          + Adicionar instrução
-        </Button>
+        {requerInstrucao ? (
+          <Button size="sm" onClick={onAdvanceInstrucao} disabled={disabled}>
+            + Adicionar instrução
+          </Button>
+        ) : (
+          <Button size="sm" onClick={onGerarOC} disabled={disabled} title="Material dispensa nº de instrução">
+            Gerar OC
+          </Button>
+        )}
       </div>
     )
   }
@@ -424,7 +432,7 @@ function StatusActions({ status, hasInstrucao, onAdvanceInstrucao, onAdvanceFina
       </div>
     )
   }
-  if (!hasInstrucao && status !== 'cancelada' && status !== 'finalizada') {
+  if (!hasInstrucao && requerInstrucao && status !== 'cancelada' && status !== 'finalizada') {
     return (
       <Button size="sm" onClick={onAdvanceInstrucao} disabled={disabled}>
         + Adicionar instrução
@@ -843,10 +851,12 @@ function DestinoMaterialCard({ solicitacao, editable, onSave }: CardProps) {
 }
 
 function InstrucaoPdfCard({ solicitacao }: { solicitacao: CardProps['solicitacao'] }) {
+  const dispensa = solicitacao.material?.requer_instrucao === false
+  const instrucaoValor = solicitacao.numero_instrucao ?? (dispensa ? 'Não exigido' : null)
   return (
     <CardShell title="Instrução e PDF" editable={false} isEditing={false} onEdit={() => {}} onCancel={() => {}}>
       <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-[13px]">
-        <Field label="Nº Instrução" value={solicitacao.numero_instrucao} />
+        <Field label="Nº Instrução" value={instrucaoValor} />
         <div>
           <dt className="text-[10px] uppercase tracking-[0.5px] text-muted-foreground">PDF</dt>
           <dd>
