@@ -13,8 +13,10 @@
 --
 -- Esta peça é independente das tabelas de parceiro (Fase 8.1), por isso é
 -- aplicada já. A view portal_solicitacoes virá junto da migration da Fase 8.1.
+--
+-- Script idempotente: pode ser reexecutado sem erro.
 
-CREATE VIEW clientes_publicos
+CREATE OR REPLACE VIEW clientes_publicos
 WITH (security_invoker = false) AS
 SELECT id, razao_social, cidade, uf
 FROM clientes
