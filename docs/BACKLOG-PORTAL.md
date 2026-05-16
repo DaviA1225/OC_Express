@@ -44,24 +44,35 @@ portal inteiro não funciona.
 
 ---
 
-## Bloco 1 — Decisões de design de segurança (resolver antes de codar)
+## Bloco 1 — Decisões de design de segurança ✅ RESOLVIDO (2026-05-16)
 
-RLS no Postgres é **por linha, não por coluna**. Resolver estes pontos evita
-vazar dado sensível para o concorrente mesmo com RLS "correta".
+RLS no Postgres é **por linha, não por coluna**. As decisões abaixo foram
+fechadas para evitar vazar dado sensível ao concorrente mesmo com RLS "correta".
+A *implementação* das views acontece no Bloco 2 (Fase 8.1).
 
-- [ ] ⚠ **VIEW `portal_solicitacoes`** — o portal deve ler solicitações por uma
-  view que expõe só colunas seguras. A tabela `solicitacoes` crua contém
-  `numero_instrucao` (nº da instrução Protheus), `pdf_url`, `atendente_id`,
-  `documentado_por` e observações internas — um parceiro consultando a API
-  REST direto receberia a linha inteira.
-- [ ] ⚠ **VIEW/RPC `clientes_publicos`** — resolve a contradição entre SPEC 4.5
-  (bloquear `clientes` para externos) e 5.5 (parceiro escolhe cliente da LHG).
-  Expor apenas `id` + `nome`; nunca `frete_*`, `liberado`, observações.
-- [ ] ⚠ Separar observações do parceiro de notas internas em `solicitacoes`
-  (campo `observacoes` hoje é único e seria compartilhado).
-- [ ] ⚠ Definir gerenciador de workspaces: npm workspaces vs pnpm.
-- [ ] ⚠ Definir estratégia de migração do `frontend/` atual → `apps/interno`
-  (mover tudo de uma vez vs incremental).
+- [x] **VIEW `portal_solicitacoes`** — decisão: o parceiro **não** recebe policy
+  de `SELECT` na tabela `solicitacoes` (só `INSERT` e `UPDATE`; sem SELECT, um
+  `UPDATE ... RETURNING` também não vaza colunas). A leitura é feita por uma
+  view **`SECURITY DEFINER`** (`security_invoker = false`) com filtro próprio
+  no `WHERE` (`origem = 'parceiro' AND parceiro_id = get_current_parceiro_id()`).
+  Colunas expostas: `id, numero_interno, tipo, status, origem, parceiro_*`,
+  `cliente_id, pamcard_status, pamcard_numero, observacoes, created_at`,
+  `enviada_em, finalizada_em`. Fica de fora (interno): `numero_instrucao`,
+  `pdf_url`, `atendente_id`, `material_id/subtipo`, `local_carregamento`,
+  `validade_*`, `pamcard_providenciado_*`, `documentado_*`, `observacoes_internas`.
+- [x] **VIEW `clientes_publicos`** — decisão: view `SECURITY DEFINER` expondo
+  apenas `id, razao_social, cidade, uf` de `clientes` com `ativo = true`.
+  Resolve a contradição SPEC 4.5 × 5.5. Não depende das tabelas de parceiro —
+  pode ser criada isoladamente. Filtro por `liberado`/`cliente_minerio` fica
+  como decisão de produto (MVP: só `ativo`).
+- [x] **Separar observações** — decisão: adicionar coluna `observacoes_internas`
+  em `solicitacoes` (na migration da Fase 8.1). `observacoes` = compartilhado
+  (parceiro escreve, aparece na view); `observacoes_internas` = só interno.
+- [x] **Workspaces** — decisão: **npm workspaces** (nativo, projeto já usa npm).
+- [x] **Migração para monorepo** — decisão: dois commits. (1) `git mv frontend
+  apps/interno` + esqueleto `apps/portal` + `package.json` raiz + `vercel.json`;
+  (2) criar `packages/shared` (`database.types`, `lib/supabase`, `validators`,
+  formatters) e reapontar os imports do `apps/interno` para `@sislog/shared`.
 
 ---
 
@@ -84,7 +95,7 @@ vazar dado sensível para o concorrente mesmo com RLS "correta".
 - [ ] `parceiro_subcontratadas` — UNIQUE (parceiro_id, cnpj) quando não nulo
 - [ ] Patch em `solicitacoes`: colunas `parceiro_id`, `parceiro_usuario_id`,
   `parceiro_motorista_id`, `parceiro_veiculo_id`, `parceiro_carreta_id`,
-  `parceiro_subcontratada_id`
+  `parceiro_subcontratada_id` e `observacoes_internas` (ver Bloco 1)
 - [ ] CHECK de integridade `origem='parceiro'` (campos parceiro obrigatórios,
   campos internos NULL) e vice-versa
 - [ ] CHECK `material_id` obrigatório fora dos status `recebida`/`cancelada`
@@ -97,7 +108,10 @@ vazar dado sensível para o concorrente mesmo com RLS "correta".
 - [ ] Políticas restritivas em todas as tabelas internas (`motoristas`,
   `veiculos`, `carretas`, `clientes`, `materiais`, `subcontratadas`,
   `perfis_usuarios`) — `USING (is_interno())`
-- [ ] RLS nas views `portal_solicitacoes` e `clientes_publicos`
+- [x] View `clientes_publicos` criada (migration 0017) — implementada antes da
+  Fase 8.1 por ser isolada das tabelas de parceiro
+- [ ] Criar view `portal_solicitacoes` conforme o design do Bloco 1
+  (`SECURITY DEFINER`, sem policy de SELECT do parceiro em `solicitacoes`)
 - [ ] **Teste de penetração de RLS**: logar como parceiro A e tentar ler dados
   de parceiro B, dados internos e colunas sensíveis via API REST
 
@@ -171,7 +185,11 @@ pública · multi-idioma · white-label · faturamento/financeiro.
 
 ## Ordem recomendada
 
-1. **Bloco 0.1** (Patch Pamcard) — gargalo, independente do portal, faça já.
-2. **Bloco 1** (decisões de segurança) — barato, evita retrabalho caro depois.
+1. ✅ **Bloco 0.1** (Patch Pamcard) — concluído (migration 0016 aplicada).
+2. ✅ **Bloco 1** (decisões de segurança) — resolvido em 2026-05-16.
 3. **Bloco 0.2** (aprovações) — em paralelo, fora do código.
 4. Blocos 2 → 6 na ordem das sub-fases do SPEC.
+
+**Próximo passo de código:** Bloco 2 (Fase 8.1) — depende dos pré-requisitos do
+Bloco 0.2. A view `clientes_publicos` (peça isolada) já foi implementada na
+migration 0017; o restante do Bloco 2 aguarda as aprovações do Bloco 0.2.
