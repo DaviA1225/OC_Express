@@ -1015,7 +1015,7 @@ function PamcardCard({ solicitacao, editable, onSave }: CardProps) {
         .eq('user_id', solicitacao.pamcard_providenciado_por!)
         .maybeSingle()
       if (error) throw error
-      return data?.nome_completo ?? null
+      return (data as Pick<Tables<'perfis_usuarios'>, 'nome_completo'> | null)?.nome_completo ?? null
     },
   })
 

@@ -1,0 +1,17 @@
+{
+  "name": "sislog-lhg",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Monorepo SisLog LHG — sistema interno e portal de parceiros",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace @sislog/interno",
+    "dev:portal": "npm run dev --workspace @sislog/portal",
+    "build": "npm run build --workspace @sislog/interno",
+    "build:portal": "npm run build --workspace @sislog/portal",
+    "lint": "npm run lint --workspace @sislog/interno"
+  }
+}

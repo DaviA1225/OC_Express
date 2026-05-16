@@ -28,6 +28,7 @@ import { formatDocumento, cn } from '@/lib/utils'
 import type { Tables } from '@/types/database.types'
 
 type Row = Tables<'subcontratadas'>
+type ExportRow = Pick<Row, 'razao_social' | 'tipo_pessoa' | 'documento' | 'ativo'>
 
 const schema = z.object({
   razao_social: z.string().min(2, 'Informe a razão social ou nome'),
@@ -85,20 +86,20 @@ export default function SubcontratadasPage() {
       let query = supabase
         .from('subcontratadas')
         .select('razao_social, tipo_pessoa, documento, ativo')
-        .order('razao_social', { ascending: true })
       if (!state.showInactive) query = query.eq('ativo', true)
       const term = state.debouncedSearch.trim()
       if (term) {
         const safe = term.replace(/[%_]/g, '\\$&')
         query = query.or(`razao_social.ilike.%${safe}%,documento.ilike.%${safe}%`)
       }
-      const { data, error } = await query
+      const { data, error } = await query.order('razao_social', { ascending: true })
       if (error) throw error
-      if (!data || data.length === 0) {
+      const rows = (data ?? []) as unknown as ExportRow[]
+      if (rows.length === 0) {
         toast.info('Nenhuma subcontratada para exportar com os filtros atuais.')
         return
       }
-      const cols: CsvColumn<(typeof data)[number]>[] = [
+      const cols: CsvColumn<ExportRow>[] = [
         { header: 'Razão Social / Nome', accessor: (r) => r.razao_social },
         { header: 'Tipo', accessor: (r) => r.tipo_pessoa },
         { header: 'CPF / CNPJ', accessor: (r) => r.documento },
@@ -106,8 +107,8 @@ export default function SubcontratadasPage() {
       ]
       const ts = new Date()
       const stamp = `${ts.getFullYear()}${String(ts.getMonth() + 1).padStart(2, '0')}${String(ts.getDate()).padStart(2, '0')}_${String(ts.getHours()).padStart(2, '0')}${String(ts.getMinutes()).padStart(2, '0')}`
-      downloadCsv(`subcontratadas_${stamp}.csv`, buildCsv(data, cols))
-      toast.success(`${data.length} ${data.length === 1 ? 'registro exportado' : 'registros exportados'}`)
+      downloadCsv(`subcontratadas_${stamp}.csv`, buildCsv(rows, cols))
+      toast.success(`${rows.length} ${rows.length === 1 ? 'registro exportado' : 'registros exportados'}`)
     } catch {
       toast.error('Falha ao exportar. Tente novamente.')
     } finally {

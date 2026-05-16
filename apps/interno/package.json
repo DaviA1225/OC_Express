@@ -1,5 +1,5 @@
 {
-  "name": "frontend",
+  "name": "@sislog/interno",
   "private": true,
   "version": "0.0.0",
   "type": "module",
