@@ -277,6 +277,13 @@ export interface Database {
           pamcard_providenciado_em: string | null
           pamcard_providenciado_por: string | null
           origem: SolicitacaoOrigem
+          parceiro_id: string | null
+          parceiro_usuario_id: string | null
+          parceiro_motorista_id: string | null
+          parceiro_veiculo_id: string | null
+          parceiro_carreta_id: string | null
+          parceiro_subcontratada_id: string | null
+          observacoes_internas: string | null
           documentado_por: string | null
           documentado_em: string | null
           created_at: string
@@ -314,6 +321,13 @@ export interface Database {
           pamcard_providenciado_em?: string | null
           pamcard_providenciado_por?: string | null
           origem?: SolicitacaoOrigem
+          parceiro_id?: string | null
+          parceiro_usuario_id?: string | null
+          parceiro_motorista_id?: string | null
+          parceiro_veiculo_id?: string | null
+          parceiro_carreta_id?: string | null
+          parceiro_subcontratada_id?: string | null
+          observacoes_internas?: string | null
           documentado_por?: string | null
           documentado_em?: string | null
           created_at?: string

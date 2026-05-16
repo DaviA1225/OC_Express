@@ -86,34 +86,35 @@ A *implementação* das views acontece no Bloco 2 (Fase 8.1).
 - [ ] Confirmar build/dev independentes de cada app
 - [ ] Ajustar `vercel.json` / deploy para os dois apps
 
-### 2.2 Migration das tabelas de parceiro
-- [ ] `parceiros` (razão social, CNPJ, contato, código interno, observações internas)
-- [ ] `parceiro_usuarios` (FK auth.users, perfil `admin_parceiro`/`operador_parceiro`)
-- [ ] `parceiro_motoristas` — UNIQUE (parceiro_id, cpf)
-- [ ] `parceiro_veiculos` — UNIQUE (parceiro_id, placa)
-- [ ] `parceiro_carretas` — UNIQUE (parceiro_id, placa)
-- [ ] `parceiro_subcontratadas` — UNIQUE (parceiro_id, cnpj) quando não nulo
-- [ ] Patch em `solicitacoes`: colunas `parceiro_id`, `parceiro_usuario_id`,
-  `parceiro_motorista_id`, `parceiro_veiculo_id`, `parceiro_carreta_id`,
-  `parceiro_subcontratada_id` e `observacoes_internas` (ver Bloco 1)
-- [ ] CHECK de integridade `origem='parceiro'` (campos parceiro obrigatórios,
-  campos internos NULL) e vice-versa
-- [ ] CHECK `material_id` obrigatório fora dos status `recebida`/`cancelada`
+### 2.2 Migration das tabelas de parceiro — ✅ migration 0018
+- [x] `parceiros` (razão social, CNPJ, contato, código interno, observações internas)
+- [x] `parceiro_usuarios` (FK auth.users, perfil `admin_parceiro`/`operador_parceiro`)
+- [x] `parceiro_motoristas` — UNIQUE (parceiro_id, cpf)
+- [x] `parceiro_veiculos` — UNIQUE (parceiro_id, placa)
+- [x] `parceiro_carretas` — UNIQUE (parceiro_id, placa)
+- [x] `parceiro_subcontratadas` — UNIQUE (parceiro_id, cnpj) quando não nulo
+- [x] Triggers `updated_at` + auditoria nas 6 tabelas
+- [x] Patch em `solicitacoes`: colunas `parceiro_*` e `observacoes_internas`
+- [x] CHECK de integridade de origem (`origem='parceiro'` × interno) — `NOT VALID`
+- [x] CHECK `material_id` obrigatório fora de `recebida`/`cancelada` (isenta `retorno`) — `NOT VALID`
 
-### 2.3 RLS
-- [ ] Funções `get_current_parceiro_id()` e `is_interno()`
-- [ ] Políticas SELECT/INSERT/UPDATE nas 4 tabelas `parceiro_*`
-- [ ] Políticas em `parceiros` e `parceiro_usuarios` (admin_parceiro gerencia usuários)
-- [ ] Políticas em `solicitacoes` (parceiro vê/cria as suas, cancela enquanto `recebida`)
-- [ ] Políticas restritivas em todas as tabelas internas (`motoristas`,
-  `veiculos`, `carretas`, `clientes`, `materiais`, `subcontratadas`,
-  `perfis_usuarios`) — `USING (is_interno())`
-- [x] View `clientes_publicos` criada (migration 0017) — implementada antes da
-  Fase 8.1 por ser isolada das tabelas de parceiro
-- [ ] Criar view `portal_solicitacoes` conforme o design do Bloco 1
-  (`SECURITY DEFINER`, sem policy de SELECT do parceiro em `solicitacoes`)
+### 2.3 RLS — ✅ migration 0018
+- [x] Funções `get_current_parceiro_id()`, `is_interno()`, `is_admin_parceiro()`
+  (SECURITY DEFINER, evita recursão de RLS)
+- [x] Políticas SELECT/INSERT/UPDATE nas 4 tabelas `parceiro_*` + leitura interna
+- [x] Políticas em `parceiros` e `parceiro_usuarios` (interno + `admin_parceiro`)
+- [x] Políticas em `solicitacoes` (interno faz tudo; parceiro cria e cancela
+  enquanto `recebida`; parceiro **sem** SELECT — lê pela view)
+- [x] Lockdown das tabelas internas: políticas `authenticated USING(true)` →
+  `is_interno()` (`perfis_usuarios`, cadastros, `cargas_retorno`,
+  `solicitacao_anexos`, `log_auditoria` com INSERT aberto p/ trigger)
+- [x] View `clientes_publicos` criada (migration 0017)
+- [x] View `portal_solicitacoes` criada (migration 0018, `SECURITY DEFINER`)
 - [ ] **Teste de penetração de RLS**: logar como parceiro A e tentar ler dados
   de parceiro B, dados internos e colunas sensíveis via API REST
+- [ ] Lockdown da RLS de **storage** (`solicitacoes-anexos`): hoje as policies
+  são `authenticated USING(bucket_id=...)`; restringir a `is_interno()` antes
+  de o portal ir ao ar
 
 ---
 
@@ -187,9 +188,10 @@ pública · multi-idioma · white-label · faturamento/financeiro.
 
 1. ✅ **Bloco 0.1** (Patch Pamcard) — concluído (migration 0016 aplicada).
 2. ✅ **Bloco 1** (decisões de segurança) — resolvido em 2026-05-16.
-3. **Bloco 0.2** (aprovações) — em paralelo, fora do código.
-4. Blocos 2 → 6 na ordem das sub-fases do SPEC.
+3. ✅ **Bloco 2.2 + 2.3** (modelo de dados + RLS) — migrations 0017 e 0018.
+4. **Bloco 0.2** (aprovações) — em paralelo, fora do código.
+5. Bloco 2.1 (monorepo) e Blocos 3 → 6 na ordem das sub-fases do SPEC.
 
-**Próximo passo de código:** Bloco 2 (Fase 8.1) — depende dos pré-requisitos do
-Bloco 0.2. A view `clientes_publicos` (peça isolada) já foi implementada na
-migration 0017; o restante do Bloco 2 aguarda as aprovações do Bloco 0.2.
+**Próximo passo de código:** Bloco 2.1 — reestruturação para monorepo
+(`apps/interno` + `apps/portal` + `packages/shared`). É o passo disruptivo;
+o modelo de dados do portal já está pronto no banco (0018).
