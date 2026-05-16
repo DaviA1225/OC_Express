@@ -57,7 +57,7 @@ export default function VeiculosPage() {
     showInactive: state.showInactive,
     page: state.page,
     pageSize: state.pageSize,
-    searchColumns: ['placa', 'tipo'],
+    searchColumns: ['placa', 'tipo', 'observacoes'],
     orderBy: 'placa',
     ascending: true,
   })
@@ -91,6 +91,18 @@ export default function VeiculosPage() {
     {
       header: 'Subcontratada',
       accessor: (r) => (r.subcontratada_id ? subById.get(r.subcontratada_id) ?? '—' : '—'),
+      className: 'text-muted-foreground',
+    },
+    {
+      header: 'Observações',
+      accessor: (r) =>
+        r.observacoes ? (
+          <span className="block max-w-[280px] truncate" title={r.observacoes}>
+            {r.observacoes}
+          </span>
+        ) : (
+          '—'
+        ),
       className: 'text-muted-foreground',
     },
   ]

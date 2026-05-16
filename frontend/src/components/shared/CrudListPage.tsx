@@ -30,6 +30,7 @@ export interface CrudListPageProps<T extends { id: string; ativo: boolean }> {
   title: string
   newButtonLabel?: string
   onNew?: () => void
+  headerActions?: React.ReactNode
   rows: T[] | undefined
   isLoading: boolean
   totalActive: number
@@ -58,6 +59,7 @@ export function CrudListPage<T extends { id: string; ativo: boolean }>(props: Cr
     title,
     newButtonLabel,
     onNew,
+    headerActions,
     rows,
     isLoading,
     totalActive,
@@ -133,12 +135,15 @@ export function CrudListPage<T extends { id: string; ativo: boolean }>(props: Cr
             {totalActive} {totalActive === 1 ? 'ativo' : 'ativos'}
           </p>
         </div>
-        {onNew && newButtonLabel && (
-          <Button onClick={onNew}>
-            <Plus className="h-4 w-4" />
-            {newButtonLabel}
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {headerActions}
+          {onNew && newButtonLabel && (
+            <Button onClick={onNew}>
+              <Plus className="h-4 w-4" />
+              {newButtonLabel}
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-background p-3">

@@ -2,7 +2,10 @@ import * as React from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Download } from 'lucide-react'
+import { toast } from 'sonner'
+import { supabase } from '@/lib/supabase'
+import { buildCsv, downloadCsv, type CsvColumn } from '@/lib/csv'
 import { CrudListPage, useCrudListState, type ColumnDef } from '@/components/shared/CrudListPage'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { useCrudList, useActiveCount, useUpsertRow, useToggleActive, useDeleteRow, useBulkToggleActive, useBulkDeleteRows } from '@/features/crud/useCrudQueries'
@@ -74,6 +77,43 @@ export default function SubcontratadasPage() {
   const [open, setOpen] = React.useState(false)
   const [confirmRow, setConfirmRow] = React.useState<Row | null>(null)
   const [deleteRow, setDeleteRow] = React.useState<Row | null>(null)
+  const [exporting, setExporting] = React.useState(false)
+
+  const handleExport = async () => {
+    setExporting(true)
+    try {
+      let query = supabase
+        .from('subcontratadas')
+        .select('razao_social, tipo_pessoa, documento, ativo')
+        .order('razao_social', { ascending: true })
+      if (!state.showInactive) query = query.eq('ativo', true)
+      const term = state.debouncedSearch.trim()
+      if (term) {
+        const safe = term.replace(/[%_]/g, '\\$&')
+        query = query.or(`razao_social.ilike.%${safe}%,documento.ilike.%${safe}%`)
+      }
+      const { data, error } = await query
+      if (error) throw error
+      if (!data || data.length === 0) {
+        toast.info('Nenhuma subcontratada para exportar com os filtros atuais.')
+        return
+      }
+      const cols: CsvColumn<(typeof data)[number]>[] = [
+        { header: 'Razão Social / Nome', accessor: (r) => r.razao_social },
+        { header: 'Tipo', accessor: (r) => r.tipo_pessoa },
+        { header: 'CPF / CNPJ', accessor: (r) => r.documento },
+        { header: 'Situação', accessor: (r) => (r.ativo ? 'Ativa' : 'Inativa') },
+      ]
+      const ts = new Date()
+      const stamp = `${ts.getFullYear()}${String(ts.getMonth() + 1).padStart(2, '0')}${String(ts.getDate()).padStart(2, '0')}_${String(ts.getHours()).padStart(2, '0')}${String(ts.getMinutes()).padStart(2, '0')}`
+      downloadCsv(`subcontratadas_${stamp}.csv`, buildCsv(data, cols))
+      toast.success(`${data.length} ${data.length === 1 ? 'registro exportado' : 'registros exportados'}`)
+    } catch {
+      toast.error('Falha ao exportar. Tente novamente.')
+    } finally {
+      setExporting(false)
+    }
+  }
 
   const columns: ColumnDef<Row>[] = [
     { header: 'Razão Social / Nome', accessor: (r) => r.razao_social },
@@ -87,6 +127,17 @@ export default function SubcontratadasPage() {
         title="Subcontratadas"
         newButtonLabel={canEdit ? 'Nova subcontratada' : undefined}
         onNew={canEdit ? () => { setEditing(null); setOpen(true) } : undefined}
+        headerActions={
+          <Button
+            variant="outline"
+            onClick={handleExport}
+            disabled={exporting || list.isLoading}
+            title="Exportar resultados filtrados em CSV"
+          >
+            {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            <span className="hidden sm:inline">Exportar CSV</span>
+          </Button>
+        }
         rows={list.data?.data}
         isLoading={list.isLoading}
         totalActive={totalActive.data ?? 0}
