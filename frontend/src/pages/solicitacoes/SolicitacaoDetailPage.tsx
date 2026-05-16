@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
-import { AlertCircle, ArrowLeft, ChevronLeft, ChevronRight, Copy, Loader2, Pencil, RotateCcw, X } from 'lucide-react'
+import { AlertCircle, ArrowLeft, ChevronLeft, ChevronRight, Copy, CreditCard, Loader2, Pencil, RotateCcw, X } from 'lucide-react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { toast } from 'sonner'
@@ -13,6 +13,9 @@ import { Combobox, type ComboboxOption } from '@/components/shared/Combobox'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
+import {
+  Dialog, DialogContent, DialogHeader, DialogBody, DialogFooter, DialogTitle, DialogDescription,
+} from '@/components/ui/dialog'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { SolicitacaoStatusBadge } from '@/components/shared/SolicitacaoStatusBadge'
 import {
@@ -35,7 +38,7 @@ const GerarOCDialog = React.lazy(() =>
 const WhatsAppEnvioDialog = React.lazy(() =>
   import('@/features/whatsapp/WhatsAppEnvioDialog').then((m) => ({ default: m.WhatsAppEnvioDialog })),
 )
-import { formatNumeroOC, formatTelefone } from '@/lib/utils'
+import { formatNumeroOC, formatTelefone, formatarPamcardParaExibicao } from '@/lib/utils'
 import { isValidTelefone } from '@/lib/validators'
 import type { MaterialSubtipo, Tables } from '@/types/database.types'
 import { isMineralMaterial } from '@/features/solicitacoes/material'
@@ -236,6 +239,7 @@ export function SolicitacaoDetailPage() {
           <SolicitanteCard solicitacao={s} editable={editable} onSave={(values) => update.mutateAsync({ id: s.id, values })} />
           <MotoristaVeiculoCard solicitacao={s} editable={editable} onSave={(values) => update.mutateAsync({ id: s.id, values })} />
           <DestinoMaterialCard solicitacao={s} editable={editable} onSave={(values) => update.mutateAsync({ id: s.id, values })} />
+          <PamcardCard solicitacao={s} editable={editable} onSave={(values) => update.mutateAsync({ id: s.id, values })} />
           {showInstrForm && (
             <InstrucaoForm
               initial={s.numero_instrucao ?? instrInput}
@@ -900,6 +904,214 @@ function InstrucaoForm({ initial, onCancel, onSave }: { initial: string; onCance
           </Button>
         </div>
       </div>
+    </section>
+  )
+}
+
+function PamcardNumeroDialog({
+  open,
+  onOpenChange,
+  title,
+  description,
+  initialNumero,
+  onConfirm,
+}: {
+  open: boolean
+  onOpenChange: (o: boolean) => void
+  title: string
+  description: string
+  initialNumero: string
+  onConfirm: (numero: string) => Promise<void>
+}) {
+  const [numero, setNumero] = React.useState(initialNumero)
+  const [erro, setErro] = React.useState<string | null>(null)
+  const [saving, setSaving] = React.useState(false)
+
+  React.useEffect(() => {
+    if (open) {
+      setNumero(initialNumero)
+      setErro(null)
+    }
+  }, [open, initialNumero])
+
+  const validar = (v: string): string | null => {
+    if (!/^[0-9]+$/.test(v)) return 'O Pamcard deve conter apenas números'
+    if (v.length < 10) return 'O Pamcard deve ter no mínimo 10 dígitos'
+    if (v.length > 16) return 'O Pamcard deve ter no máximo 16 dígitos'
+    return null
+  }
+
+  const submit = async () => {
+    const e = validar(numero)
+    if (e) {
+      setErro(e)
+      return
+    }
+    setSaving(true)
+    try {
+      await onConfirm(numero)
+      onOpenChange(false)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
+        </DialogHeader>
+        <DialogBody className="space-y-1.5">
+          <Label htmlFor="pamcard-dlg">Número do cartão *</Label>
+          <Input
+            id="pamcard-dlg"
+            autoFocus
+            value={numero}
+            onChange={(e) => {
+              setNumero(e.target.value.replace(/\D/g, '').slice(0, 16))
+              setErro(null)
+            }}
+            onBlur={() => setErro(validar(numero))}
+            inputMode="numeric"
+            pattern="[0-9]*"
+            maxLength={16}
+            placeholder="Ex: 441781209999"
+          />
+          {erro && <p className="text-[11px] text-destructive">{erro}</p>}
+        </DialogBody>
+        <DialogFooter>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
+              Cancelar
+            </Button>
+            <Button onClick={submit} disabled={saving}>
+              {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+              Confirmar
+            </Button>
+          </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function PamcardCard({ solicitacao, editable, onSave }: CardProps) {
+  const { profile } = useAuth()
+  const temCartao = solicitacao.pamcard_status === 'tem_cartao'
+  const providenciado = !!solicitacao.pamcard_providenciado_em
+  const podeAlterar = editable && solicitacao.status !== 'cancelada'
+  const [editarOpen, setEditarOpen] = React.useState(false)
+  const [providenciarOpen, setProvidenciarOpen] = React.useState(false)
+
+  const providenciadoPor = useQuery({
+    enabled: !!solicitacao.pamcard_providenciado_por,
+    queryKey: ['perfil-nome', solicitacao.pamcard_providenciado_por],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('perfis_usuarios')
+        .select('nome_completo')
+        .eq('user_id', solicitacao.pamcard_providenciado_por!)
+        .maybeSingle()
+      if (error) throw error
+      return data?.nome_completo ?? null
+    },
+  })
+
+  return (
+    <section className="rounded-lg border bg-background">
+      <header className="flex items-center justify-between border-b px-4 py-2">
+        <div className="flex items-center gap-2">
+          <CreditCard className="h-4 w-4 text-muted-foreground" />
+          <h2 className="text-[14px] font-medium text-foreground">Pamcard</h2>
+        </div>
+        {temCartao && !providenciado && podeAlterar && (
+          <Button variant="ghost" size="sm" onClick={() => setEditarOpen(true)} aria-label="Editar Pamcard">
+            <Pencil className="h-4 w-4" />
+          </Button>
+        )}
+      </header>
+      <div className="p-4">
+        {temCartao && !providenciado && (
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-[13px]">
+            <div>
+              <dt className="text-[10px] uppercase tracking-[0.5px] text-muted-foreground">Status</dt>
+              <dd className="font-medium text-green-700 dark:text-green-400">Informado pelo solicitante</dd>
+            </div>
+            <div>
+              <dt className="text-[10px] uppercase tracking-[0.5px] text-muted-foreground">Número</dt>
+              <dd className="text-foreground">{formatarPamcardParaExibicao(solicitacao.pamcard_numero) || '—'}</dd>
+            </div>
+          </dl>
+        )}
+
+        {!temCartao && !providenciado && (
+          <div className="space-y-3">
+            <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-[12px] text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-300">
+              Aguardando providência da equipe interna.
+            </div>
+            {podeAlterar && (
+              <Button className="w-full" onClick={() => setProvidenciarOpen(true)}>
+                Cartão providenciado
+              </Button>
+            )}
+          </div>
+        )}
+
+        {temCartao && providenciado && (
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-[13px]">
+            <div>
+              <dt className="text-[10px] uppercase tracking-[0.5px] text-muted-foreground">Status</dt>
+              <dd className="font-medium text-blue-700 dark:text-blue-400">Providenciado pela equipe</dd>
+            </div>
+            <div>
+              <dt className="text-[10px] uppercase tracking-[0.5px] text-muted-foreground">Número</dt>
+              <dd className="text-foreground">{formatarPamcardParaExibicao(solicitacao.pamcard_numero) || '—'}</dd>
+            </div>
+            <div className="col-span-2">
+              <dt className="text-[10px] uppercase tracking-[0.5px] text-muted-foreground">Providenciado por</dt>
+              <dd className="text-foreground">
+                {providenciadoPor.data ?? '—'}
+                {solicitacao.pamcard_providenciado_em && (
+                  <span className="text-muted-foreground">
+                    {' · '}
+                    {format(new Date(solicitacao.pamcard_providenciado_em), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                  </span>
+                )}
+              </dd>
+            </div>
+          </dl>
+        )}
+      </div>
+
+      <PamcardNumeroDialog
+        open={editarOpen}
+        onOpenChange={setEditarOpen}
+        title="Editar número do Pamcard"
+        description="Atualize o número do cartão informado pelo solicitante."
+        initialNumero={solicitacao.pamcard_numero ?? ''}
+        onConfirm={async (numero) => {
+          await onSave({ pamcard_numero: numero })
+          toast.success('Número do Pamcard atualizado')
+        }}
+      />
+      <PamcardNumeroDialog
+        open={providenciarOpen}
+        onOpenChange={setProvidenciarOpen}
+        title="Registrar cartão providenciado"
+        description="Informe o número do cartão Pamcard providenciado para esta solicitação."
+        initialNumero=""
+        onConfirm={async (numero) => {
+          await onSave({
+            pamcard_status: 'tem_cartao',
+            pamcard_numero: numero,
+            pamcard_providenciado_por: profile?.user_id ?? null,
+            pamcard_providenciado_em: new Date().toISOString(),
+          })
+          toast.success('Cartão registrado com sucesso')
+        }}
+      />
     </section>
   )
 }

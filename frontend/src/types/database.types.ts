@@ -25,6 +25,10 @@ export type SolicitacaoTipo = 'carregamento' | 'retorno'
 
 export type MaterialSubtipo = 'SINTER' | 'HEMATITA' | 'LUMP'
 
+export type PamcardStatus = 'tem_cartao' | 'nao_tem_cartao'
+
+export type SolicitacaoOrigem = 'interno' | 'parceiro' | 'email'
+
 export interface Database {
   public: {
     Tables: {
@@ -268,7 +272,11 @@ export interface Database {
           cte_emitido: boolean
           mdfe_emitido: boolean
           vale_pedagio: boolean
-          pamcard: boolean
+          pamcard_status: PamcardStatus
+          pamcard_numero: string | null
+          pamcard_providenciado_em: string | null
+          pamcard_providenciado_por: string | null
+          origem: SolicitacaoOrigem
           documentado_por: string | null
           documentado_em: string | null
           created_at: string
@@ -301,7 +309,11 @@ export interface Database {
           cte_emitido?: boolean
           mdfe_emitido?: boolean
           vale_pedagio?: boolean
-          pamcard?: boolean
+          pamcard_status?: PamcardStatus
+          pamcard_numero?: string | null
+          pamcard_providenciado_em?: string | null
+          pamcard_providenciado_por?: string | null
+          origem?: SolicitacaoOrigem
           documentado_por?: string | null
           documentado_em?: string | null
           created_at?: string

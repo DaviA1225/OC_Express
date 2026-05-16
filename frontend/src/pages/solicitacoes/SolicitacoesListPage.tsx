@@ -26,18 +26,21 @@ import {
   fetchSolicitacoesParaExport,
   type ListFilters,
   type PeriodoFiltro,
+  type PamcardFiltro,
   type SolicitacaoListRow,
 } from '@/features/solicitacoes/useSolicitacoes'
 import { buildCsv, downloadCsv, type CsvColumn } from '@/lib/csv'
 import { STATUS_LABELS, getSlaInfo, type SlaInfo } from '@/features/solicitacoes/status'
 import { formatNumeroOC } from '@/lib/utils'
 import { cn } from '@/lib/utils'
-import type { SolicitacaoStatus, SolicitacaoTipo, Tables } from '@/types/database.types'
+import type { SolicitacaoStatus, SolicitacaoTipo, SolicitacaoOrigem, Tables } from '@/types/database.types'
 
 type MaterialOpt = Pick<Tables<'materiais'>, 'id' | 'nome'>
 
 const VALID_PERIODOS: PeriodoFiltro[] = ['todos', 'hoje', '7d', 'mes']
 const VALID_TIPOS: (SolicitacaoTipo | 'todos')[] = ['todos', 'carregamento', 'retorno']
+const VALID_ORIGENS: (SolicitacaoOrigem | 'todos')[] = ['todos', 'interno', 'parceiro', 'email']
+const VALID_PAMCARD: PamcardFiltro[] = ['todos', 'com_cartao', 'pendente']
 const VALID_STATUSES: SolicitacaoStatus[] = [
   'recebida', 'em_cadastro', 'instrucao_emitida', 'oc_gerada', 'oc_enviada', 'finalizada', 'cancelada',
 ]
@@ -65,6 +68,14 @@ export function SolicitacoesListPage() {
   const tipo = (() => {
     const raw = params.get('tipo')
     return VALID_TIPOS.includes(raw as SolicitacaoTipo | 'todos') ? (raw as SolicitacaoTipo | 'todos') : 'todos'
+  })()
+  const origem = (() => {
+    const raw = params.get('origem')
+    return VALID_ORIGENS.includes(raw as SolicitacaoOrigem | 'todos') ? (raw as SolicitacaoOrigem | 'todos') : 'todos'
+  })()
+  const pamcard = (() => {
+    const raw = params.get('pamcard')
+    return VALID_PAMCARD.includes(raw as PamcardFiltro) ? (raw as PamcardFiltro) : 'todos'
   })()
   const apenasAtrasadas = params.get('atrasadas') === '1'
   const page = Math.max(1, Number(params.get('page')) || 1)
@@ -109,6 +120,16 @@ export function SolicitacoesListPage() {
       if (v !== 'todos') n.set('tipo', v); else n.delete('tipo')
       n.delete('page')
     })
+  const setOrigem = (v: SolicitacaoOrigem | 'todos') =>
+    updateParams((n) => {
+      if (v !== 'todos') n.set('origem', v); else n.delete('origem')
+      n.delete('page')
+    })
+  const setPamcard = (v: PamcardFiltro) =>
+    updateParams((n) => {
+      if (v !== 'todos') n.set('pamcard', v); else n.delete('pamcard')
+      n.delete('page')
+    })
   const setApenasAtrasadas = (v: boolean) =>
     updateParams((n) => {
       if (v) n.set('atrasadas', '1'); else n.delete('atrasadas')
@@ -125,6 +146,8 @@ export function SolicitacoesListPage() {
     periodo,
     materialId,
     tipo,
+    origem,
+    pamcard,
     atendenteId: null,
     apenasAtrasadas,
     page,
@@ -190,6 +213,8 @@ export function SolicitacoesListPage() {
         periodo,
         materialId,
         tipo,
+        origem,
+        pamcard,
         atendenteId: null,
       })
       if (rows.length === 0) {
@@ -256,10 +281,12 @@ export function SolicitacoesListPage() {
 
   const totalPages = Math.max(1, Math.ceil((list.data?.count ?? 0) / pageSize))
   const hasFilters =
-    search.trim() !== '' || statuses.length > 0 || periodo !== 'todos' || !!materialId || tipo !== 'todos' || apenasAtrasadas
+    search.trim() !== '' || statuses.length > 0 || periodo !== 'todos' || !!materialId ||
+    tipo !== 'todos' || origem !== 'todos' || pamcard !== 'todos' || apenasAtrasadas
 
   const clearFilters = () => {
-    setSearch(''); setStatuses([]); setPeriodo('todos'); setMaterialId(null); setTipo('todos'); setApenasAtrasadas(false)
+    setSearch(''); setStatuses([]); setPeriodo('todos'); setMaterialId(null); setTipo('todos')
+    setOrigem('todos'); setPamcard('todos'); setApenasAtrasadas(false)
   }
 
   const toggleStatus = (s: SolicitacaoStatus) => {
@@ -332,6 +359,23 @@ export function SolicitacoesListPage() {
               {(materiais.data ?? []).map((m) => (
                 <SelectItem key={m.id} value={m.id}>{m.nome}</SelectItem>
               ))}
+            </SelectContent>
+          </Select>
+          <Select value={origem} onValueChange={(v) => setOrigem(v as typeof origem)}>
+            <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todas as origens</SelectItem>
+              <SelectItem value="interno">Internas</SelectItem>
+              <SelectItem value="parceiro">Parceiros</SelectItem>
+              <SelectItem value="email">E-mail</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={pamcard} onValueChange={(v) => setPamcard(v as PamcardFiltro)}>
+            <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Pamcard: todos</SelectItem>
+              <SelectItem value="com_cartao">Com cartão</SelectItem>
+              <SelectItem value="pendente">Pendentes</SelectItem>
             </SelectContent>
           </Select>
           {hasFilters && (
@@ -535,6 +579,19 @@ function SolicitacaoCard({ row, selectable, selected, onToggleSelect, onOpen }: 
             onCheckedChange={onToggleSelect}
             aria-label={`Selecionar ${formatNumeroOC(row.numero_interno)}`}
           />
+          )}
+          {row.pamcard_status === 'nao_tem_cartao' && !row.pamcard_providenciado_em && (
+            <span
+              className="shrink-0 rounded bg-amber-500/20 px-2 py-0.5 text-[10px] font-medium text-amber-800 dark:text-amber-300"
+              title="Cartão Pamcard ainda não providenciado"
+            >
+              Cartão pendente
+            </span>
+          )}
+          {row.origem === 'email' && (
+            <span className="shrink-0 rounded bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+              via e-mail
+            </span>
           )}
           <span className="text-[14px] font-medium text-primary shrink-0">{formatNumeroOC(row.numero_interno)}</span>
           {row.solicitante_nome && (

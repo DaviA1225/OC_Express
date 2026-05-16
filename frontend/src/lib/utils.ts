@@ -47,3 +47,17 @@ export function formatTelefone(value: string): string {
 export function formatNumeroOC(numero: number): string {
   return `#${numero.toString().padStart(4, '0')}`
 }
+
+/**
+ * Formata um número de Pamcard para exibição visual, agrupando de 4 em 4
+ * dígitos. NÃO altera o dado armazenado — apenas a apresentação.
+ *
+ * Exemplo: '441781209999' -> '4417 8120 9999'
+ *
+ * Usado APENAS na visualização (cards, telas de detalhe). No input do
+ * formulário e no banco, o valor permanece somente dígitos sem separadores.
+ */
+export function formatarPamcardParaExibicao(numero: string | null): string {
+  if (!numero) return ''
+  return numero.replace(/(\d{4})(?=\d)/g, '$1 ').trim()
+}

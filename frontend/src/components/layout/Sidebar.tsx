@@ -19,6 +19,7 @@ import {
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
 import { canViewAuditoria, canViewUsuarios, canViewRelatorios } from '@/features/auth/permissions'
+import { usePamcardPendenteCount } from '@/features/solicitacoes/useSolicitacoes'
 
 interface NavItem {
   to: string
@@ -57,6 +58,8 @@ export function SidebarContent({ collapsed, onToggleCollapse, onNavigate, classN
   const showUsuarios = canViewUsuarios(profile)
   const showAuditoria = canViewAuditoria(profile)
   const showRelatorios = canViewRelatorios(profile)
+  const pamcardPendente = usePamcardPendenteCount()
+  const pamcardPendenteCount = pamcardPendente.data ?? 0
 
   return (
     <aside
@@ -90,6 +93,7 @@ export function SidebarContent({ collapsed, onToggleCollapse, onNavigate, classN
               item={item}
               collapsed={collapsed}
               onNavigate={onNavigate}
+              badgeCount={item.to === '/solicitacoes' ? pamcardPendenteCount : 0}
             />
           ))}
         </ul>
@@ -183,10 +187,12 @@ function NavListItem({
   item,
   collapsed,
   onNavigate,
+  badgeCount = 0,
 }: {
   item: NavItem
   collapsed: boolean
   onNavigate?: () => void
+  badgeCount?: number
 }) {
   const Icon = item.icon
   return (
@@ -204,10 +210,26 @@ function NavListItem({
             collapsed && 'justify-center px-0',
           )
         }
-        title={collapsed ? item.label : undefined}
+        title={
+          collapsed
+            ? item.label + (badgeCount > 0 ? ` (${badgeCount} Pamcard pendente)` : '')
+            : undefined
+        }
       >
         <Icon className="h-[18px] w-[18px] shrink-0" />
         {!collapsed && <span className="truncate">{item.label}</span>}
+        {badgeCount > 0 && (
+          collapsed ? (
+            <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-amber-500" />
+          ) : (
+            <span
+              className="ml-auto inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-semibold text-white"
+              title={`${badgeCount} solicitação(ões) com Pamcard pendente`}
+            >
+              {badgeCount}
+            </span>
+          )
+        )}
       </NavLink>
     </li>
   )

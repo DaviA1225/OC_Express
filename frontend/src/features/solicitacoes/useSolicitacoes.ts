@@ -9,6 +9,7 @@ import type {
   TablesUpdate,
   SolicitacaoStatus,
   SolicitacaoTipo,
+  SolicitacaoOrigem,
 } from '@/types/database.types'
 
 type Solicitacao = Tables<'solicitacoes'>
@@ -34,16 +35,36 @@ const SELECT_WITH_JOINS = `
 
 export type PeriodoFiltro = 'todos' | 'hoje' | '7d' | 'mes'
 
+/** Filtro de Pamcard: todos, só com cartão, ou pendentes de providência. */
+export type PamcardFiltro = 'todos' | 'com_cartao' | 'pendente'
+
 export interface ListFilters {
   search: string
   statuses: SolicitacaoStatus[]
   periodo: PeriodoFiltro
   materialId: string | null
   tipo: SolicitacaoTipo | 'todos'
+  origem: SolicitacaoOrigem | 'todos'
+  pamcard: PamcardFiltro
   atendenteId: string | null
   apenasAtrasadas?: boolean
   page: number
   pageSize: number
+}
+
+/** Aplica os filtros de origem e Pamcard a uma query de solicitações. */
+function applyOrigemPamcardFilters<T>(
+  query: T,
+  filters: Pick<ListFilters, 'origem' | 'pamcard'>,
+): T {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let q = query as any
+  if (filters.origem !== 'todos') q = q.eq('origem', filters.origem)
+  if (filters.pamcard === 'com_cartao') q = q.eq('pamcard_status', 'tem_cartao')
+  if (filters.pamcard === 'pendente') {
+    q = q.eq('pamcard_status', 'nao_tem_cartao').is('pamcard_providenciado_em', null)
+  }
+  return q as T
 }
 
 function slaThresholdISO(): string {
@@ -80,6 +101,7 @@ export async function fetchSolicitacoesParaExport(
   if (filters.materialId) query = query.eq('material_id', filters.materialId)
   if (filters.atendenteId) query = query.eq('atendente_id', filters.atendenteId)
   if (filters.tipo !== 'todos') query = query.eq('tipo', filters.tipo)
+  query = applyOrigemPamcardFilters(query, filters)
   if (filters.apenasAtrasadas) {
     query = query
       .in('status', SLA_PENDING_STATUSES)
@@ -124,6 +146,7 @@ export function useSolicitacoesList(filters: ListFilters) {
       if (filters.tipo !== 'todos') {
         query = query.eq('tipo', filters.tipo)
       }
+      query = applyOrigemPamcardFilters(query, filters)
       if (filters.apenasAtrasadas) {
         query = query
           .in('status', SLA_PENDING_STATUSES)
@@ -173,6 +196,26 @@ export function useSolicitacao(id: string | null | undefined) {
       if (error) throw error
       return data as unknown as SolicitacaoListRow
     },
+  })
+}
+
+/**
+ * Conta solicitações com cartão Pamcard ainda pendente de providência.
+ * Recarrega a cada 30s para alimentar o indicador da sidebar.
+ */
+export function usePamcardPendenteCount() {
+  return useQuery({
+    queryKey: ['pamcard-pendente-count'],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from('solicitacoes')
+        .select('id', { count: 'exact', head: true })
+        .eq('pamcard_status', 'nao_tem_cartao')
+        .is('pamcard_providenciado_em', null)
+      if (error) throw error
+      return count ?? 0
+    },
+    refetchInterval: 30_000,
   })
 }
 
@@ -260,6 +303,8 @@ export function useDuplicateSolicitacao() {
         material_id: source.material_id,
         material_subtipo: source.material_subtipo,
         local_carregamento: source.local_carregamento,
+        pamcard_status: source.pamcard_status,
+        pamcard_numero: source.pamcard_numero,
         observacoes: source.observacoes,
         atendente_id,
       }

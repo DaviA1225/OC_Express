@@ -67,6 +67,8 @@ const schema = z
     material_subtipo: z.enum(['SINTER', 'HEMATITA', 'LUMP']).nullable().optional(),
     local_carregamento: z.string().optional(),
     carga_retorno_id: z.string().nullable().optional(),
+    pamcard_status: z.enum(['tem_cartao', 'nao_tem_cartao']),
+    pamcard_numero: z.string().optional(),
     observacoes: z.string().optional(),
   })
   .superRefine((v, ctx) => {
@@ -105,6 +107,28 @@ const schema = z
           code: z.ZodIssueCode.custom,
           path: ['carga_retorno_id'],
           message: 'Selecione a carga de retorno',
+        })
+      }
+    }
+    if (v.pamcard_status === 'tem_cartao') {
+      const num = (v.pamcard_numero ?? '').trim()
+      if (!/^[0-9]+$/.test(num)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['pamcard_numero'],
+          message: 'O Pamcard deve conter apenas números',
+        })
+      } else if (num.length < 10) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['pamcard_numero'],
+          message: 'O Pamcard deve ter no mínimo 10 dígitos',
+        })
+      } else if (num.length > 16) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['pamcard_numero'],
+          message: 'O Pamcard deve ter no máximo 16 dígitos',
         })
       }
     }
@@ -166,6 +190,8 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, onCreated }: Props) 
         material_subtipo: null,
         local_carregamento: '',
         carga_retorno_id: null,
+        pamcard_status: 'tem_cartao',
+        pamcard_numero: '',
         observacoes: '',
       })
     }
@@ -180,6 +206,9 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, onCreated }: Props) 
   const materialSubtipo = watch('material_subtipo') ?? null
   const localCarregamento = watch('local_carregamento') ?? ''
   const cargaRetornoId = watch('carga_retorno_id') ?? null
+  const pamcardStatus = watch('pamcard_status')
+  const pamcardNumero = watch('pamcard_numero') ?? ''
+  const pamcardNumeroRef = React.useRef<HTMLInputElement>(null)
 
   const materialMinerio = React.useMemo(
     () => (materiais.data ?? []).find((m) => isMineralMaterial(m.nome)) ?? null,
@@ -277,6 +306,11 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, onCreated }: Props) 
       material_id: resolvedMaterialId,
       material_subtipo: isMinerio ? values.material_subtipo ?? null : null,
       local_carregamento: values.local_carregamento || null,
+      pamcard_status: values.pamcard_status,
+      pamcard_numero:
+        values.pamcard_status === 'tem_cartao'
+          ? (values.pamcard_numero ?? '').trim()
+          : null,
       observacoes: values.observacoes || null,
     })
     if (created?.id) onCreated?.(created.id)
@@ -517,6 +551,59 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, onCreated }: Props) 
                   </div>
                 </Section>
               )}
+
+              <Section label="Pagamento (Pamcard)">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label>Cartão *</Label>
+                    <RadioGroup
+                      value={pamcardStatus}
+                      onValueChange={(v) => {
+                        const next = v as 'tem_cartao' | 'nao_tem_cartao'
+                        setValue('pamcard_status', next, { shouldValidate: true })
+                        if (next === 'nao_tem_cartao') {
+                          setValue('pamcard_numero', '', { shouldValidate: true })
+                        } else {
+                          setTimeout(() => pamcardNumeroRef.current?.focus(), 0)
+                        }
+                      }}
+                      className="flex flex-col gap-2"
+                    >
+                      <label className="flex items-center gap-2 text-[13px]">
+                        <RadioGroupItem value="tem_cartao" />
+                        Tem cartão
+                      </label>
+                      <label className="flex items-center gap-2 text-[13px]">
+                        <RadioGroupItem value="nao_tem_cartao" />
+                        Não tem cartão (solicitar)
+                      </label>
+                    </RadioGroup>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="pamcard_numero">Número do cartão</Label>
+                    <Input
+                      id="pamcard_numero"
+                      ref={pamcardNumeroRef}
+                      value={pamcardNumero}
+                      onChange={(e) =>
+                        setValue(
+                          'pamcard_numero',
+                          e.target.value.replace(/\D/g, '').slice(0, 16),
+                          { shouldValidate: true },
+                        )
+                      }
+                      disabled={pamcardStatus !== 'tem_cartao'}
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={16}
+                      placeholder="Ex: 441781209999"
+                    />
+                    {errors.pamcard_numero && (
+                      <p className="text-[11px] text-destructive">{errors.pamcard_numero.message}</p>
+                    )}
+                  </div>
+                </div>
+              </Section>
 
               <Section label="Observações">
                 <Textarea rows={2} {...register('observacoes')} placeholder="Opcional" />
