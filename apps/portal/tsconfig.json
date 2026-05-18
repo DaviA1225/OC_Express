@@ -12,7 +12,17 @@
     "moduleDetection": "force",
     "allowImportingTsExtensions": true,
     "types": ["vite/client"],
-    "ignoreDeprecations": "6.0"
+    "ignoreDeprecations": "6.0",
+
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "erasableSyntaxOnly": true,
+    "noFallthroughCasesInSwitch": true
   },
   "include": ["src"]
 }

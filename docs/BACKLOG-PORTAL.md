@@ -152,15 +152,20 @@ A *implementação* das views acontece no Bloco 2 (Fase 8.1).
 
 (no app `apps/portal`)
 
-- [ ] Layout: header (56px) + navegação horizontal (44px), sem sidebar
-- [ ] Identidade visual diferenciada ("Portal Parceiros LHG", acento `#1E3A8A`)
-- [ ] Footer com link "Suporte" (e-mail/WhatsApp da LHG)
-- [ ] Login (`/`) — sem "esqueci senha" no MVP
-- [ ] CRUD Motoristas do parceiro
-- [ ] CRUD Veículos do parceiro
-- [ ] CRUD Carretas do parceiro
-- [ ] CRUD Subcontratadas do parceiro
-- [ ] Tela Usuários (somente `admin_parceiro`)
+- [x] Setup do app: Tailwind, shadcn (ui copiada do interno), alias `@`,
+  `index.css` com identidade azul, `lib/supabase` (factory `@sislog/shared`).
+- [x] Layout: header (56px) + navegação horizontal (44px), sem sidebar.
+- [x] Identidade visual diferenciada ("Portal Parceiros LHG", azul
+  `#1E40AF`/`#1E3A8A`).
+- [x] Footer com link "Suporte" (e-mail/WhatsApp) — **placeholders**, trocar
+  pelos contatos reais da LHG.
+- [x] Login (`/`) — sem "esqueci senha"; auth via `parceiro_usuarios`.
+- [x] CRUD Motoristas do parceiro.
+- [x] CRUD Veículos do parceiro.
+- [x] CRUD Carretas do parceiro.
+- [x] CRUD Subcontratadas do parceiro.
+- [~] Tela Usuários (somente `admin_parceiro`) — lista, edita perfil e
+  ativa/desativa. Convite de novo usuário **adiado** (Edge Function).
 
 ---
 
@@ -206,13 +211,13 @@ pública · multi-idioma · white-label · faturamento/financeiro.
 3. ✅ **Bloco 2.2 + 2.3** (modelo de dados + RLS) — migrations 0017 e 0018.
 4. ✅ **Bloco 2.1** (monorepo + `packages/shared`) — concluído em 2026-05-18.
 5. ✅ **Bloco 3** (telas internas de gestão de parceiros) — concluído em
-   2026-05-18, exceto a tela de usuários do parceiro (adiada — depende de
-   Edge Function).
-6. **Bloco 0.2** (aprovações) — em paralelo, fora do código.
-7. Blocos 4 → 6 na ordem das sub-fases do SPEC.
+   2026-05-18.
+6. ✅ **Bloco 4** (portal: auth, layout, cadastros) — concluído em 2026-05-18.
+7. **Bloco 0.2** (aprovações) — em paralelo, fora do código.
+8. Blocos 5 → 6 na ordem das sub-fases do SPEC.
 
-**Próximo passo de código:** Bloco 4 — portal (`apps/portal`): autenticação,
-layout e cadastros do parceiro. Pendências em aberto: tela de usuários do
-parceiro (Edge Function de convite) e segurança do Bloco 2.3 (teste de
-penetração de RLS + lockdown do storage `solicitacoes-anexos`) — fechar antes
-de o portal ir ao ar.
+**Próximo passo de código:** Bloco 5 — portal: solicitações (lista com labels
+amigáveis de status, "Nova solicitação" em tela cheia, detalhe e cancelamento).
+Pendências em aberto: convite de usuários (Edge Function), contatos reais de
+suporte no footer, e segurança do Bloco 2.3 (teste de penetração de RLS +
+lockdown do storage `solicitacoes-anexos`) — fechar antes de o portal ir ao ar.

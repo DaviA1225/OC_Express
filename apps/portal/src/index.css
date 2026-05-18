@@ -1,0 +1,114 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Portal Parceiros LHG — identidade azul, distinta do sistema interno
+       (laranja). Primária: azul #1E40AF · acento: azul escuro #1E3A8A.
+       O azul sinaliza ao parceiro que ele é fornecedor, não funcionário. */
+
+    --background: 0 0% 100%;
+    --foreground: 222 20% 12%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 20% 12%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 20% 12%;
+
+    --primary: 226 71% 40%;              /* #1E40AF azul portal */
+    --primary-hover: 225 64% 33%;        /* #1E3A8A azul escuro */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 222 16% 22%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 220 20% 97%;
+    --muted-foreground: 220 9% 46%;
+
+    --accent: 226 60% 95%;               /* azul bem clarinho p/ hover/realce */
+    --accent-foreground: 225 64% 33%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 160 84% 36%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 222 20% 12%;
+
+    --border: 220 13% 90%;
+    --input: 220 13% 90%;
+    --ring: 226 71% 40%;
+
+    --radius: 0.375rem;
+  }
+
+  .dark {
+    --background: 222 18% 10%;
+    --foreground: 220 16% 96%;
+
+    --card: 222 16% 13%;
+    --card-foreground: 220 16% 96%;
+
+    --popover: 222 16% 14%;
+    --popover-foreground: 220 16% 96%;
+
+    --primary: 224 76% 62%;              /* azul luminoso p/ dark */
+    --primary-hover: 226 71% 52%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 222 12% 30%;
+    --secondary-foreground: 220 16% 96%;
+
+    --muted: 222 14% 17%;
+    --muted-foreground: 220 10% 66%;
+
+    --accent: 226 40% 26%;
+    --accent-foreground: 220 16% 96%;
+
+    --destructive: 0 72% 55%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 160 70% 45%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 92% 55%;
+    --warning-foreground: 222 20% 12%;
+
+    --border: 222 12% 22%;
+    --input: 222 12% 22%;
+    --ring: 224 76% 62%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html, body, #root {
+    @apply h-full;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-size: 14px;
+    line-height: 1.5;
+    font-feature-settings: 'cv11', 'ss01', 'ss03';
+  }
+  h1, h2, h3 {
+    @apply tracking-tight font-semibold;
+  }
+  table, .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@layer components {
+  .label-uppercase {
+    @apply text-[10px] font-medium uppercase tracking-[0.5px] text-muted-foreground;
+  }
+}
