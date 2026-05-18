@@ -128,14 +128,23 @@ A *implementação* das views acontece no Bloco 2 (Fase 8.1).
 
 (no app `apps/interno`)
 
-- [ ] CRUD `/cadastros/parceiros`
-- [ ] Tela `/cadastros/parceiros/:id/usuarios` (convite via Supabase Auth)
-- [ ] Filtro "Origem" na lista de Solicitações (reaproveita o do Patch Pamcard)
-- [ ] Badge "via [Parceiro]" nos cards de solicitação
-- [ ] Indicador "Material a definir" no card e na tela de detalhe interna
-- [ ] Banner ⚠ "Material ainda não definido" antes de avançar de `recebida`
-- [ ] Botões "Enviar WhatsApp ao parceiro" / "Enviar e-mail ao parceiro" no
-  detalhe quando `status=oc_gerada` e `origem=parceiro`
+- [x] CRUD `/cadastros/parceiros` — `ParceirosPage`; edição restrita a
+  admin/gerente/supervisor (`canEditParceiros`), visualização livre. Tabelas
+  `parceiro_*` e views tipadas no `@sislog/shared`.
+- [ ] 🔴 Tela `/cadastros/parceiros/:id/usuarios` (convite via Supabase Auth)
+  — **adiado**: o convite cria usuário no Auth e exige a `service_role` key,
+  inviável no frontend. Pendente de uma Supabase Edge Function dedicada.
+- [x] Filtro "Origem" na lista de Solicitações — já existia (feito junto da
+  camada de dados do portal).
+- [x] Badge "via [Parceiro]" nos cards de solicitação — join de `parceiro` no
+  `SELECT_WITH_JOINS`; badge azul com a razão social.
+- [x] Indicador "Material a definir" no card e na tela de detalhe interna
+  (origem=parceiro, sem `material_id`, exceto retorno).
+- [x] Banner ⚠ "Material ainda não definido" no detalhe em `recebida`; o botão
+  "Marcar em emissão" fica desabilitado até definir o material.
+- [x] Botões "Enviar WhatsApp ao parceiro" / "Enviar e-mail ao parceiro" no
+  detalhe (card "Avisar o parceiro") quando `status` é `oc_gerada`/`oc_enviada`
+  e `origem=parceiro`.
 
 ---
 
@@ -196,11 +205,14 @@ pública · multi-idioma · white-label · faturamento/financeiro.
 2. ✅ **Bloco 1** (decisões de segurança) — resolvido em 2026-05-16.
 3. ✅ **Bloco 2.2 + 2.3** (modelo de dados + RLS) — migrations 0017 e 0018.
 4. ✅ **Bloco 2.1** (monorepo + `packages/shared`) — concluído em 2026-05-18.
-5. **Bloco 0.2** (aprovações) — em paralelo, fora do código.
-6. Blocos 3 → 6 na ordem das sub-fases do SPEC.
+5. ✅ **Bloco 3** (telas internas de gestão de parceiros) — concluído em
+   2026-05-18, exceto a tela de usuários do parceiro (adiada — depende de
+   Edge Function).
+6. **Bloco 0.2** (aprovações) — em paralelo, fora do código.
+7. Blocos 4 → 6 na ordem das sub-fases do SPEC.
 
-**Próximo passo de código:** Bloco 3 — telas internas de gestão de parceiros
-(CRUD `/cadastros/parceiros`, convite de usuários, filtro "Origem" e badges nas
-Solicitações). Pendências de segurança do Bloco 2.3 (teste de penetração de RLS
-e lockdown do storage `solicitacoes-anexos`) devem ser fechadas antes de o
-portal ir ao ar.
+**Próximo passo de código:** Bloco 4 — portal (`apps/portal`): autenticação,
+layout e cadastros do parceiro. Pendências em aberto: tela de usuários do
+parceiro (Edge Function de convite) e segurança do Bloco 2.3 (teste de
+penetração de RLS + lockdown do storage `solicitacoes-anexos`) — fechar antes
+de o portal ir ao ar.

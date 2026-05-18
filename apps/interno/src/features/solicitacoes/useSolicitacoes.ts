@@ -21,6 +21,7 @@ export interface SolicitacaoListRow extends Solicitacao {
   subcontratada: { razao_social: string } | null
   cliente: { razao_social: string; cidade: string | null; uf: string | null } | null
   material: { nome: string; origem_padrao: string | null; observacoes_padrao: string | null; requer_instrucao: boolean } | null
+  parceiro: { razao_social: string; contato_principal_telefone: string | null; contato_principal_email: string | null } | null
 }
 
 const SELECT_WITH_JOINS = `
@@ -30,7 +31,8 @@ const SELECT_WITH_JOINS = `
   carreta:carreta_id ( placa ),
   subcontratada:subcontratada_id ( razao_social ),
   cliente:cliente_id ( razao_social, cidade, uf ),
-  material:material_id ( nome, origem_padrao, observacoes_padrao, requer_instrucao )
+  material:material_id ( nome, origem_padrao, observacoes_padrao, requer_instrucao ),
+  parceiro:parceiro_id ( razao_social, contato_principal_telefone, contato_principal_email )
 `
 
 export type PeriodoFiltro = 'todos' | 'hoje' | '7d' | 'mes'

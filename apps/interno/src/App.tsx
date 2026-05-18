@@ -14,6 +14,7 @@ const VeiculosPage = lazy(() => import('@/pages/cadastros/VeiculosPage'))
 const CarretasPage = lazy(() => import('@/pages/cadastros/CarretasPage'))
 const ClientesPage = lazy(() => import('@/pages/cadastros/ClientesPage'))
 const MateriaisPage = lazy(() => import('@/pages/cadastros/MateriaisPage'))
+const ParceirosPage = lazy(() => import('@/pages/cadastros/ParceirosPage'))
 const UsuariosPage = lazy(() => import('@/pages/cadastros/UsuariosPage'))
 const SolicitacoesListPage = lazy(() =>
   import('@/pages/solicitacoes/SolicitacoesListPage').then((m) => ({ default: m.SolicitacoesListPage })),
@@ -56,6 +57,7 @@ export default function App() {
                 <Route path="/cadastros/clientes" element={<ClientesPage />} />
                 <Route path="/cadastros/materiais" element={<MateriaisPage />} />
                 <Route path="/cadastros/subcontratadas" element={<SubcontratadasPage />} />
+                <Route path="/cadastros/parceiros" element={<ParceirosPage />} />
 
                 <Route element={<PerfilRoute allowed={['admin']} />}>
                   <Route path="/cadastros/usuarios" element={<UsuariosPage />} />

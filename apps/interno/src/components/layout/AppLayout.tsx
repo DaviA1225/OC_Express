@@ -21,6 +21,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/cadastros/clientes': 'Clientes',
   '/cadastros/materiais': 'Materiais',
   '/cadastros/subcontratadas': 'Subcontratadas',
+  '/cadastros/parceiros': 'Parceiros',
   '/cadastros/usuarios': 'Usuários',
   '/auditoria': 'Auditoria',
   '/relatorios': 'Relatórios',
