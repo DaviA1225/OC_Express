@@ -78,13 +78,19 @@ A *implementação* das views acontece no Bloco 2 (Fase 8.1).
 
 ## Bloco 2 — Fase 8.1: Monorepo + Modelo de dados
 
-### 2.1 Reestruturação para monorepo
-- [ ] Migrar `frontend/` → `apps/interno/` (ajustar todos os imports e paths)
-- [ ] Criar `packages/shared/` com tipos, validadores e `lib/supabase`
-- [ ] Criar `apps/portal/` (esqueleto Vite + React + TS + Tailwind + shadcn)
-- [ ] Configurar workspaces no `package.json` raiz
-- [ ] Confirmar build/dev independentes de cada app
-- [ ] Ajustar `vercel.json` / deploy para os dois apps
+### 2.1 Reestruturação para monorepo — ✅ concluído
+- [x] Migrar `frontend/` → `apps/interno/` (commit `2a8700f`)
+- [x] Criar `packages/shared/` (`@sislog/shared`) com `database.types`,
+  `validators`, `formatters` e factory `createSupabaseClient`. Subpath exports
+  (`/types`, `/validators`, `/formatters`, `/supabase`). Os arquivos
+  `lib/*`/`types/*` do `apps/interno` viraram re-export shims — zero edição
+  nos ~100 sites de import.
+- [x] Criar `apps/portal/` (esqueleto Vite + React + TS) — **Tailwind + shadcn
+  ficam para o Bloco 4** (montagem da identidade visual do portal)
+- [x] Configurar workspaces no `package.json` raiz
+- [x] Confirmar build/dev independentes: `npm run build -w @sislog/interno`
+  passa (`tsc -b` + `vite build`); dev do interno (5173) e portal (5174) sobem
+- [x] `vercel.json` por app (`apps/interno`, `apps/portal`)
 
 ### 2.2 Migration das tabelas de parceiro — ✅ migration 0018
 - [x] `parceiros` (razão social, CNPJ, contato, código interno, observações internas)
@@ -189,9 +195,12 @@ pública · multi-idioma · white-label · faturamento/financeiro.
 1. ✅ **Bloco 0.1** (Patch Pamcard) — concluído (migration 0016 aplicada).
 2. ✅ **Bloco 1** (decisões de segurança) — resolvido em 2026-05-16.
 3. ✅ **Bloco 2.2 + 2.3** (modelo de dados + RLS) — migrations 0017 e 0018.
-4. **Bloco 0.2** (aprovações) — em paralelo, fora do código.
-5. Bloco 2.1 (monorepo) e Blocos 3 → 6 na ordem das sub-fases do SPEC.
+4. ✅ **Bloco 2.1** (monorepo + `packages/shared`) — concluído em 2026-05-18.
+5. **Bloco 0.2** (aprovações) — em paralelo, fora do código.
+6. Blocos 3 → 6 na ordem das sub-fases do SPEC.
 
-**Próximo passo de código:** Bloco 2.1 — reestruturação para monorepo
-(`apps/interno` + `apps/portal` + `packages/shared`). É o passo disruptivo;
-o modelo de dados do portal já está pronto no banco (0018).
+**Próximo passo de código:** Bloco 3 — telas internas de gestão de parceiros
+(CRUD `/cadastros/parceiros`, convite de usuários, filtro "Origem" e badges nas
+Solicitações). Pendências de segurança do Bloco 2.3 (teste de penetração de RLS
+e lockdown do storage `solicitacoes-anexos`) devem ser fechadas antes de o
+portal ir ao ar.
