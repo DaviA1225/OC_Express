@@ -1,4 +1,5 @@
-// Tipos do banco SisLog (espelha supabase/migrations/0001_initial_schema.sql).
+// Tipos do banco SisLog (espelha as migrations em supabase/migrations,
+// até 0018 — tabelas parceiro_* e views do Portal de Parceiros).
 // Para regenerar a partir do banco real, instale Docker Desktop e rode:
 //   npx supabase gen types typescript --db-url "<DB_URL>" --schema public
 
@@ -28,6 +29,8 @@ export type MaterialSubtipo = 'SINTER' | 'HEMATITA' | 'LUMP'
 export type PamcardStatus = 'tem_cartao' | 'nao_tem_cartao'
 
 export type SolicitacaoOrigem = 'interno' | 'parceiro' | 'email'
+
+export type ParceiroPerfil = 'admin_parceiro' | 'operador_parceiro'
 
 export interface Database {
   public: {
@@ -407,8 +410,213 @@ export interface Database {
         }
         Update: Partial<Database['public']['Tables']['log_auditoria']['Insert']>
       }
+      parceiros: {
+        Row: {
+          id: string
+          razao_social: string
+          cnpj: string
+          contato_principal_nome: string | null
+          contato_principal_telefone: string | null
+          contato_principal_email: string | null
+          codigo_interno: string | null
+          ativo: boolean
+          observacoes_internas: string | null
+          created_at: string
+          updated_at: string
+          created_by: string | null
+        }
+        Insert: {
+          id?: string
+          razao_social: string
+          cnpj: string
+          contato_principal_nome?: string | null
+          contato_principal_telefone?: string | null
+          contato_principal_email?: string | null
+          codigo_interno?: string | null
+          ativo?: boolean
+          observacoes_internas?: string | null
+          created_at?: string
+          updated_at?: string
+          created_by?: string | null
+        }
+        Update: Partial<Database['public']['Tables']['parceiros']['Insert']>
+      }
+      parceiro_usuarios: {
+        Row: {
+          id: string
+          user_id: string
+          parceiro_id: string
+          nome_completo: string
+          email: string
+          perfil: ParceiroPerfil
+          ativo: boolean
+          created_at: string
+          updated_at: string
+          created_by: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          parceiro_id: string
+          nome_completo: string
+          email: string
+          perfil: ParceiroPerfil
+          ativo?: boolean
+          created_at?: string
+          updated_at?: string
+          created_by?: string | null
+        }
+        Update: Partial<Database['public']['Tables']['parceiro_usuarios']['Insert']>
+      }
+      parceiro_subcontratadas: {
+        Row: {
+          id: string
+          parceiro_id: string
+          razao_social: string
+          cnpj: string | null
+          contato_nome: string | null
+          contato_telefone: string | null
+          ativo: boolean
+          created_at: string
+          updated_at: string
+          created_by: string | null
+        }
+        Insert: {
+          id?: string
+          parceiro_id: string
+          razao_social: string
+          cnpj?: string | null
+          contato_nome?: string | null
+          contato_telefone?: string | null
+          ativo?: boolean
+          created_at?: string
+          updated_at?: string
+          created_by?: string | null
+        }
+        Update: Partial<Database['public']['Tables']['parceiro_subcontratadas']['Insert']>
+      }
+      parceiro_motoristas: {
+        Row: {
+          id: string
+          parceiro_id: string
+          nome_completo: string
+          cpf: string
+          rg: string | null
+          antt: string | null
+          telefone: string | null
+          subcontratada_parceiro_id: string | null
+          observacoes: string | null
+          ativo: boolean
+          created_at: string
+          updated_at: string
+          created_by: string | null
+        }
+        Insert: {
+          id?: string
+          parceiro_id: string
+          nome_completo: string
+          cpf: string
+          rg?: string | null
+          antt?: string | null
+          telefone?: string | null
+          subcontratada_parceiro_id?: string | null
+          observacoes?: string | null
+          ativo?: boolean
+          created_at?: string
+          updated_at?: string
+          created_by?: string | null
+        }
+        Update: Partial<Database['public']['Tables']['parceiro_motoristas']['Insert']>
+      }
+      parceiro_veiculos: {
+        Row: {
+          id: string
+          parceiro_id: string
+          placa: string
+          tipo: string | null
+          subcontratada_parceiro_id: string | null
+          observacoes: string | null
+          ativo: boolean
+          created_at: string
+          updated_at: string
+          created_by: string | null
+        }
+        Insert: {
+          id?: string
+          parceiro_id: string
+          placa: string
+          tipo?: string | null
+          subcontratada_parceiro_id?: string | null
+          observacoes?: string | null
+          ativo?: boolean
+          created_at?: string
+          updated_at?: string
+          created_by?: string | null
+        }
+        Update: Partial<Database['public']['Tables']['parceiro_veiculos']['Insert']>
+      }
+      parceiro_carretas: {
+        Row: {
+          id: string
+          parceiro_id: string
+          placa: string
+          tipo: string | null
+          capacidade_ton: number | null
+          observacoes: string | null
+          ativo: boolean
+          created_at: string
+          updated_at: string
+          created_by: string | null
+        }
+        Insert: {
+          id?: string
+          parceiro_id: string
+          placa: string
+          tipo?: string | null
+          capacidade_ton?: number | null
+          observacoes?: string | null
+          ativo?: boolean
+          created_at?: string
+          updated_at?: string
+          created_by?: string | null
+        }
+        Update: Partial<Database['public']['Tables']['parceiro_carretas']['Insert']>
+      }
     }
-    Views: Record<string, never>
+    Views: {
+      // Views SECURITY DEFINER do Portal de Parceiros (migrations 0017/0018).
+      // Colunas anuláveis: views não carregam as garantias NOT NULL das tabelas.
+      clientes_publicos: {
+        Row: {
+          id: string | null
+          razao_social: string | null
+          cidade: string | null
+          uf: string | null
+        }
+      }
+      portal_solicitacoes: {
+        Row: {
+          id: string | null
+          numero_interno: number | null
+          tipo: SolicitacaoTipo | null
+          status: SolicitacaoStatus | null
+          origem: SolicitacaoOrigem | null
+          parceiro_id: string | null
+          parceiro_usuario_id: string | null
+          parceiro_motorista_id: string | null
+          parceiro_veiculo_id: string | null
+          parceiro_carreta_id: string | null
+          parceiro_subcontratada_id: string | null
+          cliente_id: string | null
+          pamcard_status: PamcardStatus | null
+          pamcard_numero: string | null
+          observacoes: string | null
+          created_at: string | null
+          enviada_em: string | null
+          finalizada_em: string | null
+        }
+      }
+    }
     Functions: Record<string, never>
     Enums: Record<string, never>
   }
@@ -422,3 +630,6 @@ export type TablesInsert<T extends keyof Database['public']['Tables']> =
 
 export type TablesUpdate<T extends keyof Database['public']['Tables']> =
   Database['public']['Tables'][T]['Update']
+
+export type Views<T extends keyof Database['public']['Views']> =
+  Database['public']['Views'][T]['Row']

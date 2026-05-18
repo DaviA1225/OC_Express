@@ -24,6 +24,11 @@ export function canViewUsuarios(p: PerfilRow | null): boolean {
   return is(p, 'admin')
 }
 
+/** Parceiros: visualização livre para todo o time interno. */
+export function canViewParceiros(p: PerfilRow | null): boolean {
+  return is(p, 'admin', 'gerente', 'supervisor', 'analista', 'assistente')
+}
+
 // ── Edição (capacidades por recurso) ────────────────────────────────────────
 
 /** Solicitações: criar/editar/transit/gerar PDF. admin, analista, assistente. */
@@ -54,6 +59,11 @@ export function canEditCargasRetorno(p: PerfilRow | null): boolean {
 /** Usuários: admin. */
 export function canManageUsuarios(p: PerfilRow | null): boolean {
   return is(p, 'admin')
+}
+
+/** Parceiros (criar/editar/desativar/excluir): admin, gerente, supervisor. */
+export function canEditParceiros(p: PerfilRow | null): boolean {
+  return is(p, 'admin', 'gerente', 'supervisor')
 }
 
 /** Bulk actions (em todas as páginas): apenas admin. */

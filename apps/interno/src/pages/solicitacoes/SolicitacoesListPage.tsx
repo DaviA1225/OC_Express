@@ -593,6 +593,14 @@ function SolicitacaoCard({ row, selectable, selected, onToggleSelect, onOpen }: 
               via e-mail
             </span>
           )}
+          {row.origem === 'parceiro' && (
+            <span
+              className="max-w-[150px] shrink-0 truncate rounded bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-800 dark:bg-blue-950/60 dark:text-blue-300"
+              title={`Solicitação criada pelo parceiro ${row.parceiro?.razao_social ?? ''}`}
+            >
+              via {row.parceiro?.razao_social ?? 'parceiro'}
+            </span>
+          )}
           <span className="text-[14px] font-medium text-primary shrink-0">{formatNumeroOC(row.numero_interno)}</span>
           {row.solicitante_nome && (
             <span className="truncate text-[13px] text-muted-foreground" title={row.solicitante_nome}>
@@ -617,7 +625,14 @@ function SolicitacaoCard({ row, selectable, selected, onToggleSelect, onOpen }: 
             value={[row.veiculo?.placa, row.carreta?.placa].filter(Boolean).join(' / ') || null}
           />
           <Field label="Cliente" value={row.cliente?.razao_social} />
-          <Field label="Material" value={row.material?.nome} />
+          {row.origem === 'parceiro' && !row.material_id && row.tipo !== 'retorno' ? (
+            <div>
+              <dt className="text-[10px] uppercase tracking-[0.5px] text-muted-foreground">Material</dt>
+              <dd className="font-medium text-amber-700 dark:text-amber-400">Material a definir</dd>
+            </div>
+          ) : (
+            <Field label="Material" value={row.material?.nome} />
+          )}
         </dl>
       </div>
       <div className="mt-3 flex items-center justify-between border-t pt-3 text-[11px] text-muted-foreground">

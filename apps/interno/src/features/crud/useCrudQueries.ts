@@ -5,7 +5,7 @@ import type { Database, Tables, TablesInsert, TablesUpdate } from '@/types/datab
 
 type CrudTableName = keyof Pick<
   Database['public']['Tables'],
-  'subcontratadas' | 'motoristas' | 'veiculos' | 'carretas' | 'clientes' | 'materiais' | 'cargas_retorno'
+  'subcontratadas' | 'motoristas' | 'veiculos' | 'carretas' | 'clientes' | 'materiais' | 'cargas_retorno' | 'parceiros'
 >
 
 interface ListParams {

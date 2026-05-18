@@ -10,6 +10,7 @@ import {
   Building2,
   Package,
   Handshake,
+  Network,
   Users,
   Search,
   BarChart3,
@@ -40,6 +41,7 @@ const cadastros: NavItem[] = [
   { to: '/cadastros/clientes', label: 'Clientes', icon: Building2 },
   { to: '/cadastros/materiais', label: 'Materiais', icon: Package },
   { to: '/cadastros/subcontratadas', label: 'Subcontratadas', icon: Handshake },
+  { to: '/cadastros/parceiros', label: 'Parceiros', icon: Network },
 ]
 
 const sistemaAdmin: NavItem = { to: '/cadastros/usuarios', label: 'Usuários', icon: Users }

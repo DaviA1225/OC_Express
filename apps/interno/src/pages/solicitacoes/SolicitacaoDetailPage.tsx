@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
-import { AlertCircle, ArrowLeft, ChevronLeft, ChevronRight, Copy, CreditCard, Loader2, Pencil, RotateCcw, X } from 'lucide-react'
+import { AlertCircle, ArrowLeft, ChevronLeft, ChevronRight, Copy, CreditCard, Loader2, Mail, MessageCircle, Pencil, RotateCcw, X } from 'lucide-react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { toast } from 'sonner'
@@ -40,6 +40,7 @@ const WhatsAppEnvioDialog = React.lazy(() =>
 )
 import { formatNumeroOC, formatTelefone, formatarPamcardParaExibicao } from '@/lib/utils'
 import { isValidTelefone } from '@/lib/validators'
+import { normalizeWhatsAppPhone, buildWhatsAppLink, formatOCWhatsAppMessage } from '@/features/whatsapp/whatsapp'
 import type { MaterialSubtipo, Tables } from '@/types/database.types'
 import { isMineralMaterial } from '@/features/solicitacoes/material'
 
@@ -111,6 +112,9 @@ export function SolicitacaoDetailPage() {
 
   const s = detail.data
   const editable = isEditable(s.status) && canEdit
+  // Solicitação de parceiro chega sem material definido; ele é obrigatório para
+  // sair de "recebida" (constraint solicitacoes_material_obrigatorio_apos_cadastro).
+  const materialPendente = s.origem === 'parceiro' && !s.material_id && s.tipo !== 'retorno'
 
   return (
     <div className="space-y-4">
@@ -143,6 +147,19 @@ export function SolicitacaoDetailPage() {
               Reativar
             </Button>
           )}
+        </div>
+      )}
+
+      {materialPendente && s.status === 'recebida' && (
+        <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 dark:border-amber-900/60 dark:bg-amber-950/40">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+          <div className="text-[13px] text-amber-900 dark:text-amber-200">
+            <p className="font-medium">Material ainda não definido.</p>
+            <p className="text-[12px] text-amber-800 dark:text-amber-300">
+              Esta solicitação veio do parceiro sem material. Defina o material no
+              card "Destino e material" antes de avançar para emissão.
+            </p>
+          </div>
         </div>
       )}
 
@@ -183,6 +200,7 @@ export function SolicitacaoDetailPage() {
               onGerarOC={() => setOpenGerarOC(true)}
               onEnviarWhats={() => setOpenWhats(true)}
               disabled={transit.isPending}
+              bloquearAvanco={materialPendente}
             />
           )}
           {canEdit && canCancel(s.status) && (
@@ -259,6 +277,9 @@ export function SolicitacaoDetailPage() {
         </div>
 
         <div className="space-y-4">
+          {s.origem === 'parceiro' && (s.status === 'oc_gerada' || s.status === 'oc_enviada') && (
+            <AvisarParceiroCard solicitacao={s} />
+          )}
           <HistoricoCard
             solicitacaoId={s.id}
             motoristaId={s.motorista_id}
@@ -371,12 +392,19 @@ interface ActionsProps {
   onGerarOC: () => void
   onEnviarWhats: () => void
   disabled: boolean
+  bloquearAvanco: boolean
 }
 
-function StatusActions({ status, hasInstrucao, requerInstrucao, onAdvanceInstrucao, onAdvanceFinalizar, onMarcarEmCadastro, onVoltarRecebida, onGerarOC, onEnviarWhats, disabled }: ActionsProps) {
+function StatusActions({ status, hasInstrucao, requerInstrucao, onAdvanceInstrucao, onAdvanceFinalizar, onMarcarEmCadastro, onVoltarRecebida, onGerarOC, onEnviarWhats, disabled, bloquearAvanco }: ActionsProps) {
   if (status === 'recebida') {
     return (
-      <Button size="sm" variant="outline" onClick={onMarcarEmCadastro} disabled={disabled}>
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={onMarcarEmCadastro}
+        disabled={disabled || bloquearAvanco}
+        title={bloquearAvanco ? 'Defina o material antes de avançar para emissão' : undefined}
+      >
         Marcar em emissão
       </Button>
     )
@@ -752,7 +780,14 @@ function DestinoMaterialCard({ solicitacao, editable, onSave }: CardProps) {
       {!editing ? (
         <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-[13px]">
           <Field label="Cliente" value={solicitacao.cliente?.razao_social} />
-          <Field label="Material" value={materialDisplay} />
+          {solicitacao.origem === 'parceiro' && !solicitacao.material_id && !isRetorno ? (
+            <div>
+              <dt className="text-[10px] uppercase tracking-[0.5px] text-muted-foreground">Material</dt>
+              <dd className="font-medium text-amber-700 dark:text-amber-400">Material a definir</dd>
+            </div>
+          ) : (
+            <Field label="Material" value={materialDisplay} />
+          )}
           <Field label="Local de carregamento" value={solicitacao.local_carregamento ?? solicitacao.material?.origem_padrao ?? null} />
           <Field label="Validade da OC" value={validadeDisplay} />
         </dl>
@@ -1187,6 +1222,62 @@ function TimelineCard({ solicitacao }: { solicitacao: CardProps['solicitacao'] }
           </li>
         ))}
       </ol>
+    </section>
+  )
+}
+
+// Card de comunicação com o parceiro. Aparece no detalhe de solicitações de
+// origem parceiro quando a OC já foi gerada — atalhos para avisar a
+// transportadora parceira pelos contatos cadastrados em /cadastros/parceiros.
+function AvisarParceiroCard({ solicitacao }: { solicitacao: CardProps['solicitacao'] }) {
+  const parceiro = solicitacao.parceiro
+  const fone = normalizeWhatsAppPhone(parceiro?.contato_principal_telefone)
+  const email = parceiro?.contato_principal_email ?? null
+  const mensagem = formatOCWhatsAppMessage(solicitacao)
+
+  const abrirWhatsApp = () => {
+    window.open(buildWhatsAppLink(fone, mensagem), '_blank', 'noopener,noreferrer')
+  }
+  const abrirEmail = () => {
+    if (!email) return
+    const assunto = `Ordem de Carregamento ${formatNumeroOC(solicitacao.numero_interno)}`
+    window.location.href =
+      `mailto:${email}?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(mensagem)}`
+  }
+
+  return (
+    <section className="rounded-lg border bg-background">
+      <header className="border-b px-4 py-2">
+        <h2 className="text-[14px] font-medium text-foreground">Avisar o parceiro</h2>
+      </header>
+      <div className="space-y-3 p-4">
+        <p className="text-[12px] text-muted-foreground">
+          A OC já foi gerada. Avise {parceiro?.razao_social ?? 'o parceiro'} de que a
+          ordem está disponível.
+        </p>
+        <div className="flex flex-col gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={abrirWhatsApp}
+            disabled={!fone}
+            title={fone ? undefined : 'Parceiro sem telefone de contato cadastrado'}
+          >
+            <MessageCircle className="h-4 w-4" />
+            Enviar WhatsApp ao parceiro
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={abrirEmail}
+            disabled={!email}
+            title={email ? undefined : 'Parceiro sem e-mail de contato cadastrado'}
+          >
+            <Mail className="h-4 w-4" />
+            Enviar e-mail ao parceiro
+          </Button>
+        </div>
+      </div>
     </section>
   )
 }
