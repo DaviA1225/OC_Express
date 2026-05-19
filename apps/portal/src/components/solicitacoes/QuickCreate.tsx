@@ -6,12 +6,28 @@ import { Loader2 } from 'lucide-react'
 import {
   Dialog, DialogContent, DialogHeader, DialogBody, DialogFooter, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog'
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useUpsertParceiroRow, type ParceiroCrudTable } from '@/features/cadastros/useParceiroCrud'
-import { isValidCpf, isValidCnpj, isValidPlaca, isValidTelefone } from '@sislog/shared/validators'
-import { formatCpf, formatCnpj, formatPlaca, formatTelefone } from '@/lib/utils'
+import { isValidCpf, isValidDocumento, isValidPlaca, isValidTelefone, tipoPessoa } from '@sislog/shared/validators'
+import { formatCpf, formatDocumento, formatPlaca, formatTelefone } from '@/lib/utils'
+
+// Listas de tipo replicadas dos cadastros completos (VeiculosPage/CarretasPage).
+const TIPOS_VEICULO = ['Cavalo Trucado 3 Eixos', 'Cavalo Trucado 4 Eixos'] as const
+const TIPOS_CARRETA = [
+  'Caçamba 3 Eixos',
+  'Caçamba 4 Eixos',
+  'Bi-Trem Caçamba',
+  'Rodo-Trem Caçamba',
+  'Graneleiro LS 3 Eixos',
+  'Graneleiro LS 4 Eixos',
+  'Bi-Trem Graneleiro',
+  'Rodo-Trem Graneleiro',
+] as const
 
 interface QuickCreateProps {
   open: boolean
@@ -70,7 +86,7 @@ function QuickShell({
 
 function Field({ label, htmlFor, error, children }: {
   label: string
-  htmlFor: string
+  htmlFor?: string
   error?: string
   children: React.ReactNode
 }) {
@@ -155,7 +171,7 @@ export function QuickCreateMotorista({ open, onOpenChange, parceiroId, defaultVa
   )
 }
 
-// --- Veículo / Carreta (mesma estrutura: placa + tipo) -----------------------
+// --- Veículo / Carreta (mesma estrutura: placa + tipo via Select) -----------
 
 const placaSchema = z.object({
   placa: z.string().min(1, 'Informe a placa').refine(isValidPlaca, 'Placa inválida'),
@@ -165,15 +181,15 @@ type PlacaValues = z.infer<typeof placaSchema>
 
 function QuickCreatePlaca({
   open, onOpenChange, parceiroId, defaultValue, onCreated,
-  table, friendlyName, title, tipoPlaceholder,
+  table, friendlyName, title, tipoOptions,
 }: QuickCreateProps & {
   table: Extract<ParceiroCrudTable, 'parceiro_veiculos' | 'parceiro_carretas'>
   friendlyName: string
   title: string
-  tipoPlaceholder: string
+  tipoOptions: readonly string[]
 }) {
   const upsert = useUpsertParceiroRow(table, friendlyName, parceiroId)
-  const { register, handleSubmit, reset, setValue, watch, formState: { errors } } =
+  const { handleSubmit, reset, setValue, watch, formState: { errors } } =
     useForm<PlacaValues>({ resolver: zodResolver(placaSchema) })
 
   React.useEffect(() => {
@@ -181,12 +197,13 @@ function QuickCreatePlaca({
   }, [open, defaultValue, reset])
 
   const placa = watch('placa') ?? ''
+  const tipo = watch('tipo') ?? ''
 
   const submit = handleSubmit(async (values) => {
     const row = await upsert.mutateAsync({
       values: {
         placa: formatPlaca(values.placa),
-        tipo: values.tipo?.trim() || null,
+        tipo: values.tipo || null,
       },
     })
     onCreated(newId(row))
@@ -211,8 +228,20 @@ function QuickCreatePlaca({
           placeholder="ABC1D23"
         />
       </Field>
-      <Field label="Tipo" htmlFor="qc-tipo" error={errors.tipo?.message}>
-        <Input id="qc-tipo" {...register('tipo')} placeholder={tipoPlaceholder} />
+      <Field label="Tipo">
+        <Select
+          value={tipo || undefined}
+          onValueChange={(v) => setValue('tipo', v, { shouldValidate: true })}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Selecionar tipo" />
+          </SelectTrigger>
+          <SelectContent>
+            {tipoOptions.map((t) => (
+              <SelectItem key={t} value={t}>{t}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </Field>
     </QuickShell>
   )
@@ -225,7 +254,7 @@ export function QuickCreateVeiculo(props: QuickCreateProps) {
       table="parceiro_veiculos"
       friendlyName="Veículo"
       title="Novo veículo"
-      tipoPlaceholder="Ex.: Carreta, Truck, Toco"
+      tipoOptions={TIPOS_VEICULO}
     />
   )
 }
@@ -237,16 +266,19 @@ export function QuickCreateCarreta(props: QuickCreateProps) {
       table="parceiro_carretas"
       friendlyName="Carreta"
       title="Nova carreta"
-      tipoPlaceholder="Ex.: Graneleiro, Caçamba"
+      tipoOptions={TIPOS_CARRETA}
     />
   )
 }
 
-// --- Subcontratada -----------------------------------------------------------
+// --- Subcontratada (PF/PJ via documento unificado) --------------------------
 
 const subSchema = z.object({
-  razao_social: z.string().min(2, 'Informe a razão social'),
-  cnpj: z.string().optional().refine((v) => !v || isValidCnpj(v), 'CNPJ inválido'),
+  razao_social: z.string().min(2, 'Informe a razão social ou nome'),
+  documento: z
+    .string()
+    .min(1, 'Informe o CPF ou CNPJ')
+    .refine(isValidDocumento, 'CPF ou CNPJ inválido'),
 })
 type SubValues = z.infer<typeof subSchema>
 
@@ -256,16 +288,17 @@ export function QuickCreateSubcontratada({ open, onOpenChange, parceiroId, defau
     useForm<SubValues>({ resolver: zodResolver(subSchema) })
 
   React.useEffect(() => {
-    if (open) reset({ razao_social: defaultValue ?? '', cnpj: '' })
+    if (open) reset({ razao_social: defaultValue ?? '', documento: '' })
   }, [open, defaultValue, reset])
 
-  const cnpj = watch('cnpj') ?? ''
+  const documento = watch('documento') ?? ''
 
   const submit = handleSubmit(async (values) => {
     const row = await upsert.mutateAsync({
       values: {
         razao_social: values.razao_social.trim(),
-        cnpj: values.cnpj ? formatCnpj(values.cnpj) : null,
+        documento: formatDocumento(values.documento),
+        tipo_pessoa: tipoPessoa(values.documento),
       },
     })
     onCreated(newId(row))
@@ -277,19 +310,19 @@ export function QuickCreateSubcontratada({ open, onOpenChange, parceiroId, defau
       open={open}
       onOpenChange={onOpenChange}
       title="Nova subcontratada"
-      description="Cadastro rápido — você pode completar os dados depois."
+      description="Cadastro rápido (PF ou PJ) — você pode completar depois."
       isSubmitting={upsert.isPending}
       onSubmit={submit}
     >
-      <Field label="Razão social *" htmlFor="qc-sub-razao" error={errors.razao_social?.message}>
+      <Field label="Razão social ou nome *" htmlFor="qc-sub-razao" error={errors.razao_social?.message}>
         <Input id="qc-sub-razao" autoFocus {...register('razao_social')} />
       </Field>
-      <Field label="CNPJ" htmlFor="qc-sub-cnpj" error={errors.cnpj?.message}>
+      <Field label="CPF ou CNPJ *" htmlFor="qc-sub-doc" error={errors.documento?.message}>
         <Input
-          id="qc-sub-cnpj"
-          value={cnpj}
-          onChange={(e) => setValue('cnpj', formatCnpj(e.target.value), { shouldValidate: true })}
-          placeholder="00.000.000/0000-00"
+          id="qc-sub-doc"
+          value={documento}
+          onChange={(e) => setValue('documento', formatDocumento(e.target.value), { shouldValidate: true })}
+          placeholder="CPF ou CNPJ"
           inputMode="numeric"
         />
       </Field>

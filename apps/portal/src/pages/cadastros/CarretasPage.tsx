@@ -12,27 +12,41 @@ import {
   useToggleParceiroActive,
   useDeleteParceiroRow,
 } from '@/features/cadastros/useParceiroCrud'
+import { useSubcontratadasBase } from '@/features/solicitacoes/useSolicitacoes'
 import { useAuth } from '@/hooks/useAuth'
 import {
   Dialog, DialogContent, DialogHeader, DialogBody, DialogFooter, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog'
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { Combobox, type ComboboxOption } from '@/components/shared/Combobox'
 import { isValidPlaca } from '@sislog/shared/validators'
 import { formatPlaca } from '@/lib/utils'
 import type { Tables } from '@sislog/shared/types'
 
 type Row = Tables<'parceiro_carretas'>
 
+// Mesma lista do cadastro interno (apps/interno/.../CarretasPage.tsx).
+const TIPOS = [
+  'Caçamba 3 Eixos',
+  'Caçamba 4 Eixos',
+  'Bi-Trem Caçamba',
+  'Rodo-Trem Caçamba',
+  'Graneleiro LS 3 Eixos',
+  'Graneleiro LS 4 Eixos',
+  'Bi-Trem Graneleiro',
+  'Rodo-Trem Graneleiro',
+] as const
+
 const schema = z.object({
-  placa: z.string().min(1, 'Informe a placa').refine(isValidPlaca, 'Placa inválida'),
+  placa: z.string().refine(isValidPlaca, 'Placa inválida'),
   tipo: z.string().optional(),
-  capacidade_ton: z
-    .string()
-    .optional()
-    .refine((v) => !v || (!Number.isNaN(Number(v)) && Number(v) > 0), 'Capacidade inválida'),
+  subcontratada_parceiro_id: z.string().nullable().optional(),
   observacoes: z.string().optional(),
 })
 type FormValues = z.infer<typeof schema>
@@ -46,7 +60,7 @@ export default function CarretasPage() {
     showInactive: state.showInactive,
     page: state.page,
     pageSize: state.pageSize,
-    searchColumns: ['placa', 'tipo'],
+    searchColumns: ['placa', 'tipo', 'observacoes'],
     orderBy: 'placa',
     ascending: true,
   })
@@ -54,6 +68,17 @@ export default function CarretasPage() {
   const upsert = useUpsertParceiroRow('parceiro_carretas', 'Carreta', parceiroId)
   const toggle = useToggleParceiroActive('parceiro_carretas', 'Carreta')
   const remove = useDeleteParceiroRow('parceiro_carretas', 'Carreta')
+
+  const subBase = useSubcontratadasBase()
+  const subActive = React.useMemo(
+    () => (subBase.data ?? []).filter((s) => s.ativo),
+    [subBase.data],
+  )
+  const subById = React.useMemo(() => {
+    const map = new Map<string, string>()
+    ;(subBase.data ?? []).forEach((s) => map.set(s.id, s.razao_social))
+    return map
+  }, [subBase.data])
 
   const [editing, setEditing] = React.useState<Row | null>(null)
   const [open, setOpen] = React.useState(false)
@@ -64,8 +89,21 @@ export default function CarretasPage() {
     { header: 'Placa', accessor: (r) => r.placa },
     { header: 'Tipo', accessor: (r) => r.tipo ?? '—', className: 'text-muted-foreground' },
     {
-      header: 'Capacidade (t)',
-      accessor: (r) => (r.capacidade_ton != null ? String(r.capacidade_ton) : '—'),
+      header: 'Subcontratada',
+      accessor: (r) =>
+        r.subcontratada_parceiro_id ? subById.get(r.subcontratada_parceiro_id) ?? '—' : '—',
+      className: 'text-muted-foreground',
+    },
+    {
+      header: 'Observações',
+      accessor: (r) =>
+        r.observacoes ? (
+          <span className="block max-w-[280px] truncate" title={r.observacoes}>
+            {r.observacoes}
+          </span>
+        ) : (
+          '—'
+        ),
       className: 'text-muted-foreground',
     },
   ]
@@ -101,13 +139,15 @@ export default function CarretasPage() {
         open={open}
         onOpenChange={setOpen}
         editing={editing}
+        subOptions={subActive}
+        subLoading={subBase.isLoading}
         onSubmit={async (values) => {
           await upsert.mutateAsync({
             id: editing?.id,
             values: {
               placa: formatPlaca(values.placa),
-              tipo: values.tipo?.trim() || null,
-              capacidade_ton: values.capacidade_ton ? Number(values.capacidade_ton) : null,
+              tipo: values.tipo || null,
+              subcontratada_parceiro_id: values.subcontratada_parceiro_id || null,
               observacoes: values.observacoes?.trim() || null,
             },
           })
@@ -158,10 +198,12 @@ interface FormProps {
   open: boolean
   onOpenChange: (o: boolean) => void
   editing: Row | null
+  subOptions: Tables<'parceiro_subcontratadas'>[]
+  subLoading: boolean
   onSubmit: (values: FormValues) => Promise<void>
 }
 
-function CarretaForm({ open, onOpenChange, editing, onSubmit }: FormProps) {
+function CarretaForm({ open, onOpenChange, editing, subOptions, subLoading, onSubmit }: FormProps) {
   const {
     register, handleSubmit, reset, setValue, watch,
     formState: { errors, isSubmitting },
@@ -172,13 +214,20 @@ function CarretaForm({ open, onOpenChange, editing, onSubmit }: FormProps) {
       reset({
         placa: editing?.placa ?? '',
         tipo: editing?.tipo ?? '',
-        capacidade_ton: editing?.capacidade_ton != null ? String(editing.capacidade_ton) : '',
+        subcontratada_parceiro_id: editing?.subcontratada_parceiro_id ?? null,
         observacoes: editing?.observacoes ?? '',
       })
     }
   }, [open, editing, reset])
 
   const placa = watch('placa') ?? ''
+  const tipo = watch('tipo') ?? ''
+  const subId = watch('subcontratada_parceiro_id') ?? null
+
+  const options: ComboboxOption[] = subOptions.map((s) => ({
+    value: s.id,
+    label: s.razao_social,
+  }))
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -187,7 +236,7 @@ function CarretaForm({ open, onOpenChange, editing, onSubmit }: FormProps) {
           <DialogHeader>
             <DialogTitle>{editing ? 'Editar carreta' : 'Nova carreta'}</DialogTitle>
             <DialogDescription>
-              Carretas da sua frota disponíveis para as solicitações de carregamento.
+              Cadastre as carretas (semirreboques) usadas nas operações.
             </DialogDescription>
           </DialogHeader>
           <DialogBody className="space-y-4">
@@ -201,32 +250,50 @@ function CarretaForm({ open, onOpenChange, editing, onSubmit }: FormProps) {
                   onChange={(e) => setValue('placa', formatPlaca(e.target.value), { shouldValidate: true })}
                   placeholder="ABC1D23"
                 />
-                {errors.placa && <p className="text-[11px] text-destructive">{errors.placa.message}</p>}
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="capacidade_ton">Capacidade (t)</Label>
-                <Input
-                  id="capacidade_ton"
-                  {...register('capacidade_ton')}
-                  inputMode="decimal"
-                  placeholder="Ex.: 32"
-                />
-                {errors.capacidade_ton && (
-                  <p className="text-[11px] text-destructive">{errors.capacidade_ton.message}</p>
+                {errors.placa && (
+                  <p className="text-[11px] text-destructive">{errors.placa.message}</p>
                 )}
               </div>
+              <div className="space-y-1.5">
+                <Label>Tipo</Label>
+                <Select
+                  value={tipo || undefined}
+                  onValueChange={(v) => setValue('tipo', v, { shouldValidate: true })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecionar tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TIPOS.map((t) => (
+                      <SelectItem key={t} value={t}>{t}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
+
             <div className="space-y-1.5">
-              <Label htmlFor="tipo">Tipo</Label>
-              <Input id="tipo" {...register('tipo')} placeholder="Ex.: Graneleiro, Caçamba" />
+              <Label>Subcontratada</Label>
+              <Combobox
+                options={options}
+                value={subId}
+                onChange={(v) => setValue('subcontratada_parceiro_id', v, { shouldValidate: true })}
+                placeholder="Selecionar subcontratada"
+                searchPlaceholder="Buscar subcontratada"
+                emptyMessage="Nenhuma subcontratada ativa."
+                loading={subLoading}
+              />
             </div>
+
             <div className="space-y-1.5">
               <Label htmlFor="observacoes">Observações</Label>
               <Textarea id="observacoes" rows={2} {...register('observacoes')} />
             </div>
           </DialogBody>
           <DialogFooter>
-            <span className="text-[11px] text-muted-foreground/80">Enter para salvar · Esc para cancelar</span>
+            <span className="text-[11px] text-muted-foreground/80">
+              Enter para salvar · Esc para cancelar
+            </span>
             <div className="flex items-center gap-2">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
                 Cancelar

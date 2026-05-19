@@ -19,22 +19,35 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { isValidCnpj, isValidTelefone } from '@sislog/shared/validators'
-import { formatCnpj, formatTelefone } from '@/lib/utils'
+import { isValidDocumento, tipoPessoa } from '@sislog/shared/validators'
+import { formatDocumento } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 import type { Tables } from '@sislog/shared/types'
 
 type Row = Tables<'parceiro_subcontratadas'>
 
 const schema = z.object({
-  razao_social: z.string().min(2, 'Informe a razão social'),
-  cnpj: z.string().optional().refine((v) => !v || isValidCnpj(v), 'CNPJ inválido'),
-  contato_nome: z.string().optional(),
-  contato_telefone: z
+  razao_social: z.string().min(2, 'Informe a razão social ou nome'),
+  documento: z
     .string()
-    .optional()
-    .refine((v) => !v || isValidTelefone(v), 'Telefone inválido'),
+    .min(1, 'Informe o CPF ou CNPJ')
+    .refine(isValidDocumento, 'CPF ou CNPJ inválido'),
 })
 type FormValues = z.infer<typeof schema>
+
+function TipoBadge({ tipo }: { tipo: 'PF' | 'PJ' | null }) {
+  if (!tipo) return <span className="text-[12px] text-muted-foreground">—</span>
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium tracking-[0.5px]',
+        tipo === 'PJ' ? 'bg-indigo-100 text-indigo-800' : 'bg-amber-100 text-amber-800',
+      )}
+    >
+      {tipo}
+    </span>
+  )
+}
 
 export default function SubcontratadasPage() {
   const { parceiro } = useAuth()
@@ -45,7 +58,7 @@ export default function SubcontratadasPage() {
     showInactive: state.showInactive,
     page: state.page,
     pageSize: state.pageSize,
-    searchColumns: ['razao_social', 'cnpj'],
+    searchColumns: ['razao_social', 'documento'],
     orderBy: 'razao_social',
     ascending: true,
   })
@@ -60,9 +73,9 @@ export default function SubcontratadasPage() {
   const [deleteRow, setDeleteRow] = React.useState<Row | null>(null)
 
   const columns: ColumnDef<Row>[] = [
-    { header: 'Razão social', accessor: (r) => r.razao_social },
-    { header: 'CNPJ', accessor: (r) => r.cnpj ?? '—', className: 'text-muted-foreground' },
-    { header: 'Contato', accessor: (r) => r.contato_nome ?? '—' },
+    { header: 'Razão Social / Nome', accessor: (r) => r.razao_social },
+    { header: 'Tipo', accessor: (r) => <TipoBadge tipo={r.tipo_pessoa} /> },
+    { header: 'CPF / CNPJ', accessor: (r) => r.documento ?? '—', className: 'text-muted-foreground' },
   ]
 
   return (
@@ -76,7 +89,7 @@ export default function SubcontratadasPage() {
         totalActive={totalActive.data ?? 0}
         searchValue={state.search}
         onSearchChange={state.setSearch}
-        searchPlaceholder="Buscar por razão social ou CNPJ"
+        searchPlaceholder="Buscar por nome, razão social, CPF ou CNPJ"
         showInactive={state.showInactive}
         onShowInactiveChange={state.setShowInactive}
         columns={columns}
@@ -85,7 +98,7 @@ export default function SubcontratadasPage() {
         onToggleActive={(r) => setConfirmRow(r)}
         onDelete={(r) => setDeleteRow(r)}
         emptyTitle="Nenhuma subcontratada cadastrada"
-        emptyDescription="Cadastre as empresas que subcontratam serviços para a sua transportadora."
+        emptyDescription="Cadastre as transportadoras (PJ) ou autônomos (PF) que atuam para você."
         page={state.page}
         pageSize={state.pageSize}
         totalCount={list.data?.count ?? 0}
@@ -101,11 +114,8 @@ export default function SubcontratadasPage() {
             id: editing?.id,
             values: {
               razao_social: values.razao_social.trim(),
-              cnpj: values.cnpj ? formatCnpj(values.cnpj) : null,
-              contato_nome: values.contato_nome?.trim() || null,
-              contato_telefone: values.contato_telefone
-                ? formatTelefone(values.contato_telefone)
-                : null,
+              documento: formatDocumento(values.documento),
+              tipo_pessoa: tipoPessoa(values.documento),
             },
           })
           setOpen(false)
@@ -135,7 +145,7 @@ export default function SubcontratadasPage() {
         title="Excluir subcontratada?"
         description={
           deleteRow
-            ? `O cadastro de "${deleteRow.razao_social}" será removido permanentemente. Se houver motoristas ou veículos vinculados, a exclusão será bloqueada.`
+            ? `O cadastro de "${deleteRow.razao_social}" será removido permanentemente. Se houver motoristas, veículos ou carretas vinculados, a exclusão será bloqueada.`
             : ''
         }
         confirmLabel="Sim, excluir"
@@ -168,15 +178,13 @@ function SubcontratadaForm({ open, onOpenChange, editing, onSubmit }: FormProps)
     if (open) {
       reset({
         razao_social: editing?.razao_social ?? '',
-        cnpj: editing?.cnpj ?? '',
-        contato_nome: editing?.contato_nome ?? '',
-        contato_telefone: editing?.contato_telefone ?? '',
+        documento: editing?.documento ?? '',
       })
     }
   }, [open, editing, reset])
 
-  const cnpj = watch('cnpj') ?? ''
-  const tel = watch('contato_telefone') ?? ''
+  const documento = watch('documento') ?? ''
+  const tipoAtual = tipoPessoa(documento)
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -185,49 +193,39 @@ function SubcontratadaForm({ open, onOpenChange, editing, onSubmit }: FormProps)
           <DialogHeader>
             <DialogTitle>{editing ? 'Editar subcontratada' : 'Nova subcontratada'}</DialogTitle>
             <DialogDescription>
-              Empresas que subcontratam serviços para a sua transportadora.
+              Cadastre transportadoras (PJ) ou autônomos (PF). O tipo é detectado automaticamente pelo documento.
             </DialogDescription>
           </DialogHeader>
           <DialogBody className="space-y-4">
             <div className="space-y-1.5">
-              <Label htmlFor="razao_social">Razão social *</Label>
+              <Label htmlFor="razao_social">Razão social ou nome *</Label>
               <Input id="razao_social" autoFocus {...register('razao_social')} />
               {errors.razao_social && (
                 <p className="text-[11px] text-destructive">{errors.razao_social.message}</p>
               )}
             </div>
+
             <div className="space-y-1.5">
-              <Label htmlFor="cnpj">CNPJ</Label>
+              <Label htmlFor="documento" className="flex items-center justify-between">
+                <span>CPF ou CNPJ *</span>
+                {tipoAtual && <TipoBadge tipo={tipoAtual} />}
+              </Label>
               <Input
-                id="cnpj"
-                value={cnpj}
-                onChange={(e) => setValue('cnpj', formatCnpj(e.target.value), { shouldValidate: true })}
-                placeholder="00.000.000/0000-00"
+                id="documento"
+                value={documento}
+                onChange={(e) => setValue('documento', formatDocumento(e.target.value), { shouldValidate: true })}
+                placeholder="CPF ou CNPJ"
                 inputMode="numeric"
               />
-              {errors.cnpj && <p className="text-[11px] text-destructive">{errors.cnpj.message}</p>}
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="contato_nome">Contato</Label>
-                <Input id="contato_nome" {...register('contato_nome')} placeholder="Nome do responsável" />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="contato_telefone">Telefone do contato</Label>
-                <Input
-                  id="contato_telefone"
-                  value={tel}
-                  onChange={(e) => setValue('contato_telefone', formatTelefone(e.target.value), { shouldValidate: true })}
-                  placeholder="(00) 00000-0000"
-                />
-                {errors.contato_telefone && (
-                  <p className="text-[11px] text-destructive">{errors.contato_telefone.message}</p>
-                )}
-              </div>
+              {errors.documento && (
+                <p className="text-[11px] text-destructive">{errors.documento.message}</p>
+              )}
             </div>
           </DialogBody>
           <DialogFooter>
-            <span className="text-[11px] text-muted-foreground/80">Enter para salvar · Esc para cancelar</span>
+            <span className="text-[11px] text-muted-foreground/80">
+              Enter para salvar · Esc para cancelar
+            </span>
             <div className="flex items-center gap-2">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
                 Cancelar

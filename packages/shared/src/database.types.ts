@@ -473,7 +473,10 @@ export interface Database {
           id: string
           parceiro_id: string
           razao_social: string
-          cnpj: string | null
+          documento: string | null
+          tipo_pessoa: 'PF' | 'PJ' | null
+          // Colunas dormentes (Fase 8.4): mantidas no banco para nao perder
+          // dado, mas sem UI no portal apos o alinhamento com o interno.
           contato_nome: string | null
           contato_telefone: string | null
           ativo: boolean
@@ -485,7 +488,8 @@ export interface Database {
           id?: string
           parceiro_id: string
           razao_social: string
-          cnpj?: string | null
+          documento?: string | null
+          tipo_pessoa?: 'PF' | 'PJ' | null
           contato_nome?: string | null
           contato_telefone?: string | null
           ativo?: boolean
@@ -561,6 +565,8 @@ export interface Database {
           parceiro_id: string
           placa: string
           tipo: string | null
+          subcontratada_parceiro_id: string | null
+          // Coluna dormente (Fase 8.4): mantida no banco; sem UI no portal.
           capacidade_ton: number | null
           observacoes: string | null
           ativo: boolean
@@ -573,6 +579,7 @@ export interface Database {
           parceiro_id: string
           placa: string
           tipo?: string | null
+          subcontratada_parceiro_id?: string | null
           capacidade_ton?: number | null
           observacoes?: string | null
           ativo?: boolean

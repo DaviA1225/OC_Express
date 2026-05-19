@@ -114,7 +114,7 @@ export default function NovaSolicitacaoPage() {
   const subcontratadaOptions: ComboboxOption[] = ativos(subcontratadas.data).map((s) => ({
     value: s.id,
     label: s.razao_social,
-    hint: s.cnpj ?? undefined,
+    hint: s.documento ?? undefined,
   }))
   const clienteOptions: ComboboxOption[] = (clientes.data ?? [])
     .filter((c): c is typeof c & { id: string } => !!c.id)

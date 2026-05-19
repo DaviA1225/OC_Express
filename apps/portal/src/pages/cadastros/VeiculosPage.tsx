@@ -12,23 +12,32 @@ import {
   useToggleParceiroActive,
   useDeleteParceiroRow,
 } from '@/features/cadastros/useParceiroCrud'
+import { useSubcontratadasBase } from '@/features/solicitacoes/useSolicitacoes'
 import { useAuth } from '@/hooks/useAuth'
 import {
   Dialog, DialogContent, DialogHeader, DialogBody, DialogFooter, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog'
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { Combobox, type ComboboxOption } from '@/components/shared/Combobox'
 import { isValidPlaca } from '@sislog/shared/validators'
 import { formatPlaca } from '@/lib/utils'
 import type { Tables } from '@sislog/shared/types'
 
 type Row = Tables<'parceiro_veiculos'>
 
+// Mesma lista do cadastro interno (apps/interno/.../VeiculosPage.tsx).
+const TIPOS = ['Cavalo Trucado 3 Eixos', 'Cavalo Trucado 4 Eixos'] as const
+
 const schema = z.object({
-  placa: z.string().min(1, 'Informe a placa').refine(isValidPlaca, 'Placa inválida'),
+  placa: z.string().refine(isValidPlaca, 'Placa inválida'),
   tipo: z.string().optional(),
+  subcontratada_parceiro_id: z.string().nullable().optional(),
   observacoes: z.string().optional(),
 })
 type FormValues = z.infer<typeof schema>
@@ -42,7 +51,7 @@ export default function VeiculosPage() {
     showInactive: state.showInactive,
     page: state.page,
     pageSize: state.pageSize,
-    searchColumns: ['placa', 'tipo'],
+    searchColumns: ['placa', 'tipo', 'observacoes'],
     orderBy: 'placa',
     ascending: true,
   })
@@ -50,6 +59,17 @@ export default function VeiculosPage() {
   const upsert = useUpsertParceiroRow('parceiro_veiculos', 'Veículo', parceiroId)
   const toggle = useToggleParceiroActive('parceiro_veiculos', 'Veículo')
   const remove = useDeleteParceiroRow('parceiro_veiculos', 'Veículo')
+
+  const subBase = useSubcontratadasBase()
+  const subActive = React.useMemo(
+    () => (subBase.data ?? []).filter((s) => s.ativo),
+    [subBase.data],
+  )
+  const subById = React.useMemo(() => {
+    const map = new Map<string, string>()
+    ;(subBase.data ?? []).forEach((s) => map.set(s.id, s.razao_social))
+    return map
+  }, [subBase.data])
 
   const [editing, setEditing] = React.useState<Row | null>(null)
   const [open, setOpen] = React.useState(false)
@@ -59,6 +79,24 @@ export default function VeiculosPage() {
   const columns: ColumnDef<Row>[] = [
     { header: 'Placa', accessor: (r) => r.placa },
     { header: 'Tipo', accessor: (r) => r.tipo ?? '—', className: 'text-muted-foreground' },
+    {
+      header: 'Subcontratada',
+      accessor: (r) =>
+        r.subcontratada_parceiro_id ? subById.get(r.subcontratada_parceiro_id) ?? '—' : '—',
+      className: 'text-muted-foreground',
+    },
+    {
+      header: 'Observações',
+      accessor: (r) =>
+        r.observacoes ? (
+          <span className="block max-w-[280px] truncate" title={r.observacoes}>
+            {r.observacoes}
+          </span>
+        ) : (
+          '—'
+        ),
+      className: 'text-muted-foreground',
+    },
   ]
 
   return (
@@ -92,12 +130,15 @@ export default function VeiculosPage() {
         open={open}
         onOpenChange={setOpen}
         editing={editing}
+        subOptions={subActive}
+        subLoading={subBase.isLoading}
         onSubmit={async (values) => {
           await upsert.mutateAsync({
             id: editing?.id,
             values: {
               placa: formatPlaca(values.placa),
-              tipo: values.tipo?.trim() || null,
+              tipo: values.tipo || null,
+              subcontratada_parceiro_id: values.subcontratada_parceiro_id || null,
               observacoes: values.observacoes?.trim() || null,
             },
           })
@@ -148,10 +189,12 @@ interface FormProps {
   open: boolean
   onOpenChange: (o: boolean) => void
   editing: Row | null
+  subOptions: Tables<'parceiro_subcontratadas'>[]
+  subLoading: boolean
   onSubmit: (values: FormValues) => Promise<void>
 }
 
-function VeiculoForm({ open, onOpenChange, editing, onSubmit }: FormProps) {
+function VeiculoForm({ open, onOpenChange, editing, subOptions, subLoading, onSubmit }: FormProps) {
   const {
     register, handleSubmit, reset, setValue, watch,
     formState: { errors, isSubmitting },
@@ -162,12 +205,20 @@ function VeiculoForm({ open, onOpenChange, editing, onSubmit }: FormProps) {
       reset({
         placa: editing?.placa ?? '',
         tipo: editing?.tipo ?? '',
+        subcontratada_parceiro_id: editing?.subcontratada_parceiro_id ?? null,
         observacoes: editing?.observacoes ?? '',
       })
     }
   }, [open, editing, reset])
 
   const placa = watch('placa') ?? ''
+  const tipo = watch('tipo') ?? ''
+  const subId = watch('subcontratada_parceiro_id') ?? null
+
+  const options: ComboboxOption[] = subOptions.map((s) => ({
+    value: s.id,
+    label: s.razao_social,
+  }))
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -180,28 +231,60 @@ function VeiculoForm({ open, onOpenChange, editing, onSubmit }: FormProps) {
             </DialogDescription>
           </DialogHeader>
           <DialogBody className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="placa">Placa *</Label>
+                <Input
+                  id="placa"
+                  autoFocus
+                  value={placa}
+                  onChange={(e) => setValue('placa', formatPlaca(e.target.value), { shouldValidate: true })}
+                  placeholder="ABC1D23"
+                />
+                {errors.placa && (
+                  <p className="text-[11px] text-destructive">{errors.placa.message}</p>
+                )}
+              </div>
+              <div className="space-y-1.5">
+                <Label>Tipo</Label>
+                <Select
+                  value={tipo || undefined}
+                  onValueChange={(v) => setValue('tipo', v, { shouldValidate: true })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecionar tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TIPOS.map((t) => (
+                      <SelectItem key={t} value={t}>{t}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
             <div className="space-y-1.5">
-              <Label htmlFor="placa">Placa *</Label>
-              <Input
-                id="placa"
-                autoFocus
-                value={placa}
-                onChange={(e) => setValue('placa', formatPlaca(e.target.value), { shouldValidate: true })}
-                placeholder="ABC1D23"
+              <Label>Subcontratada</Label>
+              <Combobox
+                options={options}
+                value={subId}
+                onChange={(v) => setValue('subcontratada_parceiro_id', v, { shouldValidate: true })}
+                placeholder="Selecionar subcontratada"
+                searchPlaceholder="Buscar subcontratada"
+                emptyMessage="Nenhuma subcontratada ativa."
+                loading={subLoading}
               />
-              {errors.placa && <p className="text-[11px] text-destructive">{errors.placa.message}</p>}
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="tipo">Tipo</Label>
-              <Input id="tipo" {...register('tipo')} placeholder="Ex.: Carreta, Truck, Toco" />
-            </div>
+
             <div className="space-y-1.5">
               <Label htmlFor="observacoes">Observações</Label>
               <Textarea id="observacoes" rows={2} {...register('observacoes')} />
             </div>
           </DialogBody>
           <DialogFooter>
-            <span className="text-[11px] text-muted-foreground/80">Enter para salvar · Esc para cancelar</span>
+            <span className="text-[11px] text-muted-foreground/80">
+              Enter para salvar · Esc para cancelar
+            </span>
             <div className="flex items-center gap-2">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
                 Cancelar
