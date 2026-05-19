@@ -169,18 +169,29 @@ A *implementação* das views acontece no Bloco 2 (Fase 8.1).
 
 ---
 
-## Bloco 5 — Fase 8.4: Portal — solicitações
+## Bloco 5 — Fase 8.4: Portal — solicitações — ✅ concluído (2026-05-19)
 
-- [ ] Lista `/solicitacoes` com labels amigáveis de status (mapeamento SPEC 5.3)
-- [ ] Filtros: busca, status, período
-- [ ] Nova solicitação `/solicitacoes/nova` (tela cheia, coluna 720px)
-  - [ ] Seção Motorista e Veículo (comboboxes com "+ Cadastrar novo")
-  - [ ] Seção Destino (select de `clientes_publicos`, sem material)
-  - [ ] Seção Pagamento (Pamcard)
-  - [ ] Seção Observações
-  - [ ] Submit cria `solicitacoes` com `origem='parceiro'`, `material_id=NULL`
-- [ ] Detalhe `/solicitacoes/:id` (linha do tempo, sem download de PDF)
-- [ ] Cancelamento (botão visível só com `status=recebida`)
+- [x] Lista `/solicitacoes` com labels amigáveis de status (mapeamento SPEC 5.3,
+  em `features/solicitacoes/status.ts`) — grid de cards, resolve nomes no
+  cliente (a view `portal_solicitacoes` só traz IDs).
+- [x] Filtros: busca (motorista/placa/cliente/número), status (grupos
+  amigáveis) e período.
+- [x] Nova solicitação `/solicitacoes/nova` (tela cheia, coluna 720px)
+  - [x] Seção Motorista e Veículo (comboboxes com "+ Cadastrar novo" →
+    diálogos `QuickCreate`)
+  - [x] Seção Destino (combobox de `clientes_publicos`, sem material)
+  - [x] Seção Pagamento (Pamcard) — radio + input numérico filtrado
+  - [x] Seção Observações
+  - [x] Submit cria `solicitacoes` com `origem='parceiro'`, `material_id=NULL`.
+    O id é gerado no cliente (`crypto.randomUUID`) — o parceiro não tem policy
+    de SELECT em `solicitacoes`, então não dá para usar INSERT … RETURNING.
+- [x] Detalhe `/solicitacoes/:id` (dados + linha do tempo, sem download de PDF)
+- [x] Cancelamento (botão visível só com `status=recebida`; RLS garante a regra)
+- Primitivos de UI copiados do `apps/interno` para o portal: `popover`,
+  `command`, `radio-group`, `Combobox` (+ deps `@radix-ui/react-popover`,
+  `@radix-ui/react-radio-group`, `cmdk`).
+- ⚠ Pendência menor: `apps/portal` não tem `eslint.config.js` (lacuna do
+  Bloco 4) — `npm run lint` falha; o gate de tipos (`tsc`) passa.
 
 ---
 
@@ -213,11 +224,14 @@ pública · multi-idioma · white-label · faturamento/financeiro.
 5. ✅ **Bloco 3** (telas internas de gestão de parceiros) — concluído em
    2026-05-18.
 6. ✅ **Bloco 4** (portal: auth, layout, cadastros) — concluído em 2026-05-18.
-7. **Bloco 0.2** (aprovações) — em paralelo, fora do código.
-8. Blocos 5 → 6 na ordem das sub-fases do SPEC.
+7. ✅ **Bloco 5** (portal: solicitações) — concluído em 2026-05-19.
+8. **Bloco 0.2** (aprovações) — em paralelo, fora do código.
+9. **Bloco 6** (segurança e polimento) — última sub-fase.
 
-**Próximo passo de código:** Bloco 5 — portal: solicitações (lista com labels
-amigáveis de status, "Nova solicitação" em tela cheia, detalhe e cancelamento).
+**Próximo passo de código:** Bloco 6 — segurança e polimento (rate limiting,
+captcha no login, política de senha forte, auditoria expandida `portal_*`, log
+de tentativas de login, tela "Segurança" no interno, README do portal).
 Pendências em aberto: convite de usuários (Edge Function), contatos reais de
-suporte no footer, e segurança do Bloco 2.3 (teste de penetração de RLS +
-lockdown do storage `solicitacoes-anexos`) — fechar antes de o portal ir ao ar.
+suporte no footer, `eslint.config.js` do `apps/portal`, e segurança do
+Bloco 2.3 (teste de penetração de RLS + lockdown do storage
+`solicitacoes-anexos`) — fechar antes de o portal ir ao ar.

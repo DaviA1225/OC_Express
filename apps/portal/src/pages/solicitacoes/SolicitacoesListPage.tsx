@@ -1,0 +1,229 @@
+import * as React from 'react'
+import { Link } from 'react-router-dom'
+import { format } from 'date-fns'
+import { ptBR } from 'date-fns/locale'
+import { ClipboardList, Plus, Search as SearchIcon, Truck, Building2 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Skeleton } from '@/components/ui/skeleton'
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select'
+import { EmptyState } from '@/components/shared/EmptyState'
+import { StatusBadge } from '@/components/solicitacoes/StatusBadge'
+import { useDebounce } from '@/hooks/useDebounce'
+import { formatNumeroOC } from '@/lib/utils'
+import {
+  useSolicitacoesPortal,
+  useMotoristasBase,
+  useVeiculosBase,
+  useCarretasBase,
+  useClientesPublicos,
+  type PortalSolicitacao,
+} from '@/features/solicitacoes/useSolicitacoes'
+import {
+  STATUS_FILTRO_OPTIONS,
+  matchStatusFiltro,
+  type StatusFiltro,
+} from '@/features/solicitacoes/status'
+
+type Periodo = 'todo' | '7' | '30' | '90'
+
+const PERIODO_OPTIONS: { value: Periodo; label: string }[] = [
+  { value: 'todo', label: 'Todo o período' },
+  { value: '7', label: 'Últimos 7 dias' },
+  { value: '30', label: 'Últimos 30 dias' },
+  { value: '90', label: 'Últimos 90 dias' },
+]
+
+interface SolicitacaoView {
+  sol: PortalSolicitacao
+  motorista: string
+  cavalo: string
+  carreta: string | null
+  cliente: string
+}
+
+export default function SolicitacoesListPage() {
+  const lista = useSolicitacoesPortal()
+  const motoristas = useMotoristasBase()
+  const veiculos = useVeiculosBase()
+  const carretas = useCarretasBase()
+  const clientes = useClientesPublicos()
+
+  const [search, setSearch] = React.useState('')
+  const [statusFiltro, setStatusFiltro] = React.useState<StatusFiltro>('todas')
+  const [periodo, setPeriodo] = React.useState<Periodo>('todo')
+  const debouncedSearch = useDebounce(search, 300)
+
+  // Mapas de resolução: a view só traz IDs.
+  const views = React.useMemo<SolicitacaoView[]>(() => {
+    const mot = new Map((motoristas.data ?? []).map((m) => [m.id, m.nome_completo]))
+    const veic = new Map((veiculos.data ?? []).map((v) => [v.id, v.placa]))
+    const carr = new Map((carretas.data ?? []).map((c) => [c.id, c.placa]))
+    const cli = new Map((clientes.data ?? []).map((c) => [c.id, c.razao_social]))
+    return (lista.data ?? []).map((sol) => ({
+      sol,
+      motorista: (sol.parceiro_motorista_id && mot.get(sol.parceiro_motorista_id)) || 'Motorista não identificado',
+      cavalo: (sol.parceiro_veiculo_id && veic.get(sol.parceiro_veiculo_id)) || '—',
+      carreta: sol.parceiro_carreta_id ? carr.get(sol.parceiro_carreta_id) ?? '—' : null,
+      cliente: (sol.cliente_id && cli.get(sol.cliente_id)) || 'Cliente não identificado',
+    }))
+  }, [lista.data, motoristas.data, veiculos.data, carretas.data, clientes.data])
+
+  const filtradas = React.useMemo(() => {
+    const termo = debouncedSearch.trim().toLowerCase()
+    const minData =
+      periodo === 'todo'
+        ? null
+        : Date.now() - Number(periodo) * 24 * 60 * 60 * 1000
+    return views.filter(({ sol, motorista, cavalo, carreta, cliente }) => {
+      if (!matchStatusFiltro(sol.status, statusFiltro)) return false
+      if (minData && sol.created_at && new Date(sol.created_at).getTime() < minData) {
+        return false
+      }
+      if (termo) {
+        const alvo = [
+          motorista, cavalo, carreta ?? '', cliente,
+          sol.numero_interno != null ? formatNumeroOC(sol.numero_interno) : '',
+          sol.numero_interno != null ? String(sol.numero_interno) : '',
+        ]
+          .join(' ')
+          .toLowerCase()
+        if (!alvo.includes(termo)) return false
+      }
+      return true
+    })
+  }, [views, debouncedSearch, statusFiltro, periodo])
+
+  const carregando =
+    lista.isLoading || motoristas.isLoading || veiculos.isLoading ||
+    carretas.isLoading || clientes.isLoading
+  const total = lista.data?.length ?? 0
+  const temFiltro = !!debouncedSearch.trim() || statusFiltro !== 'todas' || periodo !== 'todo'
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-[22px] font-semibold tracking-tight text-foreground">
+            Minhas solicitações
+          </h1>
+          <p className="text-[12px] text-muted-foreground">
+            {total} {total === 1 ? 'solicitação enviada' : 'solicitações enviadas'}
+          </p>
+        </div>
+        <Button asChild size="lg">
+          <Link to="/solicitacoes/nova">
+            <Plus className="h-4 w-4" />
+            Nova solicitação
+          </Link>
+        </Button>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-background p-3">
+        <div className="relative min-w-[220px] flex-1">
+          <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar por motorista, placa, cliente ou número"
+            className="pl-9"
+          />
+        </div>
+        <Select value={statusFiltro} onValueChange={(v) => setStatusFiltro(v as StatusFiltro)}>
+          <SelectTrigger className="w-[190px]"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {STATUS_FILTRO_OPTIONS.map((o) => (
+              <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={periodo} onValueChange={(v) => setPeriodo(v as Periodo)}>
+          <SelectTrigger className="w-[170px]"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {PERIODO_OPTIONS.map((o) => (
+              <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {carregando && (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-[150px] rounded-lg" />
+          ))}
+        </div>
+      )}
+
+      {!carregando && filtradas.length === 0 && (
+        <div className="rounded-lg border bg-background">
+          <EmptyState
+            icon={ClipboardList}
+            title={temFiltro ? 'Nenhuma solicitação encontrada' : 'Você ainda não enviou solicitações'}
+            description={
+              temFiltro
+                ? 'Ajuste os filtros para ver outras solicitações.'
+                : 'Crie sua primeira solicitação de carregamento — ela vai direto para a equipe da LHG.'
+            }
+            action={
+              !temFiltro && (
+                <Button asChild>
+                  <Link to="/solicitacoes/nova">
+                    <Plus className="h-4 w-4" />
+                    Nova solicitação
+                  </Link>
+                </Button>
+              )
+            }
+          />
+        </div>
+      )}
+
+      {!carregando && filtradas.length > 0 && (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {filtradas.map((v) => (
+            <SolicitacaoCard key={v.sol.id} view={v} />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function SolicitacaoCard({ view }: { view: SolicitacaoView }) {
+  const { sol, motorista, cavalo, carreta, cliente } = view
+  const enviada = sol.created_at
+    ? format(new Date(sol.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })
+    : '—'
+
+  return (
+    <Link
+      to={`/solicitacoes/${sol.id}`}
+      className="flex flex-col gap-3 rounded-lg border bg-background p-4 transition-colors hover:border-primary/40 hover:bg-accent/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      <div className="flex items-start justify-between gap-2">
+        <span className="text-[15px] font-semibold tabular-nums text-foreground">
+          {sol.numero_interno != null ? formatNumeroOC(sol.numero_interno) : 'Solicitação'}
+        </span>
+        <StatusBadge status={sol.status} />
+      </div>
+      <p className="text-[11px] text-muted-foreground">Enviada em {enviada}</p>
+      <div className="space-y-1.5 text-[13px]">
+        <div className="flex items-center gap-2">
+          <Truck className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+          <span className="truncate font-medium text-foreground">{motorista}</span>
+        </div>
+        <p className="pl-[22px] text-[12px] text-muted-foreground">
+          Cavalo {cavalo}
+          {carreta && ` · Carreta ${carreta}`}
+        </p>
+        <div className="flex items-center gap-2">
+          <Building2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+          <span className="truncate text-foreground">{cliente}</span>
+        </div>
+      </div>
+    </Link>
+  )
+}

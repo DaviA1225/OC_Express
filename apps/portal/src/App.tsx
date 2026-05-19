@@ -6,7 +6,9 @@ import { PortalLayout } from '@/components/layout/PortalLayout'
 import { PortalLoader } from '@/components/PortalLoader'
 import LoginPage from '@/pages/LoginPage'
 
-const SolicitacoesPage = lazy(() => import('@/pages/SolicitacoesPlaceholder'))
+const SolicitacoesPage = lazy(() => import('@/pages/solicitacoes/SolicitacoesListPage'))
+const NovaSolicitacaoPage = lazy(() => import('@/pages/solicitacoes/NovaSolicitacaoPage'))
+const SolicitacaoDetailPage = lazy(() => import('@/pages/solicitacoes/SolicitacaoDetailPage'))
 const MotoristasPage = lazy(() => import('@/pages/cadastros/MotoristasPage'))
 const VeiculosPage = lazy(() => import('@/pages/cadastros/VeiculosPage'))
 const CarretasPage = lazy(() => import('@/pages/cadastros/CarretasPage'))
@@ -23,6 +25,8 @@ export function App() {
           <Route element={<ProtectedRoute />}>
             <Route element={<PortalLayout />}>
               <Route path="/solicitacoes" element={<SolicitacoesPage />} />
+              <Route path="/solicitacoes/nova" element={<NovaSolicitacaoPage />} />
+              <Route path="/solicitacoes/:id" element={<SolicitacaoDetailPage />} />
               <Route path="/motoristas" element={<MotoristasPage />} />
               <Route path="/veiculos" element={<VeiculosPage />} />
               <Route path="/carretas" element={<CarretasPage />} />
