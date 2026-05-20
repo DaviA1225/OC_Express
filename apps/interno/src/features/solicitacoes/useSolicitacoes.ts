@@ -22,6 +22,14 @@ export interface SolicitacaoListRow extends Solicitacao {
   cliente: { razao_social: string; cidade: string | null; uf: string | null } | null
   material: { nome: string; origem_padrao: string | null; observacoes_padrao: string | null; requer_instrucao: boolean } | null
   parceiro: { razao_social: string; contato_principal_telefone: string | null; contato_principal_email: string | null } | null
+  // Joins das bases do parceiro (preenchidos quando origem = 'parceiro').
+  // O `normalizeParceiroJoins` copia esses dados para os campos internos
+  // acima, para que cards/WhatsApp leiam de um lugar só.
+  parceiro_motorista: { nome_completo: string; cpf: string; telefone: string | null } | null
+  parceiro_veiculo: { placa: string } | null
+  parceiro_carreta: { placa: string } | null
+  parceiro_subcontratada: { razao_social: string } | null
+  parceiro_usuario: { nome_completo: string; email: string } | null
 }
 
 const SELECT_WITH_JOINS = `
@@ -32,8 +40,48 @@ const SELECT_WITH_JOINS = `
   subcontratada:subcontratada_id ( razao_social ),
   cliente:cliente_id ( razao_social, cidade, uf ),
   material:material_id ( nome, origem_padrao, observacoes_padrao, requer_instrucao ),
-  parceiro:parceiro_id ( razao_social, contato_principal_telefone, contato_principal_email )
+  parceiro:parceiro_id ( razao_social, contato_principal_telefone, contato_principal_email ),
+  parceiro_motorista:parceiro_motorista_id ( nome_completo, cpf, telefone ),
+  parceiro_veiculo:parceiro_veiculo_id ( placa ),
+  parceiro_carreta:parceiro_carreta_id ( placa ),
+  parceiro_subcontratada:parceiro_subcontratada_id ( razao_social ),
+  parceiro_usuario:parceiro_usuario_id ( nome_completo, email )
 `
+
+/**
+ * Quando a solicitação vem do Portal de Parceiros, os IDs internos
+ * (`motorista_id`, `veiculo_id`, `carreta_id`, `subcontratada_id`) sao NULL —
+ * os dados vivem nas tabelas `parceiro_*`. Esta funcao copia os joins do
+ * parceiro para os campos internos correspondentes, e usa o `parceiro_usuario`
+ * como fallback de solicitante. Se a equipe interna substituir um campo (ex.
+ * trocar o motorista por um interno), o valor explicito vence.
+ */
+function normalizeParceiroJoins(row: SolicitacaoListRow): SolicitacaoListRow {
+  if (row.origem !== 'parceiro') return row
+  if (!row.motorista && row.parceiro_motorista) {
+    row.motorista = {
+      nome_completo: row.parceiro_motorista.nome_completo,
+      cpf: row.parceiro_motorista.cpf,
+      telefone: row.parceiro_motorista.telefone,
+    }
+  }
+  if (!row.veiculo && row.parceiro_veiculo) {
+    row.veiculo = { placa: row.parceiro_veiculo.placa, subcontratada_id: null }
+  }
+  if (!row.carreta && row.parceiro_carreta) {
+    row.carreta = { placa: row.parceiro_carreta.placa }
+  }
+  if (!row.subcontratada && row.parceiro_subcontratada) {
+    row.subcontratada = { razao_social: row.parceiro_subcontratada.razao_social }
+  }
+  if (!row.solicitante_nome && row.parceiro_usuario) {
+    row.solicitante_nome = row.parceiro_usuario.nome_completo
+  }
+  if (!row.solicitante_telefone && row.parceiro?.contato_principal_telefone) {
+    row.solicitante_telefone = row.parceiro.contato_principal_telefone
+  }
+  return row
+}
 
 export type PeriodoFiltro = 'todos' | 'hoje' | '7d' | 'mes'
 
@@ -125,7 +173,7 @@ export async function fetchSolicitacoesParaExport(
   query = query.order('created_at', { ascending: false }).range(0, 9999)
   const { data, error } = await query
   if (error) throw error
-  return (data ?? []) as unknown as SolicitacaoListRow[]
+  return ((data ?? []) as unknown as SolicitacaoListRow[]).map(normalizeParceiroJoins)
 }
 
 export function useSolicitacoesList(filters: ListFilters) {
@@ -178,7 +226,7 @@ export function useSolicitacoesList(filters: ListFilters) {
       const { data, error, count } = await query
       if (error) throw error
       return {
-        data: (data ?? []) as unknown as SolicitacaoListRow[],
+        data: ((data ?? []) as unknown as SolicitacaoListRow[]).map(normalizeParceiroJoins),
         count: count ?? 0,
       }
     },
@@ -196,7 +244,7 @@ export function useSolicitacao(id: string | null | undefined) {
         .eq('id', id!)
         .single()
       if (error) throw error
-      return data as unknown as SolicitacaoListRow
+      return normalizeParceiroJoins(data as unknown as SolicitacaoListRow)
     },
   })
 }
@@ -233,7 +281,7 @@ export function useCreateSolicitacao() {
         .select(SELECT_WITH_JOINS)
         .single()
       if (error) throw error
-      return data as unknown as SolicitacaoListRow
+      return normalizeParceiroJoins(data as unknown as SolicitacaoListRow)
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['solicitacoes'] })
@@ -317,7 +365,7 @@ export function useDuplicateSolicitacao() {
         .select(SELECT_WITH_JOINS)
         .single()
       if (error) throw error
-      return data as unknown as SolicitacaoListRow
+      return normalizeParceiroJoins(data as unknown as SolicitacaoListRow)
     },
     onSuccess: (created) => {
       qc.invalidateQueries({ queryKey: ['solicitacoes'] })
@@ -396,7 +444,7 @@ export function useUpdateSolicitacao() {
         .select(SELECT_WITH_JOINS)
         .single()
       if (error) throw error
-      return data as unknown as SolicitacaoListRow
+      return normalizeParceiroJoins(data as unknown as SolicitacaoListRow)
     },
     onMutate: ({ id, values }) =>
       snapshotAndPatchSolicitacao(qc, id, values as Partial<SolicitacaoListRow>),

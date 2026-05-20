@@ -10,6 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { StatusBadge } from '@/components/solicitacoes/StatusBadge'
+import { AnexosCard } from '@/features/anexos/AnexosCard'
 import { cn } from '@/lib/utils'
 import { formatNumeroOC, formatarPamcardParaExibicao } from '@/lib/utils'
 import { podeCancelar } from '@/features/solicitacoes/status'
@@ -164,6 +165,13 @@ export default function SolicitacaoDetailPage() {
         <h2 className="text-[15px] font-semibold text-foreground">Linha do tempo</h2>
         <Timeline sol={sol} solicitante={solicitante} />
       </section>
+
+      <div className="mt-3">
+        <AnexosCard
+          solicitacaoId={sol.id as string}
+          editable={sol.status !== 'finalizada' && sol.status !== 'cancelada'}
+        />
+      </div>
 
       <ConfirmDialog
         open={confirmOpen}

@@ -56,8 +56,22 @@ CREATE TABLE IF NOT EXISTS parceiro_subcontratadas (
   created_by uuid REFERENCES auth.users(id)
 );
 -- CNPJ único por parceiro, apenas quando informado.
-CREATE UNIQUE INDEX IF NOT EXISTS uq_parceiro_subcontratadas_cnpj
-  ON parceiro_subcontratadas (parceiro_id, cnpj) WHERE cnpj IS NOT NULL;
+-- Embrulhado num DO block porque, no script cumulativo reexecutado depois da
+-- migration 0019, a coluna `cnpj` ja foi renomeada para `documento` — neste
+-- caso, pulamos a criação aqui (a 0019 cria o índice novo). Usamos EXECUTE
+-- para que o SQL interno fique dentro de uma string e nao confunda parsers
+-- que dividem statements por ";" no nivel de cima.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+     WHERE table_schema = 'public'
+       AND table_name   = 'parceiro_subcontratadas'
+       AND column_name  = 'cnpj'
+  ) THEN
+    EXECUTE 'CREATE UNIQUE INDEX IF NOT EXISTS uq_parceiro_subcontratadas_cnpj ON parceiro_subcontratadas (parceiro_id, cnpj) WHERE cnpj IS NOT NULL';
+  END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS parceiro_motoristas (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

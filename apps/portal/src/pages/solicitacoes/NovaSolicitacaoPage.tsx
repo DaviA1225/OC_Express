@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { toast } from 'sonner'
-import { ArrowLeft, Loader2, Send } from 'lucide-react'
+import { ArrowLeft, Loader2, Paperclip, Send, Trash2, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -26,7 +26,23 @@ import {
   useClientesPublicos,
   useCriarSolicitacao,
 } from '@/features/solicitacoes/useSolicitacoes'
+import {
+  uploadAnexoFile,
+  isMimeAccepted,
+  MAX_FILE_BYTES,
+  ACCEPTED_MIME_PREFIXES,
+} from '@/features/anexos/useAnexos'
 import type { PamcardStatus } from '@sislog/shared/types'
+
+const ANEXO_ACCEPT_ATTR = ACCEPTED_MIME_PREFIXES
+  .map((p) => (p.endsWith('/') ? `${p}*` : p))
+  .join(',')
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+}
 
 const schema = z
   .object({
@@ -93,6 +109,32 @@ export default function NovaSolicitacaoPage() {
   const [qcCarreta, setQcCarreta] = React.useState<string | null>(null)
   const [qcSubcontratada, setQcSubcontratada] = React.useState<string | null>(null)
 
+  // Anexos coletados localmente; sao enviados apos a solicitacao ser criada
+  // (precisam do solicitacao_id como prefixo no storage path).
+  const [pendingFiles, setPendingFiles] = React.useState<File[]>([])
+  const [enviandoAnexos, setEnviandoAnexos] = React.useState(false)
+  const anexoInputRef = React.useRef<HTMLInputElement>(null)
+
+  const addPendingFiles = (files: FileList | File[]) => {
+    const aceitos: File[] = []
+    const erros: string[] = []
+    for (const f of Array.from(files)) {
+      if (f.size > MAX_FILE_BYTES) {
+        erros.push(`${f.name}: maior que ${(MAX_FILE_BYTES / 1024 / 1024).toFixed(0)}MB`)
+        continue
+      }
+      if (f.type && !isMimeAccepted(f.type)) {
+        erros.push(`${f.name}: tipo não suportado (apenas imagens e PDF)`)
+        continue
+      }
+      aceitos.push(f)
+    }
+    if (aceitos.length) setPendingFiles((prev) => [...prev, ...aceitos])
+    if (erros.length) toast.error(erros.join('\n'))
+  }
+  const removePendingFile = (i: number) =>
+    setPendingFiles((prev) => prev.filter((_, idx) => idx !== i))
+
   const ativos = <T extends { id: string; ativo: boolean }>(rows: T[] | undefined) =>
     (rows ?? []).filter((r) => r.ativo)
 
@@ -155,6 +197,24 @@ export default function NovaSolicitacaoPage() {
       // o toast de erro é exibido pelo onError da mutation
       return
     }
+
+    // Anexos: sobe em paralelo apos a solicitacao existir (o storage path
+    // precisa do solicitacao_id). Falhas individuais nao bloqueiam — o
+    // parceiro pode reenviar pelo detalhe.
+    if (pendingFiles.length > 0) {
+      setEnviandoAnexos(true)
+      const results = await Promise.allSettled(
+        pendingFiles.map((f) => uploadAnexoFile(novoId as string, f)),
+      )
+      setEnviandoAnexos(false)
+      const falhas = results.filter((r) => r.status === 'rejected').length
+      if (falhas > 0) {
+        toast.warning(
+          `${falhas} anexo(s) não foram enviados. Você pode tentar novamente pelo detalhe.`,
+        )
+      }
+    }
+
     toast.success(
       'Solicitação enviada. A equipe LHG processará em breve — você receberá a OC pelo WhatsApp/e-mail.',
     )
@@ -308,13 +368,72 @@ export default function NovaSolicitacaoPage() {
           />
         </Section>
 
+        <Section
+          title="Anexos"
+          description={`Imagens ou PDF até ${(MAX_FILE_BYTES / 1024 / 1024).toFixed(0)}MB cada — ex.: documentos do motorista ou da subcontratada para cadastro na J&F. Os arquivos aparecem na seção de anexos da solicitação no sislog.`}
+        >
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => anexoInputRef.current?.click()}
+            >
+              <Upload className="h-4 w-4" />
+              Adicionar arquivo
+            </Button>
+            <span className="text-[12px] text-muted-foreground">
+              {pendingFiles.length === 0
+                ? 'Nenhum arquivo selecionado'
+                : `${pendingFiles.length} arquivo${pendingFiles.length === 1 ? '' : 's'} pronto${pendingFiles.length === 1 ? '' : 's'} para envio`}
+            </span>
+            <input
+              ref={anexoInputRef}
+              type="file"
+              className="hidden"
+              accept={ANEXO_ACCEPT_ATTR}
+              multiple
+              onChange={(e) => {
+                if (e.target.files && e.target.files.length > 0) addPendingFiles(e.target.files)
+                e.target.value = ''
+              }}
+            />
+          </div>
+          {pendingFiles.length > 0 && (
+            <ul className="mt-3 divide-y rounded-md border">
+              {pendingFiles.map((f, i) => (
+                <li key={`${f.name}-${i}`} className="flex items-center gap-3 px-3 py-2">
+                  <Paperclip className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[13px] text-foreground" title={f.name}>
+                      {f.name}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">{formatBytes(f.size)}</p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removePendingFile(i)}
+                    className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                    aria-label={`Remover ${f.name}`}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Section>
+
         <div className="flex items-center justify-end gap-3 border-t pt-5">
           <Button type="button" variant="outline" asChild>
             <Link to="/solicitacoes">Cancelar</Link>
           </Button>
-          <Button type="submit" size="lg" disabled={criar.isPending}>
-            {criar.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-            Enviar solicitação
+          <Button type="submit" size="lg" disabled={criar.isPending || enviandoAnexos}>
+            {(criar.isPending || enviandoAnexos)
+              ? <Loader2 className="h-4 w-4 animate-spin" />
+              : <Send className="h-4 w-4" />}
+            {enviandoAnexos ? 'Enviando anexos…' : 'Enviar solicitação'}
           </Button>
         </div>
       </form>
