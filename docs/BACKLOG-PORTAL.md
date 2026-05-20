@@ -116,11 +116,17 @@ A *implementação* das views acontece no Bloco 2 (Fase 8.1).
   `solicitacao_anexos`, `log_auditoria` com INSERT aberto p/ trigger)
 - [x] View `clientes_publicos` criada (migration 0017)
 - [x] View `portal_solicitacoes` criada (migration 0018, `SECURITY DEFINER`)
-- [ ] **Teste de penetração de RLS**: logar como parceiro A e tentar ler dados
-  de parceiro B, dados internos e colunas sensíveis via API REST
-- [ ] Lockdown da RLS de **storage** (`solicitacoes-anexos`): hoje as policies
-  são `authenticated USING(bucket_id=...)`; restringir a `is_interno()` antes
-  de o portal ir ao ar
+- [x] **Teste de penetração de RLS** (2026-05-20): script
+  `scripts/pentest-rls.mjs` (38 cenários, 38 PASS) — parceiro A vs. parceiro B
+  em todas as tabelas `parceiro_*`, `solicitacoes` (sem SELECT direto, INSERT
+  só com `parceiro_id` próprio, sem `origem=interno`, sem cancelar/deletar
+  alheio), view `portal_solicitacoes` (só do dono), view `clientes_publicos`
+  (apenas `id/razao_social/cidade/uf`), tabelas internas bloqueadas (10 delas
+  + `log_auditoria`) e bucket `solicitacoes-anexos` (upload em pasta alheia
+  e download cross-tenant negados). Reexecutável: `npm run pentest:rls`.
+- [x] Lockdown da RLS de **storage** (`solicitacoes-anexos`) — migration
+  `0020_anexos_portal_access.sql` restringe tabela e bucket a `is_interno()`
+  OU `solicitacao_pertence_ao_parceiro_logado()`. Validado pelo pentest.
 
 ---
 
@@ -197,13 +203,63 @@ A *implementação* das views acontece no Bloco 2 (Fase 8.1).
 
 ## Bloco 6 — Fase 8.5: Segurança e polimento
 
-- [ ] Rate limiting (100 req/min/usuário, 50 solicitações/dia/usuário)
-- [ ] Captcha no login do portal (Cloudflare Turnstile ou hCaptcha)
-- [ ] Política de senha forte (mín. 12 caracteres, troca a cada 90 dias)
-- [ ] Auditoria expandida (`portal_login`, `portal_solicitacao_criada`, etc.)
-- [ ] Log de tentativas de login (IP, user agent, timestamp)
-- [ ] Tela "Segurança" no sistema interno (só admin)
-- [ ] README e documentação do portal
+Ordem recalibrada em 2026-05-20 (decisões: senha 90d fora do MVP, rate
+limit só diário via trigger SQL, captcha adiado para depois do MVP).
+
+### 6.1 Senha forte (mínimo 12 chars) — ✅ concluído (2026-05-20)
+- [x] Zod do `SegurancaCard` em `apps/interno/.../PerfilPage.tsx` subiu de
+  `min(6)` para `min(12)` + subtítulo atualizado.
+- [x] Nova página `apps/portal/.../MinhaContaPage.tsx` (rota `/minha-conta`)
+  com schema `min(12)` + confirmação + tradução do erro server-side do
+  Supabase ("password should be at least…"). Acesso pelo dropdown do header
+  ("Minha conta") — antes só existia "Sair".
+- [ ] **Passo manual pendente:** em `Authentication → Sign In / Providers →
+  Email` na dashboard do Supabase, subir `Minimum password length` para `12`.
+  Sem isso, o servidor ainda aceita senhas menores. Documentado em `TODO.md`.
+- [x] (Removido) ~~Troca a cada 90 dias~~ — fora do MVP.
+
+### 6.2 Auditoria expandida + log de login (juntas) — código pronto (2026-05-20)
+- [x] Migration `0021_eventos_portal.sql`: tabela dedicada (preferida a alargar
+  `log_auditoria` para não misturar DML automático com eventos de aplicação) +
+  função `registrar_evento_portal(tipo, payload jsonb)` `SECURITY DEFINER` que
+  deriva parceiro/usuário do `auth.uid()` (cliente não consegue forjar).
+- [x] Helper `apps/portal/src/lib/eventos.ts` (`registrarEvento`) — fire-and-forget,
+  injeta `user_agent` do navegador (IP fica null no MVP — exige Edge Function).
+- [x] Integrações no portal: `useAuth` (login/login_falha/logout), `useSolicitacoes`
+  (solicitacao_criada/solicitacao_cancelada), `MinhaContaPage` (senha_alterada).
+- [x] RLS: SELECT só `is_interno()`. INSERT/UPDATE/DELETE direto bloqueado
+  (única porta é a função `SECURITY DEFINER`).
+- [x] Pentest estendido em `scripts/pentest-rls.mjs` (7 cenários novos).
+- [x] Migration aplicada e validada em 2026-05-20 — `npm run pentest:rls`
+  reporta **45/45 PASS** (inclusive: função deriva `parceiro_id` do `auth.uid()`
+  e ignora `parceiro_id` no payload; anon consegue registrar `portal_login_falha`
+  mas não eventos que exigem usuário; RPC rejeita `tipo_evento` desconhecido).
+
+### 6.3 Tela "Segurança" no sistema interno — ✅ concluído (2026-05-20)
+- [x] Rota `/seguranca` (PerfilRoute allowed={['admin']}) + item na sidebar
+  (seção Sistema) só visível para admin (`canViewSeguranca`).
+- [x] Card de destaque no topo: nº de falhas de login nas últimas 24h
+  (`useLoginFalhasUltimas24h`) — fica amarelo se ≥ 5.
+- [x] Filtros (querystring): período (default 7d), tipo de evento (chips
+  multi-select), parceiro (chips). URL compartilhável.
+- [x] Tabela paginada 30/pg com data/hora, badge colorido por tipo, parceiro,
+  usuário (ou `email_tentado` quando login falhou), link da solicitação +
+  user-agent encurtado em tooltip + IP.
+
+### 6.4 Rate limiting diário (50 solicitações/dia/usuário)
+- [ ] Trigger BEFORE INSERT em `solicitacoes` que conta o dia corrente do
+  `parceiro_usuario_id` e bloqueia com erro amigável ao passar de 50
+- [ ] Mensagem clara no portal quando o erro voltar do banco
+- [ ] (Adiado) Limite global de req/min — exigiria Edge Function ou
+  Cloudflare; reavaliar pós-MVP se houver sinal de abuso
+
+### 6.5 README e documentação
+- [ ] `apps/portal/README.md` — visão geral, como rodar, fluxo de auth, contatos
+- [ ] Atualizar `docs/SPEC-PORTAL.md` se algo divergiu da especificação
+
+### Item parqueado — Captcha no login
+- [ ] Provedor a decidir (candidatos: Cloudflare Turnstile, hCaptcha).
+  Estrutura de login deve aceitar encaixe futuro sem refactor grande.
 
 ---
 
@@ -228,10 +284,10 @@ pública · multi-idioma · white-label · faturamento/financeiro.
 8. **Bloco 0.2** (aprovações) — em paralelo, fora do código.
 9. **Bloco 6** (segurança e polimento) — última sub-fase.
 
-**Próximo passo de código:** Bloco 6 — segurança e polimento (rate limiting,
-captcha no login, política de senha forte, auditoria expandida `portal_*`, log
-de tentativas de login, tela "Segurança" no interno, README do portal).
-Pendências em aberto: convite de usuários (Edge Function), contatos reais de
-suporte no footer, `eslint.config.js` do `apps/portal`, e segurança do
-Bloco 2.3 (teste de penetração de RLS + lockdown do storage
-`solicitacoes-anexos`) — fechar antes de o portal ir ao ar.
+**Próximo passo de código:** Bloco 6.1 — senha forte (mín. 12 chars, sem
+rotação). Em seguida 6.2 (auditoria + log de login), 6.3 (tela Segurança),
+6.4 (rate limit diário via trigger), 6.5 (README). Captcha parqueado, a
+decidir provedor depois. Pendências paralelas: convite de usuários (Edge
+Function), contatos reais de suporte no footer e `eslint.config.js` do
+`apps/portal`. Bloco 2.3 fechado em 2026-05-20 (pentest verde + lockdown
+do storage aplicado na migration 0020).

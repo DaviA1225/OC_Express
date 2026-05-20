@@ -127,7 +127,7 @@ export default function LoginPage() {
           </form>
 
           <p className="mt-10 text-center text-[11px] text-muted-foreground/80">
-            SisLog · v1.0.0
+            SisLog · v1.2.0
           </p>
         </div>
       </div>

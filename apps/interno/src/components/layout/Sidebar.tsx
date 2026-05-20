@@ -14,12 +14,13 @@ import {
   Users,
   Search,
   BarChart3,
+  ShieldAlert,
   ChevronsLeft,
   ChevronsRight,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
-import { canViewAuditoria, canViewUsuarios, canViewRelatorios } from '@/features/auth/permissions'
+import { canViewAuditoria, canViewUsuarios, canViewRelatorios, canViewSeguranca } from '@/features/auth/permissions'
 import { usePamcardPendenteCount } from '@/features/solicitacoes/useSolicitacoes'
 
 interface NavItem {
@@ -47,6 +48,7 @@ const cadastros: NavItem[] = [
 const sistemaAdmin: NavItem = { to: '/cadastros/usuarios', label: 'Usuários', icon: Users }
 const sistemaRelatorios: NavItem = { to: '/relatorios', label: 'Relatórios', icon: BarChart3 }
 const sistemaAuditoria: NavItem = { to: '/auditoria', label: 'Auditoria', icon: Search }
+const sistemaSeguranca: NavItem = { to: '/seguranca', label: 'Segurança', icon: ShieldAlert }
 
 interface SidebarProps {
   collapsed: boolean
@@ -60,6 +62,7 @@ export function SidebarContent({ collapsed, onToggleCollapse, onNavigate, classN
   const showUsuarios = canViewUsuarios(profile)
   const showAuditoria = canViewAuditoria(profile)
   const showRelatorios = canViewRelatorios(profile)
+  const showSeguranca = canViewSeguranca(profile)
   const pamcardPendente = usePamcardPendenteCount()
   const pamcardPendenteCount = pamcardPendente.data ?? 0
 
@@ -112,7 +115,7 @@ export function SidebarContent({ collapsed, onToggleCollapse, onNavigate, classN
           ))}
         </ul>
 
-        {(showUsuarios || showAuditoria || showRelatorios) && (
+        {(showUsuarios || showAuditoria || showRelatorios || showSeguranca) && (
           <>
             <SectionLabel collapsed={collapsed}>Sistema</SectionLabel>
             <ul className="space-y-0.5">
@@ -133,6 +136,13 @@ export function SidebarContent({ collapsed, onToggleCollapse, onNavigate, classN
               {showAuditoria && (
                 <NavListItem
                   item={sistemaAuditoria}
+                  collapsed={collapsed}
+                  onNavigate={onNavigate}
+                />
+              )}
+              {showSeguranca && (
+                <NavListItem
+                  item={sistemaSeguranca}
                   collapsed={collapsed}
                   onNavigate={onNavigate}
                 />

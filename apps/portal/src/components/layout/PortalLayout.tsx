@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { ChevronDown, LogOut } from 'lucide-react'
+import { ChevronDown, LogOut, User } from 'lucide-react'
 import { useAuth, hasPerfilParceiro } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -92,6 +92,10 @@ export function PortalLayout() {
               </p>
             </div>
             <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={() => navigate('/minha-conta')}>
+              <User className="mr-2 h-4 w-4" />
+              Minha conta
+            </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => void handleSignOut()}>
               <LogOut className="mr-2 h-4 w-4" />
               Sair

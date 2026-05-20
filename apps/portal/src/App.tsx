@@ -14,6 +14,7 @@ const VeiculosPage = lazy(() => import('@/pages/cadastros/VeiculosPage'))
 const CarretasPage = lazy(() => import('@/pages/cadastros/CarretasPage'))
 const SubcontratadasPage = lazy(() => import('@/pages/cadastros/SubcontratadasPage'))
 const UsuariosPage = lazy(() => import('@/pages/UsuariosPage'))
+const MinhaContaPage = lazy(() => import('@/pages/MinhaContaPage'))
 
 export function App() {
   return (
@@ -32,6 +33,7 @@ export function App() {
               <Route path="/carretas" element={<CarretasPage />} />
               <Route path="/subcontratadas" element={<SubcontratadasPage />} />
               <Route path="/usuarios" element={<UsuariosPage />} />
+              <Route path="/minha-conta" element={<MinhaContaPage />} />
               <Route path="*" element={<Navigate to="/solicitacoes" replace />} />
             </Route>
           </Route>

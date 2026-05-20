@@ -24,6 +24,7 @@ const SolicitacaoDetailPage = lazy(() =>
 )
 const CargasRetornoPage = lazy(() => import('@/pages/cargas-retorno/CargasRetornoPage'))
 const AuditoriaPage = lazy(() => import('@/pages/auditoria/AuditoriaPage'))
+const SegurancaPage = lazy(() => import('@/pages/seguranca/SegurancaPage'))
 const RelatoriosPage = lazy(() => import('@/pages/relatorios/RelatoriosPage'))
 const PerfilPage = lazy(() => import('@/pages/perfil/PerfilPage'))
 const NotFoundPage = lazy(() => import('@/pages/errors/NotFoundPage'))
@@ -68,6 +69,9 @@ export default function App() {
                 </Route>
                 <Route element={<PerfilRoute allowed={['admin', 'gerente', 'supervisor']} />}>
                   <Route path="/auditoria" element={<AuditoriaPage />} />
+                </Route>
+                <Route element={<PerfilRoute allowed={['admin']} />}>
+                  <Route path="/seguranca" element={<SegurancaPage />} />
                 </Route>
 
                 <Route path="/perfil" element={<PerfilPage />} />

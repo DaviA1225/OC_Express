@@ -1,5 +1,5 @@
 -- =====================================================================
--- OC Express / SisLog LHG — Schema cumulativo (migrations 0001 → 0020)
+-- OC Express / SisLog LHG — Schema cumulativo (migrations 0001 → 0021)
 -- =====================================================================
 --
 -- Este arquivo agrega TODAS as migrations num único script IDEMPOTENTE.
@@ -950,7 +950,114 @@ COMMENT ON VIEW portal_solicitacoes IS
 
 
 -- =====================================================================
--- 11. Operacional / vinculos de usuario (one-time setup)
+-- 11. eventos_portal + registrar_evento_portal (0021)
+-- =====================================================================
+-- Auditoria de eventos de aplicacao (login, login_falha, logout, criacao e
+-- cancelamento de solicitacao no portal, troca de senha). Unico caminho de
+-- escrita: funcao SECURITY DEFINER abaixo. RLS bloqueia INSERT/UPDATE/DELETE
+-- direto; SELECT so para `is_interno()`.
+
+CREATE TABLE IF NOT EXISTS eventos_portal (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tipo_evento text NOT NULL CHECK (tipo_evento IN (
+    'portal_login',
+    'portal_login_falha',
+    'portal_logout',
+    'portal_solicitacao_criada',
+    'portal_solicitacao_cancelada',
+    'portal_senha_alterada'
+  )),
+  user_id uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  parceiro_id uuid REFERENCES parceiros(id) ON DELETE SET NULL,
+  parceiro_usuario_id uuid REFERENCES parceiro_usuarios(id) ON DELETE SET NULL,
+  email_tentado text,
+  solicitacao_id uuid REFERENCES solicitacoes(id) ON DELETE SET NULL,
+  ip text,
+  user_agent text,
+  metadata jsonb,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_eventos_portal_created_at ON eventos_portal (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_eventos_portal_parceiro ON eventos_portal (parceiro_id);
+CREATE INDEX IF NOT EXISTS idx_eventos_portal_tipo ON eventos_portal (tipo_evento);
+CREATE INDEX IF NOT EXISTS idx_eventos_portal_user ON eventos_portal (user_id);
+
+ALTER TABLE eventos_portal ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS eventos_portal_select ON eventos_portal;
+CREATE POLICY eventos_portal_select ON eventos_portal
+  FOR SELECT TO authenticated
+  USING (is_interno());
+
+CREATE OR REPLACE FUNCTION registrar_evento_portal(
+  p_tipo_evento text,
+  p_payload jsonb DEFAULT NULL
+)
+RETURNS uuid
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_user_id uuid := auth.uid();
+  v_pu parceiro_usuarios%ROWTYPE;
+  v_parceiro_id uuid;
+  v_parceiro_usuario_id uuid;
+  v_email_tentado text;
+  v_solicitacao_id uuid;
+  v_ip text;
+  v_user_agent text;
+  v_metadata jsonb;
+  v_id uuid;
+BEGIN
+  IF p_tipo_evento NOT IN (
+    'portal_login', 'portal_login_falha', 'portal_logout',
+    'portal_solicitacao_criada', 'portal_solicitacao_cancelada',
+    'portal_senha_alterada'
+  ) THEN
+    RAISE EXCEPTION 'tipo_evento invalido: %', p_tipo_evento;
+  END IF;
+
+  IF p_tipo_evento = 'portal_login_falha' THEN
+    v_email_tentado := p_payload->>'email_tentado';
+  ELSE
+    IF v_user_id IS NULL THEN
+      RETURN NULL;
+    END IF;
+    SELECT * INTO v_pu FROM parceiro_usuarios
+      WHERE user_id = v_user_id AND ativo = true
+      LIMIT 1;
+    IF NOT FOUND THEN
+      RETURN NULL;
+    END IF;
+    v_parceiro_id := v_pu.parceiro_id;
+    v_parceiro_usuario_id := v_pu.id;
+  END IF;
+
+  v_ip := p_payload->>'ip';
+  v_user_agent := p_payload->>'user_agent';
+  v_solicitacao_id := NULLIF(p_payload->>'solicitacao_id', '')::uuid;
+  v_metadata := p_payload - ARRAY['email_tentado','ip','user_agent','solicitacao_id'];
+  IF v_metadata = '{}'::jsonb THEN v_metadata := NULL; END IF;
+
+  INSERT INTO eventos_portal (
+    tipo_evento, user_id, parceiro_id, parceiro_usuario_id,
+    email_tentado, solicitacao_id, ip, user_agent, metadata
+  ) VALUES (
+    p_tipo_evento, v_user_id, v_parceiro_id, v_parceiro_usuario_id,
+    v_email_tentado, v_solicitacao_id, v_ip, v_user_agent, v_metadata
+  )
+  RETURNING id INTO v_id;
+
+  RETURN v_id;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION registrar_evento_portal(text, jsonb) TO anon, authenticated;
+
+
+-- =====================================================================
+-- 12. Operacional / vinculos de usuario (one-time setup)
 -- =====================================================================
 -- Esta secao depende de e-mails reais existirem em auth.users. Os blocos
 -- abaixo silenciosamente nao fazem nada se o e-mail nao existir, entao

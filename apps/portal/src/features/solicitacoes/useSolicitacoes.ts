@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
+import { registrarEvento } from '@/lib/eventos'
 import { traduzirErroBanco } from '@/features/cadastros/useParceiroCrud'
 import type { Tables, Views, PamcardStatus } from '@sislog/shared/types'
 
@@ -142,8 +143,9 @@ export function useCriarSolicitacao() {
       if (error) throw error
       return id
     },
-    onSuccess: () => {
+    onSuccess: (id) => {
       qc.invalidateQueries({ queryKey: ['portal-solicitacoes'] })
+      void registrarEvento('portal_solicitacao_criada', { solicitacao_id: id })
     },
     onError: (e: unknown) => toast.error(traduzirErroBanco(e)),
   })
@@ -161,9 +163,10 @@ export function useCancelarSolicitacao() {
       if (error) throw error
       return id
     },
-    onSuccess: () => {
+    onSuccess: (id) => {
       // Invalida a lista e o detalhe (a chave do detalhe tem este prefixo).
       qc.invalidateQueries({ queryKey: ['portal-solicitacoes'] })
+      void registrarEvento('portal_solicitacao_cancelada', { solicitacao_id: id })
       toast.success('Solicitação cancelada')
     },
     onError: (e: unknown) => toast.error(traduzirErroBanco(e)),

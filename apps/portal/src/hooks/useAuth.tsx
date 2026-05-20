@@ -1,6 +1,7 @@
 import * as React from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
+import { registrarEvento } from '@/lib/eventos'
 import type { Tables, ParceiroPerfil } from '@sislog/shared/types'
 
 export type ParceiroUsuario = Tables<'parceiro_usuarios'>
@@ -104,11 +105,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn: AuthContextValue['signIn'] = async (email, password) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) return { error: traduzirErroAuth(error.message) }
+    if (error) {
+      void registrarEvento('portal_login_falha', { email_tentado: email })
+      return { error: traduzirErroAuth(error.message) }
+    }
+    void registrarEvento('portal_login')
     return { error: null }
   }
 
   const signOut = async () => {
+    // Logar ANTES do signOut para ainda termos auth.uid() no servidor.
+    await registrarEvento('portal_logout')
     await supabase.auth.signOut()
     setSession(null)
     setParceiroUsuario(null)

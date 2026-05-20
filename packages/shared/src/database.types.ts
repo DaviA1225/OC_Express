@@ -1,5 +1,5 @@
 // Tipos do banco SisLog (espelha as migrations em supabase/migrations,
-// até 0018 — tabelas parceiro_* e views do Portal de Parceiros).
+// até 0021 — eventos_portal + função registrar_evento_portal).
 // Para regenerar a partir do banco real, instale Docker Desktop e rode:
 //   npx supabase gen types typescript --db-url "<DB_URL>" --schema public
 
@@ -31,6 +31,14 @@ export type PamcardStatus = 'tem_cartao' | 'nao_tem_cartao'
 export type SolicitacaoOrigem = 'interno' | 'parceiro' | 'email'
 
 export type ParceiroPerfil = 'admin_parceiro' | 'operador_parceiro'
+
+export type TipoEventoPortal =
+  | 'portal_login'
+  | 'portal_login_falha'
+  | 'portal_logout'
+  | 'portal_solicitacao_criada'
+  | 'portal_solicitacao_cancelada'
+  | 'portal_senha_alterada'
 
 export interface Database {
   public: {
@@ -387,6 +395,25 @@ export interface Database {
         }
         Update: Partial<Database['public']['Tables']['solicitacao_anexos']['Insert']>
       }
+      eventos_portal: {
+        Row: {
+          id: string
+          tipo_evento: TipoEventoPortal
+          user_id: string | null
+          parceiro_id: string | null
+          parceiro_usuario_id: string | null
+          email_tentado: string | null
+          solicitacao_id: string | null
+          ip: string | null
+          user_agent: string | null
+          metadata: Json | null
+          created_at: string
+        }
+        // Apenas a função registrar_evento_portal escreve. Mantemos um tipo
+        // valido (vs. `never`) para nao quebrar a inferencia do supabase-js.
+        Insert: Record<string, never>
+        Update: Record<string, never>
+      }
       log_auditoria: {
         Row: {
           id: string
@@ -624,7 +651,12 @@ export interface Database {
         }
       }
     }
-    Functions: Record<string, never>
+    Functions: {
+      registrar_evento_portal: {
+        Args: { p_tipo_evento: TipoEventoPortal; p_payload: Record<string, unknown> | null }
+        Returns: string | null
+      }
+    }
     Enums: Record<string, never>
   }
 }

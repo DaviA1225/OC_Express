@@ -24,6 +24,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/cadastros/parceiros': 'Parceiros',
   '/cadastros/usuarios': 'Usuários',
   '/auditoria': 'Auditoria',
+  '/seguranca': 'Segurança',
   '/relatorios': 'Relatórios',
   '/perfil': 'Meu perfil',
 }
