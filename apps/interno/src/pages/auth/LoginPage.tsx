@@ -54,9 +54,7 @@ export default function LoginPage() {
       <div className="flex items-center justify-center bg-background px-4 py-10 sm:px-8">
         <div className="w-full max-w-[400px]">
           <div className="mb-8 lg:hidden">
-            <div className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-[#1D1E1B] text-[14px] font-semibold text-primary-foreground shadow-sm">
-              SL
-            </div>
+            <img src="/favicon.svg" alt="" aria-hidden className="h-10 w-10" />
           </div>
 
           <h1 className="font-display text-[26px] font-semibold tracking-tight text-foreground">
@@ -149,8 +147,8 @@ function BrandPanel() {
       />
 
       <header className="relative">
-        <div className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-white/10 text-[16px] font-semibold backdrop-blur-sm ring-1 ring-white/20">
-          SL
+        <div className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-white/10 backdrop-blur-sm ring-1 ring-white/20">
+          <img src="/favicon.svg" alt="" aria-hidden className="h-7 w-7" />
         </div>
       </header>
 

@@ -19,11 +19,8 @@
       }
       #app-splash .mark {
         width: 56px; height: 56px;
-        border-radius: 14px;
-        display: flex; align-items: center; justify-content: center;
-        font-weight: 600; font-size: 18px; letter-spacing: -0.02em;
-        background: linear-gradient(135deg, #FF5100 0%, #B83D0A 60%, #1D1E1B 100%);
-        box-shadow: 0 8px 24px rgba(255, 81, 0, 0.25);
+        display: block;
+        filter: drop-shadow(0 8px 24px rgba(255, 81, 0, 0.25));
       }
       #app-splash .wordmark {
         font-size: 13px; letter-spacing: 2px; text-transform: uppercase;
@@ -47,7 +44,7 @@
   <body>
     <div id="root">
       <div id="app-splash" role="status" aria-live="polite" aria-label="Carregando SisLog">
-        <div class="mark">SL</div>
+        <img class="mark" src="/favicon.svg" alt="" />
         <div class="wordmark">SisLog</div>
         <div class="dots"><span></span><span></span><span></span></div>
       </div>

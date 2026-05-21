@@ -81,9 +81,7 @@ export function SidebarContent({ collapsed, onToggleCollapse, onNavigate, classN
         )}
       >
         <div className="flex items-center gap-2">
-          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary text-[12px] font-semibold text-primary-foreground">
-            SL
-          </div>
+          <img src="/favicon.svg" alt="" aria-hidden className="h-7 w-7 shrink-0" />
           {!collapsed && (
             <span className="text-[14px] font-medium text-foreground">SisLog</span>
           )}
