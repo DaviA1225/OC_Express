@@ -59,7 +59,7 @@ export default function LoginPage() {
             </div>
           </div>
 
-          <h1 className="text-[26px] font-semibold tracking-tight text-foreground">
+          <h1 className="font-display text-[26px] font-semibold tracking-tight text-foreground">
             Portal Parceiros LHG
           </h1>
           <p className="mt-1 text-[13px] text-muted-foreground">
@@ -147,7 +147,7 @@ function BrandPanel() {
           <p className="text-[11px] font-medium uppercase tracking-[2px] text-white/70">
             Portal Parceiros
           </p>
-          <h2 className="max-w-md text-[32px] font-semibold leading-[1.15] tracking-tight">
+          <h2 className="max-w-md font-display text-[32px] font-semibold leading-[1.15] tracking-tight">
             Envie suas solicitações de carregamento direto para a LHG.
           </h2>
           <p className="max-w-md text-[14px] leading-relaxed text-white/80">

@@ -59,7 +59,7 @@ export default function LoginPage() {
             </div>
           </div>
 
-          <h1 className="text-[26px] font-semibold tracking-tight text-foreground">
+          <h1 className="font-display text-[26px] font-semibold tracking-tight text-foreground">
             Bem-vindo
           </h1>
           <p className="mt-1 text-[13px] text-muted-foreground">
@@ -127,7 +127,7 @@ export default function LoginPage() {
           </form>
 
           <p className="mt-10 text-center text-[11px] text-muted-foreground/80">
-            SisLog · v1.2.0
+            SisLog · v1.2.1
           </p>
         </div>
       </div>
@@ -159,7 +159,7 @@ function BrandPanel() {
           <p className="text-[11px] font-medium uppercase tracking-[2px] text-white/70">
             SisLog
           </p>
-          <h2 className="max-w-md text-[34px] font-semibold leading-[1.15] tracking-tight">
+          <h2 className="max-w-md font-display text-[34px] font-semibold leading-[1.15] tracking-tight">
             Gestão de carregamentos com agilidade operacional.
           </h2>
           <p className="max-w-md text-[14px] leading-relaxed text-white/80">

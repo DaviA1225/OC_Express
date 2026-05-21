@@ -1,4 +1,9 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+/* Tipografia oficial LHG — Wanted Sans (primária) + Kanit (títulos/destaque).
+   Wanted Sans não está no Google Fonts; servida via jsdelivr a partir do pacote
+   oficial `wanted-sans` (OFL-1.1). O CSS split usa unicode-range, então o
+   navegador baixa só os subsets que aparecem no DOM (latim na prática). */
+@import url('https://cdn.jsdelivr.net/npm/wanted-sans@1.0.3/fonts/webfonts/static/split/WantedSans.css');
+@import url('https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -97,8 +102,6 @@
     @apply bg-background text-foreground font-sans antialiased;
     font-size: 14px;
     line-height: 1.5;
-    /* cv11 = single-storey "a", ss01 = open digits/tnum-friendly; mantém visual técnico/limpo */
-    font-feature-settings: 'cv11', 'ss01', 'ss03';
   }
   /* Headings com tracking ligeiramente apertado — peso institucional */
   h1, h2, h3 {
