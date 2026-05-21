@@ -40,3 +40,38 @@ Passo manual a aplicar na dashboard do Supabase, em **Authentication → Sign In
 - **Password requirements (recomendado):** ao menos `Letters and digits` (subir para `Lowercase, uppercase, digits and symbols` se TI da J&F exigir)
 
 Com isso, mesmo que alguém contorne o zod do front, o servidor barra senhas menores que 12 chars. A UX no front exibe mensagem amigável antes do submit (`apps/interno/.../PerfilPage.tsx` e `apps/portal/.../MinhaContaPage.tsx`).
+
+## Convite de usuários do portal — Edge Function `convidar-parceiro-usuario`
+
+### 1. Migration nova
+- `supabase/migrations/0023_eventos_portal_usuario_convidado.sql` — amplia CHECK do `tipo_evento` e atualiza `registrar_evento_portal` para aceitar `portal_usuario_convidado`. Aplicar via `supabase db push` ou pelo SQL Editor.
+
+### 2. Deploy da Edge Function
+Pré-requisito: `npx supabase login` (abre browser) e `npx supabase link --project-ref pwufbvneqfyyqnmfxzyw`.
+
+```bash
+npx supabase functions deploy convidar-parceiro-usuario
+```
+
+A função usa as env vars que o Supabase já injeta automaticamente em todas as Edge Functions (`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`) — **não precisa** configurar secrets adicionais.
+
+### 3. Allowlist de Redirect URLs (Supabase Dashboard)
+Em **Authentication → URL Configuration → Redirect URLs**, adicionar:
+- `https://<portal-em-prod>.vercel.app/aceitar-convite` (produção)
+- `http://localhost:5174/aceitar-convite` (dev local)
+
+Sem essa entrada, o link mágico do e-mail de convite leva o usuário a uma página de erro do Supabase em vez do portal.
+
+### 4. Template de e-mail (opcional, recomendado)
+Em **Authentication → Email Templates → Invite user**, ajustar o copy do e-mail (assunto, mensagem) — o padrão do Supabase é em inglês. Por enquanto fica como está; revisar pós-MVP.
+
+### 5. Como testar
+1. Logar no portal como `admin_parceiro`.
+2. Ir em **Usuários** → "Convidar usuário".
+3. Preencher e-mail/nome/perfil e enviar.
+4. Conferir no Supabase Inbucket local (`http://127.0.0.1:54324`) **se rodando local** ou na caixa de entrada real **se produção** que o e-mail chegou.
+5. Clicar no link → cair em `/aceitar-convite` → definir senha → entrar no portal.
+
+### 6. Limitações conhecidas
+- Sem feedback de "usuário aceitou o convite" — o admin que convidou não vê quando o convidado concluiu. Para visibilidade, consultar `parceiro_usuarios.created_at` vs `auth.users.last_sign_in_at`.
+- Reenvio de convite expirado ainda não implementado. Por enquanto: desativar o usuário e convidar novamente com o mesmo e-mail (ou ressuscitar manualmente o usuário em `auth.users`).

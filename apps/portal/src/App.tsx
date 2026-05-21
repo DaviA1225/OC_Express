@@ -15,6 +15,7 @@ const CarretasPage = lazy(() => import('@/pages/cadastros/CarretasPage'))
 const SubcontratadasPage = lazy(() => import('@/pages/cadastros/SubcontratadasPage'))
 const UsuariosPage = lazy(() => import('@/pages/UsuariosPage'))
 const MinhaContaPage = lazy(() => import('@/pages/MinhaContaPage'))
+const AceitarConvitePage = lazy(() => import('@/pages/AceitarConvitePage'))
 
 export function App() {
   return (
@@ -22,6 +23,7 @@ export function App() {
       <Suspense fallback={<PortalLoader />}>
         <Routes>
           <Route path="/" element={<LoginPage />} />
+          <Route path="/aceitar-convite" element={<AceitarConvitePage />} />
 
           <Route element={<ProtectedRoute />}>
             <Route element={<PortalLayout />}>
