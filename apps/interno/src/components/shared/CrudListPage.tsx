@@ -44,6 +44,10 @@ export interface CrudListPageProps<T extends { id: string; ativo: boolean }> {
   onEdit?: (row: T) => void
   onToggleActive?: (row: T) => void
   onDelete?: (row: T) => void
+  /** Renderiza botões custom ANTES dos ícones padrão (edit/toggle/delete).
+   *  Útil pra ações que dependem da linha mas não se encaixam no CRUD padrão
+   *  (ex: navegar pra sub-rota). Cada elemento deve cuidar do próprio aria-label. */
+  rowActions?: (row: T) => React.ReactNode
   emptyTitle?: string
   emptyDescription?: string
   page: number
@@ -72,6 +76,7 @@ export function CrudListPage<T extends { id: string; ativo: boolean }>(props: Cr
     onEdit,
     onToggleActive,
     onDelete,
+    rowActions,
     rowLabel,
     emptyTitle = 'Nada encontrado',
     emptyDescription = 'Ajuste os filtros ou crie um novo registro.',
@@ -84,7 +89,7 @@ export function CrudListPage<T extends { id: string; ativo: boolean }>(props: Cr
   } = props
 
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize))
-  const hasActions = !!(onEdit || onToggleActive || onDelete)
+  const hasActions = !!(onEdit || onToggleActive || onDelete || rowActions)
   const selectable = !!(onBulkToggleActive || onBulkDelete)
 
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set())
@@ -289,6 +294,7 @@ export function CrudListPage<T extends { id: string; ativo: boolean }>(props: Cr
                 {hasActions && (
                   <TableCell>
                     <div className="flex items-center justify-start gap-1">
+                      {rowActions?.(row)}
                       {onEdit && (
                         <Button
                           variant="ghost"

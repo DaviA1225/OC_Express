@@ -1,8 +1,9 @@
 import * as React from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Users } from 'lucide-react'
 import { CrudListPage, useCrudListState, type ColumnDef } from '@/components/shared/CrudListPage'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { useCrudList, useActiveCount, useUpsertRow, useToggleActive, useDeleteRow, useBulkToggleActive, useBulkDeleteRows } from '@/features/crud/useCrudQueries'
@@ -49,6 +50,7 @@ type FormValues = z.infer<typeof schema>
 
 export default function ParceirosPage() {
   const { profile } = useAuth()
+  const navigate = useNavigate()
   const canEdit = canEditParceiros(profile)
   const canBulk = canUseBulkActions(profile)
   const state = useCrudListState()
@@ -99,6 +101,17 @@ export default function ParceirosPage() {
         onEdit={canEdit ? (r) => { setEditing(r); setOpen(true) } : undefined}
         onToggleActive={canEdit ? (r) => setConfirmRow(r) : undefined}
         onDelete={canEdit ? (r) => setDeleteRow(r) : undefined}
+        rowActions={canEdit ? (r) => (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate(`/cadastros/parceiros/${r.id}/usuarios`)}
+            aria-label={`Gerenciar usuários de ${r.razao_social}`}
+            title="Gerenciar usuários"
+          >
+            <Users className="h-4 w-4" />
+          </Button>
+        ) : undefined}
         emptyTitle="Nenhum parceiro cadastrado"
         emptyDescription="Cadastre as transportadoras parceiras que terão acesso ao portal externo."
         page={state.page}
