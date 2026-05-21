@@ -1,5 +1,5 @@
 // Tipos do banco SisLog (espelha as migrations em supabase/migrations,
-// até 0018 — tabelas parceiro_* e views do Portal de Parceiros).
+// até 0021 — eventos_portal + função registrar_evento_portal).
 // Para regenerar a partir do banco real, instale Docker Desktop e rode:
 //   npx supabase gen types typescript --db-url "<DB_URL>" --schema public
 
@@ -31,6 +31,14 @@ export type PamcardStatus = 'tem_cartao' | 'nao_tem_cartao'
 export type SolicitacaoOrigem = 'interno' | 'parceiro' | 'email'
 
 export type ParceiroPerfil = 'admin_parceiro' | 'operador_parceiro'
+
+export type TipoEventoPortal =
+  | 'portal_login'
+  | 'portal_login_falha'
+  | 'portal_logout'
+  | 'portal_solicitacao_criada'
+  | 'portal_solicitacao_cancelada'
+  | 'portal_senha_alterada'
 
 export interface Database {
   public: {
@@ -387,6 +395,25 @@ export interface Database {
         }
         Update: Partial<Database['public']['Tables']['solicitacao_anexos']['Insert']>
       }
+      eventos_portal: {
+        Row: {
+          id: string
+          tipo_evento: TipoEventoPortal
+          user_id: string | null
+          parceiro_id: string | null
+          parceiro_usuario_id: string | null
+          email_tentado: string | null
+          solicitacao_id: string | null
+          ip: string | null
+          user_agent: string | null
+          metadata: Json | null
+          created_at: string
+        }
+        // Apenas a função registrar_evento_portal escreve. Mantemos um tipo
+        // valido (vs. `never`) para nao quebrar a inferencia do supabase-js.
+        Insert: Record<string, never>
+        Update: Record<string, never>
+      }
       log_auditoria: {
         Row: {
           id: string
@@ -473,7 +500,10 @@ export interface Database {
           id: string
           parceiro_id: string
           razao_social: string
-          cnpj: string | null
+          documento: string | null
+          tipo_pessoa: 'PF' | 'PJ' | null
+          // Colunas dormentes (Fase 8.4): mantidas no banco para nao perder
+          // dado, mas sem UI no portal apos o alinhamento com o interno.
           contato_nome: string | null
           contato_telefone: string | null
           ativo: boolean
@@ -485,7 +515,8 @@ export interface Database {
           id?: string
           parceiro_id: string
           razao_social: string
-          cnpj?: string | null
+          documento?: string | null
+          tipo_pessoa?: 'PF' | 'PJ' | null
           contato_nome?: string | null
           contato_telefone?: string | null
           ativo?: boolean
@@ -561,6 +592,8 @@ export interface Database {
           parceiro_id: string
           placa: string
           tipo: string | null
+          subcontratada_parceiro_id: string | null
+          // Coluna dormente (Fase 8.4): mantida no banco; sem UI no portal.
           capacidade_ton: number | null
           observacoes: string | null
           ativo: boolean
@@ -573,6 +606,7 @@ export interface Database {
           parceiro_id: string
           placa: string
           tipo?: string | null
+          subcontratada_parceiro_id?: string | null
           capacidade_ton?: number | null
           observacoes?: string | null
           ativo?: boolean
@@ -617,7 +651,12 @@ export interface Database {
         }
       }
     }
-    Functions: Record<string, never>
+    Functions: {
+      registrar_evento_portal: {
+        Args: { p_tipo_evento: TipoEventoPortal; p_payload: Record<string, unknown> | null }
+        Returns: string | null
+      }
+    }
     Enums: Record<string, never>
   }
 }

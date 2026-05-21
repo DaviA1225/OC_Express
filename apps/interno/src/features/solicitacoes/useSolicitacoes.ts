@@ -22,6 +22,14 @@ export interface SolicitacaoListRow extends Solicitacao {
   cliente: { razao_social: string; cidade: string | null; uf: string | null } | null
   material: { nome: string; origem_padrao: string | null; observacoes_padrao: string | null; requer_instrucao: boolean } | null
   parceiro: { razao_social: string; contato_principal_telefone: string | null; contato_principal_email: string | null } | null
+  // Joins das bases do parceiro (preenchidos quando origem = 'parceiro').
+  // O `normalizeParceiroJoins` copia esses dados para os campos internos
+  // acima, para que cards/WhatsApp leiam de um lugar só.
+  parceiro_motorista: { nome_completo: string; cpf: string; telefone: string | null } | null
+  parceiro_veiculo: { placa: string } | null
+  parceiro_carreta: { placa: string } | null
+  parceiro_subcontratada: { razao_social: string } | null
+  parceiro_usuario: { nome_completo: string; email: string } | null
 }
 
 const SELECT_WITH_JOINS = `
@@ -32,8 +40,48 @@ const SELECT_WITH_JOINS = `
   subcontratada:subcontratada_id ( razao_social ),
   cliente:cliente_id ( razao_social, cidade, uf ),
   material:material_id ( nome, origem_padrao, observacoes_padrao, requer_instrucao ),
-  parceiro:parceiro_id ( razao_social, contato_principal_telefone, contato_principal_email )
+  parceiro:parceiro_id ( razao_social, contato_principal_telefone, contato_principal_email ),
+  parceiro_motorista:parceiro_motorista_id ( nome_completo, cpf, telefone ),
+  parceiro_veiculo:parceiro_veiculo_id ( placa ),
+  parceiro_carreta:parceiro_carreta_id ( placa ),
+  parceiro_subcontratada:parceiro_subcontratada_id ( razao_social ),
+  parceiro_usuario:parceiro_usuario_id ( nome_completo, email )
 `
+
+/**
+ * Quando a solicitação vem do Portal de Parceiros, os IDs internos
+ * (`motorista_id`, `veiculo_id`, `carreta_id`, `subcontratada_id`) sao NULL —
+ * os dados vivem nas tabelas `parceiro_*`. Esta funcao copia os joins do
+ * parceiro para os campos internos correspondentes, e usa o `parceiro_usuario`
+ * como fallback de solicitante. Se a equipe interna substituir um campo (ex.
+ * trocar o motorista por um interno), o valor explicito vence.
+ */
+function normalizeParceiroJoins(row: SolicitacaoListRow): SolicitacaoListRow {
+  if (row.origem !== 'parceiro') return row
+  if (!row.motorista && row.parceiro_motorista) {
+    row.motorista = {
+      nome_completo: row.parceiro_motorista.nome_completo,
+      cpf: row.parceiro_motorista.cpf,
+      telefone: row.parceiro_motorista.telefone,
+    }
+  }
+  if (!row.veiculo && row.parceiro_veiculo) {
+    row.veiculo = { placa: row.parceiro_veiculo.placa, subcontratada_id: null }
+  }
+  if (!row.carreta && row.parceiro_carreta) {
+    row.carreta = { placa: row.parceiro_carreta.placa }
+  }
+  if (!row.subcontratada && row.parceiro_subcontratada) {
+    row.subcontratada = { razao_social: row.parceiro_subcontratada.razao_social }
+  }
+  if (!row.solicitante_nome && row.parceiro_usuario) {
+    row.solicitante_nome = row.parceiro_usuario.nome_completo
+  }
+  if (!row.solicitante_telefone && row.parceiro?.contato_principal_telefone) {
+    row.solicitante_telefone = row.parceiro.contato_principal_telefone
+  }
+  return row
+}
 
 export type PeriodoFiltro = 'todos' | 'hoje' | '7d' | 'mes'
 
@@ -54,7 +102,72 @@ export interface ListFilters {
   pageSize: number
 }
 
-/** Aplica os filtros de origem e Pamcard a uma query de solicitações. */
+/** Coleta IDs auxiliares para a busca de solicitações em colunas relacionadas.
+ *  A busca textual pelo placeholder cobre solicitante e número (na própria
+ *  tabela), e também motorista (nome) e veículo/carreta (placa), que vivem em
+ *  tabelas separadas. PostgREST não permite ilike em embed pela cláusula `or`
+ *  da tabela principal, então pré-buscamos os IDs e usamos `in.(...)` no `or`.
+ *  Limite por base evita estouro de URL — termos muito genéricos podem perder
+ *  matches, mas são raros em ambiente real (~5 parceiros, dezenas de
+ *  motoristas/veículos internos). */
+const SEARCH_AUX_LIMIT = 200
+
+interface SearchAuxIds {
+  motoristaIds: string[]
+  parceiroMotoristaIds: string[]
+  veiculoIds: string[]
+  parceiroVeiculoIds: string[]
+  carretaIds: string[]
+  parceiroCarretaIds: string[]
+}
+
+async function fetchSearchAuxIds(term: string): Promise<SearchAuxIds> {
+  const like = `%${term.replace(/[%_]/g, '\\$&')}%`
+  const [mot, parcMot, veic, parcVeic, carr, parcCarr] = await Promise.all([
+    supabase.from('motoristas').select('id').ilike('nome_completo', like).limit(SEARCH_AUX_LIMIT),
+    supabase.from('parceiro_motoristas').select('id').ilike('nome_completo', like).limit(SEARCH_AUX_LIMIT),
+    supabase.from('veiculos').select('id').ilike('placa', like).limit(SEARCH_AUX_LIMIT),
+    supabase.from('parceiro_veiculos').select('id').ilike('placa', like).limit(SEARCH_AUX_LIMIT),
+    supabase.from('carretas').select('id').ilike('placa', like).limit(SEARCH_AUX_LIMIT),
+    supabase.from('parceiro_carretas').select('id').ilike('placa', like).limit(SEARCH_AUX_LIMIT),
+  ])
+  const ids = (r: { data: { id: string }[] | null }) => (r.data ?? []).map((row) => row.id)
+  return {
+    motoristaIds: ids(mot),
+    parceiroMotoristaIds: ids(parcMot),
+    veiculoIds: ids(veic),
+    parceiroVeiculoIds: ids(parcVeic),
+    carretaIds: ids(carr),
+    parceiroCarretaIds: ids(parcCarr),
+  }
+}
+
+function buildSearchOrClause(termRaw: string, aux: SearchAuxIds): string {
+  const t = termRaw.replace(/[%_]/g, '\\$&')
+  const parts: string[] = [`solicitante_nome.ilike.%${t}%`]
+  const asNumber = Number(t.replace(/\D/g, ''))
+  if (Number.isFinite(asNumber) && asNumber > 0) {
+    parts.push(`numero_interno.eq.${asNumber}`)
+  }
+  const inList = (col: string, list: string[]) => {
+    if (list.length > 0) parts.push(`${col}.in.(${list.join(',')})`)
+  }
+  inList('motorista_id', aux.motoristaIds)
+  inList('parceiro_motorista_id', aux.parceiroMotoristaIds)
+  inList('veiculo_id', aux.veiculoIds)
+  inList('parceiro_veiculo_id', aux.parceiroVeiculoIds)
+  inList('carreta_id', aux.carretaIds)
+  inList('parceiro_carreta_id', aux.parceiroCarretaIds)
+  return parts.join(',')
+}
+
+/** Aplica os filtros de origem e Pamcard a uma query de solicitações.
+ *  Pamcard só faz sentido para solicitações do portal — no fluxo interno o
+ *  cartão é gerenciado fora da solicitação. Por isso:
+ *    - se origem='todos' e pamcard != 'todos', restringimos a origem='parceiro';
+ *    - se origem='interno'/'email', as opções Pamcard são ignoradas (não
+ *      fariam sentido e produziriam combinação contraditória).
+ */
 function applyOrigemPamcardFilters<T>(
   query: T,
   filters: Pick<ListFilters, 'origem' | 'pamcard'>,
@@ -62,9 +175,15 @@ function applyOrigemPamcardFilters<T>(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let q = query as any
   if (filters.origem !== 'todos') q = q.eq('origem', filters.origem)
-  if (filters.pamcard === 'com_cartao') q = q.eq('pamcard_status', 'tem_cartao')
-  if (filters.pamcard === 'pendente') {
-    q = q.eq('pamcard_status', 'nao_tem_cartao').is('pamcard_providenciado_em', null)
+  const pamcardAplica =
+    filters.pamcard !== 'todos' &&
+    (filters.origem === 'todos' || filters.origem === 'parceiro')
+  if (pamcardAplica) {
+    if (filters.origem === 'todos') q = q.eq('origem', 'parceiro')
+    if (filters.pamcard === 'com_cartao') q = q.eq('pamcard_status', 'tem_cartao')
+    if (filters.pamcard === 'pendente') {
+      q = q.eq('pamcard_status', 'nao_tem_cartao').is('pamcard_providenciado_em', null)
+    }
   }
   return q as T
 }
@@ -113,19 +232,15 @@ export async function fetchSolicitacoesParaExport(
   if (since) query = query.gte('created_at', since)
 
   if (filters.search.trim()) {
-    const t = filters.search.trim().replace(/[%_]/g, '\\$&')
-    const asNumber = Number(t.replace(/\D/g, ''))
-    if (Number.isFinite(asNumber) && asNumber > 0) {
-      query = query.or(`solicitante_nome.ilike.%${t}%,numero_interno.eq.${asNumber}`)
-    } else {
-      query = query.ilike('solicitante_nome', `%${t}%`)
-    }
+    const t = filters.search.trim()
+    const aux = await fetchSearchAuxIds(t)
+    query = query.or(buildSearchOrClause(t, aux))
   }
 
   query = query.order('created_at', { ascending: false }).range(0, 9999)
   const { data, error } = await query
   if (error) throw error
-  return (data ?? []) as unknown as SolicitacaoListRow[]
+  return ((data ?? []) as unknown as SolicitacaoListRow[]).map(normalizeParceiroJoins)
 }
 
 export function useSolicitacoesList(filters: ListFilters) {
@@ -158,15 +273,9 @@ export function useSolicitacoesList(filters: ListFilters) {
       if (since) query = query.gte('created_at', since)
 
       if (filters.search.trim()) {
-        const t = filters.search.trim().replace(/[%_]/g, '\\$&')
-        const asNumber = Number(t.replace(/\D/g, ''))
-        if (Number.isFinite(asNumber) && asNumber > 0) {
-          query = query.or(
-            `solicitante_nome.ilike.%${t}%,numero_interno.eq.${asNumber}`,
-          )
-        } else {
-          query = query.ilike('solicitante_nome', `%${t}%`)
-        }
+        const t = filters.search.trim()
+        const aux = await fetchSearchAuxIds(t)
+        query = query.or(buildSearchOrClause(t, aux))
       }
 
       query = query.order('created_at', { ascending: false })
@@ -178,7 +287,7 @@ export function useSolicitacoesList(filters: ListFilters) {
       const { data, error, count } = await query
       if (error) throw error
       return {
-        data: (data ?? []) as unknown as SolicitacaoListRow[],
+        data: ((data ?? []) as unknown as SolicitacaoListRow[]).map(normalizeParceiroJoins),
         count: count ?? 0,
       }
     },
@@ -196,7 +305,7 @@ export function useSolicitacao(id: string | null | undefined) {
         .eq('id', id!)
         .single()
       if (error) throw error
-      return data as unknown as SolicitacaoListRow
+      return normalizeParceiroJoins(data as unknown as SolicitacaoListRow)
     },
   })
 }
@@ -212,6 +321,7 @@ export function usePamcardPendenteCount() {
       const { count, error } = await supabase
         .from('solicitacoes')
         .select('id', { count: 'exact', head: true })
+        .eq('origem', 'parceiro')
         .eq('pamcard_status', 'nao_tem_cartao')
         .is('pamcard_providenciado_em', null)
       if (error) throw error
@@ -233,7 +343,7 @@ export function useCreateSolicitacao() {
         .select(SELECT_WITH_JOINS)
         .single()
       if (error) throw error
-      return data as unknown as SolicitacaoListRow
+      return normalizeParceiroJoins(data as unknown as SolicitacaoListRow)
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['solicitacoes'] })
@@ -317,7 +427,7 @@ export function useDuplicateSolicitacao() {
         .select(SELECT_WITH_JOINS)
         .single()
       if (error) throw error
-      return data as unknown as SolicitacaoListRow
+      return normalizeParceiroJoins(data as unknown as SolicitacaoListRow)
     },
     onSuccess: (created) => {
       qc.invalidateQueries({ queryKey: ['solicitacoes'] })
@@ -396,7 +506,7 @@ export function useUpdateSolicitacao() {
         .select(SELECT_WITH_JOINS)
         .single()
       if (error) throw error
-      return data as unknown as SolicitacaoListRow
+      return normalizeParceiroJoins(data as unknown as SolicitacaoListRow)
     },
     onMutate: ({ id, values }) =>
       snapshotAndPatchSolicitacao(qc, id, values as Partial<SolicitacaoListRow>),

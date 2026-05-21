@@ -24,6 +24,11 @@ export function canViewUsuarios(p: PerfilRow | null): boolean {
   return is(p, 'admin')
 }
 
+/** Segurança (eventos do portal): somente admin. */
+export function canViewSeguranca(p: PerfilRow | null): boolean {
+  return is(p, 'admin')
+}
+
 /** Parceiros: visualização livre para todo o time interno. */
 export function canViewParceiros(p: PerfilRow | null): boolean {
   return is(p, 'admin', 'gerente', 'supervisor', 'analista', 'assistente')

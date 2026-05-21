@@ -41,8 +41,8 @@ type NomeForm = z.infer<typeof nomeSchema>
 
 const senhaSchema = z
   .object({
-    nova: z.string().min(6, 'Mínimo 6 caracteres'),
-    confirmar: z.string().min(6, 'Mínimo 6 caracteres'),
+    nova: z.string().min(12, 'Use pelo menos 12 caracteres'),
+    confirmar: z.string().min(12, 'Use pelo menos 12 caracteres'),
   })
   .refine((d) => d.nova === d.confirmar, {
     message: 'As senhas não coincidem',
@@ -231,7 +231,11 @@ function SegurancaCard({ email }: SegurancaProps) {
   })
 
   return (
-    <Card icon={<Shield className="h-4 w-4" />} title="Segurança" subtitle="Use uma senha forte com letras, números e símbolos.">
+    <Card
+      icon={<Shield className="h-4 w-4" />}
+      title="Segurança"
+      subtitle="Senha com no mínimo 12 caracteres. Combine letras, números e símbolos."
+    >
       <form onSubmit={handleSubmit((v) => change.mutateAsync(v))} className="space-y-4" noValidate>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div className="space-y-1.5">

@@ -16,7 +16,7 @@ function isMimeAccepted(mime: string): boolean {
 
 function buildStoragePath(solicitacaoId: string, file: File): string {
   const ts = Date.now()
-  const safeName = file.name.replace(/[^\w.\-]+/g, '_').slice(0, 80)
+  const safeName = file.name.replace(/[^\w.-]+/g, '_').slice(0, 80)
   return `${solicitacaoId}/${ts}_${safeName}`
 }
 

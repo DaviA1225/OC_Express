@@ -12,6 +12,7 @@
     "dev:portal": "npm run dev --workspace @sislog/portal",
     "build": "npm run build --workspace @sislog/interno",
     "build:portal": "npm run build --workspace @sislog/portal",
-    "lint": "npm run lint --workspace @sislog/interno"
+    "lint": "npm run lint --workspace @sislog/interno",
+    "pentest:rls": "node scripts/pentest-rls.mjs"
   }
 }
