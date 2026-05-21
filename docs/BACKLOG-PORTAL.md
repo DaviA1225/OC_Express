@@ -247,19 +247,34 @@ limit só diário via trigger SQL, captcha adiado para depois do MVP).
   user-agent encurtado em tooltip + IP.
 
 ### 6.4 Rate limiting diário (50 solicitações/dia/usuário)
-- [ ] Trigger BEFORE INSERT em `solicitacoes` que conta o dia corrente do
+- [x] Trigger BEFORE INSERT em `solicitacoes` que conta o dia corrente do
   `parceiro_usuario_id` e bloqueia com erro amigável ao passar de 50
-- [ ] Mensagem clara no portal quando o erro voltar do banco
+  (migration `0022`, `SECURITY DEFINER`, SQLSTATE `PT429`, dia de calendário
+  em `America/Sao_Paulo`, conta todas — ativas e canceladas)
+- [x] Mensagem clara no portal quando o erro voltar do banco
+  (`traduzirErroBanco` agora detecta `PT429` e mostra toast amigável)
 - [ ] (Adiado) Limite global de req/min — exigiria Edge Function ou
   Cloudflare; reavaliar pós-MVP se houver sinal de abuso
 
 ### 6.5 README e documentação
-- [ ] `apps/portal/README.md` — visão geral, como rodar, fluxo de auth, contatos
-- [ ] Atualizar `docs/SPEC-PORTAL.md` se algo divergiu da especificação
+- [x] `apps/portal/README.md` — visão geral, como rodar, fluxo de auth,
+  estrutura, segurança (RLS/eventos/rate limit), pentest, contatos
+- [x] `docs/SPEC-PORTAL.md` atualizada — §7 reescrito (auditoria via
+  `eventos_portal`, rate limit 50/dia implementado e 100/min adiado,
+  captcha parqueado, senha 12 chars sem complexidade/rotação, tela
+  `/seguranca`) e §8 marcado com os blocos do BACKLOG concluídos
 
 ### Item parqueado — Captcha no login
 - [ ] Provedor a decidir (candidatos: Cloudflare Turnstile, hCaptcha).
   Estrutura de login deve aceitar encaixe futuro sem refactor grande.
+
+### Item parqueado — Ativar React Compiler + migrar `watch()` → `useWatch()`
+- [ ] Quando ligarmos o React Compiler (plugin do Vite/Babel) nos dois apps,
+  reativar `react-hooks/incompatible-library` no eslint config e trocar todas
+  as chamadas `watch('campo')` por `useWatch({ control, name: 'campo' })` —
+  são ~13 arquivos com formulários (QuickCreates, CRUDs, NovaSolicitacao).
+  Hoje a regra está desligada porque o compiler não está ativo, então o
+  warning era ruído puro.
 
 ---
 

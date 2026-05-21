@@ -40,6 +40,7 @@ export function DensityProvider({ children }: { children: React.ReactNode }) {
   return <DensityContext.Provider value={value}>{children}</DensityContext.Provider>
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useDensity(): DensityContextValue {
   const ctx = React.useContext(DensityContext)
   if (!ctx) throw new Error('useDensity precisa ser usado dentro de DensityProvider')

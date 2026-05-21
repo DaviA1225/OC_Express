@@ -53,7 +53,15 @@ export default function SolicitacoesListPage() {
 
   const [search, setSearch] = React.useState('')
   const [statusFiltro, setStatusFiltro] = React.useState<StatusFiltro>('todas')
-  const [periodo, setPeriodo] = React.useState<Periodo>('todo')
+  const [periodo, setPeriodoState] = React.useState<Periodo>('todo')
+  // Snapshot do "agora" capturado quando o usuário muda o período. Manter fora
+  // do render evita Date.now() impuro durante a renderização (regra do React
+  // Compiler) e congela a fronteira do filtro no momento da seleção.
+  const [minDataMs, setMinDataMs] = React.useState<number | null>(null)
+  const setPeriodo = (next: Periodo) => {
+    setPeriodoState(next)
+    setMinDataMs(next === 'todo' ? null : Date.now() - Number(next) * 24 * 60 * 60 * 1000)
+  }
   const debouncedSearch = useDebounce(search, 300)
 
   // Mapas de resolução: a view só traz IDs.
@@ -73,13 +81,9 @@ export default function SolicitacoesListPage() {
 
   const filtradas = React.useMemo(() => {
     const termo = debouncedSearch.trim().toLowerCase()
-    const minData =
-      periodo === 'todo'
-        ? null
-        : Date.now() - Number(periodo) * 24 * 60 * 60 * 1000
     return views.filter(({ sol, motorista, cavalo, carreta, cliente }) => {
       if (!matchStatusFiltro(sol.status, statusFiltro)) return false
-      if (minData && sol.created_at && new Date(sol.created_at).getTime() < minData) {
+      if (minDataMs && sol.created_at && new Date(sol.created_at).getTime() < minDataMs) {
         return false
       }
       if (termo) {
@@ -94,7 +98,7 @@ export default function SolicitacoesListPage() {
       }
       return true
     })
-  }, [views, debouncedSearch, statusFiltro, periodo])
+  }, [views, debouncedSearch, statusFiltro, minDataMs])
 
   const carregando =
     lista.isLoading || motoristas.isLoading || veiculos.isLoading ||

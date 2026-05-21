@@ -155,6 +155,10 @@ export function useDeleteParceiroRow<TName extends ParceiroCrudTable>(
 export function traduzirErroBanco(error: unknown): string {
   const e = error as { code?: string; message?: string } | undefined
   if (!e) return 'Algo deu errado. Tente novamente em instantes.'
+  // Rate limit diário do portal (trigger da migration 0022).
+  if (e.code === 'PT429') {
+    return 'Você atingiu o limite de 50 solicitações por dia. Tente novamente amanhã.'
+  }
   if (e.code === '23505') {
     if (e.message?.includes('cpf')) return 'Esse CPF já está cadastrado.'
     if (e.message?.includes('cnpj')) return 'Esse CNPJ já está cadastrado.'

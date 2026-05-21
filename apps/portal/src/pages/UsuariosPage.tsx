@@ -228,54 +228,76 @@ function EditarPerfilDialog({
   onOpenChange: (o: boolean) => void
   onConfirm: (perfil: ParceiroPerfil) => Promise<void>
 }) {
-  const [perfil, setPerfil] = React.useState<ParceiroPerfil>('operador_parceiro')
-  const [saving, setSaving] = React.useState(false)
-
-  React.useEffect(() => {
-    if (usuario) setPerfil(usuario.perfil)
-  }, [usuario])
-
   return (
     <Dialog open={!!usuario} onOpenChange={onOpenChange}>
       <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Editar perfil</DialogTitle>
-          <DialogDescription>
-            {usuario?.nome_completo} — defina o nível de acesso ao portal.
-          </DialogDescription>
-        </DialogHeader>
-        <DialogBody className="space-y-1.5">
-          <Label htmlFor="perfil">Perfil</Label>
-          <Select value={perfil} onValueChange={(v) => setPerfil(v as ParceiroPerfil)}>
-            <SelectTrigger id="perfil"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="operador_parceiro">Operador — cria solicitações e cadastros</SelectItem>
-              <SelectItem value="admin_parceiro">Administrador — também gerencia usuários</SelectItem>
-            </SelectContent>
-          </Select>
-        </DialogBody>
-        <DialogFooter>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
-              Cancelar
-            </Button>
-            <Button
-              disabled={saving}
-              onClick={async () => {
-                setSaving(true)
-                try {
-                  await onConfirm(perfil)
-                } finally {
-                  setSaving(false)
-                }
-              }}
-            >
-              {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-              Salvar
-            </Button>
-          </div>
-        </DialogFooter>
+        {usuario && (
+          <EditarPerfilForm
+            key={usuario.id}
+            usuario={usuario}
+            onCancel={() => onOpenChange(false)}
+            onConfirm={onConfirm}
+          />
+        )}
       </DialogContent>
     </Dialog>
+  )
+}
+
+// `key={usuario.id}` no pai garante remontagem ao trocar de usuário —
+// o estado inicial vem da prop sem precisar de useEffect (evita
+// react-hooks/set-state-in-effect).
+function EditarPerfilForm({
+  usuario,
+  onCancel,
+  onConfirm,
+}: {
+  usuario: Usuario
+  onCancel: () => void
+  onConfirm: (perfil: ParceiroPerfil) => Promise<void>
+}) {
+  const [perfil, setPerfil] = React.useState<ParceiroPerfil>(usuario.perfil)
+  const [saving, setSaving] = React.useState(false)
+
+  return (
+    <>
+      <DialogHeader>
+        <DialogTitle>Editar perfil</DialogTitle>
+        <DialogDescription>
+          {usuario.nome_completo} — defina o nível de acesso ao portal.
+        </DialogDescription>
+      </DialogHeader>
+      <DialogBody className="space-y-1.5">
+        <Label htmlFor="perfil">Perfil</Label>
+        <Select value={perfil} onValueChange={(v) => setPerfil(v as ParceiroPerfil)}>
+          <SelectTrigger id="perfil"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="operador_parceiro">Operador — cria solicitações e cadastros</SelectItem>
+            <SelectItem value="admin_parceiro">Administrador — também gerencia usuários</SelectItem>
+          </SelectContent>
+        </Select>
+      </DialogBody>
+      <DialogFooter>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={onCancel} disabled={saving}>
+            Cancelar
+          </Button>
+          <Button
+            disabled={saving}
+            onClick={async () => {
+              setSaving(true)
+              try {
+                await onConfirm(perfil)
+              } finally {
+                setSaving(false)
+              }
+            }}
+          >
+            {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+            Salvar
+          </Button>
+        </div>
+      </DialogFooter>
+    </>
   )
 }

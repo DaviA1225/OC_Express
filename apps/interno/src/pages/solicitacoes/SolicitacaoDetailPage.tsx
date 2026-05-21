@@ -958,16 +958,46 @@ function PamcardNumeroDialog({
   initialNumero: string
   onConfirm: (numero: string) => Promise<void>
 }) {
+  // `key={initialNumero}` quando aberto remonta o form e o useState abaixo
+  // captura o novo valor inicial — evita useEffect+setState (regra do
+  // React Compiler) e preserva animação de fechamento.
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        {open && (
+          <PamcardNumeroForm
+            key={initialNumero}
+            title={title}
+            description={description}
+            initialNumero={initialNumero}
+            onCancel={() => onOpenChange(false)}
+            onConfirm={async (n) => {
+              await onConfirm(n)
+              onOpenChange(false)
+            }}
+          />
+        )}
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function PamcardNumeroForm({
+  title,
+  description,
+  initialNumero,
+  onCancel,
+  onConfirm,
+}: {
+  title: string
+  description: string
+  initialNumero: string
+  onCancel: () => void
+  onConfirm: (numero: string) => Promise<void>
+}) {
   const [numero, setNumero] = React.useState(initialNumero)
   const [erro, setErro] = React.useState<string | null>(null)
   const [saving, setSaving] = React.useState(false)
-
-  React.useEffect(() => {
-    if (open) {
-      setNumero(initialNumero)
-      setErro(null)
-    }
-  }, [open, initialNumero])
 
   const validar = (v: string): string | null => {
     if (!/^[0-9]+$/.test(v)) return 'O Pamcard deve conter apenas números'
@@ -985,50 +1015,47 @@ function PamcardNumeroDialog({
     setSaving(true)
     try {
       await onConfirm(numero)
-      onOpenChange(false)
     } finally {
       setSaving(false)
     }
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>{description}</DialogDescription>
-        </DialogHeader>
-        <DialogBody className="space-y-1.5">
-          <Label htmlFor="pamcard-dlg">Número do cartão *</Label>
-          <Input
-            id="pamcard-dlg"
-            autoFocus
-            value={numero}
-            onChange={(e) => {
-              setNumero(e.target.value.replace(/\D/g, '').slice(0, 16))
-              setErro(null)
-            }}
-            onBlur={() => setErro(validar(numero))}
-            inputMode="numeric"
-            pattern="[0-9]*"
-            maxLength={16}
-            placeholder="Ex: 441781209999"
-          />
-          {erro && <p className="text-[11px] text-destructive">{erro}</p>}
-        </DialogBody>
-        <DialogFooter>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
-              Cancelar
-            </Button>
-            <Button onClick={submit} disabled={saving}>
-              {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-              Confirmar
-            </Button>
-          </div>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <>
+      <DialogHeader>
+        <DialogTitle>{title}</DialogTitle>
+        <DialogDescription>{description}</DialogDescription>
+      </DialogHeader>
+      <DialogBody className="space-y-1.5">
+        <Label htmlFor="pamcard-dlg">Número do cartão *</Label>
+        <Input
+          id="pamcard-dlg"
+          autoFocus
+          value={numero}
+          onChange={(e) => {
+            setNumero(e.target.value.replace(/\D/g, '').slice(0, 16))
+            setErro(null)
+          }}
+          onBlur={() => setErro(validar(numero))}
+          inputMode="numeric"
+          pattern="[0-9]*"
+          maxLength={16}
+          placeholder="Ex: 441781209999"
+        />
+        {erro && <p className="text-[11px] text-destructive">{erro}</p>}
+      </DialogBody>
+      <DialogFooter>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={onCancel} disabled={saving}>
+            Cancelar
+          </Button>
+          <Button onClick={submit} disabled={saving}>
+            {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+            Confirmar
+          </Button>
+        </div>
+      </DialogFooter>
+    </>
   )
 }
 

@@ -641,51 +641,80 @@ Ao cancelar:
 
 ## 7. Considerações de segurança adicionais
 
-### 7.1 Auditoria expandida
+### 7.1 Auditoria expandida — **implementado (migration 0021)**
 
-Toda ação do portal deve ser logada em `log_auditoria` com `acao` específica:
-- `portal_login`
-- `portal_solicitacao_criada`
-- `portal_solicitacao_cancelada`
-- `portal_motorista_cadastrado`
-- `portal_motorista_editado`
-- `portal_veiculo_cadastrado`
-- `portal_veiculo_editado`
-- (etc.)
+A SPEC original previa logar eventos do portal em `log_auditoria`. Na
+implementação isso foi para uma **tabela dedicada `eventos_portal`** porque
+`log_auditoria` captura DML automático via trigger e não cobre eventos de
+aplicação (login, logout, login_falha).
 
-### 7.2 Rate limiting
+- Tabela `eventos_portal` (RLS: SELECT só `is_interno()`, nenhum INSERT/
+  UPDATE/DELETE direto). Tipos válidos:
+  - `portal_login`
+  - `portal_login_falha` (único disparado por anon — guarda `email_tentado`)
+  - `portal_logout`
+  - `portal_solicitacao_criada`
+  - `portal_solicitacao_cancelada`
+  - `portal_senha_alterada`
+- **Única porta de escrita:** função `registrar_evento_portal(tipo, payload)`
+  `SECURITY DEFINER`. Deriva `parceiro_id` e `parceiro_usuario_id` do
+  `auth.uid()` — o cliente não consegue forjar identidade.
+- Eventos de DML em `parceiro_*` continuam sendo gravados em `log_auditoria`
+  pelo trigger genérico (não precisam de tipo dedicado).
+- IP fica `null` no MVP (front não obtém de forma confiável). Quando houver
+  Edge Function ou proxy próprio, capturar do `X-Forwarded-For`.
 
-Configurar no Supabase ou no proxy:
-- Máximo 100 requests/minuto por usuário do portal
-- Máximo 50 solicitações criadas/dia por usuário do portal (parametrizável
-  por parceiro se necessário)
+### 7.2 Rate limiting — **parcial (migration 0022)**
 
-### 7.3 Captcha no login
+- ✅ **50 solicitações/dia/usuário** — trigger `BEFORE INSERT` em
+  `solicitacoes` (`check_portal_rate_limit_diario`, `SECURITY DEFINER`).
+  Janela = dia de calendário em `America/Sao_Paulo`. Conta TUDO no dia
+  (ativas e canceladas) — criar+cancelar não burla. SQLSTATE custom `PT429`;
+  o portal detecta em `traduzirErroBanco` e mostra toast amigável. Internos
+  e e-mail (`origem != 'parceiro'`) passam direto.
+- ⏳ **100 req/min global** — adiado. Exige Edge Function ou Cloudflare;
+  reavaliar pós-MVP se houver sinal de abuso.
 
-Adicionar Cloudflare Turnstile ou hCaptcha no login do portal (não no
-interno) para prevenir tentativas automatizadas.
+### 7.3 Captcha no login — **parqueado**
 
-### 7.4 Senha forte obrigatória
+Decisão de projeto: parqueado até existir sinal de abuso. Provedor a decidir
+(candidatos: Cloudflare Turnstile, hCaptcha). A tela de login deve aceitar
+o encaixe futuro sem refactor grande.
 
-Política de senha para usuários de parceiro:
-- Mínimo 12 caracteres
-- Combinação de letras maiúsculas, minúsculas, números, símbolos
-- Não pode ser igual ao email
-- Forçar troca a cada 90 dias (configurável)
+### 7.4 Senha forte — **implementado parcial (Bloco 6.1)**
 
-### 7.5 Logs de tentativa de acesso
+A SPEC original pedia complexidade (maiúsculas/minúsculas/números/símbolos)
+e rotação de 90 dias. Implementado escopo enxuto:
 
-Registrar todas as tentativas de login (sucesso e falha) com IP, user agent,
-timestamp. Disponibilizar para a equipe interna em uma tela de "Segurança"
-no SisLog (visível apenas para admin).
+- ✅ **Mínimo 12 caracteres** — validado no front (zod) e no Supabase
+  (passo manual: *Authentication → Sign In / Providers → Email → Minimum
+  password length*).
+- ❌ **Complexidade não exigida** — não há regra de mistura de caracteres.
+- ❌ **Rotação de 90 dias descartada** — política de rotação obrigatória
+  costuma piorar a segurança real (senhas previsíveis, anotadas, sufixadas
+  com mês). NIST 800-63B desencoraja.
+- ❌ **Bloqueio de senha == e-mail** — não implementado; o Supabase já
+  rejeita senhas muito comuns pela heurística interna.
+
+### 7.5 Logs de tentativa de acesso — **implementado (Bloco 6.3)**
+
+- `portal_login`, `portal_login_falha` e `portal_logout` registrados na
+  `eventos_portal` (campos: `user_id`, `parceiro_id`, `parceiro_usuario_id`,
+  `email_tentado`, `ip`, `user_agent`, `metadata`).
+- Tela **/seguranca** no sistema interno (admin only, `canViewSeguranca`):
+  filtros chip por tipo/parceiro/período (URL compartilhável), tabela
+  paginada e card de destaque com nº de falhas de login das últimas 24h
+  (fica amarelo se ≥ 5).
 
 ---
 
 ## 8. Sub-fases de implementação
 
-Esta fase 8 é grande e precisa ser quebrada em entregas menores:
+Esta fase 8 é grande e precisa ser quebrada em entregas menores. O status
+operacional vive em `docs/BACKLOG-PORTAL.md` (referência viva); as
+sub-fases abaixo correspondem aos "Blocos" 2–6 do backlog.
 
-**Fase 8.1 — Reestruturação para monorepo + Modelo de dados**
+**Fase 8.1 — Reestruturação para monorepo + Modelo de dados** — ✅ Blocos 2.1–2.3
 - Migrar projeto atual para estrutura `apps/interno`
 - Criar `apps/portal` vazio (esqueleto)
 - Criar `packages/shared` com tipos e utils
@@ -695,7 +724,7 @@ Esta fase 8 é grande e precisa ser quebrada em entregas menores:
 - Migration de patch na tabela `solicitacoes` (campos `parceiro_*` e
   `material_id` nullable)
 
-**Fase 8.2 — Telas internas de gestão de parceiros**
+**Fase 8.2 — Telas internas de gestão de parceiros** — ✅ Bloco 3
 - CRUD de parceiros no sistema interno
 - Convite de admin_parceiro
 - Filtro "Origem" na tela de solicitações (já preparado no patch Pamcard)
@@ -703,27 +732,27 @@ Esta fase 8 é grande e precisa ser quebrada em entregas menores:
 - Indicador "Material a definir" no card e na tela de detalhe interno
 - Botões de envio de OC (WhatsApp/Email) para parceiro na tela de detalhe
 
-**Fase 8.3 — Portal externo: autenticação e cadastros**
+**Fase 8.3 — Portal externo: autenticação e cadastros** — ✅ Bloco 4
 - Setup do app `apps/portal` (Vite + React + TS + Tailwind + shadcn)
 - Layout, header, navegação horizontal
 - Login
 - CRUDs de motoristas, veículos, carretas, subcontratadas (do parceiro)
 - Gestão de usuários (admin_parceiro)
 
-**Fase 8.4 — Portal externo: solicitações**
+**Fase 8.4 — Portal externo: solicitações** — ✅ Bloco 5
 - Lista de solicitações (com labels amigáveis de status)
 - Nova solicitação (tela cheia)
 - Detalhe da solicitação
 - Cancelamento
 
-**Fase 8.5 — Segurança e polimento**
-- Rate limiting
-- Captcha no login
-- Política de senha forte
-- Auditoria expandida
-- Logs de tentativa de acesso
-- Tela "Segurança" no sistema interno
-- README e documentação
+**Fase 8.5 — Segurança e polimento** — ✅ Bloco 6 (ver §7 para escopo final)
+- Rate limiting — 50/dia implementado; 100/min adiado
+- Captcha no login — parqueado
+- Política de senha forte — mínimo 12 chars (sem complexidade nem rotação)
+- Auditoria expandida — tabela `eventos_portal` + função `SECURITY DEFINER`
+- Logs de tentativa de acesso — login/login_falha/logout em `eventos_portal`
+- Tela "Segurança" no sistema interno — `/seguranca` (admin only)
+- README e documentação — `apps/portal/README.md`
 
 ---
 
