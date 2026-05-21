@@ -580,7 +580,9 @@ function SolicitacaoCard({ row, selectable, selected, onToggleSelect, onOpen }: 
             aria-label={`Selecionar ${formatNumeroOC(row.numero_interno)}`}
           />
           )}
-          {row.pamcard_status === 'nao_tem_cartao' && !row.pamcard_providenciado_em && (
+          {row.origem === 'parceiro'
+            && row.pamcard_status === 'nao_tem_cartao'
+            && !row.pamcard_providenciado_em && (
             <span
               className="shrink-0 rounded bg-amber-500/20 px-2 py-0.5 text-[10px] font-medium text-amber-800 dark:text-amber-300"
               title="Cartão Pamcard ainda não providenciado"

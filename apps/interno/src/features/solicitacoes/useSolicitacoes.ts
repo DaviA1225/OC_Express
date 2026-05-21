@@ -161,7 +161,13 @@ function buildSearchOrClause(termRaw: string, aux: SearchAuxIds): string {
   return parts.join(',')
 }
 
-/** Aplica os filtros de origem e Pamcard a uma query de solicitações. */
+/** Aplica os filtros de origem e Pamcard a uma query de solicitações.
+ *  Pamcard só faz sentido para solicitações do portal — no fluxo interno o
+ *  cartão é gerenciado fora da solicitação. Por isso:
+ *    - se origem='todos' e pamcard != 'todos', restringimos a origem='parceiro';
+ *    - se origem='interno'/'email', as opções Pamcard são ignoradas (não
+ *      fariam sentido e produziriam combinação contraditória).
+ */
 function applyOrigemPamcardFilters<T>(
   query: T,
   filters: Pick<ListFilters, 'origem' | 'pamcard'>,
@@ -169,9 +175,15 @@ function applyOrigemPamcardFilters<T>(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let q = query as any
   if (filters.origem !== 'todos') q = q.eq('origem', filters.origem)
-  if (filters.pamcard === 'com_cartao') q = q.eq('pamcard_status', 'tem_cartao')
-  if (filters.pamcard === 'pendente') {
-    q = q.eq('pamcard_status', 'nao_tem_cartao').is('pamcard_providenciado_em', null)
+  const pamcardAplica =
+    filters.pamcard !== 'todos' &&
+    (filters.origem === 'todos' || filters.origem === 'parceiro')
+  if (pamcardAplica) {
+    if (filters.origem === 'todos') q = q.eq('origem', 'parceiro')
+    if (filters.pamcard === 'com_cartao') q = q.eq('pamcard_status', 'tem_cartao')
+    if (filters.pamcard === 'pendente') {
+      q = q.eq('pamcard_status', 'nao_tem_cartao').is('pamcard_providenciado_em', null)
+    }
   }
   return q as T
 }
@@ -309,6 +321,7 @@ export function usePamcardPendenteCount() {
       const { count, error } = await supabase
         .from('solicitacoes')
         .select('id', { count: 'exact', head: true })
+        .eq('origem', 'parceiro')
         .eq('pamcard_status', 'nao_tem_cartao')
         .is('pamcard_providenciado_em', null)
       if (error) throw error

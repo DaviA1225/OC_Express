@@ -257,7 +257,11 @@ export function SolicitacaoDetailPage() {
           <SolicitanteCard solicitacao={s} editable={editable} onSave={(values) => update.mutateAsync({ id: s.id, values })} />
           <MotoristaVeiculoCard solicitacao={s} editable={editable} onSave={(values) => update.mutateAsync({ id: s.id, values })} />
           <DestinoMaterialCard solicitacao={s} editable={editable} onSave={(values) => update.mutateAsync({ id: s.id, values })} />
-          <PamcardCard solicitacao={s} editable={editable} onSave={(values) => update.mutateAsync({ id: s.id, values })} />
+          {/* Pamcard só aparece nas solicitações vindas do portal de parceiros —
+              no fluxo interno o cartão é gerenciado fora da solicitação. */}
+          {s.origem === 'parceiro' && (
+            <PamcardCard solicitacao={s} editable={editable} onSave={(values) => update.mutateAsync({ id: s.id, values })} />
+          )}
           {showInstrForm && (
             <InstrucaoForm
               initial={s.numero_instrucao ?? instrInput}
