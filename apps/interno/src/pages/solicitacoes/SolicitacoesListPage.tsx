@@ -331,7 +331,7 @@ export function SolicitacoesListPage() {
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar por número (#0287) ou solicitante"
+              placeholder="Buscar por número, solicitante, motorista ou placa"
               className="pl-9"
             />
           </div>

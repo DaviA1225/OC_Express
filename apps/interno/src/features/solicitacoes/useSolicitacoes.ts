@@ -102,6 +102,65 @@ export interface ListFilters {
   pageSize: number
 }
 
+/** Coleta IDs auxiliares para a busca de solicitações em colunas relacionadas.
+ *  A busca textual pelo placeholder cobre solicitante e número (na própria
+ *  tabela), e também motorista (nome) e veículo/carreta (placa), que vivem em
+ *  tabelas separadas. PostgREST não permite ilike em embed pela cláusula `or`
+ *  da tabela principal, então pré-buscamos os IDs e usamos `in.(...)` no `or`.
+ *  Limite por base evita estouro de URL — termos muito genéricos podem perder
+ *  matches, mas são raros em ambiente real (~5 parceiros, dezenas de
+ *  motoristas/veículos internos). */
+const SEARCH_AUX_LIMIT = 200
+
+interface SearchAuxIds {
+  motoristaIds: string[]
+  parceiroMotoristaIds: string[]
+  veiculoIds: string[]
+  parceiroVeiculoIds: string[]
+  carretaIds: string[]
+  parceiroCarretaIds: string[]
+}
+
+async function fetchSearchAuxIds(term: string): Promise<SearchAuxIds> {
+  const like = `%${term.replace(/[%_]/g, '\\$&')}%`
+  const [mot, parcMot, veic, parcVeic, carr, parcCarr] = await Promise.all([
+    supabase.from('motoristas').select('id').ilike('nome_completo', like).limit(SEARCH_AUX_LIMIT),
+    supabase.from('parceiro_motoristas').select('id').ilike('nome_completo', like).limit(SEARCH_AUX_LIMIT),
+    supabase.from('veiculos').select('id').ilike('placa', like).limit(SEARCH_AUX_LIMIT),
+    supabase.from('parceiro_veiculos').select('id').ilike('placa', like).limit(SEARCH_AUX_LIMIT),
+    supabase.from('carretas').select('id').ilike('placa', like).limit(SEARCH_AUX_LIMIT),
+    supabase.from('parceiro_carretas').select('id').ilike('placa', like).limit(SEARCH_AUX_LIMIT),
+  ])
+  const ids = (r: { data: { id: string }[] | null }) => (r.data ?? []).map((row) => row.id)
+  return {
+    motoristaIds: ids(mot),
+    parceiroMotoristaIds: ids(parcMot),
+    veiculoIds: ids(veic),
+    parceiroVeiculoIds: ids(parcVeic),
+    carretaIds: ids(carr),
+    parceiroCarretaIds: ids(parcCarr),
+  }
+}
+
+function buildSearchOrClause(termRaw: string, aux: SearchAuxIds): string {
+  const t = termRaw.replace(/[%_]/g, '\\$&')
+  const parts: string[] = [`solicitante_nome.ilike.%${t}%`]
+  const asNumber = Number(t.replace(/\D/g, ''))
+  if (Number.isFinite(asNumber) && asNumber > 0) {
+    parts.push(`numero_interno.eq.${asNumber}`)
+  }
+  const inList = (col: string, list: string[]) => {
+    if (list.length > 0) parts.push(`${col}.in.(${list.join(',')})`)
+  }
+  inList('motorista_id', aux.motoristaIds)
+  inList('parceiro_motorista_id', aux.parceiroMotoristaIds)
+  inList('veiculo_id', aux.veiculoIds)
+  inList('parceiro_veiculo_id', aux.parceiroVeiculoIds)
+  inList('carreta_id', aux.carretaIds)
+  inList('parceiro_carreta_id', aux.parceiroCarretaIds)
+  return parts.join(',')
+}
+
 /** Aplica os filtros de origem e Pamcard a uma query de solicitações. */
 function applyOrigemPamcardFilters<T>(
   query: T,
@@ -161,13 +220,9 @@ export async function fetchSolicitacoesParaExport(
   if (since) query = query.gte('created_at', since)
 
   if (filters.search.trim()) {
-    const t = filters.search.trim().replace(/[%_]/g, '\\$&')
-    const asNumber = Number(t.replace(/\D/g, ''))
-    if (Number.isFinite(asNumber) && asNumber > 0) {
-      query = query.or(`solicitante_nome.ilike.%${t}%,numero_interno.eq.${asNumber}`)
-    } else {
-      query = query.ilike('solicitante_nome', `%${t}%`)
-    }
+    const t = filters.search.trim()
+    const aux = await fetchSearchAuxIds(t)
+    query = query.or(buildSearchOrClause(t, aux))
   }
 
   query = query.order('created_at', { ascending: false }).range(0, 9999)
@@ -206,15 +261,9 @@ export function useSolicitacoesList(filters: ListFilters) {
       if (since) query = query.gte('created_at', since)
 
       if (filters.search.trim()) {
-        const t = filters.search.trim().replace(/[%_]/g, '\\$&')
-        const asNumber = Number(t.replace(/\D/g, ''))
-        if (Number.isFinite(asNumber) && asNumber > 0) {
-          query = query.or(
-            `solicitante_nome.ilike.%${t}%,numero_interno.eq.${asNumber}`,
-          )
-        } else {
-          query = query.ilike('solicitante_nome', `%${t}%`)
-        }
+        const t = filters.search.trim()
+        const aux = await fetchSearchAuxIds(t)
+        query = query.or(buildSearchOrClause(t, aux))
       }
 
       query = query.order('created_at', { ascending: false })
