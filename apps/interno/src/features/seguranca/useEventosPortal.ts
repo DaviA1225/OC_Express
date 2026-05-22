@@ -42,6 +42,7 @@ export const TIPO_EVENTO_LABELS: Record<TipoEventoPortal, string> = {
   portal_solicitacao_criada: 'Solicitação criada',
   portal_solicitacao_cancelada: 'Solicitação cancelada',
   portal_senha_alterada: 'Senha alterada',
+  portal_usuario_convidado: 'Usuário convidado',
 }
 
 export const TIPOS_EVENTO: TipoEventoPortal[] = [
@@ -51,6 +52,7 @@ export const TIPOS_EVENTO: TipoEventoPortal[] = [
   'portal_solicitacao_criada',
   'portal_solicitacao_cancelada',
   'portal_senha_alterada',
+  'portal_usuario_convidado',
 ]
 
 export function useEventosPortal(filters: EventosPortalFilters) {
