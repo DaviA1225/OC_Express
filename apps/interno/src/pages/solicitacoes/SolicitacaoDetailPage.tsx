@@ -654,7 +654,11 @@ function MotoristaVeiculoCard({ solicitacao, editable, onSave }: CardProps) {
             value={solicitacao.motorista?.nome_completo}
             extra={solicitacao.motorista?.cpf}
           />
-          <Field label="Subcontratada" value={solicitacao.subcontratada?.razao_social} />
+          <Field
+            label="Subcontratada"
+            value={solicitacao.subcontratada?.razao_social}
+            extra={solicitacao.subcontratada?.documento}
+          />
           <Field label="Cavalo" value={solicitacao.veiculo?.placa} />
           <Field label="Carreta" value={solicitacao.carreta?.placa} />
         </dl>
