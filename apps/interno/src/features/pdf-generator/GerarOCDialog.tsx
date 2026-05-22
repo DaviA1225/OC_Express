@@ -18,6 +18,7 @@ import { supabase } from '@/lib/supabase'
 import { useTransitStatus } from '@/features/solicitacoes/useSolicitacoes'
 import { traduzirErroBanco } from '@/features/crud/useCrudQueries'
 import { OCDocument, type OCData } from './OCDocument'
+import { OCS_PDF_BUCKET } from './ocPdf'
 import { LOGO_DATA_URL } from './logo'
 import type { SolicitacaoListRow } from '@/features/solicitacoes/useSolicitacoes'
 import type { Tables } from '@/types/database.types'
@@ -171,17 +172,16 @@ export function GerarOCDialog({ open, onOpenChange, solicitacao, material, onSav
     setSaving(true)
     try {
       const { error: upErr } = await supabase.storage
-        .from('ocs-pdf')
+        .from(OCS_PDF_BUCKET)
         .upload(filename, blob, { contentType: 'application/pdf', upsert: true })
       if (upErr) throw upErr
 
-      const { data: pub } = supabase.storage.from('ocs-pdf').getPublicUrl(filename)
-      const pdfUrl = pub.publicUrl
-
+      // Bucket privado (migration 0026): guardamos o PATH, não a URL pública.
+      // O link de acesso vira signed URL temporário, gerado sob demanda.
       await transit.mutateAsync({
         id: solicitacao.id,
         status: 'oc_gerada',
-        extra: { pdf_url: pdfUrl },
+        extra: { pdf_url: filename },
       })
       onOpenChange(false)
       if (onSaved) onSaved()

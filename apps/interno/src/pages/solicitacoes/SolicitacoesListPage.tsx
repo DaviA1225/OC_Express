@@ -241,7 +241,7 @@ export function SolicitacoesListPage() {
         { header: 'Validade fim', accessor: (r) => r.validade_fim },
         { header: 'Nº instrução', accessor: (r) => r.numero_instrucao },
         { header: 'Observações', accessor: (r) => r.observacoes },
-        { header: 'PDF', accessor: (r) => r.pdf_url },
+        { header: 'PDF', accessor: (r) => (r.pdf_url ? 'Sim' : '') },
         { header: 'Criada em', accessor: (r) => r.created_at },
         { header: 'Enviada em', accessor: (r) => r.enviada_em },
         { header: 'Finalizada em', accessor: (r) => r.finalizada_em },

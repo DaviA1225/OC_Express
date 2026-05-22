@@ -41,6 +41,8 @@ import { QuickCreateCarreta } from '@/components/forms/QuickCreateCarreta'
 import { QuickCreateCliente } from '@/components/forms/QuickCreateCliente'
 import type { MaterialSubtipo, SolicitacaoTipo, Tables } from '@/types/database.types'
 import { isMineralMaterial } from '@/features/solicitacoes/material'
+import { useAuth } from '@/hooks/useAuth'
+import { canEditClientes } from '@/features/auth/permissions'
 import { useCargasRetorno } from '@/features/cargas-retorno/useCargasRetorno'
 
 type MotoristaOpt = Pick<Tables<'motoristas'>, 'id' | 'nome_completo' | 'cpf'>
@@ -120,6 +122,10 @@ interface Props {
 
 export function NovaSolicitacaoDialog({ open, onOpenChange, onCreated }: Props) {
   const create = useCreateSolicitacao()
+  const { profile } = useAuth()
+  // Assistente não pode escrever em clientes (RLS 0025): esconde o atalho de
+  // cadastrar cliente novo. Ele escolhe um cliente já cadastrado.
+  const podeCriarCliente = canEditClientes(profile)
 
   const motoristas = useCrudOptions<MotoristaOpt>({
     table: 'motoristas', selectColumns: 'id, nome_completo, cpf', orderBy: 'nome_completo',
@@ -446,7 +452,7 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, onCreated }: Props) 
                       searchPlaceholder="Buscar cliente"
                       emptyMessage="Nenhum cliente encontrado."
                       loading={clientes.isLoading}
-                      onCreateNew={(s) => setQcCli({ open: true, nome: s })}
+                      onCreateNew={podeCriarCliente ? (s) => setQcCli({ open: true, nome: s }) : undefined}
                       createNewLabel="Cadastrar novo cliente"
                     />
                     {errors.cliente_id && (

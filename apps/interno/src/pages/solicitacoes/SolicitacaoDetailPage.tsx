@@ -41,6 +41,7 @@ const WhatsAppEnvioDialog = React.lazy(() =>
 import { formatNumeroOC, formatTelefone, formatarPamcardParaExibicao } from '@/lib/utils'
 import { isValidTelefone } from '@/lib/validators'
 import { normalizeWhatsAppPhone, buildWhatsAppLink, formatOCWhatsAppMessage } from '@/features/whatsapp/whatsapp'
+import { getOcPdfSignedUrl } from '@/features/pdf-generator/ocPdf'
 import type { MaterialSubtipo, Tables } from '@/types/database.types'
 import { isMineralMaterial } from '@/features/solicitacoes/material'
 
@@ -908,9 +909,7 @@ function InstrucaoPdfCard({ solicitacao }: { solicitacao: CardProps['solicitacao
           <dt className="text-[10px] uppercase tracking-[0.5px] text-muted-foreground">PDF</dt>
           <dd>
             {solicitacao.pdf_url ? (
-              <a href={solicitacao.pdf_url} target="_blank" rel="noreferrer noopener" className="text-primary hover:underline">
-                Abrir PDF
-              </a>
+              <AbrirPdfLink stored={solicitacao.pdf_url} />
             ) : (
               <span className="text-muted-foreground">—</span>
             )}
@@ -918,6 +917,32 @@ function InstrucaoPdfCard({ solicitacao }: { solicitacao: CardProps['solicitacao
         </div>
       </dl>
     </CardShell>
+  )
+}
+
+/** Abre o PDF da OC gerando uma signed URL na hora (bucket privado, 0026). */
+function AbrirPdfLink({ stored }: { stored: string }) {
+  const [loading, setLoading] = React.useState(false)
+  const abrir = async () => {
+    setLoading(true)
+    try {
+      const url = await getOcPdfSignedUrl(stored)
+      window.open(url, '_blank', 'noopener,noreferrer')
+    } catch {
+      toast.error('Não foi possível abrir o PDF')
+    } finally {
+      setLoading(false)
+    }
+  }
+  return (
+    <button
+      type="button"
+      onClick={abrir}
+      disabled={loading}
+      className="text-primary hover:underline disabled:opacity-60"
+    >
+      {loading ? 'Abrindo…' : 'Abrir PDF'}
+    </button>
   )
 }
 
