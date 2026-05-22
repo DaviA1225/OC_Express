@@ -12,9 +12,9 @@ import {
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu'
 
-// TODO: substituir pelos contatos reais de suporte da LHG.
-const SUPORTE_EMAIL = 'suporte@lhg.com.br'
-const SUPORTE_WHATSAPP = 'https://wa.me/5500000000000'
+// Contatos de suporte da LHG (WhatsApp +55 67 9 9871-2180).
+const SUPORTE_EMAIL = 'davi.silva@lhgmining.com.br'
+const SUPORTE_WHATSAPP = 'https://wa.me/5567998712180'
 
 interface NavItem {
   to: string
