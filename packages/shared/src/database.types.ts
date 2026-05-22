@@ -71,6 +71,7 @@ export interface Database {
         Row: {
           id: string
           razao_social: string
+          razao_social_unaccent: string
           documento: string | null
           tipo_pessoa: 'PF' | 'PJ' | null
           contato_nome: string | null
@@ -98,6 +99,7 @@ export interface Database {
         Row: {
           id: string
           nome_completo: string
+          nome_completo_unaccent: string
           cpf: string
           rg: string | null
           antt: string | null
@@ -181,6 +183,7 @@ export interface Database {
         Row: {
           id: string
           razao_social: string
+          razao_social_unaccent: string
           cnpj: string | null
           endereco: string | null
           cidade: string | null
@@ -230,6 +233,7 @@ export interface Database {
         Row: {
           id: string
           nome: string
+          nome_unaccent: string
           cnpj_filial: string
           filial: string
           origem_padrao: string | null
@@ -264,6 +268,7 @@ export interface Database {
           tipo: SolicitacaoTipo
           status: SolicitacaoStatus
           solicitante_nome: string | null
+          solicitante_nome_unaccent: string | null
           solicitante_telefone: string | null
           motorista_id: string | null
           veiculo_id: string | null

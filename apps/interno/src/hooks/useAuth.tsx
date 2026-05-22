@@ -9,6 +9,8 @@ interface AuthContextValue {
   session: Session | null
   user: User | null
   profile: PerfilRow | null
+  /** A última tentativa de carregar o perfil falhou (erro transitório/rede). */
+  profileError: boolean
   loading: boolean
   signIn: (email: string, password: string) => Promise<{ error: string | null }>
   signOut: () => Promise<void>
@@ -31,21 +33,47 @@ async function fetchProfile(userId: string): Promise<PerfilRow | null> {
   return data as PerfilRow | null
 }
 
+// Tenta carregar o perfil com algumas tentativas e backoff. maybeSingle()
+// devolve data=null SEM erro quando não há perfil — esse caso não cai aqui,
+// só erros reais (rede, 5xx, lock do auth durante refresh do token) repetem.
+async function fetchProfileWithRetry(userId: string, attempts = 3): Promise<PerfilRow | null> {
+  let lastErr: unknown
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fetchProfile(userId)
+    } catch (err) {
+      lastErr = err
+      if (i < attempts - 1) {
+        await new Promise((r) => setTimeout(r, 400 * (i + 1)))
+      }
+    }
+  }
+  throw lastErr
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = React.useState<Session | null>(null)
   const [profile, setProfile] = React.useState<PerfilRow | null>(null)
+  const [profileError, setProfileError] = React.useState(false)
   const [loading, setLoading] = React.useState(true)
 
   const loadProfile = React.useCallback(async (currentSession: Session | null) => {
     if (!currentSession?.user) {
       setProfile(null)
+      setProfileError(false)
       return
     }
     try {
-      const p = await fetchProfile(currentSession.user.id)
+      const p = await fetchProfileWithRetry(currentSession.user.id)
       setProfile(p)
-    } catch {
-      setProfile(null)
+      setProfileError(false)
+    } catch (err) {
+      console.error('[useAuth] loadProfile failed after retries', err)
+      // NÃO zera um perfil já carregado: um erro transitório (refresh de token,
+      // rede) não deve derrubar quem já está logado para "Aguardando liberação".
+      // Apenas sinaliza o erro — o ProtectedRoute mostra tela de reconexão
+      // quando ainda não há perfil nenhum.
+      setProfileError(true)
     }
   }, [])
 
@@ -96,6 +124,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await supabase.auth.signOut()
     setSession(null)
     setProfile(null)
+    setProfileError(false)
   }
 
   const refreshProfile = async () => {
@@ -106,6 +135,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     session,
     user: session?.user ?? null,
     profile,
+    profileError,
     loading,
     signIn,
     signOut,

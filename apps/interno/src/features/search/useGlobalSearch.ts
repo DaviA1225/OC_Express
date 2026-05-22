@@ -24,6 +24,13 @@ function escapeIlike(t: string): string {
   return t.replace(/[%_]/g, '\\$&')
 }
 
+// Remove acentos do termo no cliente para casar com as colunas `*_unaccent`
+// (geradas via imm_unaccent no banco — migration 0024). Assim "jose" acha
+// "josé" e "graos" acha "grãos".
+function unaccent(t: string): string {
+  return t.normalize('NFD').replace(/[̀-ͯ]/g, '')
+}
+
 export function useGlobalSearch(query: string, enabled: boolean) {
   const term = query.trim()
   return useQuery({
@@ -33,6 +40,9 @@ export function useGlobalSearch(query: string, enabled: boolean) {
     queryFn: async (): Promise<SearchResultItem[]> => {
       const t = escapeIlike(term)
       const ilike = `%${t}%`
+      // Termo sem acento para as colunas `*_unaccent` (migration 0024).
+      const tu = escapeIlike(unaccent(term))
+      const ilikeU = `%${tu}%`
       const asNumber = Number(term.replace(/\D/g, ''))
       const isNumber = Number.isFinite(asNumber) && asNumber > 0
 
@@ -48,20 +58,20 @@ export function useGlobalSearch(query: string, enabled: boolean) {
           supabase
             .from('solicitacoes')
             .select('id, numero_interno, status, solicitante_nome, cliente:cliente_id(razao_social)')
-            .ilike('solicitante_nome', ilike)
+            .ilike('solicitante_nome_unaccent', ilikeU)
             .order('created_at', { ascending: false })
             .limit(PER_TYPE_LIMIT),
           supabase
             .from('clientes')
             .select('id, razao_social, cidade, uf')
-            .ilike('razao_social', ilike)
+            .ilike('razao_social_unaccent', ilikeU)
             .eq('ativo', true)
             .order('razao_social', { ascending: true })
             .limit(PER_TYPE_LIMIT),
           supabase
             .from('motoristas')
             .select('id, nome_completo, cpf')
-            .or(`nome_completo.ilike.${ilike},cpf.ilike.${ilike}`)
+            .or(`nome_completo_unaccent.ilike.${ilikeU},cpf.ilike.${ilike}`)
             .eq('ativo', true)
             .order('nome_completo', { ascending: true })
             .limit(PER_TYPE_LIMIT),
@@ -82,18 +92,25 @@ export function useGlobalSearch(query: string, enabled: boolean) {
           supabase
             .from('materiais')
             .select('id, nome, filial')
-            .ilike('nome', ilike)
+            .ilike('nome_unaccent', ilikeU)
             .eq('ativo', true)
             .order('nome', { ascending: true })
             .limit(PER_TYPE_LIMIT),
           supabase
             .from('subcontratadas')
             .select('id, razao_social, documento')
-            .or(`razao_social.ilike.${ilike},documento.ilike.${ilike}`)
+            .or(`razao_social_unaccent.ilike.${ilikeU},documento.ilike.${ilike}`)
             .eq('ativo', true)
             .order('razao_social', { ascending: true })
             .limit(PER_TYPE_LIMIT),
         ])
+
+      // Surface qualquer erro do banco como falha da query (react-query marca
+      // isError) em vez de silenciosamente devolver categorias vazias.
+      const firstError = [
+        solicNum, solicNome, clientes, motoristas, veiculos, carretas, materiais, subs,
+      ].find((r) => r.error)?.error
+      if (firstError) throw firstError
 
       const out: SearchResultItem[] = []
       const seen = new Set<string>()
