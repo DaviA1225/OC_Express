@@ -36,8 +36,12 @@ function fmtDate(iso: string | null): string {
 /**
  * Mensagem padrão da OC para enviar pelo WhatsApp.
  * Usa marcação simples (asterisco para negrito) que o WhatsApp interpreta.
+ *
+ * `pdfUrl` é a signed URL temporária do PDF (gerada pelo chamador, validade de
+ * 7 dias). Não usamos mais `s.pdf_url` direto porque agora ele guarda só o path
+ * do bucket privado, que não abre sem assinatura.
  */
-export function formatOCWhatsAppMessage(s: SolicitacaoListRow): string {
+export function formatOCWhatsAppMessage(s: SolicitacaoListRow, pdfUrl?: string | null): string {
   const linhas: string[] = []
   linhas.push(`*ORDEM DE CARREGAMENTO ${formatNumeroOC(s.numero_interno)}*`)
   linhas.push('')
@@ -68,9 +72,9 @@ export function formatOCWhatsAppMessage(s: SolicitacaoListRow): string {
     linhas.push(`Validade: ${fmtDate(s.validade_inicio)} a ${fmtDate(s.validade_fim)}`)
   }
 
-  if (s.pdf_url) {
+  if (pdfUrl) {
     linhas.push('')
-    linhas.push(`PDF: ${s.pdf_url}`)
+    linhas.push(`PDF: ${pdfUrl}`)
   }
 
   return linhas.join('\n')

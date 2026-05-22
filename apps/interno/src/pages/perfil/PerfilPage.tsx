@@ -145,10 +145,12 @@ function InformacoesCard({ nomeAtual, onSaved }: InformacoesProps) {
   const update = useMutation({
     mutationFn: async (values: NomeForm) => {
       if (!user?.id) throw new Error('Sessão expirada')
-      const { error } = await supabase
-        .from('perfis_usuarios')
-        .update({ nome_completo: values.nome_completo.trim() } as never)
-        .eq('user_id', user.id)
+      // UPDATE direto em perfis_usuarios é admin-only (RLS 0025). O usuário
+      // comum edita só o próprio nome via RPC SECURITY DEFINER, que não permite
+      // mexer em perfil/ativo (sem escalonamento de privilégio).
+      const { error } = await supabase.rpc('atualizar_meu_nome', {
+        novo_nome: values.nome_completo.trim(),
+      } as never)
       if (error) throw error
     },
     onSuccess: async () => {

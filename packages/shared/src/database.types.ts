@@ -301,6 +301,7 @@ export interface Database {
           parceiro_carreta_id: string | null
           parceiro_subcontratada_id: string | null
           observacoes_internas: string | null
+          external_msg_id: string | null
           documentado_por: string | null
           documentado_em: string | null
           created_at: string
@@ -345,6 +346,7 @@ export interface Database {
           parceiro_carreta_id?: string | null
           parceiro_subcontratada_id?: string | null
           observacoes_internas?: string | null
+          external_msg_id?: string | null
           documentado_por?: string | null
           documentado_em?: string | null
           created_at?: string
@@ -661,6 +663,10 @@ export interface Database {
       registrar_evento_portal: {
         Args: { p_tipo_evento: TipoEventoPortal; p_payload: Record<string, unknown> | null }
         Returns: string | null
+      }
+      atualizar_meu_nome: {
+        Args: { novo_nome: string }
+        Returns: undefined
       }
     }
     Enums: Record<string, never>

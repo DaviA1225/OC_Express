@@ -23,6 +23,7 @@ import {
   normalizeWhatsAppPhone,
   type WhatsAppDestino,
 } from './whatsapp'
+import { getOcPdfSignedUrl, OC_PDF_WHATSAPP_EXPIRES } from '@/features/pdf-generator/ocPdf'
 import { cn } from '@/lib/utils'
 
 interface Props {
@@ -37,16 +38,39 @@ export function WhatsAppEnvioDialog({ open, onOpenChange, solicitacao }: Props) 
 
   const [destinoIdx, setDestinoIdx] = React.useState<number>(destinos.length > 0 ? 0 : -1)
   const [telefoneManual, setTelefoneManual] = React.useState('')
-  const [mensagem, setMensagem] = React.useState(() => formatOCWhatsAppMessage(solicitacao))
+  // Mensagem inicial sem o link do PDF — ele é injetado pelo efeito abaixo
+  // assim que a signed URL (7 dias) é gerada.
+  const [mensagem, setMensagem] = React.useState(() => formatOCWhatsAppMessage(solicitacao, null))
   const [copied, setCopied] = React.useState(false)
+  // Se o usuário editar a mensagem, não sobrescrevemos com o link do PDF.
+  const editedRef = React.useRef(false)
 
   const [lastSol, setLastSol] = React.useState(solicitacao.id)
   if (lastSol !== solicitacao.id) {
     setLastSol(solicitacao.id)
-    setMensagem(formatOCWhatsAppMessage(solicitacao))
+    setMensagem(formatOCWhatsAppMessage(solicitacao, null))
     setDestinoIdx(destinos.length > 0 ? 0 : -1)
     setTelefoneManual('')
   }
+
+  // PDF em bucket privado: gera signed URL de 7 dias e injeta na mensagem.
+  React.useEffect(() => {
+    editedRef.current = false
+    if (!open || !solicitacao.pdf_url) return
+    let cancelled = false
+    getOcPdfSignedUrl(solicitacao.pdf_url, OC_PDF_WHATSAPP_EXPIRES)
+      .then((url) => {
+        if (cancelled || editedRef.current) return
+        setMensagem(formatOCWhatsAppMessage(solicitacao, url))
+      })
+      .catch(() => {
+        /* sem link no PDF; a mensagem segue sem ele */
+      })
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, solicitacao.id, solicitacao.pdf_url])
 
   const destinoSelecionado: WhatsAppDestino | null =
     destinoIdx >= 0 ? destinos[destinoIdx] : null
@@ -152,7 +176,10 @@ export function WhatsAppEnvioDialog({ open, onOpenChange, solicitacao }: Props) 
             <Textarea
               id="wa-msg"
               value={mensagem}
-              onChange={(e) => setMensagem(e.target.value)}
+              onChange={(e) => {
+                editedRef.current = true
+                setMensagem(e.target.value)
+              }}
               rows={12}
               className="font-mono text-[12px]"
             />

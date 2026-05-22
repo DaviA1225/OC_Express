@@ -6,13 +6,17 @@ Lista do que ficou em aberto após a fase de testes com a equipe. Atualizar conf
 
 ## Endurecimento pós-testes (prioridade ao validar com gestor)
 
-- [ ] **RLS por perfil** — hoje policies são permissivas (`USING (true)` para todo `authenticated`). Substituir por checagem em `perfis_usuarios.perfil`:
-  - Cadastros (`clientes`, `materiais`, `cargas_retorno`): `INSERT/UPDATE/DELETE` apenas para `admin/gerente/supervisor`; `analista/assistente` só `SELECT`.
-  - `perfis_usuarios`: só `admin` modifica.
-  - `log_auditoria`: leitura restrita a `admin/gerente/supervisor`.
-  - `solicitacao_anexos`: avaliar regra por `uploaded_by` ou `atendente_id` da solicitação.
-- [ ] **Bucket `ocs-pdf` privado** — converter em privado e usar signed URLs (mesmo padrão de `solicitacoes-anexos`). PDF contém nome/CPF do motorista, placa, etc.
-- [ ] **Idempotência WhatsApp** — adicionar coluna `external_msg_id text UNIQUE` em `solicitacoes`. Pré-requisito para o futuro agente de IA não duplicar mensagens reprocessadas.
+- [x] **RLS por perfil** — migration `0025_rls_por_perfil.sql`. Substitui o INSERT/UPDATE/DELETE `is_interno()` das tabelas internas por checagem de perfil, **espelhando exatamente** a matriz do front (`apps/interno/src/features/auth/permissions.ts`):
+  - Operacionais (`subcontratadas/motoristas/veiculos/carretas`): escrita p/ `admin/analista/assistente` (assistente precisa do quick-create na Nova Solicitação).
+  - `clientes`: `admin/gerente/supervisor/analista`. `materiais` e `cargas_retorno`: `admin/supervisor/analista`. (SELECT segue liberado a todo interno.)
+  - `perfis_usuarios`: só `admin` escreve. Edição do próprio nome saiu do UPDATE direto → RPC `atualizar_meu_nome` (SECURITY DEFINER, só `nome_completo`, sem escalonamento). `PerfilPage.tsx` ajustada.
+  - `log_auditoria`: leitura `admin/gerente/supervisor`; UPDATE/DELETE só `admin`.
+  - Helper novo `meu_perfil_interno()` (SECURITY DEFINER, evita recursão de RLS).
+  - Front: quick-create de cliente na Nova Solicitação agora gated por `canEditClientes` (some para assistente). `cargas_retorno` estava em `USING(true)` (brecha — qualquer authenticated, até parceiro externo, escrevia) — fechada aqui.
+  - ✅ **Pentest estendido (`scripts/pentest-rls.mjs`)** — semeia 5 usuários internos (um por perfil) e valida a matriz de escrita tabela a tabela, anti-escalonamento em `perfis_usuarios` (UPDATE direto p/ `perfil='admin'` bloqueado), RPC `atualizar_meu_nome` (muda só o nome), e leitura de `log_auditoria` por perfil. **107/107 PASS.**
+  - **Fora de escopo (decisão à parte):** restringir `solicitacoes`/`solicitacao_anexos` por perfil — o front já g-ateia via `canEditSolicitacoes`; RLS aqui é defense-in-depth a tratar depois.
+- [x] **Bucket `ocs-pdf` privado** — migration `0026_ocs_pdf_privado.sql`: bucket vira privado + policies do storage exigem `is_interno()` (parceiro não acessa OC). Front: `GerarOCDialog` guarda o **path** em `pdf_url` (não mais URL pública); helper `features/pdf-generator/ocPdf.ts` (`ocPdfStoragePath` trata registros antigos com URL pública + `getOcPdfSignedUrl`); "Abrir PDF" no detalhe gera signed URL de 1h sob demanda (`AbrirPdfLink`); envio WhatsApp gera signed URL de **7 dias** e injeta na mensagem (`WhatsAppEnvioDialog` + `formatOCWhatsAppMessage(s, pdfUrl?)`); export da lista mostra "Sim" em vez do path. Card "Avisar o parceiro" deixou de incluir o link do PDF (correto: OC tem dado do motorista LHG, não vai p/ concorrente). Validado no pentest (parceiro não baixa nem assina PDF; URL pública dá 400). ⚠️ **Lição:** `UPDATE storage.buckets SET public=false` falha no SQL Editor (role sem privilégio de UPDATE na tabela, só INSERT) e **aborta a transação inteira** — por isso a 0026 foi reescrita com o UPDATE dentro de `DO ... EXCEPTION WHEN insufficient_privilege`. Para tornar bucket privado, usar Dashboard ou `storage.updateBucket(..., { public:false })`.
+- [x] **Idempotência WhatsApp** — migration `0027_solicitacoes_external_msg_id.sql`: coluna `external_msg_id text` (nullable) + índice único parcial `uq_solicitacoes_external_msg_id` (`WHERE external_msg_id IS NOT NULL` — vários NULL convivem). Não exposta ao portal (`portal_solicitacoes` não inclui). Tipo alinhado em `@sislog/shared` (Row+Insert). Sem wiring no front — é pré-requisito do futuro agente de IA (`docs/AGENT_CONTEXT.md`), que grava o ID da mensagem e deixa o índice barrar reinserção. **Pendente:** aplicar a migration no Supabase.
 
 ## Operacional / quality of life ainda em aberto
 
