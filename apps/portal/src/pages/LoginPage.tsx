@@ -116,7 +116,7 @@ export default function LoginPage() {
 
           <p className="mt-6 text-[12px] leading-relaxed text-muted-foreground">
             Esqueceu a senha? Procure o administrador da sua transportadora ou
-            o suporte da LHG — o portal não tem recuperação automática.
+            o suporte da LHG o portal não tem recuperação automática.
           </p>
         </div>
       </div>
@@ -152,13 +152,13 @@ function BrandPanel() {
           </h2>
           <p className="max-w-md text-[14px] leading-relaxed text-white/80">
             Mantenha sua base de motoristas e veículos e crie solicitações de
-            carregamento — sem telefonemas, sem planilhas.
+            carregamento sem telefonemas, sem planilhas.
           </p>
         </div>
 
         <ul className="grid max-w-md gap-3 text-[13px] text-white/85">
           <Feature icon={Truck}>Sua frota e seus motoristas, organizados em um só lugar</Feature>
-          <Feature icon={ShieldCheck}>Acesso isolado e seguro — você vê apenas os seus dados</Feature>
+          <Feature icon={ShieldCheck}>Acesso isolado e seguro, você vê apenas os seus dados</Feature>
         </ul>
       </div>
 
