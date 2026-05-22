@@ -120,11 +120,17 @@ export function GlobalSearchDialog({ open, onOpenChange }: Props) {
                 </div>
               )}
 
-              {term.length >= 2 && !search.isLoading && (search.data?.length ?? 0) === 0 && (
+              {term.length >= 2 && search.isError && (
+                <div className="px-4 py-6 text-center text-[12px] text-destructive">
+                  Erro ao buscar. Verifique a conexão e tente de novo.
+                </div>
+              )}
+
+              {term.length >= 2 && !search.isLoading && !search.isError && (search.data?.length ?? 0) === 0 && (
                 <CommandEmpty>Nenhum resultado para "{term}".</CommandEmpty>
               )}
 
-              {term.length >= 2 && !search.isLoading && TYPE_ORDER.map((type) => {
+              {term.length >= 2 && !search.isLoading && !search.isError && TYPE_ORDER.map((type) => {
                 const items = grouped[type]
                 if (items.length === 0) return null
                 const Icon = TYPE_ICONS[type]
