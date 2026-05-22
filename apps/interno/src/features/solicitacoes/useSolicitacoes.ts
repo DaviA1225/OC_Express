@@ -18,7 +18,7 @@ export interface SolicitacaoListRow extends Solicitacao {
   motorista: { nome_completo: string; cpf: string | null; telefone: string | null } | null
   veiculo: { placa: string; subcontratada_id: string | null } | null
   carreta: { placa: string } | null
-  subcontratada: { razao_social: string } | null
+  subcontratada: { razao_social: string; documento: string | null } | null
   cliente: { razao_social: string; cidade: string | null; uf: string | null } | null
   material: { nome: string; origem_padrao: string | null; observacoes_padrao: string | null; requer_instrucao: boolean } | null
   parceiro: { razao_social: string; contato_principal_telefone: string | null; contato_principal_email: string | null } | null
@@ -28,7 +28,7 @@ export interface SolicitacaoListRow extends Solicitacao {
   parceiro_motorista: { nome_completo: string; cpf: string; telefone: string | null } | null
   parceiro_veiculo: { placa: string } | null
   parceiro_carreta: { placa: string } | null
-  parceiro_subcontratada: { razao_social: string } | null
+  parceiro_subcontratada: { razao_social: string; documento: string | null } | null
   parceiro_usuario: { nome_completo: string; email: string } | null
 }
 
@@ -37,14 +37,14 @@ const SELECT_WITH_JOINS = `
   motorista:motorista_id ( nome_completo, cpf, telefone ),
   veiculo:veiculo_id ( placa, subcontratada_id ),
   carreta:carreta_id ( placa ),
-  subcontratada:subcontratada_id ( razao_social ),
+  subcontratada:subcontratada_id ( razao_social, documento ),
   cliente:cliente_id ( razao_social, cidade, uf ),
   material:material_id ( nome, origem_padrao, observacoes_padrao, requer_instrucao ),
   parceiro:parceiro_id ( razao_social, contato_principal_telefone, contato_principal_email ),
   parceiro_motorista:parceiro_motorista_id ( nome_completo, cpf, telefone ),
   parceiro_veiculo:parceiro_veiculo_id ( placa ),
   parceiro_carreta:parceiro_carreta_id ( placa ),
-  parceiro_subcontratada:parceiro_subcontratada_id ( razao_social ),
+  parceiro_subcontratada:parceiro_subcontratada_id ( razao_social, documento ),
   parceiro_usuario:parceiro_usuario_id ( nome_completo, email )
 `
 
@@ -72,7 +72,10 @@ function normalizeParceiroJoins(row: SolicitacaoListRow): SolicitacaoListRow {
     row.carreta = { placa: row.parceiro_carreta.placa }
   }
   if (!row.subcontratada && row.parceiro_subcontratada) {
-    row.subcontratada = { razao_social: row.parceiro_subcontratada.razao_social }
+    row.subcontratada = {
+      razao_social: row.parceiro_subcontratada.razao_social,
+      documento: row.parceiro_subcontratada.documento,
+    }
   }
   if (!row.solicitante_nome && row.parceiro_usuario) {
     row.solicitante_nome = row.parceiro_usuario.nome_completo
