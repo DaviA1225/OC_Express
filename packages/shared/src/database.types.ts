@@ -485,6 +485,7 @@ export interface Database {
           email: string
           perfil: ParceiroPerfil
           ativo: boolean
+          convite_aceito_em: string | null
           created_at: string
           updated_at: string
           created_by: string | null
@@ -497,6 +498,7 @@ export interface Database {
           email: string
           perfil: ParceiroPerfil
           ativo?: boolean
+          convite_aceito_em?: string | null
           created_at?: string
           updated_at?: string
           created_by?: string | null
@@ -667,6 +669,10 @@ export interface Database {
       atualizar_meu_nome: {
         Args: { novo_nome: string }
         Returns: undefined
+      }
+      marcar_meu_convite_aceito: {
+        Args: Record<string, never>
+        Returns: string | null
       }
     }
     Enums: Record<string, never>
