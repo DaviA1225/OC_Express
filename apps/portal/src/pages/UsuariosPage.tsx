@@ -475,10 +475,14 @@ function ConvidarForm({
           },
         },
       )
-      // Functions.invoke devolve o body em `data` mesmo em erros 4xx/5xx quando
-      // o servidor responde JSON; checamos o campo `error` antes do erro de rede.
       if (data?.error) throw new Error(traduzirErroConvite(data.error, data.detalhe))
-      if (error) throw new Error(error.message || 'Falha ao convidar usuário')
+      if (error) {
+        // supabase-js v2 nao expõe o body em FunctionsHttpError; extraímos
+        // de error.context pra ver o código real (ex: rate-limit do SMTP).
+        const body = await extractFunctionErrorBody(error)
+        if (body?.error) throw new Error(traduzirErroConvite(body.error, body.detalhe))
+        throw new Error(error.message || 'Falha ao convidar usuário')
+      }
       return data
     },
     onSuccess: () => {

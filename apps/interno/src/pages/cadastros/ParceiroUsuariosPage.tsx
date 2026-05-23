@@ -508,7 +508,11 @@ function ConvidarForm({
         },
       )
       if (data?.error) throw new Error(traduzirErroConvite(data.error, data.detalhe))
-      if (error) throw new Error(error.message || 'Falha ao convidar usuário')
+      if (error) {
+        const body = await extractFunctionErrorBody(error)
+        if (body?.error) throw new Error(traduzirErroConvite(body.error, body.detalhe))
+        throw new Error(error.message || 'Falha ao convidar usuário')
+      }
       return data
     },
     onSuccess: () => {
