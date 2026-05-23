@@ -61,6 +61,10 @@ export default function AceitarConvitePage() {
       toast.error(traduzirErro(error.message))
       return
     }
+    // Marca o convite como aceito (fire-and-forget — não bloqueia o login se
+    // falhar). Cliente nunca escreve direto em parceiro_usuarios.convite_aceito_em:
+    // a RPC SECURITY DEFINER deriva o user_id de auth.uid() e ignora qualquer arg.
+    void supabase.rpc('marcar_meu_convite_aceito')
     toast.success('Senha definida — bem-vindo ao portal!')
     navigate('/solicitacoes', { replace: true })
   }

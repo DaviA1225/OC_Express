@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Loader2, ShieldAlert, UserPlus } from 'lucide-react'
+import { Copy, Loader2, Mail, ShieldAlert, UserPlus } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuth, hasPerfilParceiro } from '@/hooks/useAuth'
 import { traduzirErroBanco } from '@/features/cadastros/useParceiroCrud'
@@ -28,6 +28,29 @@ const PERFIL_LABELS: Record<ParceiroPerfil, string> = {
   operador_parceiro: 'Operador',
 }
 
+// Três estados visíveis, derivados de `ativo` + `convite_aceito_em`:
+//   - Aguardando: convite ainda não foi aceito (ativo=true, convite_aceito_em=NULL)
+//   - Inativo:    o admin desativou o usuário (ativo=false)
+//   - Ativo:      logou pelo menos uma vez e segue ativo
+function computarSituacao(u: Usuario): { label: string; className: string } {
+  if (!u.ativo) {
+    return {
+      label: 'Inativo',
+      className: 'inline-flex rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground',
+    }
+  }
+  if (!u.convite_aceito_em) {
+    return {
+      label: 'Aguardando',
+      className: 'inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800',
+    }
+  }
+  return {
+    label: 'Ativo',
+    className: 'inline-flex rounded-full bg-success/10 px-2 py-0.5 text-[11px] font-medium text-success',
+  }
+}
+
 function useUsuariosParceiro() {
   return useQuery({
     queryKey: ['parceiro-usuarios'],
@@ -51,6 +74,26 @@ export default function UsuariosPage() {
   const [editing, setEditing] = React.useState<Usuario | null>(null)
   const [toggleRow, setToggleRow] = React.useState<Usuario | null>(null)
   const [convidarOpen, setConvidarOpen] = React.useState(false)
+  const [reenviarLink, setReenviarLink] = React.useState<{
+    link: string; email: string; nome: string
+  } | null>(null)
+
+  const reenviarConvite = useMutation({
+    mutationFn: async (usuario: Usuario) => {
+      const { data, error } = await supabase.functions.invoke<{
+        ok?: true; error?: string; detalhe?: string
+        action_link?: string; email?: string; nome_completo?: string
+      }>('reenviar-convite-parceiro-usuario', {
+        body: { parceiro_usuario_id: usuario.id },
+      })
+      if (data?.error) throw new Error(traduzirErroReenvio(data.error, data.detalhe))
+      if (error) throw new Error(error.message || 'Falha ao reenviar convite')
+      if (!data?.action_link) throw new Error('Resposta sem link de convite')
+      return { link: data.action_link, email: data.email ?? usuario.email, nome: data.nome_completo ?? usuario.nome_completo }
+    },
+    onSuccess: (res) => setReenviarLink(res),
+    onError: (e: Error) => toast.error(e.message),
+  })
 
   const updatePerfil = useMutation({
     mutationFn: async ({ id, perfil }: { id: string; perfil: ParceiroPerfil }) => {
@@ -135,6 +178,7 @@ export default function UsuariosPage() {
 
             {!list.isLoading && usuarios.map((u) => {
               const isSelf = u.id === parceiroUsuario?.id
+              const situacao = computarSituacao(u)
               return (
                 <TableRow key={u.id} className={!u.ativo ? 'opacity-60' : undefined}>
                   <TableCell className="font-medium text-foreground">
@@ -144,21 +188,27 @@ export default function UsuariosPage() {
                   <TableCell className="text-muted-foreground">{u.email}</TableCell>
                   <TableCell>{PERFIL_LABELS[u.perfil]}</TableCell>
                   <TableCell>
-                    <span
-                      className={
-                        u.ativo
-                          ? 'inline-flex rounded-full bg-success/10 px-2 py-0.5 text-[11px] font-medium text-success'
-                          : 'inline-flex rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground'
-                      }
-                    >
-                      {u.ativo ? 'Ativo' : 'Inativo'}
-                    </span>
+                    <span className={situacao.className}>{situacao.label}</span>
                   </TableCell>
                   <TableCell>
                     {isSelf ? (
                       <span className="text-[12px] text-muted-foreground">—</span>
                     ) : (
-                      <div className="flex items-center gap-1">
+                      <div className="flex flex-wrap items-center gap-1">
+                        {u.ativo && !u.convite_aceito_em && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => reenviarConvite.mutate(u)}
+                            disabled={reenviarConvite.isPending && reenviarConvite.variables?.id === u.id}
+                            className="gap-1"
+                          >
+                            {reenviarConvite.isPending && reenviarConvite.variables?.id === u.id
+                              ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              : <Mail className="h-3.5 w-3.5" />}
+                            Reenviar
+                          </Button>
+                        )}
                         <Button variant="ghost" size="sm" onClick={() => setEditing(u)}>
                           Editar perfil
                         </Button>
@@ -192,6 +242,11 @@ export default function UsuariosPage() {
         open={convidarOpen}
         onOpenChange={setConvidarOpen}
         onSuccess={() => qc.invalidateQueries({ queryKey: ['parceiro-usuarios'] })}
+      />
+
+      <LinkConviteDialog
+        info={reenviarLink}
+        onOpenChange={(o) => !o && setReenviarLink(null)}
       />
 
       <EditarPerfilDialog
@@ -450,4 +505,86 @@ function traduzirErroConvite(code: string, detalhe?: string): string {
     case 'falha_no_insert': return 'Convite emitido, mas falhou ao salvar o vínculo. Procure o suporte.'
     default: return detalhe || 'Erro ao processar o convite.'
   }
+}
+
+function traduzirErroReenvio(code: string, detalhe?: string): string {
+  switch (code) {
+    case 'parceiro_usuario_id_obrigatorio': return 'Usuário alvo não informado.'
+    case 'sessao_invalida': return 'Sua sessão expirou. Saia e entre de novo.'
+    case 'forbidden': return 'Você não tem permissão para reenviar este convite.'
+    case 'usuario_nao_encontrado': return 'Usuário não encontrado.'
+    case 'usuario_inativo': return 'Reative o usuário antes de reenviar o convite.'
+    case 'convite_ja_aceito':
+      return 'Este usuário já definiu a senha. Peça para ele usar "Esqueci minha senha" no login.'
+    case 'falha_ao_gerar_link': return `Não foi possível gerar o link${detalhe ? `: ${detalhe}` : ''}.`
+    default: return detalhe || 'Erro ao reenviar o convite.'
+  }
+}
+
+// =====================================================================
+// Dialog que mostra o link de convite gerado pela Edge Function de reenvio.
+// Por enquanto o admin do parceiro copia e manda manualmente (WhatsApp). Quando
+// o SMTP custom do Supabase estiver configurado, o template "Reset password"
+// também vai chegar por e-mail automaticamente no mesmo fluxo.
+// =====================================================================
+function LinkConviteDialog({
+  info,
+  onOpenChange,
+}: {
+  info: { link: string; email: string; nome: string } | null
+  onOpenChange: (o: boolean) => void
+}) {
+  const [copiado, setCopiado] = React.useState(false)
+
+  React.useEffect(() => {
+    if (!info) setCopiado(false)
+  }, [info])
+
+  const copiar = async () => {
+    if (!info) return
+    try {
+      await navigator.clipboard.writeText(info.link)
+      setCopiado(true)
+      toast.success('Link copiado')
+    } catch {
+      toast.error('Não foi possível copiar. Copie manualmente do campo abaixo.')
+    }
+  }
+
+  return (
+    <Dialog open={!!info} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Link de convite gerado</DialogTitle>
+          <DialogDescription>
+            Envie este link para {info?.nome} ({info?.email}) por WhatsApp ou outro canal.
+            O link expira em 1 hora.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogBody className="space-y-2">
+          <Label htmlFor="link-convite">Link</Label>
+          <div className="flex items-center gap-2">
+            <Input
+              id="link-convite"
+              readOnly
+              value={info?.link ?? ''}
+              onClick={(e) => (e.target as HTMLInputElement).select()}
+              className="font-mono text-[12px]"
+            />
+            <Button type="button" variant="outline" size="sm" onClick={copiar} className="shrink-0 gap-1">
+              <Copy className="h-3.5 w-3.5" />
+              {copiado ? 'Copiado' : 'Copiar'}
+            </Button>
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            Ao clicar no link, {info?.nome.split(' ')[0] ?? 'a pessoa'} vai cair na tela
+            de "Definir senha" e entrar no portal automaticamente.
+          </p>
+        </DialogBody>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Fechar</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
 }
