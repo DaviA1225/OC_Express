@@ -5,7 +5,7 @@ import { ptBR } from 'date-fns/locale'
 import {
   AlertTriangle, ChevronLeft, ChevronRight, ChevronDown,
   Eraser, Inbox, LogIn, LogOut, FileText, X, KeyRound,
-  ShieldAlert, UserPlus, Circle,
+  ShieldAlert, UserPlus, UserMinus, Circle,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -355,6 +355,7 @@ const TIPO_VISUAL: Record<TipoEventoPortal, { className: string; icon: React.Rea
   portal_solicitacao_cancelada: { className: 'bg-amber-100 text-amber-800', icon: <X className="h-3 w-3" /> },
   portal_senha_alterada: { className: 'bg-purple-100 text-purple-800', icon: <KeyRound className="h-3 w-3" /> },
   portal_usuario_convidado: { className: 'bg-teal-100 text-teal-800', icon: <UserPlus className="h-3 w-3" /> },
+  portal_usuario_excluido: { className: 'bg-rose-100 text-rose-800', icon: <UserMinus className="h-3 w-3" /> },
 }
 
 const TIPO_VISUAL_FALLBACK = { className: 'bg-muted text-muted-foreground', icon: <Circle className="h-3 w-3" /> }
