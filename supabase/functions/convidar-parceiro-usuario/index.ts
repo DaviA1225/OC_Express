@@ -172,10 +172,13 @@ Deno.serve(async (req) => {
     }, 409)
   }
 
-  // redirectTo derivado do Origin do request (o caller é o portal ou o interno).
+  // redirectTo precisa apontar pro PORTAL, não pro interno (que também invoca
+  // esta função). Usamos o secret PORTAL_URL (ex.: https://oc-sislog-portal.vercel.app);
+  // se não estiver setado, caímos no header `Origin` da request — útil em
+  // testes locais com o portal rodando.
   // A URL final precisa estar na allowlist do Supabase Auth → Redirect URLs.
-  const origin = req.headers.get('origin') ?? ''
-  const redirectTo = origin ? `${origin}/aceitar-convite` : undefined
+  const portalBase = Deno.env.get('PORTAL_URL') || req.headers.get('origin') || ''
+  const redirectTo = portalBase ? `${portalBase.replace(/\/$/, '')}/aceitar-convite` : undefined
 
   // Convida via Auth Admin (cria auth.users + envia e-mail de magic link)
   const { data: invite, error: inviteErr } = await admin.auth.admin.inviteUserByEmail(email, {

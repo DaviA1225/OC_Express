@@ -143,9 +143,10 @@ Deno.serve(async (req) => {
     }, 400)
   }
 
-  // redirectTo derivado do Origin (cliente é o portal ou o interno).
-  const origin = req.headers.get('origin') ?? ''
-  const redirectTo = origin ? `${origin}/aceitar-convite` : undefined
+  // redirectTo precisa apontar pro PORTAL (interno também invoca esta função).
+  // Usa o secret PORTAL_URL; fallback pro Origin em dev local.
+  const portalBase = Deno.env.get('PORTAL_URL') || req.headers.get('origin') || ''
+  const redirectTo = portalBase ? `${portalBase.replace(/\/$/, '')}/aceitar-convite` : undefined
 
   // Gera novo link de recovery — aceita usuário existente que nunca logou.
   // A AceitarConvitePage trata o fluxo (define senha + chama RPC marcar_meu_convite_aceito).

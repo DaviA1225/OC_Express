@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Copy, Loader2, Mail, ShieldAlert, UserPlus } from 'lucide-react'
+import { Copy, Loader2, Mail, ShieldAlert, Trash2, UserPlus } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuth, hasPerfilParceiro } from '@/hooks/useAuth'
 import { traduzirErroBanco } from '@/features/cadastros/useParceiroCrud'
@@ -73,6 +73,7 @@ export default function UsuariosPage() {
 
   const [editing, setEditing] = React.useState<Usuario | null>(null)
   const [toggleRow, setToggleRow] = React.useState<Usuario | null>(null)
+  const [excluirRow, setExcluirRow] = React.useState<Usuario | null>(null)
   const [convidarOpen, setConvidarOpen] = React.useState(false)
   const [reenviarLink, setReenviarLink] = React.useState<{
     link: string; email: string; nome: string
@@ -87,7 +88,11 @@ export default function UsuariosPage() {
         body: { parceiro_usuario_id: usuario.id },
       })
       if (data?.error) throw new Error(traduzirErroReenvio(data.error, data.detalhe))
-      if (error) throw new Error(error.message || 'Falha ao reenviar convite')
+      if (error) {
+        const body = await extractFunctionErrorBody(error)
+        if (body?.error) throw new Error(traduzirErroReenvio(body.error, body.detalhe))
+        throw new Error(error.message || 'Falha ao reenviar convite')
+      }
       if (!data?.action_link) throw new Error('Resposta sem link de convite')
       return { link: data.action_link, email: data.email ?? usuario.email, nome: data.nome_completo ?? usuario.nome_completo }
     },
@@ -123,6 +128,31 @@ export default function UsuariosPage() {
       toast.success(vars.ativo ? 'Usuário reativado' : 'Usuário desativado')
     },
     onError: (e: unknown) => toast.error(traduzirErroBanco(e)),
+  })
+
+  const excluirUsuario = useMutation({
+    mutationFn: async (usuario: Usuario) => {
+      const { data, error } = await supabase.functions.invoke<{
+        ok?: true; error?: string; detalhe?: string; email?: string
+      }>('excluir-parceiro-usuario', {
+        body: { parceiro_usuario_id: usuario.id },
+      })
+      if (data?.error) throw new Error(traduzirErroExclusao(data.error, data.detalhe))
+      if (error) {
+        // supabase-js v2 nao expõe o body em respostas non-2xx — extraímos
+        // manualmente do error.context (FunctionsHttpError) pra mostrar a
+        // mensagem real em vez de "non-2xx status code".
+        const body = await extractFunctionErrorBody(error)
+        if (body?.error) throw new Error(traduzirErroExclusao(body.error, body.detalhe))
+        throw new Error(error.message || 'Falha ao excluir usuário')
+      }
+      return data
+    },
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['parceiro-usuarios'] })
+      toast.success(`Usuário ${data?.email ?? ''} excluído — e-mail liberado para reuso`)
+    },
+    onError: (e: Error) => toast.error(e.message),
   })
 
   if (!isAdmin) {
@@ -220,6 +250,16 @@ export default function UsuariosPage() {
                         >
                           {u.ativo ? 'Desativar' : 'Reativar'}
                         </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setExcluirRow(u)}
+                          className="gap-1 text-destructive hover:text-destructive"
+                          title="Apaga definitivamente — libera o e-mail para reuso em outro parceiro"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          Excluir
+                        </Button>
                       </div>
                     )}
                   </TableCell>
@@ -273,6 +313,25 @@ export default function UsuariosPage() {
           if (toggleRow) {
             await toggleAtivo.mutateAsync({ id: toggleRow.id, ativo: !toggleRow.ativo })
             setToggleRow(null)
+          }
+        }}
+      />
+
+      <ConfirmDialog
+        open={!!excluirRow}
+        onOpenChange={(o) => !o && setExcluirRow(null)}
+        title="Excluir usuário definitivamente?"
+        description={
+          excluirRow
+            ? `${excluirRow.nome_completo} (${excluirRow.email}) será removido para sempre. Solicitações antigas dele ficam no histórico, mas o vínculo com o usuário some. O e-mail fica livre para uso em outro parceiro. Esta ação não pode ser desfeita.`
+            : ''
+        }
+        confirmLabel="Sim, excluir"
+        destructive
+        onConfirm={async () => {
+          if (excluirRow) {
+            await excluirUsuario.mutateAsync(excluirRow)
+            setExcluirRow(null)
           }
         }}
       />
@@ -416,10 +475,14 @@ function ConvidarForm({
           },
         },
       )
-      // Functions.invoke devolve o body em `data` mesmo em erros 4xx/5xx quando
-      // o servidor responde JSON; checamos o campo `error` antes do erro de rede.
       if (data?.error) throw new Error(traduzirErroConvite(data.error, data.detalhe))
-      if (error) throw new Error(error.message || 'Falha ao convidar usuário')
+      if (error) {
+        // supabase-js v2 nao expõe o body em FunctionsHttpError; extraímos
+        // de error.context pra ver o código real (ex: rate-limit do SMTP).
+        const body = await extractFunctionErrorBody(error)
+        if (body?.error) throw new Error(traduzirErroConvite(body.error, body.detalhe))
+        throw new Error(error.message || 'Falha ao convidar usuário')
+      }
       return data
     },
     onSuccess: () => {
@@ -519,6 +582,38 @@ function traduzirErroReenvio(code: string, detalhe?: string): string {
     case 'falha_ao_gerar_link': return `Não foi possível gerar o link${detalhe ? `: ${detalhe}` : ''}.`
     default: return detalhe || 'Erro ao reenviar o convite.'
   }
+}
+
+function traduzirErroExclusao(code: string, detalhe?: string): string {
+  switch (code) {
+    case 'parceiro_usuario_id_obrigatorio': return 'Usuário alvo não informado.'
+    case 'sessao_invalida': return 'Sua sessão expirou. Saia e entre de novo.'
+    case 'forbidden': return 'Você não tem permissão para excluir este usuário.'
+    case 'usuario_nao_encontrado': return 'Usuário não encontrado.'
+    case 'nao_pode_apagar_a_si_mesmo': return 'Você não pode excluir a sua própria conta.'
+    case 'falha_ao_liberar_email': return `Não foi possível liberar o e-mail${detalhe ? `: ${detalhe}` : ''}.`
+    case 'falha_no_delete': return `Não foi possível excluir${detalhe ? `: ${detalhe}` : ''}.`
+    default: return detalhe || 'Erro ao excluir o usuário.'
+  }
+}
+
+// supabase-js v2 retorna FunctionsHttpError sem expor o body do response em
+// `error.message` ("Edge Function returned a non-2xx status code"). O body
+// crú está em `error.context` (Response). Tentamos `.json()` e devolvemos
+// `{ error, detalhe }` quando bate com o formato das nossas Edge Functions.
+async function extractFunctionErrorBody(
+  err: unknown,
+): Promise<{ error?: string; detalhe?: string } | null> {
+  try {
+    const ctx = (err as { context?: Response }).context
+    if (ctx && typeof ctx.json === 'function') {
+      const body = await ctx.clone().json()
+      if (body && typeof body === 'object') return body as { error?: string; detalhe?: string }
+    }
+  } catch {
+    /* ignora — devolve null e o caller cai no fallback */
+  }
+  return null
 }
 
 // =====================================================================

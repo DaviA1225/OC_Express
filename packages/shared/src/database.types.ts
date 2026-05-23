@@ -40,6 +40,7 @@ export type TipoEventoPortal =
   | 'portal_solicitacao_cancelada'
   | 'portal_senha_alterada'
   | 'portal_usuario_convidado'
+  | 'portal_usuario_excluido'
 
 export interface Database {
   public: {
