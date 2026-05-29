@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -220,6 +220,13 @@ export default function NovaSolicitacaoPage() {
     )
     navigate(`/solicitacoes/${novoId}`, { replace: true })
   })
+
+  // Backstop pro caso do parceiro digitar a URL direto: a lista ja' esconde o
+  // botao quando solicitacoes_bloqueadas=true; aqui voltamos pra lista. Fica
+  // apos os hooks pra nao quebrar a regra dos hooks.
+  if (parceiro?.solicitacoes_bloqueadas) {
+    return <Navigate to="/solicitacoes" replace />
+  }
 
   return (
     <div className="mx-auto w-full max-w-[720px]">

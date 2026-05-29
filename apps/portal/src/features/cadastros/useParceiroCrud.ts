@@ -159,6 +159,10 @@ export function traduzirErroBanco(error: unknown): string {
   if (e.code === 'PT429') {
     return 'Você atingiu o limite de 50 solicitações por dia. Tente novamente amanhã.'
   }
+  // Bloqueio de novas solicitações por parceiro (trigger da migration 0033).
+  if (e.code === 'PT423') {
+    return 'Novas solicitações estão temporariamente indisponíveis. Fale com a equipe da LHG.'
+  }
   if (e.code === '23505') {
     if (e.message?.includes('cpf')) return 'Esse CPF já está cadastrado.'
     if (e.message?.includes('cnpj')) return 'Esse CNPJ já está cadastrado.'
