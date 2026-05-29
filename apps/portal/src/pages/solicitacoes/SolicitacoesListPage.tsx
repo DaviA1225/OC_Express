@@ -2,7 +2,7 @@ import * as React from 'react'
 import { Link } from 'react-router-dom'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { ClipboardList, Plus, Search as SearchIcon, Truck, Building2 } from 'lucide-react'
+import { ClipboardList, Lock, Plus, Search as SearchIcon, Truck, Building2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/select'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { StatusBadge } from '@/components/solicitacoes/StatusBadge'
+import { useAuth } from '@/hooks/useAuth'
 import { useDebounce } from '@/hooks/useDebounce'
 import { formatNumeroOC } from '@/lib/utils'
 import {
@@ -45,6 +46,8 @@ interface SolicitacaoView {
 }
 
 export default function SolicitacoesListPage() {
+  const { parceiro } = useAuth()
+  const bloqueado = parceiro?.solicitacoes_bloqueadas === true
   const lista = useSolicitacoesPortal()
   const motoristas = useMotoristasBase()
   const veiculos = useVeiculosBase()
@@ -117,13 +120,35 @@ export default function SolicitacoesListPage() {
             {total} {total === 1 ? 'solicitação enviada' : 'solicitações enviadas'}
           </p>
         </div>
-        <Button asChild size="lg">
-          <Link to="/solicitacoes/nova">
-            <Plus className="h-4 w-4" />
+        {bloqueado ? (
+          <Button size="lg" disabled title="Novas solicitações temporariamente indisponíveis">
+            <Lock className="h-4 w-4" />
             Nova solicitação
-          </Link>
-        </Button>
+          </Button>
+        ) : (
+          <Button asChild size="lg">
+            <Link to="/solicitacoes/nova">
+              <Plus className="h-4 w-4" />
+              Nova solicitação
+            </Link>
+          </Button>
+        )}
       </div>
+
+      {bloqueado && (
+        <div className="flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4 text-amber-900">
+          <Lock className="mt-0.5 h-4 w-4 shrink-0" />
+          <div className="space-y-1">
+            <p className="text-[13px] font-semibold">
+              Novas solicitações temporariamente indisponíveis
+            </p>
+            <p className="text-[12px] leading-relaxed">
+              Você ainda pode acompanhar as solicitações já enviadas e baixar os
+              arquivos. Para liberar novamente, fale com a equipe da LHG.
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-background p-3">
         <div className="relative min-w-[220px] flex-1">
@@ -172,7 +197,7 @@ export default function SolicitacoesListPage() {
                 : 'Crie sua primeira solicitação de carregamento — ela vai direto para a equipe da LHG.'
             }
             action={
-              !temFiltro && (
+              !temFiltro && !bloqueado && (
                 <Button asChild>
                   <Link to="/solicitacoes/nova">
                     <Plus className="h-4 w-4" />

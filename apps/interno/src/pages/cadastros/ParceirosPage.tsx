@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Loader2, Users } from 'lucide-react'
+import { Loader2, Lock, Unlock, Users } from 'lucide-react'
 import { CrudListPage, useCrudListState, type ColumnDef } from '@/components/shared/CrudListPage'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { useCrudList, useActiveCount, useUpsertRow, useToggleActive, useDeleteRow, useBulkToggleActive, useBulkDeleteRows } from '@/features/crud/useCrudQueries'
@@ -74,6 +74,7 @@ export default function ParceirosPage() {
   const [open, setOpen] = React.useState(false)
   const [confirmRow, setConfirmRow] = React.useState<Row | null>(null)
   const [deleteRow, setDeleteRow] = React.useState<Row | null>(null)
+  const [bloqueioRow, setBloqueioRow] = React.useState<Row | null>(null)
 
   const columns: ColumnDef<Row>[] = [
     { header: 'Razão social', accessor: (r) => r.razao_social },
@@ -102,15 +103,35 @@ export default function ParceirosPage() {
         onToggleActive={canEdit ? (r) => setConfirmRow(r) : undefined}
         onDelete={canEdit ? (r) => setDeleteRow(r) : undefined}
         rowActions={canEdit ? (r) => (
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate(`/cadastros/parceiros/${r.id}/usuarios`)}
-            aria-label={`Gerenciar usuários de ${r.razao_social}`}
-            title="Gerenciar usuários"
-          >
-            <Users className="h-4 w-4" />
-          </Button>
+          <>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setBloqueioRow(r)}
+              aria-label={
+                r.solicitacoes_bloqueadas
+                  ? `Liberar novas solicitações de ${r.razao_social}`
+                  : `Bloquear novas solicitações de ${r.razao_social}`
+              }
+              title={
+                r.solicitacoes_bloqueadas
+                  ? 'Liberar novas solicitações'
+                  : 'Bloquear novas solicitações'
+              }
+              className={r.solicitacoes_bloqueadas ? 'text-destructive hover:text-destructive' : undefined}
+            >
+              {r.solicitacoes_bloqueadas ? <Unlock className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate(`/cadastros/parceiros/${r.id}/usuarios`)}
+              aria-label={`Gerenciar usuários de ${r.razao_social}`}
+              title="Gerenciar usuários"
+            >
+              <Users className="h-4 w-4" />
+            </Button>
+          </>
         ) : undefined}
         emptyTitle="Nenhum parceiro cadastrado"
         emptyDescription="Cadastre as transportadoras parceiras que terão acesso ao portal externo."
@@ -158,6 +179,32 @@ export default function ParceirosPage() {
           if (confirmRow) {
             await toggle.mutateAsync({ id: confirmRow.id, ativo: !confirmRow.ativo })
             setConfirmRow(null)
+          }
+        }}
+      />
+
+      <ConfirmDialog
+        open={!!bloqueioRow}
+        onOpenChange={(o) => !o && setBloqueioRow(null)}
+        title={bloqueioRow?.solicitacoes_bloqueadas
+          ? 'Liberar novas solicitações?'
+          : 'Bloquear novas solicitações?'}
+        description={bloqueioRow?.solicitacoes_bloqueadas
+          ? `O parceiro "${bloqueioRow?.razao_social}" voltará a conseguir criar solicitações pelo portal.`
+          : `O parceiro "${bloqueioRow?.razao_social}" deixará de conseguir criar novas solicitações pelo portal. As solicitações já enviadas continuam visíveis e o parceiro segue conseguindo baixar os arquivos.`}
+        confirmLabel={bloqueioRow?.solicitacoes_bloqueadas ? 'Sim, liberar' : 'Sim, bloquear'}
+        destructive={!bloqueioRow?.solicitacoes_bloqueadas}
+        onConfirm={async () => {
+          if (bloqueioRow) {
+            const proximo = !bloqueioRow.solicitacoes_bloqueadas
+            await upsert.mutateAsync({
+              id: bloqueioRow.id,
+              values: {
+                solicitacoes_bloqueadas: proximo,
+                solicitacoes_bloqueadas_em: proximo ? new Date().toISOString() : null,
+              },
+            })
+            setBloqueioRow(null)
           }
         }}
       />

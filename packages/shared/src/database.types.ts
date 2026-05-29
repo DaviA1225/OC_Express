@@ -456,6 +456,8 @@ export interface Database {
           contato_principal_email: string | null
           codigo_interno: string | null
           ativo: boolean
+          solicitacoes_bloqueadas: boolean
+          solicitacoes_bloqueadas_em: string | null
           observacoes_internas: string | null
           created_at: string
           updated_at: string
@@ -470,6 +472,8 @@ export interface Database {
           contato_principal_email?: string | null
           codigo_interno?: string | null
           ativo?: boolean
+          solicitacoes_bloqueadas?: boolean
+          solicitacoes_bloqueadas_em?: string | null
           observacoes_internas?: string | null
           created_at?: string
           updated_at?: string
