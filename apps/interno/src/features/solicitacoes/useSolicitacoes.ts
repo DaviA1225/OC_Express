@@ -18,6 +18,8 @@ export interface SolicitacaoListRow extends Solicitacao {
   motorista: { nome_completo: string; cpf: string | null; telefone: string | null } | null
   veiculo: { placa: string; subcontratada_id: string | null } | null
   carreta: { placa: string } | null
+  primeira_carreta: { placa: string } | null
+  dolly: { placa: string } | null
   subcontratada: { razao_social: string; documento: string | null } | null
   cliente: { razao_social: string; cidade: string | null; uf: string | null } | null
   material: { nome: string; origem_padrao: string | null; observacoes_padrao: string | null; requer_instrucao: boolean } | null
@@ -28,6 +30,8 @@ export interface SolicitacaoListRow extends Solicitacao {
   parceiro_motorista: { nome_completo: string; cpf: string; telefone: string | null } | null
   parceiro_veiculo: { placa: string } | null
   parceiro_carreta: { placa: string } | null
+  parceiro_primeira_carreta: { placa: string } | null
+  parceiro_dolly: { placa: string } | null
   parceiro_subcontratada: { razao_social: string; documento: string | null } | null
   parceiro_usuario: { nome_completo: string; email: string } | null
 }
@@ -37,6 +41,8 @@ const SELECT_WITH_JOINS = `
   motorista:motorista_id ( nome_completo, cpf, telefone ),
   veiculo:veiculo_id ( placa, subcontratada_id ),
   carreta:carreta_id ( placa ),
+  primeira_carreta:primeira_carreta_id ( placa ),
+  dolly:dolly_id ( placa ),
   subcontratada:subcontratada_id ( razao_social, documento ),
   cliente:cliente_id ( razao_social, cidade, uf ),
   material:material_id ( nome, origem_padrao, observacoes_padrao, requer_instrucao ),
@@ -44,6 +50,8 @@ const SELECT_WITH_JOINS = `
   parceiro_motorista:parceiro_motorista_id ( nome_completo, cpf, telefone ),
   parceiro_veiculo:parceiro_veiculo_id ( placa ),
   parceiro_carreta:parceiro_carreta_id ( placa ),
+  parceiro_primeira_carreta:parceiro_primeira_carreta_id ( placa ),
+  parceiro_dolly:parceiro_dolly_id ( placa ),
   parceiro_subcontratada:parceiro_subcontratada_id ( razao_social, documento ),
   parceiro_usuario:parceiro_usuario_id ( nome_completo, email )
 `
@@ -70,6 +78,12 @@ function normalizeParceiroJoins(row: SolicitacaoListRow): SolicitacaoListRow {
   }
   if (!row.carreta && row.parceiro_carreta) {
     row.carreta = { placa: row.parceiro_carreta.placa }
+  }
+  if (!row.primeira_carreta && row.parceiro_primeira_carreta) {
+    row.primeira_carreta = { placa: row.parceiro_primeira_carreta.placa }
+  }
+  if (!row.dolly && row.parceiro_dolly) {
+    row.dolly = { placa: row.parceiro_dolly.placa }
   }
   if (!row.subcontratada && row.parceiro_subcontratada) {
     row.subcontratada = {
@@ -413,6 +427,8 @@ export function useDuplicateSolicitacao() {
         motorista_id: source.motorista_id,
         veiculo_id: source.veiculo_id,
         carreta_id: source.carreta_id,
+        primeira_carreta_id: source.primeira_carreta_id,
+        dolly_id: source.dolly_id,
         subcontratada_id: source.subcontratada_id,
         cliente_id: source.cliente_id,
         material_id: source.material_id,

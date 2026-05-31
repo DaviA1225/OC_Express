@@ -274,6 +274,8 @@ export interface Database {
           motorista_id: string | null
           veiculo_id: string | null
           carreta_id: string | null
+          primeira_carreta_id: string | null
+          dolly_id: string | null
           subcontratada_id: string | null
           cliente_id: string | null
           material_id: string | null
@@ -300,6 +302,8 @@ export interface Database {
           parceiro_motorista_id: string | null
           parceiro_veiculo_id: string | null
           parceiro_carreta_id: string | null
+          parceiro_primeira_carreta_id: string | null
+          parceiro_dolly_id: string | null
           parceiro_subcontratada_id: string | null
           observacoes_internas: string | null
           external_msg_id: string | null
@@ -319,6 +323,8 @@ export interface Database {
           motorista_id?: string | null
           veiculo_id?: string | null
           carreta_id?: string | null
+          primeira_carreta_id?: string | null
+          dolly_id?: string | null
           subcontratada_id?: string | null
           cliente_id?: string | null
           material_id?: string | null
@@ -345,6 +351,8 @@ export interface Database {
           parceiro_motorista_id?: string | null
           parceiro_veiculo_id?: string | null
           parceiro_carreta_id?: string | null
+          parceiro_primeira_carreta_id?: string | null
+          parceiro_dolly_id?: string | null
           parceiro_subcontratada_id?: string | null
           observacoes_internas?: string | null
           external_msg_id?: string | null
@@ -655,6 +663,8 @@ export interface Database {
           parceiro_motorista_id: string | null
           parceiro_veiculo_id: string | null
           parceiro_carreta_id: string | null
+          parceiro_primeira_carreta_id: string | null
+          parceiro_dolly_id: string | null
           parceiro_subcontratada_id: string | null
           cliente_id: string | null
           pamcard_status: PamcardStatus | null

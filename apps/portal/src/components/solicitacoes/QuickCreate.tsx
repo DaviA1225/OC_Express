@@ -22,11 +22,14 @@ const TIPOS_CARRETA = [
   'Caçamba 3 Eixos',
   'Caçamba 4 Eixos',
   'Bi-Trem Caçamba',
+  '8 Eixos Caçamba',
   'Rodo-Trem Caçamba',
   'Graneleiro LS 3 Eixos',
   'Graneleiro LS 4 Eixos',
   'Bi-Trem Graneleiro',
+  '8 Eixos Graneleiro',
   'Rodo-Trem Graneleiro',
+  'Dolly',
 ] as const
 
 interface QuickCreateProps {

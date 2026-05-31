@@ -49,6 +49,8 @@ const schema = z
     parceiro_motorista_id: z.string().min(1, 'Selecione o motorista'),
     parceiro_veiculo_id: z.string().min(1, 'Selecione o cavalo'),
     parceiro_carreta_id: z.string(),
+    parceiro_primeira_carreta_id: z.string(),
+    parceiro_dolly_id: z.string(),
     parceiro_subcontratada_id: z.string(),
     cliente_id: z.string().min(1, 'Selecione o cliente'),
     pamcard_status: z.enum(['tem_cartao', 'nao_tem_cartao']),
@@ -94,6 +96,8 @@ export default function NovaSolicitacaoPage() {
       parceiro_motorista_id: '',
       parceiro_veiculo_id: '',
       parceiro_carreta_id: '',
+      parceiro_primeira_carreta_id: '',
+      parceiro_dolly_id: '',
       parceiro_subcontratada_id: '',
       cliente_id: '',
       pamcard_status: 'tem_cartao',
@@ -107,6 +111,8 @@ export default function NovaSolicitacaoPage() {
   const [qcMotorista, setQcMotorista] = React.useState<string | null>(null)
   const [qcVeiculo, setQcVeiculo] = React.useState<string | null>(null)
   const [qcCarreta, setQcCarreta] = React.useState<string | null>(null)
+  const [qcPrimeiraCarreta, setQcPrimeiraCarreta] = React.useState<string | null>(null)
+  const [qcDolly, setQcDolly] = React.useState<string | null>(null)
   const [qcSubcontratada, setQcSubcontratada] = React.useState<string | null>(null)
 
   // Anexos coletados localmente; sao enviados apos a solicitacao ser criada
@@ -174,6 +180,8 @@ export default function NovaSolicitacaoPage() {
     | 'parceiro_motorista_id'
     | 'parceiro_veiculo_id'
     | 'parceiro_carreta_id'
+    | 'parceiro_primeira_carreta_id'
+    | 'parceiro_dolly_id'
     | 'parceiro_subcontratada_id'
     | 'cliente_id'
   const set = (field: IdField, value: string) =>
@@ -186,6 +194,8 @@ export default function NovaSolicitacaoPage() {
         parceiro_motorista_id: v.parceiro_motorista_id,
         parceiro_veiculo_id: v.parceiro_veiculo_id,
         parceiro_carreta_id: v.parceiro_carreta_id || null,
+        parceiro_primeira_carreta_id: v.parceiro_primeira_carreta_id || null,
+        parceiro_dolly_id: v.parceiro_dolly_id || null,
         parceiro_subcontratada_id: v.parceiro_subcontratada_id || null,
         cliente_id: v.cliente_id,
         pamcard_status: v.pamcard_status,
@@ -275,7 +285,7 @@ export default function NovaSolicitacaoPage() {
               error={errors.parceiro_veiculo_id?.message}
             />
             <ComboField
-              label="Carreta"
+              label="Última Carreta"
               placeholder="Selecionar carreta (opcional)"
               options={carretaOptions}
               loading={carretas.isLoading}
@@ -285,6 +295,32 @@ export default function NovaSolicitacaoPage() {
               createNewLabel="Cadastrar nova carreta"
             />
           </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <ComboField
+              label="1ª Carreta"
+              placeholder="Selecionar carreta (opcional)"
+              options={carretaOptions}
+              loading={carretas.isLoading}
+              value={watch('parceiro_primeira_carreta_id')}
+              onChange={(val) => set('parceiro_primeira_carreta_id', val ?? '')}
+              onCreateNew={(s) => setQcPrimeiraCarreta(s)}
+              createNewLabel="Cadastrar nova carreta"
+            />
+            <ComboField
+              label="Dolly"
+              placeholder="Selecionar dolly (opcional)"
+              options={carretaOptions}
+              loading={carretas.isLoading}
+              value={watch('parceiro_dolly_id')}
+              onChange={(val) => set('parceiro_dolly_id', val ?? '')}
+              onCreateNew={(s) => setQcDolly(s)}
+              createNewLabel="Cadastrar novo dolly"
+            />
+          </div>
+          <p className="text-[12px] text-muted-foreground">
+            Preencha 1ª Carreta e Dolly apenas quando a composição tiver esses
+            implementos (exigência ANTT). Em branco, a OC traz só cavalo e última carreta.
+          </p>
           <ComboField
             label="Subcontratada"
             placeholder="Selecionar subcontratada (opcional)"
@@ -473,6 +509,26 @@ export default function NovaSolicitacaoPage() {
         onCreated={(id) => {
           set('parceiro_carreta_id', id)
           setQcCarreta(null)
+        }}
+      />
+      <QuickCreateCarreta
+        open={qcPrimeiraCarreta !== null}
+        onOpenChange={(o) => !o && setQcPrimeiraCarreta(null)}
+        parceiroId={parceiroId}
+        defaultValue={qcPrimeiraCarreta ?? ''}
+        onCreated={(id) => {
+          set('parceiro_primeira_carreta_id', id)
+          setQcPrimeiraCarreta(null)
+        }}
+      />
+      <QuickCreateCarreta
+        open={qcDolly !== null}
+        onOpenChange={(o) => !o && setQcDolly(null)}
+        parceiroId={parceiroId}
+        defaultValue={qcDolly ?? ''}
+        onCreated={(id) => {
+          set('parceiro_dolly_id', id)
+          setQcDolly(null)
         }}
       />
       <QuickCreateSubcontratada

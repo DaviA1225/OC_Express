@@ -136,6 +136,8 @@ export interface OCData {
   subcontratada?: string | null
   motorista: string
   cavalo_placa: string
+  primeira_carreta?: string | null
+  dolly?: string | null
   ultima_carreta?: string | null
   carregamento?: string | null
   destino: string
@@ -150,7 +152,7 @@ export interface OCData {
 }
 
 export function OCDocument({ data }: { data: OCData }) {
-  const linhas: {
+  type Linha = {
     label: string
     ast?: boolean
     valor: string
@@ -159,14 +161,41 @@ export function OCDocument({ data }: { data: OCData }) {
     rightAst?: boolean
     rightValor?: string
     rightValorSm?: boolean
-  }[] = [
+  }
+
+  // Composição veicular na ordem física exigida pela ANTT:
+  //   Cavalo → 1ª Carreta → Dolly → Última Carreta.
+  // 1ª Carreta e Dolly são opcionais: quando vazios, as linhas são omitidas e
+  // a OC traz apenas Cavalo e Última Carreta. As placas são pareadas duas por
+  // linha mantendo a sequência (esquerda→direita, cima→baixo).
+  const placas: { label: string; ast?: boolean; valor: string }[] = [
+    { label: 'Cavalo', ast: true, valor: data.cavalo_placa },
+  ]
+  if ((data.primeira_carreta ?? '').trim()) {
+    placas.push({ label: '1ª Carreta', valor: (data.primeira_carreta ?? '').trim() })
+  }
+  if ((data.dolly ?? '').trim()) {
+    placas.push({ label: 'Dolly', valor: (data.dolly ?? '').trim() })
+  }
+  placas.push({ label: 'Última Carreta', ast: true, valor: data.ultima_carreta ?? '' })
+
+  const placaRows: Linha[] = []
+  for (let i = 0; i < placas.length; i += 2) {
+    const left = placas[i]
+    const right = placas[i + 1]
+    placaRows.push({
+      label: left.label, ast: left.ast, valor: left.valor,
+      ...(right
+        ? { rightLabel: right.label, rightAst: right.ast, rightValor: right.valor }
+        : {}),
+    })
+  }
+
+  const linhas: Linha[] = [
     { label: 'Filial', valor: data.filial },
     { label: 'Subcontratada', ast: true, valor: data.subcontratada ?? '' },
     { label: 'Motorista', ast: true, valor: data.motorista, valorSm: true },
-    {
-      label: 'Cavalo', ast: true, valor: data.cavalo_placa,
-      rightLabel: 'Última Carreta', rightAst: true, rightValor: data.ultima_carreta ?? '',
-    },
+    ...placaRows,
     {
       label: 'Carregamento', valor: data.carregamento ?? '',
       rightLabel: 'Destino', rightValor: data.destino,
@@ -263,7 +292,7 @@ export function OCDocument({ data }: { data: OCData }) {
           ))}
           <Text style={styles.notaNormal}>2° Proibido: Acompanhantes dentro do pátio de carregamento.</Text>
           <Text style={styles.notaNormal}>     Erguer báscula dentro dos pátios.</Text>
-          <Text style={styles.notaNormal}>3° Confira seus dados (*) na OC assim como cavalo e última carreta.</Text>
+          <Text style={styles.notaNormal}>3° Confira seus dados (*) na OC e as placas da composição (cavalo, carretas e dolly).</Text>
           <Text style={styles.notaNormal}>4° Antes de deixar a Mina, certifique-se:</Text>
           <Text style={styles.notaNormal}>     Nota Fiscal, CTE e MDFE estejam emitidos corretamente.</Text>
           <Text style={styles.notaNormal}>5° Certifique-se: recebimento valor do frete assim como o pedágio.</Text>

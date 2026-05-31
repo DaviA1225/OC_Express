@@ -51,6 +51,8 @@ class OrdemCreate(BaseModel):
     subcontratada_id: Optional[str] = None
     motorista_id: Optional[str] = None
     cavalo_placa: str
+    primeira_carreta: Optional[str] = None
+    dolly: Optional[str] = None
     ultima_carreta: Optional[str] = None
     carregamento: str
     destino: str
@@ -77,6 +79,8 @@ class OrdemPDFRequest(BaseModel):
     subcontratada: Optional[str] = None
     motorista: Optional[str] = None
     cavalo_placa: str
+    primeira_carreta: Optional[str] = None
+    dolly: Optional[str] = None
     ultima_carreta: Optional[str] = None
     carregamento: str
     destino: str

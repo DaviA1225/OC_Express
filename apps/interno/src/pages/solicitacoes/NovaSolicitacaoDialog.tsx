@@ -63,6 +63,8 @@ const schema = z
     motorista_id: z.string().min(1, 'Motorista é obrigatório'),
     veiculo_id: z.string().min(1, 'Cavalo é obrigatório'),
     carreta_id: z.string().nullable().optional(),
+    primeira_carreta_id: z.string().nullable().optional(),
+    dolly_id: z.string().nullable().optional(),
     subcontratada_id: z.string().nullable().optional(),
     cliente_id: z.string().min(1, 'Cliente é obrigatório'),
     material_id: z.string().nullable().optional(),
@@ -166,6 +168,8 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, onCreated }: Props) 
         motorista_id: '',
         veiculo_id: '',
         carreta_id: null,
+        primeira_carreta_id: null,
+        dolly_id: null,
         subcontratada_id: null,
         cliente_id: '',
         material_id: null,
@@ -182,6 +186,8 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, onCreated }: Props) 
   const motoristaId = watch('motorista_id')
   const veiculoId = watch('veiculo_id')
   const carretaId = watch('carreta_id') ?? null
+  const primeiraCarretaId = watch('primeira_carreta_id') ?? null
+  const dollyId = watch('dolly_id') ?? null
   const subcontratadaId = watch('subcontratada_id') ?? null
   const materialSubtipo = watch('material_subtipo') ?? null
   const localCarregamento = watch('local_carregamento') ?? ''
@@ -224,6 +230,8 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, onCreated }: Props) 
   const [qcMot, setQcMot] = React.useState<{ open: boolean; nome: string }>({ open: false, nome: '' })
   const [qcVeic, setQcVeic] = React.useState<{ open: boolean; placa: string }>({ open: false, placa: '' })
   const [qcCar, setQcCar] = React.useState<{ open: boolean; placa: string }>({ open: false, placa: '' })
+  const [qcPrimCar, setQcPrimCar] = React.useState<{ open: boolean; placa: string }>({ open: false, placa: '' })
+  const [qcDolly, setQcDolly] = React.useState<{ open: boolean; placa: string }>({ open: false, placa: '' })
   const [qcCli, setQcCli] = React.useState<{ open: boolean; nome: string }>({ open: false, nome: '' })
   const [pendingDup, setPendingDup] = React.useState<{ values: FormValues; dup: PossibleDuplicate } | null>(null)
 
@@ -278,6 +286,8 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, onCreated }: Props) 
       motorista_id: values.motorista_id,
       veiculo_id: values.veiculo_id,
       carreta_id: values.carreta_id || null,
+      primeira_carreta_id: values.primeira_carreta_id || null,
+      dolly_id: values.dolly_id || null,
       subcontratada_id: values.subcontratada_id || null,
       cliente_id: values.cliente_id,
       material_id: resolvedMaterialId,
@@ -409,7 +419,7 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, onCreated }: Props) 
                     )}
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Carreta</Label>
+                    <Label>Última Carreta</Label>
                     <Combobox
                       options={carretaOptions}
                       value={carretaId}
@@ -423,6 +433,40 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, onCreated }: Props) 
                     />
                   </div>
                 </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label>1ª Carreta</Label>
+                    <Combobox
+                      options={carretaOptions}
+                      value={primeiraCarretaId}
+                      onChange={(v) => setValue('primeira_carreta_id', v, { shouldValidate: true })}
+                      placeholder="Opcional"
+                      searchPlaceholder="Buscar carreta"
+                      emptyMessage="Nenhuma carreta encontrada."
+                      loading={carretas.isLoading}
+                      onCreateNew={(s) => setQcPrimCar({ open: true, placa: s })}
+                      createNewLabel="Cadastrar nova carreta"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Dolly</Label>
+                    <Combobox
+                      options={carretaOptions}
+                      value={dollyId}
+                      onChange={(v) => setValue('dolly_id', v, { shouldValidate: true })}
+                      placeholder="Opcional"
+                      searchPlaceholder="Buscar dolly"
+                      emptyMessage="Nenhuma carreta encontrada."
+                      loading={carretas.isLoading}
+                      onCreateNew={(s) => setQcDolly({ open: true, placa: s })}
+                      createNewLabel="Cadastrar novo dolly"
+                    />
+                  </div>
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  Preencha 1ª Carreta e Dolly apenas quando a composição tiver esses
+                  implementos (ANTT). Em branco, a OC traz só cavalo e última carreta.
+                </p>
                 <div className="space-y-1.5">
                   <Label>Subcontratada</Label>
                   <Combobox
@@ -576,6 +620,24 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, onCreated }: Props) 
         initialPlaca={qcCar.placa}
         onCreated={(row) => {
           setValue('carreta_id', row.id, { shouldValidate: true })
+          carretas.refetch()
+        }}
+      />
+      <QuickCreateCarreta
+        open={qcPrimCar.open}
+        onOpenChange={(o) => setQcPrimCar((s) => ({ ...s, open: o }))}
+        initialPlaca={qcPrimCar.placa}
+        onCreated={(row) => {
+          setValue('primeira_carreta_id', row.id, { shouldValidate: true })
+          carretas.refetch()
+        }}
+      />
+      <QuickCreateCarreta
+        open={qcDolly.open}
+        onOpenChange={(o) => setQcDolly((s) => ({ ...s, open: o }))}
+        initialPlaca={qcDolly.placa}
+        onCreated={(row) => {
+          setValue('dolly_id', row.id, { shouldValidate: true })
           carretas.refetch()
         }}
       />

@@ -98,6 +98,8 @@ export default function SolicitacaoDetailPage() {
   const motorista = motoristas.data?.find((m) => m.id === sol.parceiro_motorista_id) ?? null
   const veiculo = veiculos.data?.find((v) => v.id === sol.parceiro_veiculo_id) ?? null
   const carreta = carretas.data?.find((c) => c.id === sol.parceiro_carreta_id) ?? null
+  const primeiraCarreta = carretas.data?.find((c) => c.id === sol.parceiro_primeira_carreta_id) ?? null
+  const dolly = carretas.data?.find((c) => c.id === sol.parceiro_dolly_id) ?? null
   const subcontratada =
     subcontratadas.data?.find((s) => s.id === sol.parceiro_subcontratada_id) ?? null
   const cliente = clientes.data?.find((c) => c.id === sol.cliente_id) ?? null
@@ -142,7 +144,15 @@ export default function SolicitacaoDetailPage() {
           />
           <DataRow label="Cavalo" value={placaTipo(veiculo?.placa, veiculo?.tipo)} />
           <DataRow
-            label="Carreta"
+            label="1ª Carreta"
+            value={primeiraCarreta ? placaTipo(primeiraCarreta.placa, primeiraCarreta.tipo) : 'Sem 1ª carreta'}
+          />
+          <DataRow
+            label="Dolly"
+            value={dolly ? placaTipo(dolly.placa, dolly.tipo) : 'Sem dolly'}
+          />
+          <DataRow
+            label="Última Carreta"
             value={carreta ? placaTipo(carreta.placa, carreta.tipo) : 'Sem carreta'}
           />
           <DataRow

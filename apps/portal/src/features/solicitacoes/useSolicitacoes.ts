@@ -101,6 +101,8 @@ export interface NovaSolicitacaoInput {
   parceiro_motorista_id: string
   parceiro_veiculo_id: string
   parceiro_carreta_id: string | null
+  parceiro_primeira_carreta_id: string | null
+  parceiro_dolly_id: string | null
   parceiro_subcontratada_id: string | null
   cliente_id: string
   pamcard_status: PamcardStatus
@@ -133,6 +135,8 @@ export function useCriarSolicitacao() {
         parceiro_motorista_id: input.parceiro_motorista_id,
         parceiro_veiculo_id: input.parceiro_veiculo_id,
         parceiro_carreta_id: input.parceiro_carreta_id,
+        parceiro_primeira_carreta_id: input.parceiro_primeira_carreta_id,
+        parceiro_dolly_id: input.parceiro_dolly_id,
         parceiro_subcontratada_id: input.parceiro_subcontratada_id,
         cliente_id: input.cliente_id,
         material_id: null,

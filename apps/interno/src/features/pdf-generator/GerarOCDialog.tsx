@@ -70,6 +70,8 @@ export function GerarOCDialog({ open, onOpenChange, solicitacao, material, onSav
   const motoristaNome = solicitacao.motorista?.nome_completo ?? ''
   const motoristaCpf = solicitacao.motorista?.cpf ?? ''
   const cavaloPlaca = solicitacao.veiculo?.placa ?? ''
+  const primeiraCarreta = solicitacao.primeira_carreta?.placa ?? ''
+  const dolly = solicitacao.dolly?.placa ?? ''
   const ultimaCarreta = solicitacao.carreta?.placa ?? ''
   const subcontratadaNome = solicitacao.subcontratada?.razao_social ?? ''
   const clienteRazao = solicitacao.cliente?.razao_social ?? ''
@@ -104,6 +106,8 @@ export function GerarOCDialog({ open, onOpenChange, solicitacao, material, onSav
       subcontratada: subcontratadaNome || null,
       motorista: motoristaLinha,
       cavalo_placa: cavaloPlaca,
+      primeira_carreta: primeiraCarreta,
+      dolly: dolly,
       ultima_carreta: ultimaCarreta,
       carregamento: localCarregamento,
       destino: cidadeUf,
@@ -118,7 +122,7 @@ export function GerarOCDialog({ open, onOpenChange, solicitacao, material, onSav
     }
   }, [
     material, solicitacao.numero_interno, subcontratadaNome, motoristaNome, motoristaCpf,
-    cavaloPlaca, ultimaCarreta, clienteRazao, clienteCidade, clienteUf, materialNome,
+    cavaloPlaca, primeiraCarreta, dolly, ultimaCarreta, clienteRazao, clienteCidade, clienteUf, materialNome,
     subtipo, numeroInstrucao, localCarregamento, profileNome, matCnpj, matFilial, matObs,
     validadeInicio, validadeFim,
   ])

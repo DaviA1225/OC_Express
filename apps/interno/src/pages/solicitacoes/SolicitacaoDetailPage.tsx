@@ -597,6 +597,8 @@ function MotoristaVeiculoCard({ solicitacao, editable, onSave }: CardProps) {
   const [motorista, setMotorista] = React.useState<string | null>(solicitacao.motorista_id)
   const [veiculo, setVeiculo] = React.useState<string | null>(solicitacao.veiculo_id)
   const [carreta, setCarreta] = React.useState<string | null>(solicitacao.carreta_id)
+  const [primeiraCarreta, setPrimeiraCarreta] = React.useState<string | null>(solicitacao.primeira_carreta_id)
+  const [dolly, setDolly] = React.useState<string | null>(solicitacao.dolly_id)
   const [subcontratada, setSubcontratada] = React.useState<string | null>(solicitacao.subcontratada_id)
   const [saving, setSaving] = React.useState(false)
 
@@ -612,6 +614,8 @@ function MotoristaVeiculoCard({ solicitacao, editable, onSave }: CardProps) {
       setMotorista(solicitacao.motorista_id)
       setVeiculo(solicitacao.veiculo_id)
       setCarreta(solicitacao.carreta_id)
+      setPrimeiraCarreta(solicitacao.primeira_carreta_id)
+      setDolly(solicitacao.dolly_id)
       setSubcontratada(solicitacao.subcontratada_id)
     }
   }
@@ -640,6 +644,8 @@ function MotoristaVeiculoCard({ solicitacao, editable, onSave }: CardProps) {
         motorista_id: motorista,
         veiculo_id: veiculo,
         carreta_id: carreta,
+        primeira_carreta_id: primeiraCarreta,
+        dolly_id: dolly,
         subcontratada_id: subcontratada,
       })
       setEditing(false)
@@ -661,7 +667,9 @@ function MotoristaVeiculoCard({ solicitacao, editable, onSave }: CardProps) {
             extra={solicitacao.subcontratada?.documento}
           />
           <Field label="Cavalo" value={solicitacao.veiculo?.placa} />
-          <Field label="Carreta" value={solicitacao.carreta?.placa} />
+          <Field label="1ª Carreta" value={solicitacao.primeira_carreta?.placa} />
+          <Field label="Dolly" value={solicitacao.dolly?.placa} />
+          <Field label="Última Carreta" value={solicitacao.carreta?.placa} />
         </dl>
       ) : (
         <div className="space-y-3">
@@ -677,11 +685,26 @@ function MotoristaVeiculoCard({ solicitacao, editable, onSave }: CardProps) {
                 placeholder="Selecionar" loading={veiculos.isLoading} />
             </div>
             <div className="space-y-1.5">
-              <Label>Carreta</Label>
+              <Label>Última Carreta</Label>
               <Combobox options={carOpts} value={carreta} onChange={setCarreta}
                 placeholder="Opcional" loading={carretas.isLoading} />
             </div>
           </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>1ª Carreta</Label>
+              <Combobox options={carOpts} value={primeiraCarreta} onChange={setPrimeiraCarreta}
+                placeholder="Opcional" loading={carretas.isLoading} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Dolly</Label>
+              <Combobox options={carOpts} value={dolly} onChange={setDolly}
+                placeholder="Opcional" loading={carretas.isLoading} />
+            </div>
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            1ª Carreta e Dolly são opcionais — preencha conforme a composição (ANTT).
+          </p>
           <div className="space-y-1.5">
             <Label>Subcontratada</Label>
             <Combobox options={subOpts} value={subcontratada} onChange={setSubcontratada}

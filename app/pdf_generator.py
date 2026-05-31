@@ -113,31 +113,63 @@ def gerar_pdf(data: dict) -> bytes:
     COL = [W * 0.18, W * 0.03, W * 0.29, W * 0.18, W * 0.03, W * 0.29]
     COL_FULL = [W * 0.18, W * 0.03, W * 0.79]
 
-    campos_data = [
-        # Filial
-        [lbl("Filial"), vazio, val(data.get("filial", "")), "", "", ""],
-        # Subcontratada
-        [lbl("Subcontratada"), ast(), val(data.get("subcontratada", "")), "", "", ""],
-        # Motorista
-        [lbl("Motorista"), ast(), val(data.get("motorista", "")), "", "", ""],
-        # Cavalo | Última Carreta
-        [lbl("Cavalo"), ast(), val(data.get("cavalo_placa", "")),
-         lbl("Última Carreta"), ast(), val(data.get("ultima_carreta", ""))],
-        # Carregamento | Destino
-        [lbl("Carregamento"), vazio, val(data.get("carregamento", "")),
-         lbl("Destino"), vazio, val(data.get("destino", ""))],
-        # Instrução | Descarga
-        [lbl("Instrução"), vazio, val(data.get("instrucao", "")),
-         lbl("Descarga"), vazio, val(data.get("descarga", ""))],
-        # Material
-        [lbl("Material"), vazio, val(data.get("material", "")), "", "", ""],
-        # Autorizado
-        [lbl("Autorizado"), vazio, val(data.get("autorizado_por", "DAVI ASAF SILVA")), "", "", ""],
-        # Validade
-        [lbl("Validade"), vazio,
-         val(f"{_fmt_date(data.get('validade_inicio'))}   a   {_fmt_date(data.get('validade_fim'))}"),
-         "", "", ""],
-    ]
+    # Composição veicular na ordem física exigida pela ANTT:
+    #   Cavalo → 1ª Carreta → Dolly → Última Carreta.
+    # 1ª Carreta e Dolly são opcionais — omitidas quando vazias. As placas são
+    # pareadas duas por linha mantendo a sequência (esquerda→direita, cima→baixo).
+    placas = [("Cavalo", True, data.get("cavalo_placa", ""))]
+    if str(data.get("primeira_carreta") or "").strip():
+        placas.append(("1ª Carreta", False, str(data.get("primeira_carreta")).strip()))
+    if str(data.get("dolly") or "").strip():
+        placas.append(("Dolly", False, str(data.get("dolly")).strip()))
+    placas.append(("Última Carreta", True, data.get("ultima_carreta", "")))
+
+    def _cell_ast(with_ast):
+        return ast() if with_ast else vazio
+
+    # Monta as linhas dinamicamente e registra os índices para os SPANs/cinza.
+    campos_data = []
+    span_full_rows = []   # valor com colspan 2→5 (linha sem coluna direita)
+    cinza_right_rows = []  # linha com label à direita (col 3) em cinza
+
+    def add_full(label, value, with_ast=False):
+        idx = len(campos_data)
+        campos_data.append([lbl(label), _cell_ast(with_ast), val(value), "", "", ""])
+        span_full_rows.append(idx)
+
+    add_full("Filial", data.get("filial", ""))
+    add_full("Subcontratada", data.get("subcontratada", ""), with_ast=True)
+    add_full("Motorista", data.get("motorista", ""), with_ast=True)
+
+    for i in range(0, len(placas), 2):
+        left = placas[i]
+        right = placas[i + 1] if i + 1 < len(placas) else None
+        idx = len(campos_data)
+        row = [lbl(left[0]), _cell_ast(left[1]), val(left[2])]
+        if right is not None:
+            row += [lbl(right[0]), _cell_ast(right[1]), val(right[2])]
+            cinza_right_rows.append(idx)
+        else:
+            row += ["", "", ""]
+            span_full_rows.append(idx)
+        campos_data.append(row)
+
+    idx = len(campos_data)
+    campos_data.append([lbl("Carregamento"), vazio, val(data.get("carregamento", "")),
+                        lbl("Destino"), vazio, val(data.get("destino", ""))])
+    cinza_right_rows.append(idx)
+
+    idx = len(campos_data)
+    campos_data.append([lbl("Instrução"), vazio, val(data.get("instrucao", "")),
+                        lbl("Descarga"), vazio, val(data.get("descarga", ""))])
+    cinza_right_rows.append(idx)
+
+    add_full("Material", data.get("material", ""))
+    add_full("Autorizado", data.get("autorizado_por", "DAVI ASAF SILVA"))
+    add_full(
+        "Validade",
+        f"{_fmt_date(data.get('validade_inicio'))}   a   {_fmt_date(data.get('validade_fim'))}",
+    )
 
     campos_table = Table(campos_data, colWidths=COL)
     campos_style = [
@@ -149,22 +181,13 @@ def gerar_pdf(data: dict) -> bytes:
         ("LEFTPADDING", (0, 0), (-1, -1), 5),
         ("RIGHTPADDING", (0, 0), (-1, -1), 5),
         ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#CCCCCC")),
-        # Labels com fundo cinza
+        # Coluna de labels (esquerda) com fundo cinza
         ("BACKGROUND", (0, 0), (0, -1), CINZA_CLARO),
-        ("BACKGROUND", (3, 3), (3, 5), CINZA_CLARO),
-        # Filial: colspan 3→6
-        ("SPAN", (2, 0), (5, 0)),
-        # Subcontratada: colspan 3→6
-        ("SPAN", (2, 1), (5, 1)),
-        # Motorista: colspan 3→6
-        ("SPAN", (2, 2), (5, 2)),
-        # Material: colspan 3→6
-        ("SPAN", (2, 6), (5, 6)),
-        # Autorizado: colspan 3→6
-        ("SPAN", (2, 7), (5, 7)),
-        # Validade: colspan 3→6
-        ("SPAN", (2, 8), (5, 8)),
     ]
+    for idx in cinza_right_rows:
+        campos_style.append(("BACKGROUND", (3, idx), (3, idx), CINZA_CLARO))
+    for idx in span_full_rows:
+        campos_style.append(("SPAN", (2, idx), (5, idx)))
     campos_table.setStyle(TableStyle(campos_style))
     story.append(campos_table)
     story.append(Spacer(1, 5 * mm))
@@ -209,7 +232,7 @@ def gerar_pdf(data: dict) -> bytes:
         (False, "     Caçambas limpas para evitar contaminação do minério."),
         (False, "2° Proibido: Acompanhantes dentro do pátio de carregamento."),
         (False, "     Erguer báscula dentro dos pátios."),
-        (False, "3° Confira seus dados (*) na OC assim como cavalo e última carreta."),
+        (False, "3° Confira seus dados (*) na OC e as placas da composição (cavalo, carretas e dolly)."),
         (False, "4° Antes de deixar a Mina, certifique-se:"),
         (False, "     Nota Fiscal, CTE e MDFE estejam emitidos corretamente."),
         (False, "5° Certifique-se: recebimento valor do frete assim como o pedágio."),
