@@ -37,7 +37,7 @@ export function Header({ pageTitle, onOpenMobileMenu, onOpenSearch, realtimeStat
   }
 
   return (
-    <header className="flex h-14 shrink-0 items-center gap-3 border-b border-black/30 bg-gradient-to-r from-[#C44612] from-0% via-[#3A1E10] via-15% to-[#1D1E1B] to-100% px-4 text-primary-foreground shadow-sm">
+    <header className="flex h-14 shrink-0 items-center gap-3 border-b border-white/10 bg-[#1D1E1B] px-4 text-primary-foreground">
       <Button
         type="button"
         variant="ghost"

@@ -11,31 +11,32 @@
 
 @layer base {
   :root {
-    /* Paleta LHG Mining/Logística — manual oficial
-       Primária: laranja #FF5100  ·  preto #1D1E1B  ·  cinza #6F7271
-       Secundárias: bege #F4D4BD · cinza-claro #E5E5E5 · laranja-escuro #D3641A */
+    /* Identidade LHG — estrutura GRAFITE NEUTRA (institucional) com o laranja
+       #FF5100 reservado a acento: ações primárias, estado ativo e foco. O preto
+       LHG #1D1E1B vira a barra superior (sólida). Estrutura em escala fria/ardósia
+       para um visual corporativo, sem o tom "quente" anterior. */
 
     --background: 0 0% 100%;             /* #FFFFFF */
-    --foreground: 80 7% 11%;             /* #1D1E1B preto LHG */
+    --foreground: 220 20% 13%;           /* grafite near-black neutro */
 
     --card: 0 0% 100%;
-    --card-foreground: 80 7% 11%;
+    --card-foreground: 220 20% 13%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 80 7% 11%;
+    --popover-foreground: 220 20% 13%;
 
-    --primary: 19 100% 50%;              /* #FF5100 laranja LHG */
+    --primary: 19 100% 50%;              /* #FF5100 laranja LHG — acento */
     --primary-hover: 21 79% 47%;         /* #D3641A laranja queimado */
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 80 7% 18%;              /* tom escuro derivado do preto LHG */
+    --secondary: 220 16% 20%;            /* grafite escuro neutro */
     --secondary-foreground: 0 0% 100%;
 
-    --muted: 30 25% 97%;                 /* bege bem clarinho (warm white) */
-    --muted-foreground: 180 1% 44%;      /* #6F7271 cinza LHG */
+    --muted: 220 20% 97%;                /* canvas cinza-ardósia bem claro */
+    --muted-foreground: 220 9% 46%;      /* slate-500 */
 
-    --accent: 26 73% 85%;                /* #F4D4BD bege secundário */
-    --accent-foreground: 80 7% 11%;
+    --accent: 220 16% 94%;               /* cinza neutro p/ hover/realce */
+    --accent-foreground: 220 20% 20%;
 
     --destructive: 0 84% 60%;            /* #EF4444 */
     --destructive-foreground: 0 0% 100%;
@@ -44,37 +45,37 @@
     --success-foreground: 0 0% 100%;
 
     --warning: 38 92% 50%;
-    --warning-foreground: 80 7% 11%;
+    --warning-foreground: 220 20% 13%;
 
-    --border: 30 12% 89%;                /* cinza ligeiramente quente */
-    --input: 30 12% 89%;
+    --border: 220 14% 90%;               /* hairline cinza frio */
+    --input: 220 14% 90%;
     --ring: 19 100% 50%;                 /* foco em laranja LHG */
 
-    --radius: 0.375rem;
+    --radius: 0.25rem;
   }
 
   .dark {
-    --background: 80 6% 9%;              /* near-black com leve calor */
-    --foreground: 30 15% 96%;            /* off-white quente */
+    --background: 220 16% 10%;           /* grafite escuro neutro */
+    --foreground: 220 14% 96%;           /* off-white neutro */
 
-    --card: 80 6% 12%;                   /* card um tom acima do bg */
-    --card-foreground: 30 15% 96%;
+    --card: 220 15% 13%;                 /* card um tom acima do bg */
+    --card-foreground: 220 14% 96%;
 
-    --popover: 80 6% 13%;
-    --popover-foreground: 30 15% 96%;
+    --popover: 220 15% 14%;
+    --popover-foreground: 220 14% 96%;
 
     --primary: 21 100% 60%;              /* laranja luminoso para dark */
     --primary-hover: 19 100% 52%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 180 1% 30%;
-    --secondary-foreground: 30 15% 96%;
+    --secondary: 220 10% 30%;
+    --secondary-foreground: 220 14% 96%;
 
-    --muted: 80 6% 15%;
-    --muted-foreground: 30 8% 68%;
+    --muted: 220 14% 16%;
+    --muted-foreground: 220 9% 66%;
 
-    --accent: 21 55% 22%;                /* laranja escuro queimado pra accent */
-    --accent-foreground: 30 15% 96%;
+    --accent: 220 14% 22%;               /* cinza neutro p/ realce */
+    --accent-foreground: 220 14% 96%;
 
     --destructive: 0 72% 55%;
     --destructive-foreground: 0 0% 100%;
@@ -83,10 +84,10 @@
     --success-foreground: 0 0% 100%;
 
     --warning: 38 92% 55%;
-    --warning-foreground: 80 7% 11%;
+    --warning-foreground: 220 20% 13%;
 
-    --border: 80 6% 20%;                 /* contraste de borda um pouco mais visível */
-    --input: 80 6% 20%;
+    --border: 220 12% 22%;               /* contraste de borda um pouco mais visível */
+    --input: 220 12% 22%;
     --ring: 21 100% 60%;
   }
 }

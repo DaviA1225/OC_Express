@@ -16,12 +16,12 @@ export function EmptyState({ icon: Icon, title, description, action, size = 'md'
         aria-hidden
         className={
           isCompact
-            ? 'mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-primary/5 ring-1 ring-primary/15'
-            : 'mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-primary/5 ring-1 ring-primary/15'
+            ? 'mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-muted ring-1 ring-border'
+            : 'mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-muted ring-1 ring-border'
         }
       >
         <Icon
-          className={isCompact ? 'h-6 w-6 text-primary/60' : 'h-9 w-9 text-primary/60'}
+          className={isCompact ? 'h-6 w-6 text-muted-foreground' : 'h-9 w-9 text-muted-foreground'}
           strokeWidth={1.5}
         />
       </div>

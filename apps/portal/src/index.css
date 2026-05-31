@@ -50,7 +50,8 @@
     --input: 220 13% 90%;
     --ring: 226 71% 40%;
 
-    --radius: 0.375rem;
+    /* Radius sóbrio (institucional), alinhado ao sistema interno. */
+    --radius: 0.25rem;
   }
 
   .dark {

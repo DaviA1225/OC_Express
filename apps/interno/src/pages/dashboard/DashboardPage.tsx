@@ -25,7 +25,6 @@ import {
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { useAuth } from '@/hooks/useAuth'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   useRelatorioDataset,
@@ -67,7 +66,6 @@ const CHART_PRIMARY = '#FF5100'  // laranja LHG
 const CHART_SECONDARY = '#10b981'// emerald (mantido como sinal universal de "concluído")
 
 export default function DashboardPage() {
-  const { profile } = useAuth()
   const [params, setParams] = useSearchParams()
   const presetRaw = params.get('p')
   const preset: PeriodoPreset = VALID_PRESETS.includes(presetRaw ?? '')
@@ -100,8 +98,6 @@ export default function DashboardPage() {
   const topMotoristasItems = ds.data ? topMotoristas(ds.data, 5) : []
   const topSubcontratadasItems = ds.data ? topSubcontratadas(ds.data, 5) : []
 
-  const saudacao = saudar()
-  const nome = profile?.nome_completo?.split(' ')[0] ?? 'usuário'
   const atrasadas = estado.data?.atrasadas ?? 0
   const pendentesAtuais = estado.data?.pendentes ?? 0
 
@@ -109,8 +105,8 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-[24px] font-semibold tracking-tight text-foreground">
-            {saudacao}, {nome}.
+          <h1 className="text-[22px] font-semibold tracking-tight text-foreground">
+            Visão geral
           </h1>
           <p className="text-[12px] text-muted-foreground">
             {periodo.label} ·{' '}
@@ -145,7 +141,7 @@ export default function DashboardPage() {
           value={kpis?.total}
           previous={kpisAnt?.total}
           icon={<ClipboardList className="h-4 w-4" />}
-          accent="text-primary bg-primary/10 dark:bg-primary/15"
+          accent="text-foreground/70"
           isLoading={ds.isLoading}
           higherIsBetter
         />
@@ -155,7 +151,7 @@ export default function DashboardPage() {
           subValue={kpis ? `${(kpis.taxaFinalizacao * 100).toFixed(0)}% de conclusão` : undefined}
           previous={kpisAnt?.finalizadas}
           icon={<ClipboardCheck className="h-4 w-4" />}
-          accent="text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40"
+          accent="text-foreground/70"
           isLoading={ds.isLoading}
           higherIsBetter
         />
@@ -166,7 +162,7 @@ export default function DashboardPage() {
           subValue="Criada → finalizada"
           previous={kpisAnt?.tempoMedioHoras ?? null}
           icon={<Hourglass className="h-4 w-4" />}
-          accent="text-amber-600 bg-amber-50 dark:bg-amber-950/40"
+          accent="text-foreground/70"
           isLoading={ds.isLoading}
           higherIsBetter={false}
         />
@@ -175,7 +171,7 @@ export default function DashboardPage() {
           value={pendentesAtuais}
           subValue="Estado atual da fila"
           icon={<Inbox className="h-4 w-4" />}
-          accent="text-foreground bg-muted dark:bg-muted/50"
+          accent="text-foreground/70"
           isLoading={estado.isLoading}
         />
       </div>
@@ -264,12 +260,12 @@ function KpiCard({
 }: KpiCardProps) {
   const delta = computeDelta(value, previous)
   return (
-    <div className="rounded-lg border bg-background p-5 transition-shadow hover:shadow-sm">
+    <div className="rounded-lg border bg-background p-4">
       <div className="flex items-start justify-between gap-2">
         <p className="text-[11px] font-medium uppercase tracking-[0.5px] text-muted-foreground">
           {label}
         </p>
-        <span className={cn('flex h-8 w-8 items-center justify-center rounded-md', accent)}>
+        <span className={cn('flex h-8 w-8 items-center justify-center rounded-md border bg-muted/60', accent)}>
           {icon}
         </span>
       </div>
@@ -519,11 +515,4 @@ function TopList({
       })}
     </ul>
   )
-}
-
-function saudar() {
-  const h = new Date().getHours()
-  if (h < 12) return 'Bom dia'
-  if (h < 18) return 'Boa tarde'
-  return 'Boa noite'
 }
