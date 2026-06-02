@@ -32,6 +32,8 @@ export type SolicitacaoOrigem = 'interno' | 'parceiro' | 'email'
 
 export type ParceiroPerfil = 'admin_parceiro' | 'operador_parceiro'
 
+export type SolicitacaoPendenciaStatus = 'aberta' | 'resolvida'
+
 export type TipoEventoPortal =
   | 'portal_login'
   | 'portal_login_falha'
@@ -411,6 +413,37 @@ export interface Database {
           updated_at?: string
         }
         Update: Partial<Database['public']['Tables']['solicitacao_anexos']['Insert']>
+      }
+      solicitacao_pendencias: {
+        Row: {
+          id: string
+          solicitacao_id: string
+          parceiro_id: string
+          motivo: string
+          status: SolicitacaoPendenciaStatus
+          resposta_parceiro: string | null
+          criada_por: string | null
+          resolvida_por: string | null
+          created_at: string
+          updated_at: string
+          resolvida_em: string | null
+        }
+        // parceiro_id, criada_por, status e resolvida_* são preenchidos por
+        // triggers (migration 0035) — o cliente só envia solicitacao_id e motivo.
+        Insert: {
+          id?: string
+          solicitacao_id: string
+          parceiro_id?: string
+          motivo: string
+          status?: SolicitacaoPendenciaStatus
+          resposta_parceiro?: string | null
+          criada_por?: string | null
+          resolvida_por?: string | null
+          created_at?: string
+          updated_at?: string
+          resolvida_em?: string | null
+        }
+        Update: Partial<Database['public']['Tables']['solicitacao_pendencias']['Insert']>
       }
       eventos_portal: {
         Row: {

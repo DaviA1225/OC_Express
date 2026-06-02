@@ -30,6 +30,10 @@ export function useRealtimeSubscriptions(): RealtimeStatus {
         qc.invalidateQueries({ queryKey: ['crud', 'cargas_retorno'] })
         qc.invalidateQueries({ queryKey: ['crud-count-active', 'cargas_retorno'] })
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'solicitacao_pendencias' }, () => {
+        qc.invalidateQueries({ queryKey: ['pendencias'] })
+        qc.invalidateQueries({ queryKey: ['notifications'] })
+      })
       .subscribe((s) => {
         if (s === 'SUBSCRIBED') setStatus('live')
         else if (s === 'CHANNEL_ERROR' || s === 'TIMED_OUT' || s === 'CLOSED') setStatus('error')

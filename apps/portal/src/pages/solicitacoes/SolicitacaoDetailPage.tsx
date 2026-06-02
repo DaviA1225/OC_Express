@@ -3,9 +3,10 @@ import { Link, useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { ArrowLeft, X, AlertCircle, Check } from 'lucide-react'
+import { ArrowLeft, X, AlertCircle, Check, Undo2, Loader2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
+import { Textarea } from '@/components/ui/textarea'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
@@ -24,6 +25,7 @@ import {
   useClientesPublicos,
   type PortalSolicitacao,
 } from '@/features/solicitacoes/useSolicitacoes'
+import { usePendenciaAberta, useResolverPendencia } from '@/features/solicitacoes/usePendencias'
 import type { Tables, SolicitacaoStatus } from '@sislog/shared/types'
 
 function fmtDataHora(iso: string | null): string {
@@ -35,6 +37,7 @@ export default function SolicitacaoDetailPage() {
   const navigate = useNavigate()
   const detalhe = useSolicitacaoPortal(id)
   const cancelar = useCancelarSolicitacao()
+  const pendencia = usePendenciaAberta(id)
   const [confirmOpen, setConfirmOpen] = React.useState(false)
 
   const motoristas = useMotoristasBase()
@@ -133,6 +136,12 @@ export default function SolicitacaoDetailPage() {
         )}
       </div>
 
+      {pendencia.data && (
+        <PendenciaBanner
+          pendencia={pendencia.data}
+        />
+      )}
+
       <section className="mt-4 rounded-lg border bg-background p-5">
         <h2 className="text-[15px] font-semibold text-foreground">Dados da solicitação</h2>
         <dl className="mt-4 grid gap-x-6 gap-y-3.5 sm:grid-cols-2">
@@ -197,6 +206,64 @@ export default function SolicitacaoDetailPage() {
         }}
       />
     </div>
+  )
+}
+
+// Banner de pendência: a equipe da LHG devolveu a solicitação pedindo uma ação
+// (ex.: documento do veículo). O parceiro lê o motivo e responde ao resolver.
+function PendenciaBanner({
+  pendencia,
+}: {
+  pendencia: { id: string; motivo: string; created_at: string }
+}) {
+  const resolver = useResolverPendencia()
+  const [resposta, setResposta] = React.useState('')
+
+  return (
+    <section className="mt-4 rounded-lg border border-orange-300 bg-orange-50 p-5 dark:border-orange-900/60 dark:bg-orange-950/40">
+      <div className="flex items-start gap-2.5">
+        <Undo2 className="mt-0.5 h-5 w-5 shrink-0 text-orange-600 dark:text-orange-400" />
+        <div className="min-w-0 flex-1">
+          <h2 className="text-[15px] font-semibold text-orange-900 dark:text-orange-200">
+            Ação necessária
+          </h2>
+          <p className="mt-0.5 text-[12px] text-orange-800 dark:text-orange-300">
+            A equipe da LHG devolveu esta solicitação{' '}
+            {format(new Date(pendencia.created_at), "dd/MM 'às' HH:mm", { locale: ptBR })}. Resolva
+            para a equipe continuar.
+          </p>
+          <p className="mt-3 whitespace-pre-wrap rounded-md bg-background/70 px-3 py-2 text-[13px] text-foreground">
+            {pendencia.motivo}
+          </p>
+
+          <div className="mt-3 space-y-2">
+            <Textarea
+              rows={3}
+              value={resposta}
+              onChange={(e) => setResposta(e.target.value)}
+              placeholder="Descreva como resolveu (opcional). Se precisar enviar um documento, anexe abaixo antes de resolver."
+              className="bg-background"
+            />
+            <div className="flex justify-end">
+              <Button
+                onClick={async () => {
+                  await resolver.mutateAsync({ id: pendencia.id, resposta: resposta.trim() })
+                }}
+                disabled={resolver.isPending}
+                className="bg-orange-600 text-white hover:bg-orange-700"
+              >
+                {resolver.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Check className="h-4 w-4" />
+                )}
+                Marcar como resolvido
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
   )
 }
 

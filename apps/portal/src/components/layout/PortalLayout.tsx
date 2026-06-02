@@ -11,6 +11,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu'
+import { PendenciasBell } from '@/components/layout/PendenciasBell'
 
 // Contatos de suporte da LHG (WhatsApp +55 67 9 9871-2180).
 const SUPORTE_EMAIL = 'davi.silva@lhgmining.com.br'
@@ -65,6 +66,8 @@ export function PortalLayout() {
           </div>
         </div>
 
+        <div className="flex items-center gap-1.5">
+        <PendenciasBell />
         <DropdownMenu>
           <DropdownMenuTrigger className="flex items-center gap-2 rounded-md px-1.5 py-1 outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">
             <Avatar className="h-8 w-8">
@@ -102,6 +105,7 @@ export function PortalLayout() {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        </div>
       </header>
 
       {/* Navegação horizontal — 44px */}

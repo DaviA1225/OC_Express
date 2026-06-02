@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Bell, Hourglass, FileX, Send, CalendarClock, CheckCheck } from 'lucide-react'
+import { Bell, Hourglass, FileX, Send, CalendarClock, CheckCheck, CheckCircle2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useNotifications, NOTIFICATION_LABELS, type NotificationKind, type NotificationItem } from './useNotifications'
@@ -45,9 +45,10 @@ function saveDismissed(m: DismissalMap) {
   }
 }
 
-const KIND_ORDER: NotificationKind[] = ['validade_vencendo', 'sem_oc', 'oc_nao_enviada', 'pendente']
+const KIND_ORDER: NotificationKind[] = ['pendencia_resolvida', 'validade_vencendo', 'sem_oc', 'oc_nao_enviada', 'pendente']
 
 const KIND_STYLES: Record<NotificationKind, { dot: string; icon: React.ComponentType<{ className?: string }> }> = {
+  pendencia_resolvida: { dot: 'bg-emerald-500', icon: CheckCircle2 },
   validade_vencendo: { dot: 'bg-red-500', icon: CalendarClock },
   sem_oc: { dot: 'bg-orange-500', icon: FileX },
   oc_nao_enviada: { dot: 'bg-orange-400', icon: Send },
@@ -68,6 +69,7 @@ export function NotificationsBell() {
   const total = visible.length
 
   const grouped: Record<NotificationKind, NotificationItem[]> = {
+    pendencia_resolvida: [],
     pendente: [],
     sem_oc: [],
     oc_nao_enviada: [],
@@ -182,6 +184,7 @@ export function NotificationsBell() {
 
 function kindIconColor(kind: NotificationKind): string {
   switch (kind) {
+    case 'pendencia_resolvida': return 'text-emerald-500'
     case 'validade_vencendo': return 'text-red-500'
     case 'sem_oc': return 'text-orange-500'
     case 'oc_nao_enviada': return 'text-orange-400'
