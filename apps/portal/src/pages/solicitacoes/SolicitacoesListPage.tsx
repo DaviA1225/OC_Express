@@ -252,7 +252,11 @@ function SolicitacaoCard({ view, temPendencia }: { view: SolicitacaoView; temPen
         <StatusBadge status={sol.status} />
       </div>
       {temPendencia && (
-        <span className="inline-flex w-fit items-center gap-1 rounded-full bg-orange-100 px-2 py-0.5 text-[11px] font-medium text-orange-800 dark:bg-orange-950/60 dark:text-orange-300">
+        <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-orange-100 px-2 py-0.5 text-[11px] font-semibold text-orange-800 dark:bg-orange-950/60 dark:text-orange-300">
+          <span className="relative flex h-2 w-2">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-orange-500 opacity-75" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-orange-500" />
+          </span>
           <Undo2 className="h-3 w-3" />
           Ação necessária
         </span>

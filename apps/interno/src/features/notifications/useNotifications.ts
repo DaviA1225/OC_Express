@@ -113,6 +113,7 @@ export function useNotifications() {
           .from('solicitacao_pendencias')
           .select('id, solicitacao_id, resolvida_em, solicitacao:solicitacao_id(numero_interno, solicitante_nome, status, created_at, cliente:cliente_id(razao_social))')
           .eq('status', 'resolvida')
+          .is('vista_equipe_em', null)
           .gte('resolvida_em', cutoffPendencia)
           .order('resolvida_em', { ascending: false })
           .limit(20)

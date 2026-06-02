@@ -1,5 +1,5 @@
 -- =====================================================================
--- OC Express / SisLog LHG — Schema cumulativo (migrations 0001 → 0035)
+-- OC Express / SisLog LHG — Schema cumulativo (migrations 0001 → 0036)
 -- =====================================================================
 --
 -- Este arquivo agrega TODAS as migrations num único script IDEMPOTENTE.
@@ -2230,6 +2230,19 @@ COMMENT ON TABLE solicitacao_pendencias IS
   'solicitacoes.status. parceiro_id é denormalizado para o RLS do parceiro.';
 
 
+-- 0036 — Pendência: marcar quando a equipe já viu a resposta do parceiro
+--
+-- Torna o aviso de "parceiro respondeu" um sinal COMPARTILHADO (pop no card da
+-- solicitação) em vez de só o sino, que cada usuário apaga individualmente. O
+-- pop some para todos quando alguem da equipe marca como visto. So interno
+-- escreve (policy pendencias_interno_all, 0035). Idempotente.
+
+ALTER TABLE solicitacao_pendencias
+  ADD COLUMN IF NOT EXISTS vista_equipe_em timestamptz;
+
+COMMENT ON COLUMN solicitacao_pendencias.vista_equipe_em IS
+  'Quando alguem da equipe interna marcou a resposta do parceiro como vista. '
+  'NULL = resolvida mas ainda nao tratada (mostra pop no card). So interno escreve.';
 
 
 -- =====================================================================

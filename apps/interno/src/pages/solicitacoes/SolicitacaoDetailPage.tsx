@@ -32,7 +32,7 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { AnexosCard } from '@/features/anexos/AnexosCard'
 import { HistoricoCard } from '@/features/solicitacoes/HistoricoCard'
-import { usePendencias, useDevolverParceiro, type Pendencia } from '@/features/solicitacoes/usePendencias'
+import { usePendencias, useDevolverParceiro, useMarcarPendenciaVista, type Pendencia } from '@/features/solicitacoes/usePendencias'
 const GerarOCDialog = React.lazy(() =>
   import('@/features/pdf-generator/GerarOCDialog').then((m) => ({ default: m.GerarOCDialog })),
 )
@@ -1442,6 +1442,7 @@ function DevolverParceiroForm({
 // Histórico de pendências da solicitação: o que foi devolvido, o status e a
 // resposta do parceiro quando resolvida.
 function PendenciasCard({ pendencias }: { pendencias: Pendencia[] }) {
+  const marcarVista = useMarcarPendenciaVista()
   return (
     <section className="rounded-lg border bg-background">
       <header className="flex items-center justify-between border-b px-4 py-2">
@@ -1450,8 +1451,15 @@ function PendenciasCard({ pendencias }: { pendencias: Pendencia[] }) {
       <ul className="divide-y">
         {pendencias.map((p) => {
           const aberta = p.status === 'aberta'
+          const respondidaNaoVista = !aberta && !p.vista_equipe_em
           return (
-            <li key={p.id} className="space-y-1.5 px-4 py-3">
+            <li
+              key={p.id}
+              className={cn(
+                'space-y-1.5 px-4 py-3',
+                respondidaNaoVista && 'bg-emerald-50/60 dark:bg-emerald-950/20',
+              )}
+            >
               <div className="flex items-center gap-2">
                 <span
                   className={cn(
@@ -1480,6 +1488,24 @@ function PendenciasCard({ pendencias }: { pendencias: Pendencia[] }) {
               {!aberta && p.resolvida_em && (
                 <p className="text-[11px] text-emerald-700 dark:text-emerald-400">
                   Resolvida em {format(new Date(p.resolvida_em), "dd/MM 'às' HH:mm", { locale: ptBR })}
+                </p>
+              )}
+              {respondidaNaoVista && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="mt-1 h-7 border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-950/40"
+                  disabled={marcarVista.isPending}
+                  onClick={() => marcarVista.mutate(p.id)}
+                  title="Marca a resposta como vista — remove o aviso do card para toda a equipe"
+                >
+                  {marcarVista.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+                  Marcar como visto
+                </Button>
+              )}
+              {!aberta && p.vista_equipe_em && (
+                <p className="text-[11px] text-muted-foreground">
+                  Visto pela equipe em {format(new Date(p.vista_equipe_em), "dd/MM 'às' HH:mm", { locale: ptBR })}
                 </p>
               )}
             </li>

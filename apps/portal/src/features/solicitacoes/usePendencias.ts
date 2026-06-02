@@ -31,6 +31,9 @@ export function usePendenciaAberta(solicitacaoId: string | undefined) {
   return useQuery({
     queryKey: ['pendencia-aberta', solicitacaoId],
     enabled: !!solicitacaoId,
+    refetchInterval: 45_000,
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: true,
     queryFn: async (): Promise<Pendencia | null> => {
       const { data, error } = await supabase
         .from('solicitacao_pendencias')

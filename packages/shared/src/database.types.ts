@@ -427,6 +427,7 @@ export interface Database {
           created_at: string
           updated_at: string
           resolvida_em: string | null
+          vista_equipe_em: string | null
         }
         // parceiro_id, criada_por, status e resolvida_* são preenchidos por
         // triggers (migration 0035) — o cliente só envia solicitacao_id e motivo.
@@ -442,6 +443,7 @@ export interface Database {
           created_at?: string
           updated_at?: string
           resolvida_em?: string | null
+          vista_equipe_em?: string | null
         }
         Update: Partial<Database['public']['Tables']['solicitacao_pendencias']['Insert']>
       }
