@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Plus, Search as SearchIcon, Inbox, Eraser, ChevronLeft, ChevronRight, X, CheckSquare, Square, Download, Loader2, Trash2, Clock } from 'lucide-react'
+import { Plus, Search as SearchIcon, Inbox, Eraser, ChevronLeft, ChevronRight, X, CheckSquare, Square, Download, Loader2, Trash2, Clock, Undo2, Reply } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -31,6 +31,7 @@ import {
 } from '@/features/solicitacoes/useSolicitacoes'
 import { buildCsv, downloadCsv, type CsvColumn } from '@/lib/csv'
 import { STATUS_LABELS, getSlaInfo, type SlaInfo } from '@/features/solicitacoes/status'
+import { usePendenciasSinais, type PendenciaSinal } from '@/features/solicitacoes/usePendencias'
 import { formatNumeroOC } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 import type { SolicitacaoStatus, SolicitacaoTipo, SolicitacaoOrigem, Tables } from '@/types/database.types'
@@ -155,6 +156,7 @@ export function SolicitacoesListPage() {
   }
 
   const list = useSolicitacoesList(filters)
+  const pendenciaSinais = usePendenciasSinais()
   const materiais = useCrudOptions<MaterialOpt>({
     table: 'materiais', selectColumns: 'id, nome', orderBy: 'nome',
   })
@@ -496,6 +498,7 @@ export function SolicitacoesListPage() {
               <SolicitacaoCard
                 key={row.id}
                 row={row}
+                sinalPendencia={pendenciaSinais.data?.get(row.id) ?? null}
                 selectable={canBulk}
                 selected={selectedIds.has(row.id)}
                 onToggleSelect={() => toggleId(row.id)}
@@ -553,22 +556,27 @@ export function SolicitacoesListPage() {
 
 interface CardProps {
   row: SolicitacaoListRow
+  sinalPendencia: PendenciaSinal | null
   selectable: boolean
   selected: boolean
   onToggleSelect: () => void
   onOpen: () => void
 }
 
-function SolicitacaoCard({ row, selectable, selected, onToggleSelect, onOpen }: CardProps) {
+function SolicitacaoCard({ row, sinalPendencia, selectable, selected, onToggleSelect, onOpen }: CardProps) {
   const created = row.created_at ? new Date(row.created_at) : null
   const sla = getSlaInfo(row.status, row.created_at)
+  const ativa = row.status !== 'finalizada' && row.status !== 'cancelada'
+  const sinal = ativa ? sinalPendencia : null
   return (
     <div
       className={cn(
         'rounded-lg border bg-background p-4 transition-colors hover:border-primary/40',
         selectable && selected && 'border-primary bg-primary/5',
-        !selected && sla?.severity === 'alert' && 'border-red-300 dark:border-red-900/60',
-        !selected && sla?.severity === 'warning' && 'border-amber-300 dark:border-amber-900/60',
+        !selected && sinal === 'parceiro_respondeu' && 'border-emerald-400 ring-1 ring-emerald-200 dark:border-emerald-700 dark:ring-emerald-900/50',
+        !selected && sinal === 'aguardando_parceiro' && 'border-orange-300 dark:border-orange-900/60',
+        !selected && !sinal && sla?.severity === 'alert' && 'border-red-300 dark:border-red-900/60',
+        !selected && !sinal && sla?.severity === 'warning' && 'border-amber-300 dark:border-amber-900/60',
       )}
     >
       <div className="flex items-center justify-between gap-2">
@@ -580,6 +588,7 @@ function SolicitacaoCard({ row, selectable, selected, onToggleSelect, onOpen }: 
             aria-label={`Selecionar ${formatNumeroOC(row.numero_interno)}`}
           />
           )}
+          {sinal && <PendenciaPop sinal={sinal} />}
           {row.origem === 'parceiro'
             && row.pamcard_status === 'nao_tem_cartao'
             && !row.pamcard_providenciado_em && (
@@ -709,6 +718,36 @@ function BulkActionsBar({
         Limpar seleção
       </Button>
     </div>
+  )
+}
+
+// "Pop" persistente de pendência no card — visível a qualquer um que olhe a
+// lista (não é o sino, que cada usuário apaga). 'parceiro_respondeu' é o
+// acionável (resposta sem tratamento); 'aguardando_parceiro' é informativo.
+function PendenciaPop({ sinal }: { sinal: PendenciaSinal }) {
+  if (sinal === 'parceiro_respondeu') {
+    return (
+      <span
+        className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300"
+        title="O parceiro respondeu a pendência e ainda não foi tratada"
+      >
+        <span className="relative flex h-2 w-2">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-75" />
+          <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+        </span>
+        <Reply className="h-3 w-3" />
+        Parceiro respondeu
+      </span>
+    )
+  }
+  return (
+    <span
+      className="inline-flex shrink-0 items-center gap-1 rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-medium text-orange-800 dark:bg-orange-950/60 dark:text-orange-300"
+      title="Devolvida ao parceiro — aguardando ele resolver"
+    >
+      <Undo2 className="h-3 w-3" />
+      Aguardando parceiro
+    </span>
   )
 }
 

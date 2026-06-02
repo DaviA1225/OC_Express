@@ -69,6 +69,12 @@ export function useClientesPublicos() {
 export function useSolicitacoesPortal() {
   return useQuery({
     queryKey: ['portal-solicitacoes'],
+    // O status (OC pronta, finalizada...) muda no lado da LHG e não chega ao
+    // parceiro por realtime (sem SELECT em solicitacoes). Polling reflete sem
+    // refresh manual; refocus também reconsulta.
+    refetchInterval: 45_000,
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: true,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('portal_solicitacoes')
@@ -85,6 +91,9 @@ export function useSolicitacaoPortal(id: string | undefined) {
   return useQuery({
     queryKey: ['portal-solicitacoes', id],
     enabled: !!id,
+    refetchInterval: 45_000,
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: true,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('portal_solicitacoes')

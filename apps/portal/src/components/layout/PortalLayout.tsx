@@ -12,6 +12,7 @@ import {
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu'
 import { PendenciasBell } from '@/components/layout/PendenciasBell'
+import { usePortalRealtime } from '@/hooks/usePortalRealtime'
 
 // Contatos de suporte da LHG (WhatsApp +55 67 9 9871-2180).
 const SUPORTE_EMAIL = 'davi.silva@lhgmining.com.br'
@@ -44,6 +45,9 @@ export function PortalLayout() {
   const navigate = useNavigate()
   const isAdmin = hasPerfilParceiro(parceiroUsuario, 'admin_parceiro')
   const navItems = NAV_ITEMS.filter((item) => !item.adminOnly || isAdmin)
+
+  // Atualiza pendências ao vivo (o parceiro recebe os eventos das suas pendências).
+  usePortalRealtime()
 
   const handleSignOut = async () => {
     await signOut()
