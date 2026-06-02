@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
-import { AlertCircle, ArrowLeft, ChevronLeft, ChevronRight, Copy, CreditCard, Loader2, Mail, MessageCircle, Pencil, RotateCcw, X } from 'lucide-react'
+import { AlertCircle, ArrowLeft, CheckCircle2, ChevronLeft, ChevronRight, Copy, CreditCard, Loader2, Mail, MessageCircle, Pencil, RotateCcw, Undo2, X } from 'lucide-react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { toast } from 'sonner'
@@ -32,13 +32,14 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { AnexosCard } from '@/features/anexos/AnexosCard'
 import { HistoricoCard } from '@/features/solicitacoes/HistoricoCard'
+import { usePendencias, useDevolverParceiro, type Pendencia } from '@/features/solicitacoes/usePendencias'
 const GerarOCDialog = React.lazy(() =>
   import('@/features/pdf-generator/GerarOCDialog').then((m) => ({ default: m.GerarOCDialog })),
 )
 const WhatsAppEnvioDialog = React.lazy(() =>
   import('@/features/whatsapp/WhatsAppEnvioDialog').then((m) => ({ default: m.WhatsAppEnvioDialog })),
 )
-import { formatNumeroOC, formatTelefone, formatarPamcardParaExibicao } from '@/lib/utils'
+import { formatNumeroOC, formatTelefone, formatarPamcardParaExibicao, cn } from '@/lib/utils'
 import { isValidTelefone } from '@/lib/validators'
 import { normalizeWhatsAppPhone, buildWhatsAppLink, formatOCWhatsAppMessage } from '@/features/whatsapp/whatsapp'
 import { getOcPdfSignedUrl } from '@/features/pdf-generator/ocPdf'
@@ -73,6 +74,11 @@ export function SolicitacaoDetailPage() {
   const [showInstrForm, setShowInstrForm] = React.useState(false)
   const [openGerarOC, setOpenGerarOC] = React.useState(false)
   const [openWhats, setOpenWhats] = React.useState(false)
+  const [openDevolver, setOpenDevolver] = React.useState(false)
+
+  const pendencias = usePendencias(id)
+  const devolver = useDevolverParceiro()
+  const pendenciaAberta = pendencias.data?.find((p) => p.status === 'aberta') ?? null
 
   const materialDetalhe = useQuery({
     enabled: !!detail.data?.material_id,
@@ -116,6 +122,11 @@ export function SolicitacaoDetailPage() {
   // Solicitação de parceiro chega sem material definido; ele é obrigatório para
   // sair de "recebida" (constraint solicitacoes_material_obrigatorio_apos_cadastro).
   const materialPendente = s.origem === 'parceiro' && !s.material_id && s.tipo !== 'retorno'
+  // "Devolver ao parceiro" só faz sentido em solicitação de parceiro ainda em
+  // andamento e sem outra pendência aberta.
+  const podeDevolver =
+    canEdit && s.origem === 'parceiro' && s.status !== 'finalizada' &&
+    s.status !== 'cancelada' && !pendenciaAberta
 
   return (
     <div className="space-y-4">
@@ -164,6 +175,24 @@ export function SolicitacaoDetailPage() {
         </div>
       )}
 
+      {pendenciaAberta && (
+        <div className="flex items-start gap-2 rounded-lg border border-orange-300 bg-orange-50 px-4 py-3 dark:border-orange-900/60 dark:bg-orange-950/40">
+          <Undo2 className="mt-0.5 h-4 w-4 shrink-0 text-orange-600 dark:text-orange-400" />
+          <div className="text-[13px] text-orange-900 dark:text-orange-200">
+            <p className="font-medium">
+              Devolvida ao parceiro — aguardando resolução
+              <span className="font-normal text-orange-800 dark:text-orange-300">
+                {' · desde '}
+                {format(new Date(pendenciaAberta.created_at), "dd/MM 'às' HH:mm", { locale: ptBR })}
+              </span>
+            </p>
+            <p className="mt-0.5 text-[12px] text-orange-800 dark:text-orange-300">
+              Motivo: {pendenciaAberta.motivo}
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="flex items-center gap-3">
@@ -203,6 +232,19 @@ export function SolicitacaoDetailPage() {
               disabled={transit.isPending}
               bloquearAvanco={materialPendente}
             />
+          )}
+          {podeDevolver && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setOpenDevolver(true)}
+              disabled={devolver.isPending}
+              title="Devolver ao parceiro para resolver uma pendência (ex.: documento do veículo)"
+              className="border-orange-300 text-orange-700 hover:bg-orange-50 dark:border-orange-900/60 dark:text-orange-300 dark:hover:bg-orange-950/40"
+            >
+              <Undo2 className="h-4 w-4" />
+              Devolver ao parceiro
+            </Button>
           )}
           {canEdit && canCancel(s.status) && (
             <Button variant="ghost" size="sm" onClick={() => setConfirmCancel(true)} className="text-destructive hover:text-destructive">
@@ -285,6 +327,9 @@ export function SolicitacaoDetailPage() {
           {s.origem === 'parceiro' && (s.status === 'oc_gerada' || s.status === 'oc_enviada') && (
             <AvisarParceiroCard solicitacao={s} />
           )}
+          {s.origem === 'parceiro' && (pendencias.data?.length ?? 0) > 0 && (
+            <PendenciasCard pendencias={pendencias.data ?? []} />
+          )}
           <HistoricoCard
             solicitacaoId={s.id}
             motoristaId={s.motorista_id}
@@ -351,6 +396,17 @@ export function SolicitacaoDetailPage() {
           const created = await duplicate.mutateAsync({ sourceId: s.id })
           setConfirmDuplicate(false)
           navigate(`/solicitacoes/${created.id}`)
+        }}
+      />
+
+      <DevolverParceiroDialog
+        open={openDevolver}
+        onOpenChange={setOpenDevolver}
+        numero={formatNumeroOC(s.numero_interno)}
+        saving={devolver.isPending}
+        onConfirm={async (motivo) => {
+          await devolver.mutateAsync({ solicitacaoId: s.id, motivo })
+          setOpenDevolver(false)
         }}
       />
 
@@ -1305,6 +1361,131 @@ function TimelineCard({ solicitacao }: { solicitacao: CardProps['solicitacao'] }
           </li>
         ))}
       </ol>
+    </section>
+  )
+}
+
+// Diálogo para devolver a solicitação ao parceiro com um motivo. Cria uma
+// pendência aberta (migration 0035) que o parceiro vê e resolve no portal.
+function DevolverParceiroDialog({
+  open, onOpenChange, numero, saving, onConfirm,
+}: {
+  open: boolean
+  onOpenChange: (o: boolean) => void
+  numero: string
+  saving: boolean
+  onConfirm: (motivo: string) => Promise<void>
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        {open && (
+          <DevolverParceiroForm
+            numero={numero}
+            saving={saving}
+            onCancel={() => onOpenChange(false)}
+            onConfirm={onConfirm}
+          />
+        )}
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function DevolverParceiroForm({
+  numero, saving, onCancel, onConfirm,
+}: {
+  numero: string
+  saving: boolean
+  onCancel: () => void
+  onConfirm: (motivo: string) => Promise<void>
+}) {
+  const [motivo, setMotivo] = React.useState('')
+  return (
+    <>
+      <DialogHeader>
+        <DialogTitle>Devolver {numero} ao parceiro</DialogTitle>
+        <DialogDescription>
+          Descreva a pendência que impede a finalização. O parceiro recebe um
+          aviso no portal e responde quando resolver — você é notificado de volta.
+        </DialogDescription>
+      </DialogHeader>
+      <DialogBody className="space-y-1.5">
+        <Label htmlFor="devolver-motivo">Motivo da pendência *</Label>
+        <Textarea
+          id="devolver-motivo"
+          autoFocus
+          rows={4}
+          value={motivo}
+          onChange={(e) => setMotivo(e.target.value)}
+          placeholder="Ex.: CRLV do cavalo está vencido. Envie o documento atualizado nos anexos."
+        />
+      </DialogBody>
+      <DialogFooter>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={onCancel} disabled={saving}>Cancelar</Button>
+          <Button
+            onClick={() => onConfirm(motivo.trim())}
+            disabled={saving || motivo.trim().length === 0}
+            className="bg-orange-600 text-white hover:bg-orange-700"
+          >
+            {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+            <Undo2 className="h-4 w-4" />
+            Devolver ao parceiro
+          </Button>
+        </div>
+      </DialogFooter>
+    </>
+  )
+}
+
+// Histórico de pendências da solicitação: o que foi devolvido, o status e a
+// resposta do parceiro quando resolvida.
+function PendenciasCard({ pendencias }: { pendencias: Pendencia[] }) {
+  return (
+    <section className="rounded-lg border bg-background">
+      <header className="flex items-center justify-between border-b px-4 py-2">
+        <h2 className="text-[14px] font-medium text-foreground">Pendências com o parceiro</h2>
+      </header>
+      <ul className="divide-y">
+        {pendencias.map((p) => {
+          const aberta = p.status === 'aberta'
+          return (
+            <li key={p.id} className="space-y-1.5 px-4 py-3">
+              <div className="flex items-center gap-2">
+                <span
+                  className={cn(
+                    'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium',
+                    aberta
+                      ? 'bg-orange-100 text-orange-800 dark:bg-orange-950/60 dark:text-orange-300'
+                      : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300',
+                  )}
+                >
+                  {aberta ? <Undo2 className="h-3 w-3" /> : <CheckCircle2 className="h-3 w-3" />}
+                  {aberta ? 'Aguardando parceiro' : 'Resolvida'}
+                </span>
+                <span className="text-[11px] text-muted-foreground">
+                  {format(new Date(p.created_at), "dd/MM 'às' HH:mm", { locale: ptBR })}
+                </span>
+              </div>
+              <p className="text-[12px] text-foreground">
+                <span className="text-muted-foreground">Motivo: </span>{p.motivo}
+              </p>
+              {p.resposta_parceiro && (
+                <p className="rounded-md bg-muted/60 px-2.5 py-1.5 text-[12px] text-foreground">
+                  <span className="text-muted-foreground">Resposta do parceiro: </span>
+                  {p.resposta_parceiro}
+                </p>
+              )}
+              {!aberta && p.resolvida_em && (
+                <p className="text-[11px] text-emerald-700 dark:text-emerald-400">
+                  Resolvida em {format(new Date(p.resolvida_em), "dd/MM 'às' HH:mm", { locale: ptBR })}
+                </p>
+              )}
+            </li>
+          )
+        })}
+      </ul>
     </section>
   )
 }

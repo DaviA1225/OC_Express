@@ -2,7 +2,7 @@ import * as React from 'react'
 import { Link } from 'react-router-dom'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { ClipboardList, Lock, Plus, Search as SearchIcon, Truck, Building2 } from 'lucide-react'
+import { ClipboardList, Lock, Plus, Search as SearchIcon, Truck, Building2, Undo2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -13,7 +13,7 @@ import { EmptyState } from '@/components/shared/EmptyState'
 import { StatusBadge } from '@/components/solicitacoes/StatusBadge'
 import { useAuth } from '@/hooks/useAuth'
 import { useDebounce } from '@/hooks/useDebounce'
-import { formatNumeroOC } from '@/lib/utils'
+import { formatNumeroOC, cn } from '@/lib/utils'
 import {
   useSolicitacoesPortal,
   useMotoristasBase,
@@ -22,6 +22,7 @@ import {
   useClientesPublicos,
   type PortalSolicitacao,
 } from '@/features/solicitacoes/useSolicitacoes'
+import { usePendenciasAbertas } from '@/features/solicitacoes/usePendencias'
 import {
   STATUS_FILTRO_OPTIONS,
   matchStatusFiltro,
@@ -53,6 +54,11 @@ export default function SolicitacoesListPage() {
   const veiculos = useVeiculosBase()
   const carretas = useCarretasBase()
   const clientes = useClientesPublicos()
+  const pendencias = usePendenciasAbertas()
+  const pendenciaPorSolicitacao = React.useMemo(
+    () => new Set((pendencias.data ?? []).map((p) => p.solicitacao_id)),
+    [pendencias.data],
+  )
 
   const [search, setSearch] = React.useState('')
   const [statusFiltro, setStatusFiltro] = React.useState<StatusFiltro>('todas')
@@ -213,7 +219,11 @@ export default function SolicitacoesListPage() {
       {!carregando && filtradas.length > 0 && (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {filtradas.map((v) => (
-            <SolicitacaoCard key={v.sol.id} view={v} />
+            <SolicitacaoCard
+              key={v.sol.id}
+              view={v}
+              temPendencia={v.sol.id != null && pendenciaPorSolicitacao.has(v.sol.id)}
+            />
           ))}
         </div>
       )}
@@ -221,7 +231,7 @@ export default function SolicitacoesListPage() {
   )
 }
 
-function SolicitacaoCard({ view }: { view: SolicitacaoView }) {
+function SolicitacaoCard({ view, temPendencia }: { view: SolicitacaoView; temPendencia: boolean }) {
   const { sol, motorista, cavalo, carreta, cliente } = view
   const enviada = sol.created_at
     ? format(new Date(sol.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })
@@ -230,7 +240,10 @@ function SolicitacaoCard({ view }: { view: SolicitacaoView }) {
   return (
     <Link
       to={`/solicitacoes/${sol.id}`}
-      className="flex flex-col gap-3 rounded-lg border bg-background p-4 transition-colors hover:border-primary/40 hover:bg-accent/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className={cn(
+        'flex flex-col gap-3 rounded-lg border bg-background p-4 transition-colors hover:border-primary/40 hover:bg-accent/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+        temPendencia && 'border-orange-300 ring-1 ring-orange-200 dark:border-orange-900/60 dark:ring-orange-900/40',
+      )}
     >
       <div className="flex items-start justify-between gap-2">
         <span className="text-[15px] font-semibold tabular-nums text-foreground">
@@ -238,6 +251,12 @@ function SolicitacaoCard({ view }: { view: SolicitacaoView }) {
         </span>
         <StatusBadge status={sol.status} />
       </div>
+      {temPendencia && (
+        <span className="inline-flex w-fit items-center gap-1 rounded-full bg-orange-100 px-2 py-0.5 text-[11px] font-medium text-orange-800 dark:bg-orange-950/60 dark:text-orange-300">
+          <Undo2 className="h-3 w-3" />
+          Ação necessária
+        </span>
+      )}
       <p className="text-[11px] text-muted-foreground">Enviada em {enviada}</p>
       <div className="space-y-1.5 text-[13px]">
         <div className="flex items-center gap-2">

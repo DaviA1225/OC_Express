@@ -1,5 +1,5 @@
 -- =====================================================================
--- OC Express / SisLog LHG — Schema cumulativo (migrations 0001 → 0021)
+-- OC Express / SisLog LHG — Schema cumulativo (migrations 0001 → 0035)
 -- =====================================================================
 --
 -- Este arquivo agrega TODAS as migrations num único script IDEMPOTENTE.
@@ -931,8 +931,16 @@ CREATE POLICY "solicitacoes_anexos_delete" ON storage.objects
 -- =====================================================================
 -- A view e criada DEPOIS das funcoes auxiliares e dos joins parceiro_*
 -- estarem disponiveis.
+--
+-- IMPORTANTE: usa DROP + CREATE (e nao CREATE OR REPLACE). A 0034 amplia esta
+-- view com parceiro_primeira_carreta_id/parceiro_dolly_id; quando o banco ja
+-- esta na 0034 e este script cumulativo roda de novo, um CREATE OR REPLACE com
+-- a lista ANTIGA (menos colunas) falha com 42P16 "cannot drop columns from
+-- view" e aborta a transacao inteira. O DROP IF EXISTS recria do zero a cada
+-- execucao; a 0034 (no fim do arquivo) recria com a lista final.
 
-CREATE OR REPLACE VIEW portal_solicitacoes
+DROP VIEW IF EXISTS portal_solicitacoes;
+CREATE VIEW portal_solicitacoes
 WITH (security_invoker = false) AS
 SELECT id, numero_interno, tipo, status, origem,
        parceiro_id, parceiro_usuario_id, parceiro_motorista_id,
@@ -1054,6 +1062,1174 @@ END;
 $$;
 
 GRANT EXECUTE ON FUNCTION registrar_evento_portal(text, jsonb) TO anon, authenticated;
+
+
+-- 0022 — Bloco 6.4: rate limit diario por usuario do portal (50 solicitacoes/dia)
+--
+-- Trigger BEFORE INSERT em `solicitacoes` que conta as solicitacoes ja criadas
+-- pelo `parceiro_usuario_id` no dia de calendario (America/Sao_Paulo) e
+-- aborta com SQLSTATE custom 'PT429' quando ultrapassa 50. A contagem inclui
+-- TODAS as solicitacoes do dia (ativas e canceladas) — criar e cancelar em
+-- loop nao zera o contador.
+--
+-- Internos e e-mails (origem != 'parceiro') passam direto: para esses casos
+-- parceiro_usuario_id vem null por constraint (0018).
+--
+-- A funcao usa SECURITY DEFINER para conseguir contar `solicitacoes` —
+-- parceiros nao tem policy de SELECT na tabela, entao sem isso o count
+-- voltaria sempre 0 e o limite nunca dispararia.
+--
+-- Idempotente.
+
+CREATE OR REPLACE FUNCTION check_portal_rate_limit_diario()
+RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_count integer;
+  v_limite constant integer := 50;
+BEGIN
+  IF NEW.origem <> 'parceiro' OR NEW.parceiro_usuario_id IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  SELECT count(*)::int INTO v_count
+  FROM solicitacoes
+  WHERE parceiro_usuario_id = NEW.parceiro_usuario_id
+    AND (created_at AT TIME ZONE 'America/Sao_Paulo')::date
+        = (now()        AT TIME ZONE 'America/Sao_Paulo')::date;
+
+  IF v_count >= v_limite THEN
+    RAISE EXCEPTION
+      'Limite diario de % solicitacoes por usuario atingido. Tente novamente amanha.',
+      v_limite
+      USING ERRCODE = 'PT429';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+COMMENT ON FUNCTION check_portal_rate_limit_diario() IS
+  'Bloco 6.4: bloqueia INSERT em solicitacoes quando o parceiro_usuario_id ja '
+  'criou 50 solicitacoes no dia (America/Sao_Paulo). SQLSTATE PT429.';
+
+DROP TRIGGER IF EXISTS trg_solicitacoes_rate_limit_diario ON solicitacoes;
+CREATE TRIGGER trg_solicitacoes_rate_limit_diario
+  BEFORE INSERT ON solicitacoes
+  FOR EACH ROW EXECUTE FUNCTION check_portal_rate_limit_diario();
+
+
+-- 0023 — Adiciona tipo de evento `portal_usuario_convidado`
+--
+-- A Edge Function `convidar-parceiro-usuario` registra um evento nesse tipo
+-- depois de criar o novo `parceiro_usuario`, para deixar trilha de auditoria
+-- na tela /seguranca. Idempotente: o CHECK é dropado e recriado, e a função
+-- é CREATE OR REPLACE.
+
+-- ============================================================
+-- 1. Ampliar o CHECK de tipo_evento
+-- ============================================================
+
+ALTER TABLE eventos_portal DROP CONSTRAINT IF EXISTS eventos_portal_tipo_evento_check;
+ALTER TABLE eventos_portal ADD CONSTRAINT eventos_portal_tipo_evento_check
+  CHECK (tipo_evento IN (
+    'portal_login',
+    'portal_login_falha',
+    'portal_logout',
+    'portal_solicitacao_criada',
+    'portal_solicitacao_cancelada',
+    'portal_senha_alterada',
+    'portal_usuario_convidado'
+  ));
+
+-- ============================================================
+-- 2. Atualizar registrar_evento_portal — mesmo corpo, lista nova
+-- ============================================================
+-- Diferenças vs. 0021:
+--   - Aceita 'portal_usuario_convidado' na lista de tipos válidos.
+--   - O caller deste evento é interno OU admin_parceiro (ambos têm `auth.uid()`
+--     válido e mapeam num parceiro_usuarios ativo OU num perfil interno).
+--     Para suportar o caso "interno convida um parceiro", se o caller NÃO é
+--     parceiro_usuario o evento vai sem `parceiro_*` populado por aqui —
+--     a Edge Function passa `parceiro_id` no payload e quem chama a tela
+--     /seguranca enxerga via metadata.
+--   - Para evitar perder o `parceiro_id` no caso interno, lemos do payload
+--     quando o caller não tem vínculo de parceiro_usuario.
+
+CREATE OR REPLACE FUNCTION registrar_evento_portal(
+  p_tipo_evento text,
+  p_payload jsonb DEFAULT NULL
+)
+RETURNS uuid
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_user_id uuid := auth.uid();
+  v_pu parceiro_usuarios%ROWTYPE;
+  v_parceiro_id uuid;
+  v_parceiro_usuario_id uuid;
+  v_email_tentado text;
+  v_solicitacao_id uuid;
+  v_ip text;
+  v_user_agent text;
+  v_metadata jsonb;
+  v_id uuid;
+BEGIN
+  IF p_tipo_evento NOT IN (
+    'portal_login', 'portal_login_falha', 'portal_logout',
+    'portal_solicitacao_criada', 'portal_solicitacao_cancelada',
+    'portal_senha_alterada', 'portal_usuario_convidado'
+  ) THEN
+    RAISE EXCEPTION 'tipo_evento invalido: %', p_tipo_evento;
+  END IF;
+
+  IF p_tipo_evento = 'portal_login_falha' THEN
+    v_email_tentado := p_payload->>'email_tentado';
+  ELSE
+    IF v_user_id IS NULL THEN
+      RETURN NULL;
+    END IF;
+    SELECT * INTO v_pu FROM parceiro_usuarios
+      WHERE user_id = v_user_id AND ativo = true
+      LIMIT 1;
+    IF FOUND THEN
+      v_parceiro_id := v_pu.parceiro_id;
+      v_parceiro_usuario_id := v_pu.id;
+    ELSIF p_tipo_evento = 'portal_usuario_convidado' THEN
+      -- caller interno convidando: aceita parceiro_id explícito do payload
+      v_parceiro_id := NULLIF(p_payload->>'parceiro_id', '')::uuid;
+    ELSE
+      -- demais tipos exigem vínculo de parceiro
+      RETURN NULL;
+    END IF;
+  END IF;
+
+  v_ip := p_payload->>'ip';
+  v_user_agent := p_payload->>'user_agent';
+  v_solicitacao_id := NULLIF(p_payload->>'solicitacao_id', '')::uuid;
+  v_metadata := p_payload - ARRAY['email_tentado','ip','user_agent','solicitacao_id','parceiro_id'];
+  IF v_metadata = '{}'::jsonb THEN v_metadata := NULL; END IF;
+
+  INSERT INTO eventos_portal (
+    tipo_evento, user_id, parceiro_id, parceiro_usuario_id,
+    email_tentado, solicitacao_id, ip, user_agent, metadata
+  ) VALUES (
+    p_tipo_evento, v_user_id, v_parceiro_id, v_parceiro_usuario_id,
+    v_email_tentado, v_solicitacao_id, v_ip, v_user_agent, v_metadata
+  )
+  RETURNING id INTO v_id;
+
+  RETURN v_id;
+END;
+$$;
+
+
+-- 0024 — Busca global sem acento (unaccent)
+--
+-- A busca global (apps/interno/.../useGlobalSearch.ts) usava ilike direto nas
+-- colunas de texto. No Postgres o ilike é case-insensitive mas SENSÍVEL a
+-- acento: buscar "jose" não encontrava "josé", "graos" não achava "grãos".
+--
+-- Solução: um wrapper IMMUTABLE de unaccent + colunas geradas `*_unaccent`
+-- nas tabelas pesquisáveis. O cliente desacentua o termo e filtra por essas
+-- colunas, então a comparação fica sem acento dos dois lados.
+--
+-- Idempotente: extensão IF NOT EXISTS, função CREATE OR REPLACE, colunas via
+-- ADD COLUMN IF NOT EXISTS. Reexecutável sem erro.
+
+-- ============================================================
+-- 1. Extensão unaccent (schema padrão de extensões no Supabase)
+-- ============================================================
+CREATE EXTENSION IF NOT EXISTS unaccent WITH SCHEMA extensions;
+
+-- ============================================================
+-- 2. Wrapper IMMUTABLE de unaccent
+-- ============================================================
+-- O unaccent() nativo é STABLE (o dicionário pode mudar), então não pode ser
+-- usado em coluna gerada STORED. Fixar o dicionário explicitamente e qualificar
+-- tudo pelo schema o torna determinístico o suficiente para ser IMMUTABLE.
+CREATE OR REPLACE FUNCTION public.imm_unaccent(txt text)
+RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+STRICT
+AS $$
+  SELECT extensions.unaccent('extensions.unaccent'::regdictionary, txt)
+$$;
+
+-- ============================================================
+-- 3. Colunas geradas *_unaccent nas tabelas pesquisáveis
+-- ============================================================
+-- Colunas geradas STORED: herdam a RLS da própria tabela (sem policy nova) e
+-- são mantidas pelo Postgres a cada INSERT/UPDATE. veiculos/carretas usam só
+-- placa (sem acento) e seguem com ilike direto — não precisam de coluna nova.
+ALTER TABLE clientes
+  ADD COLUMN IF NOT EXISTS razao_social_unaccent text
+  GENERATED ALWAYS AS (public.imm_unaccent(razao_social)) STORED;
+
+ALTER TABLE subcontratadas
+  ADD COLUMN IF NOT EXISTS razao_social_unaccent text
+  GENERATED ALWAYS AS (public.imm_unaccent(razao_social)) STORED;
+
+ALTER TABLE motoristas
+  ADD COLUMN IF NOT EXISTS nome_completo_unaccent text
+  GENERATED ALWAYS AS (public.imm_unaccent(nome_completo)) STORED;
+
+ALTER TABLE materiais
+  ADD COLUMN IF NOT EXISTS nome_unaccent text
+  GENERATED ALWAYS AS (public.imm_unaccent(nome)) STORED;
+
+ALTER TABLE solicitacoes
+  ADD COLUMN IF NOT EXISTS solicitante_nome_unaccent text
+  GENERATED ALWAYS AS (public.imm_unaccent(solicitante_nome)) STORED;
+
+
+-- 0025 — RLS por perfil (endurecimento pós-testes / TODO.md)
+--
+-- Até aqui as tabelas internas usavam `is_interno()` para TODO o CRUD: qualquer
+-- usuário interno ativo (admin, gerente, supervisor, analista, assistente) podia
+-- inserir/alterar/excluir qualquer cadastro. Esta migration substitui o INSERT/
+-- UPDATE/DELETE por checagem de perfil, espelhando EXATAMENTE a matriz já
+-- implementada no front em `apps/interno/src/features/auth/permissions.ts`
+-- (fonte de verdade). O SELECT continua liberado a todo o time interno.
+--
+-- Matriz (escrita):
+--   operacionais (subcontratadas/motoristas/veiculos/carretas):
+--                                       admin, analista, assistente
+--   clientes:                           admin, gerente, supervisor, analista
+--   materiais:                          admin, supervisor, analista
+--   cargas_retorno:                     admin, supervisor, analista
+--   perfis_usuarios:                    admin
+--   log_auditoria (leitura):            admin, gerente, supervisor
+--
+-- Fora de escopo desta migration (mantidos como is_interno()/portal):
+--   solicitacoes e solicitacao_anexos — o front já restringe a edição
+--   (canEditSolicitacoes) e as policies do portal são sensíveis; tratar à parte.
+--
+-- Script idempotente: pode ser reexecutado sem erro.
+
+-- ============================================================
+-- 1. Helper: perfil interno do usuário logado
+-- ============================================================
+-- SECURITY DEFINER para ler perfis_usuarios sem disparar a própria RLS
+-- (evita recursão quando usado nas policies de perfis_usuarios). Retorna NULL
+-- para quem não é interno ativo — assim toda checagem de perfil reprova.
+
+CREATE OR REPLACE FUNCTION meu_perfil_interno()
+RETURNS text
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+  SELECT perfil FROM perfis_usuarios
+  WHERE user_id = auth.uid() AND ativo = true
+  LIMIT 1;
+$$;
+
+-- ============================================================
+-- 2. Cadastros operacionais — admin, analista, assistente
+-- ============================================================
+-- Assistente/analista precisam criar motorista/veículo/carreta/subcontratada
+-- no quick-create da Nova Solicitação, por isso seguem com escrita liberada
+-- para esses perfis.
+
+DO $$
+DECLARE t text;
+BEGIN
+  FOR t IN SELECT unnest(ARRAY[
+    'subcontratadas','motoristas','veiculos','carretas'
+  ]) LOOP
+    EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
+    EXECUTE format('DROP POLICY IF EXISTS %I ON %I', t || '_select', t);
+    EXECUTE format('DROP POLICY IF EXISTS %I ON %I', t || '_insert', t);
+    EXECUTE format('DROP POLICY IF EXISTS %I ON %I', t || '_update', t);
+    EXECUTE format('DROP POLICY IF EXISTS %I ON %I', t || '_delete', t);
+    EXECUTE format('CREATE POLICY %I ON %I FOR SELECT TO authenticated USING (is_interno())', t || '_select', t);
+    EXECUTE format($f$CREATE POLICY %I ON %I FOR INSERT TO authenticated WITH CHECK (meu_perfil_interno() IN ('admin','analista','assistente'))$f$, t || '_insert', t);
+    EXECUTE format($f$CREATE POLICY %I ON %I FOR UPDATE TO authenticated USING (meu_perfil_interno() IN ('admin','analista','assistente')) WITH CHECK (meu_perfil_interno() IN ('admin','analista','assistente'))$f$, t || '_update', t);
+    EXECUTE format($f$CREATE POLICY %I ON %I FOR DELETE TO authenticated USING (meu_perfil_interno() IN ('admin','analista','assistente'))$f$, t || '_delete', t);
+  END LOOP;
+END $$;
+
+-- ============================================================
+-- 3. clientes — admin, gerente, supervisor, analista
+-- ============================================================
+ALTER TABLE clientes ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS clientes_select ON clientes;
+DROP POLICY IF EXISTS clientes_insert ON clientes;
+DROP POLICY IF EXISTS clientes_update ON clientes;
+DROP POLICY IF EXISTS clientes_delete ON clientes;
+CREATE POLICY clientes_select ON clientes FOR SELECT TO authenticated USING (is_interno());
+CREATE POLICY clientes_insert ON clientes FOR INSERT TO authenticated
+  WITH CHECK (meu_perfil_interno() IN ('admin','gerente','supervisor','analista'));
+CREATE POLICY clientes_update ON clientes FOR UPDATE TO authenticated
+  USING (meu_perfil_interno() IN ('admin','gerente','supervisor','analista'))
+  WITH CHECK (meu_perfil_interno() IN ('admin','gerente','supervisor','analista'));
+CREATE POLICY clientes_delete ON clientes FOR DELETE TO authenticated
+  USING (meu_perfil_interno() IN ('admin','gerente','supervisor','analista'));
+
+-- ============================================================
+-- 4. materiais — admin, supervisor, analista
+-- ============================================================
+ALTER TABLE materiais ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS materiais_select ON materiais;
+DROP POLICY IF EXISTS materiais_insert ON materiais;
+DROP POLICY IF EXISTS materiais_update ON materiais;
+DROP POLICY IF EXISTS materiais_delete ON materiais;
+CREATE POLICY materiais_select ON materiais FOR SELECT TO authenticated USING (is_interno());
+CREATE POLICY materiais_insert ON materiais FOR INSERT TO authenticated
+  WITH CHECK (meu_perfil_interno() IN ('admin','supervisor','analista'));
+CREATE POLICY materiais_update ON materiais FOR UPDATE TO authenticated
+  USING (meu_perfil_interno() IN ('admin','supervisor','analista'))
+  WITH CHECK (meu_perfil_interno() IN ('admin','supervisor','analista'));
+CREATE POLICY materiais_delete ON materiais FOR DELETE TO authenticated
+  USING (meu_perfil_interno() IN ('admin','supervisor','analista'));
+
+-- ============================================================
+-- 5. cargas_retorno — admin, supervisor, analista
+-- ============================================================
+-- Nota: a 0010 deixou esta tabela em `USING (true)` e a 0018 não a endureceu,
+-- então até aqui QUALQUER authenticated (inclusive parceiro externo) escrevia
+-- nela. Aqui ela passa a exigir perfil interno, fechando essa brecha.
+ALTER TABLE cargas_retorno ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS cargas_retorno_select ON cargas_retorno;
+DROP POLICY IF EXISTS cargas_retorno_insert ON cargas_retorno;
+DROP POLICY IF EXISTS cargas_retorno_update ON cargas_retorno;
+DROP POLICY IF EXISTS cargas_retorno_delete ON cargas_retorno;
+CREATE POLICY cargas_retorno_select ON cargas_retorno FOR SELECT TO authenticated USING (is_interno());
+CREATE POLICY cargas_retorno_insert ON cargas_retorno FOR INSERT TO authenticated
+  WITH CHECK (meu_perfil_interno() IN ('admin','supervisor','analista'));
+CREATE POLICY cargas_retorno_update ON cargas_retorno FOR UPDATE TO authenticated
+  USING (meu_perfil_interno() IN ('admin','supervisor','analista'))
+  WITH CHECK (meu_perfil_interno() IN ('admin','supervisor','analista'));
+CREATE POLICY cargas_retorno_delete ON cargas_retorno FOR DELETE TO authenticated
+  USING (meu_perfil_interno() IN ('admin','supervisor','analista'));
+
+-- ============================================================
+-- 6. perfis_usuarios — somente admin escreve
+-- ============================================================
+-- SELECT segue liberado ao time interno (nomes são resolvidos em auditoria,
+-- relatórios, detalhe de solicitação etc.). A edição do próprio nome pelo
+-- usuário comum sai do UPDATE direto e passa pelo RPC `atualizar_meu_nome`
+-- (seção 8) — assim ninguém consegue escalar o próprio `perfil` via API.
+ALTER TABLE perfis_usuarios ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS perfis_usuarios_select ON perfis_usuarios;
+DROP POLICY IF EXISTS perfis_usuarios_insert ON perfis_usuarios;
+DROP POLICY IF EXISTS perfis_usuarios_update ON perfis_usuarios;
+DROP POLICY IF EXISTS perfis_usuarios_delete ON perfis_usuarios;
+CREATE POLICY perfis_usuarios_select ON perfis_usuarios FOR SELECT TO authenticated USING (is_interno());
+CREATE POLICY perfis_usuarios_insert ON perfis_usuarios FOR INSERT TO authenticated
+  WITH CHECK (meu_perfil_interno() = 'admin');
+CREATE POLICY perfis_usuarios_update ON perfis_usuarios FOR UPDATE TO authenticated
+  USING (meu_perfil_interno() = 'admin')
+  WITH CHECK (meu_perfil_interno() = 'admin');
+CREATE POLICY perfis_usuarios_delete ON perfis_usuarios FOR DELETE TO authenticated
+  USING (meu_perfil_interno() = 'admin');
+
+-- ============================================================
+-- 7. log_auditoria — leitura só admin/gerente/supervisor
+-- ============================================================
+-- INSERT permanece aberto: a trigger de auditoria roda como o usuário que
+-- disparou a ação (inclusive parceiros). UPDATE/DELETE travados em admin —
+-- o log é, na prática, imutável.
+ALTER TABLE log_auditoria ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS log_auditoria_select ON log_auditoria;
+DROP POLICY IF EXISTS log_auditoria_insert ON log_auditoria;
+DROP POLICY IF EXISTS log_auditoria_update ON log_auditoria;
+DROP POLICY IF EXISTS log_auditoria_delete ON log_auditoria;
+CREATE POLICY log_auditoria_select ON log_auditoria FOR SELECT TO authenticated
+  USING (meu_perfil_interno() IN ('admin','gerente','supervisor'));
+CREATE POLICY log_auditoria_insert ON log_auditoria FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY log_auditoria_update ON log_auditoria FOR UPDATE TO authenticated
+  USING (meu_perfil_interno() = 'admin') WITH CHECK (meu_perfil_interno() = 'admin');
+CREATE POLICY log_auditoria_delete ON log_auditoria FOR DELETE TO authenticated
+  USING (meu_perfil_interno() = 'admin');
+
+-- ============================================================
+-- 8. RPC: usuário comum altera só o próprio nome
+-- ============================================================
+-- Substitui o UPDATE direto que o PerfilPage fazia em perfis_usuarios. Como o
+-- UPDATE agora é admin-only, sem isto o usuário comum não conseguiria editar o
+-- próprio nome. A função toca SOMENTE nome_completo da própria linha — não há
+-- como mexer em `perfil` ou `ativo` por aqui (sem risco de escalonamento).
+CREATE OR REPLACE FUNCTION atualizar_meu_nome(novo_nome text)
+RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_nome text := btrim(novo_nome);
+BEGIN
+  IF v_nome IS NULL OR char_length(v_nome) < 2 THEN
+    RAISE EXCEPTION 'Nome inválido' USING ERRCODE = 'check_violation';
+  END IF;
+  UPDATE perfis_usuarios
+     SET nome_completo = v_nome
+   WHERE user_id = auth.uid() AND ativo = true;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION atualizar_meu_nome(text) FROM public;
+GRANT EXECUTE ON FUNCTION atualizar_meu_nome(text) TO authenticated;
+
+
+-- 0026 — Bucket ocs-pdf privado (endurecimento pós-testes / TODO.md)
+--
+-- O PDF da OC contém dado sensível (nome/CPF do motorista, placas, cliente).
+-- Até aqui o bucket `ocs-pdf` era PÚBLICO (0001) e o front guardava a URL
+-- pública permanente em `solicitacoes.pdf_url` — qualquer pessoa com o link
+-- (ou adivinhando o nome do arquivo) abria o PDF sem login, para sempre.
+--
+-- Esta migration torna o bucket privado e restringe o acesso direto ao time
+-- interno. O front passa a:
+--   - guardar o PATH do arquivo em pdf_url (não mais a URL pública);
+--   - gerar signed URL curto (1h) no "Abrir PDF" interno;
+--   - gerar signed URL de 7 dias no momento de enviar pelo WhatsApp.
+-- Signed URLs são pré-assinados: funcionam para o destinatário externo (sem
+-- login) só durante a validade, e deixam de ser permanentes/adivinháveis.
+--
+-- Parceiros do portal NÃO acessam PDFs de OC (a view portal_solicitacoes não
+-- expõe pdf_url), por isso as policies exigem apenas is_interno().
+--
+-- Script idempotente: pode ser reexecutado sem erro.
+
+-- 1. Tornar o bucket privado ---------------------------------------------------
+-- ATENÇÃO: em alguns projetos o role do editor SQL não é owner de
+-- `storage.buckets` e este UPDATE levanta `insufficient_privilege`, o que
+-- ABORTARIA a transação inteira (as policies abaixo nunca aplicariam). Por isso
+-- envolvemos num bloco que tolera a falta de privilégio. Se cair no NOTICE,
+-- ajuste o bucket para privado pelo Dashboard (Storage → ocs-pdf → Make private)
+-- ou via Storage API: supabase.storage.updateBucket('ocs-pdf', { public: false }).
+DO $$
+BEGIN
+  UPDATE storage.buckets SET public = false WHERE id = 'ocs-pdf';
+EXCEPTION WHEN insufficient_privilege THEN
+  RAISE NOTICE 'Sem privilégio para alterar storage.buckets via SQL. Torne o bucket ocs-pdf privado pelo Dashboard ou Storage API.';
+END $$;
+
+-- 2. Policies do storage: somente time interno --------------------------------
+-- (as policies da 0001 eram `bucket_id = 'ocs-pdf'` para qualquer authenticated)
+DROP POLICY IF EXISTS "ocs_pdf_select" ON storage.objects;
+DROP POLICY IF EXISTS "ocs_pdf_insert" ON storage.objects;
+DROP POLICY IF EXISTS "ocs_pdf_update" ON storage.objects;
+DROP POLICY IF EXISTS "ocs_pdf_delete" ON storage.objects;
+
+CREATE POLICY "ocs_pdf_select" ON storage.objects
+  FOR SELECT TO authenticated
+  USING (bucket_id = 'ocs-pdf' AND is_interno());
+CREATE POLICY "ocs_pdf_insert" ON storage.objects
+  FOR INSERT TO authenticated
+  WITH CHECK (bucket_id = 'ocs-pdf' AND is_interno());
+CREATE POLICY "ocs_pdf_update" ON storage.objects
+  FOR UPDATE TO authenticated
+  USING (bucket_id = 'ocs-pdf' AND is_interno())
+  WITH CHECK (bucket_id = 'ocs-pdf' AND is_interno());
+CREATE POLICY "ocs_pdf_delete" ON storage.objects
+  FOR DELETE TO authenticated
+  USING (bucket_id = 'ocs-pdf' AND is_interno());
+
+
+-- 0027 — Idempotência WhatsApp: solicitacoes.external_msg_id (TODO.md)
+--
+-- Pré-requisito para o futuro agente de IA do WhatsApp (docs/AGENT_CONTEXT.md):
+-- ao reprocessar a mesma mensagem (retry, reenvio, replay do webhook), o agente
+-- grava o ID externo da mensagem aqui e o índice único impede a 2ª inserção,
+-- evitando solicitações duplicadas. Coluna nullable: solicitações criadas pela
+-- equipe interna ou pelo portal seguem com external_msg_id = NULL.
+--
+-- Índice único PARCIAL (WHERE NOT NULL): unicidade só vale para valores
+-- preenchidos; vários NULL convivem normalmente. Não exposto ao portal — a view
+-- portal_solicitacoes não inclui esta coluna (metadado interno).
+--
+-- Script idempotente: pode ser reexecutado sem erro.
+
+ALTER TABLE solicitacoes
+  ADD COLUMN IF NOT EXISTS external_msg_id text;
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_solicitacoes_external_msg_id
+  ON solicitacoes (external_msg_id)
+  WHERE external_msg_id IS NOT NULL;
+
+COMMENT ON COLUMN solicitacoes.external_msg_id IS
+  'ID da mensagem externa (ex.: WhatsApp) que originou a solicitação. Único '
+  'quando preenchido — chave de idempotência para o agente de IA não duplicar '
+  'mensagens reprocessadas. NULL para origem interna/portal.';
+
+
+-- 0028 — Aperta o UPDATE do parceiro em solicitacoes: só cancelamento
+--
+-- A policy `solicitacoes_parceiro_cancel` (migration 0018) deixava o parceiro
+-- dar UPDATE na própria solicitação enquanto `status='recebida'`, mas o
+-- WITH CHECK só validava origem + parceiro_id — NÃO restringia o status novo
+-- nem as colunas. Na prática, um parceiro com acesso direto à API podia:
+--   - editar campos da própria solicitação ainda pendente (placa, cliente…);
+--   - forçar o status para qualquer valor (ex.: 'oc_gerada', 'finalizada'),
+--     fingindo progresso que a LHG não fez.
+-- O portal nunca expôs isso (só oferece "Cancelar"), mas era uma brecha de
+-- defense-in-depth.
+--
+-- Aqui o WITH CHECK passa a exigir `status = 'cancelada'`: combinado com o
+-- USING (`status = 'recebida'`), a ÚNICA transição que o parceiro consegue é
+-- recebida → cancelada. Qualquer outro UPDATE (editar campo mantendo recebida,
+-- ou forçar outro status) é rejeitado (42501). O cancelamento do portal
+-- (`update({ status: 'cancelada' })`) continua funcionando. O time interno usa
+-- a policy `solicitacoes_interno_update` (is_interno()), intacta.
+--
+-- Script idempotente: pode ser reexecutado sem erro.
+
+DROP POLICY IF EXISTS solicitacoes_parceiro_cancel ON solicitacoes;
+
+CREATE POLICY solicitacoes_parceiro_cancel ON solicitacoes FOR UPDATE TO authenticated
+  USING (
+    origem = 'parceiro'
+    AND parceiro_id = get_current_parceiro_id()
+    AND status = 'recebida'
+  )
+  WITH CHECK (
+    origem = 'parceiro'
+    AND parceiro_id = get_current_parceiro_id()
+    AND status = 'cancelada'
+  );
+
+
+-- 0029 — Marca quando o convite do parceiro_usuario foi aceito
+--
+-- Hoje o admin do parceiro convida um operador e não tem visibilidade de se
+-- a pessoa já clicou no link e definiu a senha — `parceiro_usuarios.ativo` é
+-- só "o admin desligou ou não", e `auth.users.last_sign_in_at` fica fora da
+-- visão do parceiro (sem SELECT nas tabelas do schema auth).
+--
+-- Solução: coluna `convite_aceito_em timestamptz` nullable em
+-- `parceiro_usuarios`, populada pelo próprio convidado via RPC quando ele
+-- termina o fluxo de /aceitar-convite (depois do updateUser({password})
+-- retornar OK). A UI então mostra "Aguardando" enquanto NULL e "Ativo" depois.
+--
+-- Backfill: para usuários que JÁ logaram pelo menos uma vez antes desta
+-- migration, copia `auth.users.last_sign_in_at` (o melhor proxy disponível).
+-- Para o cofundador/admin original do parceiro que foi seedado manualmente
+-- sem passar pelo convite, isso garante que ele apareça como "Ativo" e não
+-- "Aguardando" perpetuamente.
+--
+-- Idempotente: ADD COLUMN IF NOT EXISTS, UPDATE só onde NULL, CREATE OR REPLACE.
+
+-- ============================================================
+-- 1. Coluna nova
+-- ============================================================
+
+ALTER TABLE parceiro_usuarios
+  ADD COLUMN IF NOT EXISTS convite_aceito_em timestamptz;
+
+COMMENT ON COLUMN parceiro_usuarios.convite_aceito_em IS
+  'Quando o convidado abriu o link e definiu a senha pela primeira vez. NULL = ainda pendente.';
+
+-- ============================================================
+-- 2. Backfill — para quem já logou alguma vez
+-- ============================================================
+-- Só roda em linhas onde a coluna ainda está NULL (idempotente).
+-- Lê `auth.users.last_sign_in_at` — não precisa estar exatamente no momento
+-- do aceite; é o melhor proxy para usuários pré-existentes.
+
+UPDATE parceiro_usuarios pu
+SET convite_aceito_em = au.last_sign_in_at
+FROM auth.users au
+WHERE pu.user_id = au.id
+  AND pu.convite_aceito_em IS NULL
+  AND au.last_sign_in_at IS NOT NULL;
+
+-- ============================================================
+-- 3. RPC marcar_meu_convite_aceito
+-- ============================================================
+-- SECURITY DEFINER porque o caller (parceiro_usuario recém-logado) tem
+-- policy de UPDATE em parceiro_usuarios só para o próprio parceiro_id +
+-- não-escalonamento de perfil — não dá pra autoaprovar via UPDATE direto
+-- sem expandir a policy. Aqui o SECURITY DEFINER faz exatamente uma coisa
+-- segura: marca a própria linha (filtra por auth.uid()) e só se ainda NULL.
+--
+-- Não recebe parâmetros: o caller é sempre "eu mesmo". Idempotente: chamar
+-- duas vezes não muda nada (WHERE convite_aceito_em IS NULL).
+
+CREATE OR REPLACE FUNCTION marcar_meu_convite_aceito()
+RETURNS timestamptz
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_now timestamptz := now();
+  v_uid uuid := auth.uid();
+BEGIN
+  IF v_uid IS NULL THEN
+    RETURN NULL;
+  END IF;
+
+  UPDATE parceiro_usuarios
+  SET convite_aceito_em = v_now
+  WHERE user_id = v_uid
+    AND convite_aceito_em IS NULL;
+
+  -- Retorna o valor atual (após o UPDATE) — útil pro cliente confirmar.
+  -- Se o UPDATE não pegou nada (já marcado, ou usuário não é parceiro),
+  -- devolve o que já estava lá (ou NULL).
+  RETURN (
+    SELECT convite_aceito_em FROM parceiro_usuarios WHERE user_id = v_uid LIMIT 1
+  );
+END;
+$$;
+
+-- Permitir invocar via PostgREST.
+GRANT EXECUTE ON FUNCTION marcar_meu_convite_aceito() TO authenticated;
+
+
+-- 0030 — Filtra clientes_publicos para mostrar só clientes de minério
+--
+-- Regra de negócio: o parceiro externo só carrega minério. Clientes de retorno
+-- (cliente_retorno=true / cliente_minerio=false) só são atendidos por motoristas
+-- da própria LHG. Antes desta migration, a view clientes_publicos (0017)
+-- filtrava apenas por `ativo = true`, então o select de "Cliente" no formulário
+-- de Nova Solicitação do portal listava também os clientes-retorno —
+-- desnecessário e confuso pro operador da transportadora.
+--
+-- Fix: adiciona `cliente_minerio = true` ao WHERE. Não importa se o cliente
+-- também aceita retorno (cliente_retorno=true): se ele aceita minério, o
+-- parceiro pode solicitar carregamento.
+--
+-- Colunas e GRANTs mantidos — só muda o filtro. CREATE OR REPLACE VIEW
+-- funciona porque a lista de colunas é a mesma da 0017.
+
+CREATE OR REPLACE VIEW clientes_publicos
+WITH (security_invoker = false) AS
+SELECT id, razao_social, cidade, uf
+FROM clientes
+WHERE ativo = true
+  AND cliente_minerio = true;
+
+COMMENT ON VIEW clientes_publicos IS
+  'Clientes ativos de minerio com colunas seguras para o Portal de Parceiros. '
+  'Clientes de retorno (cliente_minerio=false) sao filtrados — so a LHG carrega retorno.';
+
+
+-- 0031 — Permite excluir definitivamente um parceiro_usuario
+--
+-- Cenário: usuário sai do parceiro A e vai pro parceiro B. Hoje "Desativar"
+-- só seta `parceiro_usuarios.ativo=false`, mas o e-mail continua preso em
+-- `auth.users` e a Edge Function `convidar-parceiro-usuario` rejeita reuso
+-- (responde `email_inativo_existente`). Pra liberar o e-mail, é preciso
+-- deletar a linha em `auth.users` — que cascateia em `parceiro_usuarios`
+-- pelo `ON DELETE CASCADE` da FK `user_id` (migration 0018).
+--
+-- Bloqueio atual: `solicitacoes.parceiro_usuario_id REFERENCES
+-- parceiro_usuarios(id)` foi criado SEM `ON DELETE` (default = NO ACTION),
+-- então tentar apagar um usuário que já criou solicitações dispara erro de
+-- FK e a transação aborta. Esta migration troca essa FK por `ON DELETE
+-- SET NULL` — preserva a solicitação no histórico (rastreio interno fica
+-- intacto) e só anula a referência ao usuário deletado. Mesmo padrão já
+-- usado em `eventos_portal.parceiro_usuario_id` (migration 0021).
+--
+-- Também amplia o `tipo_evento` de `eventos_portal` com `portal_usuario_excluido`
+-- (a Edge Function nova `excluir-parceiro-usuario` registra esse evento) e
+-- atualiza `registrar_evento_portal` pra aceitá-lo. Mesmo modelo do interno-
+-- convida-portal (`portal_usuario_convidado`): se o caller não tem vínculo
+-- de parceiro, lê `parceiro_id` do payload.
+--
+-- Script idempotente.
+
+-- ============================================================
+-- 1. FK solicitacoes.parceiro_usuario_id → ON DELETE SET NULL
+-- ============================================================
+-- Reescrita: DROP CONSTRAINT + ADD CONSTRAINT. Idempotente porque o IF EXISTS
+-- cobre o DROP, e o ADD usa um nome explícito (o IF NOT EXISTS na própria
+-- linha não funciona para constraint; usamos DO block).
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'solicitacoes_parceiro_usuario_id_fkey'
+      AND conrelid = 'public.solicitacoes'::regclass
+  ) THEN
+    ALTER TABLE solicitacoes DROP CONSTRAINT solicitacoes_parceiro_usuario_id_fkey;
+  END IF;
+  -- Se a FK tem outro nome (raro, mas possível), o DROP acima é no-op e o ADD
+  -- abaixo dá erro de duplicação. Para cobrir esse caso, dropamos qualquer FK
+  -- que aponte pra parceiro_usuarios a partir dessa coluna.
+  PERFORM 1 FROM pg_constraint c
+    JOIN pg_attribute a ON a.attnum = ANY(c.conkey) AND a.attrelid = c.conrelid
+    WHERE c.conrelid = 'public.solicitacoes'::regclass
+      AND a.attname = 'parceiro_usuario_id'
+      AND c.contype = 'f';
+  -- (não é dropado em massa para não apagar algo inesperado; o caso normal
+  -- já foi tratado acima)
+END $$;
+
+ALTER TABLE solicitacoes
+  ADD CONSTRAINT solicitacoes_parceiro_usuario_id_fkey
+  FOREIGN KEY (parceiro_usuario_id)
+  REFERENCES parceiro_usuarios(id)
+  ON DELETE SET NULL;
+
+-- ============================================================
+-- 2. tipo_evento `portal_usuario_excluido`
+-- ============================================================
+
+ALTER TABLE eventos_portal DROP CONSTRAINT IF EXISTS eventos_portal_tipo_evento_check;
+ALTER TABLE eventos_portal ADD CONSTRAINT eventos_portal_tipo_evento_check
+  CHECK (tipo_evento IN (
+    'portal_login',
+    'portal_login_falha',
+    'portal_logout',
+    'portal_solicitacao_criada',
+    'portal_solicitacao_cancelada',
+    'portal_senha_alterada',
+    'portal_usuario_convidado',
+    'portal_usuario_excluido'
+  ));
+
+-- ============================================================
+-- 3. registrar_evento_portal aceitando o novo tipo
+-- ============================================================
+-- Mesmo corpo da 0023, só ampliando a lista de tipos válidos. Caller pode
+-- ser interno OU admin_parceiro; para o caso interno (sem vínculo de parceiro)
+-- lemos `parceiro_id` do payload — mesmo padrão de `portal_usuario_convidado`.
+
+CREATE OR REPLACE FUNCTION registrar_evento_portal(
+  p_tipo_evento text,
+  p_payload jsonb DEFAULT NULL
+)
+RETURNS uuid
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_user_id uuid := auth.uid();
+  v_pu parceiro_usuarios%ROWTYPE;
+  v_parceiro_id uuid;
+  v_parceiro_usuario_id uuid;
+  v_email_tentado text;
+  v_solicitacao_id uuid;
+  v_ip text;
+  v_user_agent text;
+  v_metadata jsonb;
+  v_id uuid;
+BEGIN
+  IF p_tipo_evento NOT IN (
+    'portal_login', 'portal_login_falha', 'portal_logout',
+    'portal_solicitacao_criada', 'portal_solicitacao_cancelada',
+    'portal_senha_alterada', 'portal_usuario_convidado',
+    'portal_usuario_excluido'
+  ) THEN
+    RAISE EXCEPTION 'tipo_evento invalido: %', p_tipo_evento;
+  END IF;
+
+  IF p_tipo_evento = 'portal_login_falha' THEN
+    v_email_tentado := p_payload->>'email_tentado';
+  ELSE
+    IF v_user_id IS NULL THEN
+      RETURN NULL;
+    END IF;
+    SELECT * INTO v_pu FROM parceiro_usuarios
+      WHERE user_id = v_user_id AND ativo = true
+      LIMIT 1;
+    IF FOUND THEN
+      v_parceiro_id := v_pu.parceiro_id;
+      v_parceiro_usuario_id := v_pu.id;
+    ELSIF p_tipo_evento IN ('portal_usuario_convidado', 'portal_usuario_excluido') THEN
+      -- caller interno: aceita parceiro_id explícito do payload
+      v_parceiro_id := NULLIF(p_payload->>'parceiro_id', '')::uuid;
+    ELSE
+      RETURN NULL;
+    END IF;
+  END IF;
+
+  v_ip := p_payload->>'ip';
+  v_user_agent := p_payload->>'user_agent';
+  v_solicitacao_id := NULLIF(p_payload->>'solicitacao_id', '')::uuid;
+  v_metadata := p_payload - ARRAY['email_tentado','ip','user_agent','solicitacao_id','parceiro_id'];
+  IF v_metadata = '{}'::jsonb THEN v_metadata := NULL; END IF;
+
+  INSERT INTO eventos_portal (
+    tipo_evento, user_id, parceiro_id, parceiro_usuario_id,
+    email_tentado, solicitacao_id, ip, user_agent, metadata
+  ) VALUES (
+    p_tipo_evento, v_user_id, v_parceiro_id, v_parceiro_usuario_id,
+    v_email_tentado, v_solicitacao_id, v_ip, v_user_agent, v_metadata
+  )
+  RETURNING id INTO v_id;
+
+  RETURN v_id;
+END;
+$$;
+
+
+-- 0032 — Adiciona 'whatsapp' aos valores aceitos por solicitacoes.origem
+--
+-- A coluna `origem` foi criada na 0016 com CHECK IN ('interno','parceiro','email').
+-- Com a entrada do agente de IA do WhatsApp (docs/AGENT_CONTEXT.md), precisamos
+-- de uma 4ª categoria para distinguir o canal no filtro "Origem" da listagem e
+-- na auditoria. Reaproveitar 'email' deixaria o filtro mentiroso (mensagens de
+-- WhatsApp apareceriam ao filtrar e-mail).
+--
+-- O CHECK original foi criado inline na 0016, com nome auto-gerado pelo
+-- Postgres (`solicitacoes_origem_check`). O DO block abaixo localiza e dropa
+-- qualquer CHECK em `solicitacoes` cuja definição mencione `origem IN`,
+-- independente do nome — isso mantém a migration reexecutável em ambientes
+-- onde o nome possa variar. Depois recria com nome canônico e os 4 valores.
+--
+-- Script idempotente: pode ser reexecutado sem erro.
+
+DO $$
+DECLARE
+  v_name text;
+BEGIN
+  FOR v_name IN
+    SELECT conname
+      FROM pg_constraint
+     WHERE conrelid = 'solicitacoes'::regclass
+       AND contype = 'c'
+       AND pg_get_constraintdef(oid) ILIKE '%origem%IN%'
+  LOOP
+    EXECUTE format('ALTER TABLE solicitacoes DROP CONSTRAINT %I', v_name);
+  END LOOP;
+END $$;
+
+ALTER TABLE solicitacoes
+  ADD CONSTRAINT solicitacoes_origem_check
+  CHECK (origem IN ('interno', 'parceiro', 'email', 'whatsapp'));
+
+COMMENT ON COLUMN solicitacoes.origem IS
+  'Canal pelo qual a solicitação entrou no sistema: ''interno'' (equipe LHG '
+  'cadastrando manualmente), ''parceiro'' (portal externo da Fase 8), ''email'' '
+  '(triagem manual de e-mail) ou ''whatsapp'' (agente de IA via Meta Cloud API).';
+
+
+-- 0033 — Bloqueio temporario de novas solicitacoes por parceiro
+--
+-- Adiciona um switch por parceiro que impede a criacao de novas solicitacoes
+-- pelo portal, mantendo o login, a listagem e o download de arquivos das
+-- solicitacoes ja existentes. Diferente de `parceiros.ativo=false`, que tranca
+-- o portal inteiro (e tambem ja desativa os usuarios via UI), este flag e' uma
+-- pausa "estou encerrando os testes" controlada pela equipe interna.
+--
+-- Mudancas:
+--   1. Colunas `solicitacoes_bloqueadas` (bool, default false) e
+--      `solicitacoes_bloqueadas_em` (timestamptz) em `parceiros`.
+--   2. Trigger BEFORE INSERT em `solicitacoes` que aborta com SQLSTATE custom
+--      `PT423` (Locked) quando a origem e' do parceiro e o flag esta ligado.
+--      Internos/e-mail (`origem != 'parceiro'`) passam direto. Igual a
+--      check_portal_rate_limit_diario, a funcao e' SECURITY DEFINER porque o
+--      parceiro nao tem policy de SELECT em `solicitacoes`.
+--
+-- Idempotente.
+
+-- ============================================================
+-- 1. Colunas em parceiros
+-- ============================================================
+
+ALTER TABLE parceiros
+  ADD COLUMN IF NOT EXISTS solicitacoes_bloqueadas boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS solicitacoes_bloqueadas_em timestamptz;
+
+COMMENT ON COLUMN parceiros.solicitacoes_bloqueadas IS
+  'Quando true, o parceiro nao consegue criar novas solicitacoes pelo portal '
+  '(trigger check_parceiro_solicitacoes_bloqueadas, SQLSTATE PT423). A '
+  'leitura/download de arquivos das solicitacoes existentes continua liberada.';
+
+COMMENT ON COLUMN parceiros.solicitacoes_bloqueadas_em IS
+  'Momento em que o bloqueio foi ativado (null quando solicitacoes_bloqueadas=false).';
+
+-- ============================================================
+-- 2. Trigger BEFORE INSERT em solicitacoes
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION check_parceiro_solicitacoes_bloqueadas()
+RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_bloqueado boolean;
+BEGIN
+  IF NEW.origem <> 'parceiro' OR NEW.parceiro_id IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  SELECT solicitacoes_bloqueadas INTO v_bloqueado
+  FROM parceiros
+  WHERE id = NEW.parceiro_id;
+
+  IF v_bloqueado IS TRUE THEN
+    RAISE EXCEPTION
+      'Novas solicitacoes estao temporariamente indisponiveis para este parceiro.'
+      USING ERRCODE = 'PT423';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+COMMENT ON FUNCTION check_parceiro_solicitacoes_bloqueadas() IS
+  'Bloqueia INSERT em solicitacoes quando parceiros.solicitacoes_bloqueadas=true. '
+  'SQLSTATE PT423.';
+
+DROP TRIGGER IF EXISTS trg_solicitacoes_parceiro_bloqueado ON solicitacoes;
+CREATE TRIGGER trg_solicitacoes_parceiro_bloqueado
+  BEFORE INSERT ON solicitacoes
+  FOR EACH ROW EXECUTE FUNCTION check_parceiro_solicitacoes_bloqueadas();
+
+
+-- 0034 — Placas da composicao em ordem (ANTT): 1a carreta + dolly
+--
+-- A nova regulamentacao fiscal da ANTT exige que TODAS as placas da composicao
+-- veicular apareçam na Ordem de Carregamento, na ordem fisica do conjunto:
+--   Cavalo -> 1a Carreta -> Dolly -> Ultima Carreta
+-- Hoje a solicitacao so registra Cavalo (veiculo_id) e Ultima Carreta
+-- (carreta_id). Esta migration adiciona dois vinculos OPCIONAIS de carreta,
+-- reaproveitando o cadastro existente de `carretas` (o dolly e' cadastrado como
+-- uma carreta). Quando vazios, saem em branco na OC.
+--
+-- Espelha os campos no fluxo do portal (parceiro_carretas), atualiza a
+-- constraint de integridade de origem e recria a view portal_solicitacoes.
+--
+-- Idempotente.
+
+-- ============================================================
+-- 1. Vinculos internos (cadastro de carretas)
+-- ============================================================
+
+ALTER TABLE solicitacoes
+  ADD COLUMN IF NOT EXISTS primeira_carreta_id uuid REFERENCES carretas(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS dolly_id uuid REFERENCES carretas(id) ON DELETE SET NULL;
+
+CREATE INDEX IF NOT EXISTS idx_solicitacoes_primeira_carreta ON solicitacoes(primeira_carreta_id);
+CREATE INDEX IF NOT EXISTS idx_solicitacoes_dolly ON solicitacoes(dolly_id);
+
+-- ============================================================
+-- 2. Vinculos do portal (cadastro do parceiro)
+-- ============================================================
+
+ALTER TABLE solicitacoes
+  ADD COLUMN IF NOT EXISTS parceiro_primeira_carreta_id uuid REFERENCES parceiro_carretas(id),
+  ADD COLUMN IF NOT EXISTS parceiro_dolly_id uuid REFERENCES parceiro_carretas(id);
+
+COMMENT ON COLUMN solicitacoes.primeira_carreta_id IS
+  'Placa da 1a carreta da composicao (ANTT). Opcional; FK carretas.';
+COMMENT ON COLUMN solicitacoes.dolly_id IS
+  'Placa do dolly da composicao (ANTT). Opcional; FK carretas (dolly cadastrado como carreta).';
+COMMENT ON COLUMN solicitacoes.parceiro_primeira_carreta_id IS
+  'Espelho de primeira_carreta_id no fluxo do portal (FK parceiro_carretas).';
+COMMENT ON COLUMN solicitacoes.parceiro_dolly_id IS
+  'Espelho de dolly_id no fluxo do portal (FK parceiro_carretas).';
+
+-- ============================================================
+-- 3. Constraint de integridade de origem (cobre os novos campos)
+-- ============================================================
+-- Mantem a regra da 0018: solicitacao de parceiro usa apenas referencias
+-- parceiro_*; interna/e-mail nao usa nenhuma referencia parceiro_*. NOT VALID:
+-- nao varre linhas legadas (todas tem os novos campos NULL).
+
+ALTER TABLE solicitacoes
+  DROP CONSTRAINT IF EXISTS solicitacoes_origem_integridade;
+ALTER TABLE solicitacoes
+  ADD CONSTRAINT solicitacoes_origem_integridade
+  CHECK (
+    (origem = 'parceiro'
+      AND parceiro_id IS NOT NULL
+      AND parceiro_usuario_id IS NOT NULL
+      AND parceiro_motorista_id IS NOT NULL
+      AND parceiro_veiculo_id IS NOT NULL
+      AND motorista_id IS NULL
+      AND veiculo_id IS NULL
+      AND carreta_id IS NULL
+      AND primeira_carreta_id IS NULL
+      AND dolly_id IS NULL
+      AND subcontratada_id IS NULL)
+    OR
+    (origem <> 'parceiro'
+      AND parceiro_id IS NULL
+      AND parceiro_usuario_id IS NULL
+      AND parceiro_motorista_id IS NULL
+      AND parceiro_veiculo_id IS NULL
+      AND parceiro_carreta_id IS NULL
+      AND parceiro_primeira_carreta_id IS NULL
+      AND parceiro_dolly_id IS NULL
+      AND parceiro_subcontratada_id IS NULL)
+  ) NOT VALID;
+
+-- ============================================================
+-- 4. View portal_solicitacoes — expoe os novos IDs do parceiro
+-- ============================================================
+-- DROP + CREATE (em vez de CREATE OR REPLACE) porque o Postgres nao permite
+-- inserir colunas no meio da lista via REPLACE. O portal resolve as colunas por
+-- nome, entao a ordem nao importa para a aplicacao.
+
+DROP VIEW IF EXISTS portal_solicitacoes;
+CREATE VIEW portal_solicitacoes
+WITH (security_invoker = false) AS
+SELECT id, numero_interno, tipo, status, origem,
+       parceiro_id, parceiro_usuario_id, parceiro_motorista_id,
+       parceiro_veiculo_id, parceiro_carreta_id,
+       parceiro_primeira_carreta_id, parceiro_dolly_id,
+       parceiro_subcontratada_id,
+       cliente_id, pamcard_status, pamcard_numero,
+       observacoes, created_at, enviada_em, finalizada_em
+FROM solicitacoes
+WHERE origem = 'parceiro' AND parceiro_id = get_current_parceiro_id();
+
+GRANT SELECT ON portal_solicitacoes TO authenticated;
+
+COMMENT ON VIEW portal_solicitacoes IS
+  'Solicitações do parceiro logado, apenas com colunas seguras. O portal lê '
+  'por aqui; o parceiro não tem policy de SELECT na tabela solicitacoes.';
+
+
+-- 0035 — Loop de pendência: devolver solicitação ao parceiro e receber a volta
+--
+-- Hoje a comunicação parceiro <-> equipe interna é de mão única: quando o
+-- veículo tem uma pendência que trava a finalização, a equipe não tem como
+-- "devolver" a solicitação ao parceiro, e quando o parceiro resolve nada
+-- aparece no SisLog. Esta migration cria a tabela `solicitacao_pendencias`
+-- como overlay sobre a solicitação (NÃO mexe no enum `solicitacoes.status`,
+-- preservando a máquina de estados, SLA e timeline).
+--
+-- Fluxo:
+--   1. Interno cria uma pendência (motivo) -> status 'aberta'.
+--   2. Parceiro vê no portal (sino + banner), resolve (resposta) -> 'resolvida'.
+--   3. Interno é notificado no sino e continua a finalização.
+--
+-- Segurança: o parceiro NÃO tem SELECT em `solicitacoes` (Bloco 1). Para o RLS
+-- do parceiro funcionar sem recursão, denormalizamos `parceiro_id` na própria
+-- pendência (mesmo padrão de parceiro_motoristas etc.). Um trigger BEFORE INSERT
+-- preenche `parceiro_id`/`criada_por` a partir da solicitação — o cliente não
+-- precisa (nem consegue forjar) esses campos.
+--
+-- Script idempotente: pode ser reexecutado sem erro.
+
+-- ============================================================
+-- 1. Tabela
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS solicitacao_pendencias (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  solicitacao_id uuid NOT NULL REFERENCES solicitacoes(id) ON DELETE CASCADE,
+  -- Denormalizado a partir da solicitação (trigger). É a chave do RLS do parceiro.
+  parceiro_id uuid NOT NULL REFERENCES parceiros(id) ON DELETE CASCADE,
+  motivo text NOT NULL,
+  status text NOT NULL DEFAULT 'aberta' CHECK (status IN ('aberta', 'resolvida')),
+  resposta_parceiro text,
+  criada_por uuid REFERENCES auth.users(id),
+  resolvida_por uuid REFERENCES auth.users(id),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  resolvida_em timestamptz
+);
+
+CREATE INDEX IF NOT EXISTS idx_pendencias_solicitacao ON solicitacao_pendencias(solicitacao_id);
+CREATE INDEX IF NOT EXISTS idx_pendencias_parceiro ON solicitacao_pendencias(parceiro_id);
+CREATE INDEX IF NOT EXISTS idx_pendencias_status ON solicitacao_pendencias(status);
+-- No máximo UMA pendência aberta por solicitação.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_pendencia_aberta_por_solicitacao
+  ON solicitacao_pendencias(solicitacao_id) WHERE status = 'aberta';
+
+-- ============================================================
+-- 2. Triggers de preenchimento + updated_at + auditoria
+-- ============================================================
+-- BEFORE INSERT: deriva parceiro_id da solicitação (ignora o que o cliente
+-- mandar) e marca criada_por = auth.uid(). Se a solicitação não for de parceiro
+-- (parceiro_id NULL), o NOT NULL aborta — pendência só existe para origem
+-- 'parceiro', que é o único caso onde o loop faz sentido.
+CREATE OR REPLACE FUNCTION pendencia_preencher_insert()
+RETURNS TRIGGER
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+BEGIN
+  SELECT parceiro_id INTO NEW.parceiro_id FROM solicitacoes WHERE id = NEW.solicitacao_id;
+  NEW.criada_por := COALESCE(NEW.criada_por, auth.uid());
+  NEW.status := 'aberta';
+  NEW.resolvida_em := NULL;
+  NEW.resolvida_por := NULL;
+  RETURN NEW;
+END;
+$$;
+
+-- BEFORE UPDATE: quando alguém move 'aberta' -> 'resolvida', carimba
+-- resolvida_em/por no servidor (não confia no cliente).
+CREATE OR REPLACE FUNCTION pendencia_carimbar_resolucao()
+RETURNS TRIGGER
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+BEGIN
+  IF NEW.status = 'resolvida' AND OLD.status <> 'resolvida' THEN
+    NEW.resolvida_em := now();
+    NEW.resolvida_por := auth.uid();
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_pendencia_preencher ON solicitacao_pendencias;
+CREATE TRIGGER trg_pendencia_preencher BEFORE INSERT ON solicitacao_pendencias
+  FOR EACH ROW EXECUTE FUNCTION pendencia_preencher_insert();
+
+DROP TRIGGER IF EXISTS trg_pendencia_resolucao ON solicitacao_pendencias;
+CREATE TRIGGER trg_pendencia_resolucao BEFORE UPDATE ON solicitacao_pendencias
+  FOR EACH ROW EXECUTE FUNCTION pendencia_carimbar_resolucao();
+
+DROP TRIGGER IF EXISTS trg_pendencias_updated ON solicitacao_pendencias;
+CREATE TRIGGER trg_pendencias_updated BEFORE UPDATE ON solicitacao_pendencias
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+DROP TRIGGER IF EXISTS aud_solicitacao_pendencias ON solicitacao_pendencias;
+CREATE TRIGGER aud_solicitacao_pendencias
+  AFTER INSERT OR UPDATE OR DELETE ON solicitacao_pendencias
+  FOR EACH ROW EXECUTE FUNCTION audit_trigger();
+
+-- ============================================================
+-- 3. RLS
+-- ============================================================
+-- Interno: tudo. Parceiro: lê as suas (parceiro_id) e só consegue a transição
+-- 'aberta' -> 'resolvida' (resposta). Sem INSERT/DELETE pelo parceiro.
+
+ALTER TABLE solicitacao_pendencias ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS pendencias_interno_all ON solicitacao_pendencias;
+DROP POLICY IF EXISTS pendencias_parceiro_select ON solicitacao_pendencias;
+DROP POLICY IF EXISTS pendencias_parceiro_resolve ON solicitacao_pendencias;
+
+CREATE POLICY pendencias_interno_all ON solicitacao_pendencias FOR ALL TO authenticated
+  USING (is_interno()) WITH CHECK (is_interno());
+
+CREATE POLICY pendencias_parceiro_select ON solicitacao_pendencias FOR SELECT TO authenticated
+  USING (parceiro_id = get_current_parceiro_id());
+
+-- Só aberta -> resolvida. O WITH CHECK trava o status final em 'resolvida';
+-- combinado com o USING (status='aberta'), a única transição possível é
+-- resolver. Editar o motivo continua tecnicamente possível para o parceiro,
+-- mas é inócuo (a equipe é a fonte da verdade e vê tudo); o portal só envia
+-- status + resposta_parceiro.
+CREATE POLICY pendencias_parceiro_resolve ON solicitacao_pendencias FOR UPDATE TO authenticated
+  USING (parceiro_id = get_current_parceiro_id() AND status = 'aberta')
+  WITH CHECK (parceiro_id = get_current_parceiro_id() AND status = 'resolvida');
+
+-- ============================================================
+-- 4. Realtime
+-- ============================================================
+-- Para que devolução/resolução apareçam ao vivo nos dois apps (igual 0013).
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime' AND tablename = 'solicitacao_pendencias'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE solicitacao_pendencias;
+  END IF;
+END $$;
+
+COMMENT ON TABLE solicitacao_pendencias IS
+  'Overlay de pendências sobre a solicitação: a equipe devolve ao parceiro com '
+  'um motivo (aberta) e o parceiro resolve (resolvida). Não altera '
+  'solicitacoes.status. parceiro_id é denormalizado para o RLS do parceiro.';
+
+
 
 
 -- =====================================================================
