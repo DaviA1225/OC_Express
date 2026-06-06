@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Plus, Search as SearchIcon, Inbox, Eraser, ChevronLeft, ChevronRight, X, CheckSquare, Square, Download, Loader2, Trash2, Clock, Undo2, Reply } from 'lucide-react'
+import { Plus, Search as SearchIcon, Inbox, Eraser, ChevronLeft, ChevronRight, X, CheckSquare, Square, Download, Loader2, Trash2, Clock, Undo2, Reply, LayoutGrid, List as ListIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -79,6 +79,7 @@ export function SolicitacoesListPage() {
     return VALID_PAMCARD.includes(raw as PamcardFiltro) ? (raw as PamcardFiltro) : 'todos'
   })()
   const apenasAtrasadas = params.get('atrasadas') === '1'
+  const view: 'grade' | 'lista' = params.get('view') === 'lista' ? 'lista' : 'grade'
   const page = Math.max(1, Number(params.get('page')) || 1)
   const pageSize = 30
 
@@ -139,6 +140,10 @@ export function SolicitacoesListPage() {
   const setPage = (p: number) =>
     updateParams((n) => {
       if (p > 1) n.set('page', String(p)); else n.delete('page')
+    })
+  const setView = (v: 'grade' | 'lista') =>
+    updateParams((n) => {
+      if (v === 'lista') n.set('view', 'lista'); else n.delete('view')
     })
 
   const filters: ListFilters = {
@@ -305,6 +310,32 @@ export function SolicitacoesListPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <div className="flex items-center rounded-md border p-0.5" role="group" aria-label="Modo de exibição">
+            <button
+              type="button"
+              onClick={() => setView('grade')}
+              aria-pressed={view === 'grade'}
+              title="Ver em grade"
+              className={cn(
+                'inline-flex items-center justify-center rounded p-1.5 transition-colors',
+                view === 'grade' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setView('lista')}
+              aria-pressed={view === 'lista'}
+              title="Ver em lista"
+              className={cn(
+                'inline-flex items-center justify-center rounded p-1.5 transition-colors',
+                view === 'lista' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              <ListIcon className="h-4 w-4" />
+            </button>
+          </div>
           <Button
             type="button"
             variant="outline"
@@ -493,19 +524,35 @@ export function SolicitacoesListPage() {
             />
           )}
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {list.data!.data.map((row) => (
-              <SolicitacaoCard
-                key={row.id}
-                row={row}
-                sinalPendencia={pendenciaSinais.data?.get(row.id) ?? null}
-                selectable={canBulk}
-                selected={selectedIds.has(row.id)}
-                onToggleSelect={() => toggleId(row.id)}
-                onOpen={() => navigate(`/solicitacoes/${row.id}`)}
-              />
-            ))}
-          </div>
+          {view === 'grade' ? (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {list.data!.data.map((row) => (
+                <SolicitacaoCard
+                  key={row.id}
+                  row={row}
+                  sinalPendencia={pendenciaSinais.data?.get(row.id) ?? null}
+                  selectable={canBulk}
+                  selected={selectedIds.has(row.id)}
+                  onToggleSelect={() => toggleId(row.id)}
+                  onOpen={() => navigate(`/solicitacoes/${row.id}`)}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="divide-y rounded-lg border bg-background">
+              {list.data!.data.map((row) => (
+                <SolicitacaoListaRow
+                  key={row.id}
+                  row={row}
+                  sinalPendencia={pendenciaSinais.data?.get(row.id) ?? null}
+                  selectable={canBulk}
+                  selected={selectedIds.has(row.id)}
+                  onToggleSelect={() => toggleId(row.id)}
+                  onOpen={() => navigate(`/solicitacoes/${row.id}`)}
+                />
+              ))}
+            </div>
+          )}
         </>
       )}
 
@@ -579,8 +626,8 @@ function SolicitacaoCard({ row, sinalPendencia, selectable, selected, onToggleSe
         !selected && !sinal && sla?.severity === 'warning' && 'border-amber-300 dark:border-amber-900/60',
       )}
     >
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
           {selectable && (
           <Checkbox
             checked={selected}
@@ -652,6 +699,58 @@ function SolicitacaoCard({ row, sinalPendencia, selectable, selected, onToggleSe
           {row.numero_instrucao ? ` · Instr. ${row.numero_instrucao}` : ''}
         </span>
         <Button variant="outline" size="sm" onClick={onOpen}>Abrir</Button>
+      </div>
+    </div>
+  )
+}
+
+// Linha compacta da visualização em lista — mesma informação essencial dos
+// cards, numa densidade maior e sem estouro lateral em telas pequenas.
+function SolicitacaoListaRow({ row, sinalPendencia, selectable, selected, onToggleSelect, onOpen }: CardProps) {
+  const created = row.created_at ? new Date(row.created_at) : null
+  const sla = getSlaInfo(row.status, row.created_at)
+  const ativa = row.status !== 'finalizada' && row.status !== 'cancelada'
+  const sinal = ativa ? sinalPendencia : null
+  const motorista = row.motorista?.nome_completo
+  const cliente = row.cliente?.razao_social
+  const resumo = [row.solicitante_nome, motorista, cliente].filter(Boolean).join(' · ')
+  return (
+    <div
+      className={cn(
+        'flex items-center gap-3 px-3 py-2.5 transition-colors hover:bg-muted/50',
+        selectable && selected && 'bg-primary/5',
+      )}
+    >
+      {selectable && (
+        <Checkbox
+          checked={selected}
+          onCheckedChange={onToggleSelect}
+          aria-label={`Selecionar ${formatNumeroOC(row.numero_interno)}`}
+        />
+      )}
+      <button
+        type="button"
+        onClick={onOpen}
+        className="flex min-w-0 flex-1 items-center gap-2 text-left"
+      >
+        <span className="shrink-0 text-[13px] font-medium text-primary">{formatNumeroOC(row.numero_interno)}</span>
+        {sinal && <PendenciaPop sinal={sinal} />}
+        {row.origem === 'parceiro'
+          && row.pamcard_status === 'nao_tem_cartao'
+          && !row.pamcard_providenciado_em && (
+          <span className="hidden shrink-0 rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-medium text-amber-800 dark:text-amber-300 sm:inline">
+            Cartão pendente
+          </span>
+        )}
+        <span className="truncate text-[13px] text-muted-foreground">{resumo || '—'}</span>
+      </button>
+      <div className="flex shrink-0 items-center gap-2">
+        <span className="hidden text-[11px] text-muted-foreground md:inline">
+          {created ? format(created, 'dd/MM/yyyy HH:mm', { locale: ptBR }) : '—'}
+        </span>
+        {sla && <SlaBadge sla={sla} />}
+        <SolicitacaoStatusBadge status={row.status} />
+        <ChevronRight className="h-4 w-4 text-muted-foreground" />
       </div>
     </div>
   )

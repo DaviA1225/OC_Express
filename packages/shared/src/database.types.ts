@@ -26,7 +26,9 @@ export type SolicitacaoTipo = 'carregamento' | 'retorno'
 
 export type MaterialSubtipo = 'SINTER' | 'HEMATITA' | 'LUMP'
 
-export type PamcardStatus = 'tem_cartao' | 'nao_tem_cartao'
+// 'nao_necessario' (migration 0037): pagamento por outro meio (regra nova ANTT),
+// não exige cartão e não entra na fila de "cartão pendente" da equipe interna.
+export type PamcardStatus = 'tem_cartao' | 'nao_tem_cartao' | 'nao_necessario'
 
 export type SolicitacaoOrigem = 'interno' | 'parceiro' | 'email'
 

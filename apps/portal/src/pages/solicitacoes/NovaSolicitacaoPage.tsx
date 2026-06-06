@@ -53,7 +53,7 @@ const schema = z
     parceiro_dolly_id: z.string(),
     parceiro_subcontratada_id: z.string(),
     cliente_id: z.string().min(1, 'Selecione o cliente'),
-    pamcard_status: z.enum(['tem_cartao', 'nao_tem_cartao']),
+    pamcard_status: z.enum(['tem_cartao', 'nao_tem_cartao', 'nao_necessario']),
     pamcard_numero: z.string().optional(),
     observacoes: z.string().optional(),
   })
@@ -360,7 +360,7 @@ export default function NovaSolicitacaoPage() {
                 onValueChange={(v) => {
                   const next = v as PamcardStatus
                   setValue('pamcard_status', next, { shouldValidate: true })
-                  if (next === 'nao_tem_cartao') {
+                  if (next !== 'tem_cartao') {
                     setValue('pamcard_numero', '', { shouldValidate: true })
                   }
                 }}
@@ -373,6 +373,10 @@ export default function NovaSolicitacaoPage() {
                 <label className="flex items-center gap-2 text-[13px]">
                   <RadioGroupItem value="nao_tem_cartao" />
                   Não tem cartão (solicitar)
+                </label>
+                <label className="flex items-center gap-2 text-[13px]">
+                  <RadioGroupItem value="nao_necessario" />
+                  Não necessário (pagamento por outro meio)
                 </label>
               </RadioGroup>
             </div>

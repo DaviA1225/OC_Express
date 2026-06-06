@@ -229,6 +229,13 @@ export function SolicitacaoDetailPage() {
               }}
               onGerarOC={() => setOpenGerarOC(true)}
               onEnviarWhats={() => setOpenWhats(true)}
+              onMarcarEnviada={() => {
+                if (id) transit.mutate({
+                  id,
+                  status: 'oc_enviada',
+                  extra: { enviada_em: new Date().toISOString() },
+                })
+              }}
               disabled={transit.isPending}
               bloquearAvanco={materialPendente}
             />
@@ -452,11 +459,12 @@ interface ActionsProps {
   onVoltarRecebida: () => void
   onGerarOC: () => void
   onEnviarWhats: () => void
+  onMarcarEnviada: () => void
   disabled: boolean
   bloquearAvanco: boolean
 }
 
-function StatusActions({ status, hasInstrucao, requerInstrucao, onAdvanceInstrucao, onAdvanceFinalizar, onMarcarEmCadastro, onVoltarRecebida, onGerarOC, onEnviarWhats, disabled, bloquearAvanco }: ActionsProps) {
+function StatusActions({ status, hasInstrucao, requerInstrucao, onAdvanceInstrucao, onAdvanceFinalizar, onMarcarEmCadastro, onVoltarRecebida, onGerarOC, onEnviarWhats, onMarcarEnviada, disabled, bloquearAvanco }: ActionsProps) {
   if (status === 'recebida') {
     return (
       <Button
@@ -506,6 +514,15 @@ function StatusActions({ status, hasInstrucao, requerInstrucao, onAdvanceInstruc
       <div className="flex items-center gap-2">
         <Button size="sm" variant="outline" onClick={onGerarOC} disabled={disabled}>
           Regerar OC
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={onMarcarEnviada}
+          disabled={disabled}
+          title="Marcar como enviada sem abrir o WhatsApp (ex.: enviou por outro meio)"
+        >
+          Marcar como enviada
         </Button>
         <Button size="sm" onClick={onEnviarWhats} disabled={disabled}>
           Enviar WhatsApp
@@ -1174,6 +1191,7 @@ function PamcardNumeroForm({
 function PamcardCard({ solicitacao, editable, onSave }: CardProps) {
   const { profile } = useAuth()
   const temCartao = solicitacao.pamcard_status === 'tem_cartao'
+  const naoNecessario = solicitacao.pamcard_status === 'nao_necessario'
   const providenciado = !!solicitacao.pamcard_providenciado_em
   const podeAlterar = editable && solicitacao.status !== 'cancelada'
   const [editarOpen, setEditarOpen] = React.useState(false)
@@ -1220,7 +1238,16 @@ function PamcardCard({ solicitacao, editable, onSave }: CardProps) {
           </dl>
         )}
 
-        {!temCartao && !providenciado && (
+        {naoNecessario && (
+          <div>
+            <dt className="text-[10px] uppercase tracking-[0.5px] text-muted-foreground">Status</dt>
+            <dd className="font-medium text-muted-foreground">
+              Não necessário — pagamento por outro meio
+            </dd>
+          </div>
+        )}
+
+        {!temCartao && !naoNecessario && !providenciado && (
           <div className="space-y-3">
             <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-[12px] text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-300">
               Aguardando providência da equipe interna.
@@ -1526,7 +1553,8 @@ function AvisarParceiroCard({ solicitacao }: { solicitacao: CardProps['solicitac
   const mensagem = formatOCWhatsAppMessage(solicitacao)
 
   const abrirWhatsApp = () => {
-    window.open(buildWhatsAppLink(fone, mensagem), '_blank', 'noopener,noreferrer')
+    // Mesma aba do WhatsApp a cada envio (ver WhatsAppEnvioDialog.handleAbrir).
+    window.open(buildWhatsAppLink(fone, mensagem), 'sislog_whatsapp')
   }
   const abrirEmail = () => {
     if (!email) return

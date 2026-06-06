@@ -115,7 +115,9 @@ export default function SolicitacaoDetailPage() {
   const pamcard =
     sol.pamcard_status === 'tem_cartao'
       ? `Tem cartão${sol.pamcard_numero ? ` — ${formatarPamcardParaExibicao(sol.pamcard_numero)}` : ''}`
-      : 'Não tem cartão (solicitado à LHG)'
+      : sol.pamcard_status === 'nao_necessario'
+        ? 'Não necessário (pagamento por outro meio)'
+        : 'Não tem cartão (solicitado à LHG)'
 
   return (
     <div className="mx-auto w-full max-w-[720px]">

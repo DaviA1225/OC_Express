@@ -55,7 +55,12 @@ DialogHeader.displayName = 'DialogHeader'
 const DialogBody = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
   <div
     className={cn(
-      'max-h-[60vh] overflow-y-auto px-4 py-3 sm:max-h-[460px] sm:px-5 sm:py-4',
+      // Altura relativa ao viewport (não fixa) para que cabeçalho + rodapé
+      // sempre caibam dentro do `max-h-[calc(100vh-2rem)]` do DialogContent.
+      // Em notebooks 14" com escala do Windows (125–150%) a altura útil em CSS
+      // cai para ~510–610px; o antigo `sm:max-h-[460px]` estourava o limite e o
+      // `overflow-hidden` do content cortava o rodapé (botão "Salvar").
+      'max-h-[calc(100vh-13rem)] overflow-y-auto px-4 py-3 sm:px-5 sm:py-4',
       className,
     )}
     {...props}

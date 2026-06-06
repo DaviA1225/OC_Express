@@ -631,9 +631,13 @@ function LinkConviteDialog({
 }) {
   const [copiado, setCopiado] = React.useState(false)
 
-  React.useEffect(() => {
-    if (!info) setCopiado(false)
-  }, [info])
+  // Reset do "Copiado" quando o diálogo fecha/troca de pessoa — ajuste de estado
+  // durante o render (padrão do projeto), em vez de setState num useEffect.
+  const [lastInfo, setLastInfo] = React.useState(info)
+  if (lastInfo !== info) {
+    setLastInfo(info)
+    if (copiado) setCopiado(false)
+  }
 
   const copiar = async () => {
     if (!info) return
