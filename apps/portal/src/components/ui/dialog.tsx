@@ -55,7 +55,10 @@ DialogHeader.displayName = 'DialogHeader'
 const DialogBody = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
   <div
     className={cn(
-      'max-h-[60vh] overflow-y-auto px-4 py-3 sm:max-h-[460px] sm:px-5 sm:py-4',
+      // Altura relativa ao viewport (não fixa) para que cabeçalho + rodapé
+      // sempre caibam dentro do `max-h-[calc(100vh-2rem)]` do DialogContent —
+      // evita o corte do rodapé em telas baixas (notebook 14" + escala Windows).
+      'max-h-[calc(100vh-13rem)] overflow-y-auto px-4 py-3 sm:px-5 sm:py-4',
       className,
     )}
     {...props}

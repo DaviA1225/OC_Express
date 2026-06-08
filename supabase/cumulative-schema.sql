@@ -380,7 +380,7 @@ ALTER TABLE solicitacoes
   DROP CONSTRAINT IF EXISTS solicitacoes_pamcard_status_check;
 ALTER TABLE solicitacoes
   ADD CONSTRAINT solicitacoes_pamcard_status_check
-  CHECK (pamcard_status IN ('tem_cartao', 'nao_tem_cartao'));
+  CHECK (pamcard_status IN ('tem_cartao', 'nao_tem_cartao', 'nao_necessario'));
 ALTER TABLE solicitacoes
   DROP CONSTRAINT IF EXISTS solicitacoes_origem_check;
 ALTER TABLE solicitacoes
@@ -395,7 +395,7 @@ ALTER TABLE solicitacoes
       AND pamcard_numero IS NOT NULL
       AND pamcard_numero ~ '^[0-9]{10,16}$')
     OR
-    (pamcard_status = 'nao_tem_cartao' AND pamcard_numero IS NULL)
+    (pamcard_status IN ('nao_tem_cartao', 'nao_necessario') AND pamcard_numero IS NULL)
   );
 CREATE INDEX IF NOT EXISTS idx_solicitacoes_pamcard_pendente
   ON solicitacoes (pamcard_status, pamcard_providenciado_em)

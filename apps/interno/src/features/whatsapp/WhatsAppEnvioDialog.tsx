@@ -83,7 +83,11 @@ export function WhatsAppEnvioDialog({ open, onOpenChange, solicitacao }: Props) 
   const podeEnviar = !!telefoneFinal || !destinoSelecionado // sem destino, abre wa.me sem número
 
   const handleAbrir = () => {
-    window.open(link, '_blank', 'noopener,noreferrer')
+    // Nome de janela fixo (em vez de '_blank') para reaproveitar a MESMA aba do
+    // WhatsApp Web a cada envio, em vez de abrir uma aba nova toda vez. Sem
+    // 'noopener' aqui de propósito: ele criaria um novo contexto e o nome não
+    // reutilizaria a aba existente.
+    window.open(link, 'sislog_whatsapp')
     if (solicitacao.status === 'oc_gerada') {
       transit.mutate({
         id: solicitacao.id,

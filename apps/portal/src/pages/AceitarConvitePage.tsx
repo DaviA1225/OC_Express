@@ -28,6 +28,9 @@ export default function AceitarConvitePage() {
   const navigate = useNavigate()
   const [showSenha, setShowSenha] = React.useState(false)
   const [showConf, setShowConf] = React.useState(false)
+  // Snapshot do horário de montagem (inicializador lazy = puro, roda uma vez).
+  // Evita chamar Date.now() direto no render (regra react-hooks/purity).
+  const [agoraMs] = React.useState(() => Date.now())
 
   const {
     register,
@@ -52,7 +55,7 @@ export default function AceitarConvitePage() {
   // Setar senha aqui não quebra nada, mas evitamos confundir quem navegou
   // pra /aceitar-convite por engano depois de já estar logado.
   const createdAt = user?.created_at ? new Date(user.created_at).getTime() : 0
-  const sessaoAntiga = createdAt > 0 && Date.now() - createdAt > 30 * 60 * 1000
+  const sessaoAntiga = createdAt > 0 && agoraMs - createdAt > 30 * 60 * 1000
   if (sessaoAntiga) return <Navigate to="/solicitacoes" replace />
 
   const onSubmit = async (values: FormValues) => {

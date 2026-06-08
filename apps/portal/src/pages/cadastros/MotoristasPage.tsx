@@ -2,7 +2,8 @@ import * as React from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Download } from 'lucide-react'
+import { toast } from 'sonner'
 import { CrudListPage, useCrudListState, type ColumnDef } from '@/components/shared/CrudListPage'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import {
@@ -12,6 +13,8 @@ import {
   useToggleParceiroActive,
   useDeleteParceiroRow,
 } from '@/features/cadastros/useParceiroCrud'
+import { supabase } from '@/lib/supabase'
+import { buildCsv, downloadCsv, type CsvColumn } from '@/lib/csv'
 import { useAuth } from '@/hooks/useAuth'
 import {
   Dialog, DialogContent, DialogHeader, DialogBody, DialogFooter, DialogTitle, DialogDescription,
@@ -56,6 +59,49 @@ export default function MotoristasPage() {
   const [open, setOpen] = React.useState(false)
   const [confirmRow, setConfirmRow] = React.useState<Row | null>(null)
   const [deleteRow, setDeleteRow] = React.useState<Row | null>(null)
+  const [exporting, setExporting] = React.useState(false)
+
+  // Exporta TODOS os motoristas da frota do parceiro que batem com os filtros
+  // atuais (a RLS já restringe às linhas do próprio parceiro).
+  const exportCsv = async () => {
+    setExporting(true)
+    try {
+      let query = supabase
+        .from('parceiro_motoristas')
+        .select('nome_completo, cpf, telefone, observacoes, ativo, created_at')
+        .order('nome_completo', { ascending: true })
+      if (!state.showInactive) query = query.eq('ativo', true)
+      const term = state.debouncedSearch.trim()
+      if (term) {
+        const safe = term.replace(/[%_]/g, '\\$&')
+        query = query.or(`nome_completo.ilike.%${safe}%,cpf.ilike.%${safe}%`)
+      }
+      const { data, error } = await query
+      if (error) throw error
+      const rows = (data ?? []) as Pick<Row, 'nome_completo' | 'cpf' | 'telefone' | 'observacoes' | 'ativo' | 'created_at'>[]
+      if (rows.length === 0) {
+        toast.info('Nenhum motorista para exportar com os filtros atuais.')
+        return
+      }
+      const cols: CsvColumn<(typeof rows)[number]>[] = [
+        { header: 'Nome', accessor: (r) => r.nome_completo },
+        { header: 'CPF', accessor: (r) => r.cpf },
+        { header: 'Telefone', accessor: (r) => r.telefone },
+        { header: 'Observações', accessor: (r) => r.observacoes },
+        { header: 'Ativo', accessor: (r) => r.ativo },
+        { header: 'Criado em', accessor: (r) => r.created_at },
+      ]
+      const ts = new Date()
+      const stamp = `${ts.getFullYear()}${String(ts.getMonth() + 1).padStart(2, '0')}${String(ts.getDate()).padStart(2, '0')}_${String(ts.getHours()).padStart(2, '0')}${String(ts.getMinutes()).padStart(2, '0')}`
+      downloadCsv(`motoristas_${stamp}.csv`, buildCsv(rows, cols))
+      toast.success(`${rows.length} ${rows.length === 1 ? 'registro exportado' : 'registros exportados'}`)
+    } catch (err) {
+      toast.error('Falha ao exportar. Tente novamente.')
+      console.error('export motoristas csv error', err)
+    } finally {
+      setExporting(false)
+    }
+  }
 
   const columns: ColumnDef<Row>[] = [
     { header: 'Nome', accessor: (r) => r.nome_completo },
@@ -67,6 +113,18 @@ export default function MotoristasPage() {
     <>
       <CrudListPage<Row>
         title="Motoristas"
+        headerActions={
+          <Button
+            type="button"
+            variant="outline"
+            onClick={exportCsv}
+            disabled={exporting || list.isLoading}
+            title="Exportar motoristas (filtros atuais) em CSV"
+          >
+            {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            <span className="hidden sm:inline">Exportar CSV</span>
+          </Button>
+        }
         newButtonLabel="Novo motorista"
         onNew={() => { setEditing(null); setOpen(true) }}
         rows={list.data?.data}
