@@ -274,6 +274,71 @@ export function QuickCreateCarreta(props: QuickCreateProps) {
   )
 }
 
+// --- Pamcard (numero + apelido) ---------------------------------------------
+// Diferente dos demais quick-creates: `onCreated` devolve o NÚMERO do cartão
+// (e não o id), porque a solicitação grava o número em `pamcard_numero` — não
+// há FK para o cartão. O combobox da Nova Solicitação usa o número como valor.
+
+const pamcardSchema = z.object({
+  numero: z
+    .string()
+    .min(1, 'Informe o número do cartão')
+    .refine((v) => /^\d+$/.test(v), 'O Pamcard deve conter apenas números')
+    .refine((v) => v.length >= 10, 'O Pamcard deve ter no mínimo 10 dígitos')
+    .refine((v) => v.length <= 16, 'O Pamcard deve ter no máximo 16 dígitos'),
+  apelido: z.string().optional(),
+})
+type PamcardValues = z.infer<typeof pamcardSchema>
+
+export function QuickCreatePamcard({ open, onOpenChange, parceiroId, defaultValue, onCreated }: QuickCreateProps) {
+  const upsert = useUpsertParceiroRow('parceiro_pamcards', 'Cartão', parceiroId)
+  const { register, handleSubmit, reset, setValue, watch, formState: { errors } } =
+    useForm<PamcardValues>({ resolver: zodResolver(pamcardSchema) })
+
+  React.useEffect(() => {
+    if (open) reset({ numero: (defaultValue ?? '').replace(/\D/g, '').slice(0, 16), apelido: '' })
+  }, [open, defaultValue, reset])
+
+  const numero = watch('numero') ?? ''
+
+  const submit = handleSubmit(async (values) => {
+    await upsert.mutateAsync({
+      values: {
+        numero: values.numero,
+        apelido: values.apelido?.trim() || null,
+      },
+    })
+    onCreated(values.numero)
+    onOpenChange(false)
+  })
+
+  return (
+    <QuickShell
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Novo cartão Pamcard"
+      description="Cadastro rápido — você pode completar os dados depois em Cartões Pamcard."
+      isSubmitting={upsert.isPending}
+      onSubmit={submit}
+    >
+      <Field label="Número do cartão *" htmlFor="qc-pam-numero" error={errors.numero?.message}>
+        <Input
+          id="qc-pam-numero"
+          autoFocus
+          value={numero}
+          onChange={(e) => setValue('numero', e.target.value.replace(/\D/g, '').slice(0, 16), { shouldValidate: true })}
+          placeholder="Ex.: 441781209999"
+          inputMode="numeric"
+          maxLength={16}
+        />
+      </Field>
+      <Field label="Apelido" htmlFor="qc-pam-apelido">
+        <Input id="qc-pam-apelido" {...register('apelido')} placeholder="Opcional — ex.: Cartão João" />
+      </Field>
+    </QuickShell>
+  )
+}
+
 // --- Subcontratada (PF/PJ via documento unificado) --------------------------
 
 const subSchema = z.object({

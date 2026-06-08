@@ -20,6 +20,7 @@ type ParceiroBaseTable =
   | 'parceiro_veiculos'
   | 'parceiro_carretas'
   | 'parceiro_subcontratadas'
+  | 'parceiro_pamcards'
 
 /** Carrega uma base de cadastro do parceiro inteira (ativos e inativos: uma
  *  solicitação antiga pode apontar para um registro já desativado). Usa a
@@ -45,6 +46,7 @@ export const useVeiculosBase = () => useParceiroBase('parceiro_veiculos', 'placa
 export const useCarretasBase = () => useParceiroBase('parceiro_carretas', 'placa')
 export const useSubcontratadasBase = () =>
   useParceiroBase('parceiro_subcontratadas', 'razao_social')
+export const usePamcardsBase = () => useParceiroBase('parceiro_pamcards', 'numero')
 
 /** Clientes da LHG disponíveis para o parceiro escolher (view pública —
  *  só `id, razao_social, cidade, uf` dos clientes ativos). */

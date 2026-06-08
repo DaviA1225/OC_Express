@@ -30,6 +30,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/veiculos', label: 'Veículos' },
   { to: '/carretas', label: 'Carretas' },
   { to: '/subcontratadas', label: 'Subcontratadas' },
+  { to: '/pamcards', label: 'Cartões Pamcard' },
   { to: '/usuarios', label: 'Usuários', adminOnly: true },
 ]
 

@@ -8,7 +8,6 @@ import { ArrowLeft, Loader2, Paperclip, Send, Trash2, Upload } from 'lucide-reac
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Input } from '@/components/ui/input'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Combobox, type ComboboxOption } from '@/components/shared/Combobox'
 import {
@@ -16,6 +15,7 @@ import {
   QuickCreateVeiculo,
   QuickCreateCarreta,
   QuickCreateSubcontratada,
+  QuickCreatePamcard,
 } from '@/components/solicitacoes/QuickCreate'
 import { useAuth } from '@/hooks/useAuth'
 import {
@@ -23,9 +23,11 @@ import {
   useVeiculosBase,
   useCarretasBase,
   useSubcontratadasBase,
+  usePamcardsBase,
   useClientesPublicos,
   useCriarSolicitacao,
 } from '@/features/solicitacoes/useSolicitacoes'
+import { formatarPamcardParaExibicao } from '@sislog/shared/formatters'
 import {
   uploadAnexoFile,
   isMimeAccepted,
@@ -82,6 +84,7 @@ export default function NovaSolicitacaoPage() {
   const veiculos = useVeiculosBase()
   const carretas = useCarretasBase()
   const subcontratadas = useSubcontratadasBase()
+  const pamcards = usePamcardsBase()
   const clientes = useClientesPublicos()
   const criar = useCriarSolicitacao()
 
@@ -114,6 +117,7 @@ export default function NovaSolicitacaoPage() {
   const [qcPrimeiraCarreta, setQcPrimeiraCarreta] = React.useState<string | null>(null)
   const [qcDolly, setQcDolly] = React.useState<string | null>(null)
   const [qcSubcontratada, setQcSubcontratada] = React.useState<string | null>(null)
+  const [qcPamcard, setQcPamcard] = React.useState<string | null>(null)
 
   // Anexos coletados localmente; sao enviados apos a solicitacao ser criada
   // (precisam do solicitacao_id como prefixo no storage path).
@@ -163,6 +167,12 @@ export default function NovaSolicitacaoPage() {
     value: s.id,
     label: s.razao_social,
     hint: s.documento ?? undefined,
+  }))
+  const pamcardOptions: ComboboxOption[] = ativos(pamcards.data).map((p) => ({
+    // O valor é o próprio número — é ele que a solicitação grava em pamcard_numero.
+    value: p.numero,
+    label: p.apelido || formatarPamcardParaExibicao(p.numero),
+    hint: p.apelido ? formatarPamcardParaExibicao(p.numero) : undefined,
   }))
   const clienteOptions: ComboboxOption[] = (clientes.data ?? [])
     .filter((c): c is typeof c & { id: string } => !!c.id)
@@ -381,23 +391,29 @@ export default function NovaSolicitacaoPage() {
               </RadioGroup>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="pamcard_numero">Número do cartão</Label>
-              <Input
-                id="pamcard_numero"
-                value={pamcardNumero}
-                onChange={(e) =>
-                  setValue('pamcard_numero', e.target.value.replace(/\D/g, '').slice(0, 16), {
-                    shouldValidate: true,
-                  })
-                }
-                disabled={pamcardStatus !== 'tem_cartao'}
-                inputMode="numeric"
-                pattern="[0-9]*"
-                maxLength={16}
-                placeholder="Ex.: 441781209999"
-              />
-              {errors.pamcard_numero && (
-                <p className="text-[11px] text-destructive">{errors.pamcard_numero.message}</p>
+              <Label>Número do cartão</Label>
+              {pamcardStatus === 'tem_cartao' ? (
+                <>
+                  <Combobox
+                    options={pamcardOptions}
+                    value={pamcardNumero || null}
+                    onChange={(val) =>
+                      setValue('pamcard_numero', val ?? '', { shouldValidate: true })
+                    }
+                    placeholder="Selecionar cartão"
+                    loading={pamcards.isLoading}
+                    onCreateNew={(s) => setQcPamcard(s)}
+                    createNewLabel="Cadastrar novo cartão"
+                    emptyMessage="Nenhum cartão na sua base."
+                  />
+                  {errors.pamcard_numero && (
+                    <p className="text-[11px] text-destructive">{errors.pamcard_numero.message}</p>
+                  )}
+                </>
+              ) : (
+                <p className="pt-2 text-[12px] text-muted-foreground">
+                  Não se aplica a esta opção.
+                </p>
               )}
             </div>
           </div>
@@ -543,6 +559,17 @@ export default function NovaSolicitacaoPage() {
         onCreated={(id) => {
           set('parceiro_subcontratada_id', id)
           setQcSubcontratada(null)
+        }}
+      />
+      <QuickCreatePamcard
+        open={qcPamcard !== null}
+        onOpenChange={(o) => !o && setQcPamcard(null)}
+        parceiroId={parceiroId}
+        defaultValue={qcPamcard ?? ''}
+        onCreated={(numero) => {
+          // QuickCreatePamcard devolve o número (não o id) — é o valor do combobox.
+          setValue('pamcard_numero', numero, { shouldValidate: true })
+          setQcPamcard(null)
         }}
       />
     </div>
