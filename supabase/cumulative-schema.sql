@@ -1,5 +1,5 @@
 -- =====================================================================
--- OC Express / SisLog LHG — Schema cumulativo (migrations 0001 → 0039)
+-- OC Express / SisLog LHG — Schema cumulativo (migrations 0001 → 0040)
 -- =====================================================================
 --
 -- Este arquivo agrega TODAS as migrations num único script IDEMPOTENTE.
@@ -2344,6 +2344,25 @@ CREATE POLICY parceiro_pamcards_parceiro_delete ON parceiro_pamcards FOR DELETE 
   USING (parceiro_id = get_current_parceiro_id());
 CREATE POLICY parceiro_pamcards_interno_select ON parceiro_pamcards FOR SELECT TO authenticated
   USING (is_interno());
+
+
+-- ============================================================
+-- 0040 — Portal: policy de DELETE nos cadastros do parceiro
+-- ============================================================
+-- A 0018 (secao 8) criou so SELECT/INSERT/UPDATE; sem DELETE o botao Excluir
+-- do portal era no-op. Registros em uso seguem protegidos pelas FKs de
+-- solicitacoes (RESTRICT => 23503).
+DO $$
+DECLARE t text;
+BEGIN
+  FOR t IN SELECT unnest(ARRAY[
+    'parceiro_motoristas','parceiro_veiculos','parceiro_carretas','parceiro_subcontratadas'
+  ]) LOOP
+    EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
+    EXECUTE format('DROP POLICY IF EXISTS %I ON %I', t || '_parceiro_delete', t);
+    EXECUTE format('CREATE POLICY %I ON %I FOR DELETE TO authenticated USING (parceiro_id = get_current_parceiro_id())', t || '_parceiro_delete', t);
+  END LOOP;
+END $$;
 
 
 -- =====================================================================
