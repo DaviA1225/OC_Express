@@ -1,5 +1,5 @@
 -- =====================================================================
--- OC Express / SisLog LHG — Schema cumulativo (migrations 0001 → 0036)
+-- OC Express / SisLog LHG — Schema cumulativo (migrations 0001 → 0039)
 -- =====================================================================
 --
 -- Este arquivo agrega TODAS as migrations num único script IDEMPOTENTE.
@@ -2243,6 +2243,107 @@ ALTER TABLE solicitacao_pendencias
 COMMENT ON COLUMN solicitacao_pendencias.vista_equipe_em IS
   'Quando alguem da equipe interna marcou a resposta do parceiro como vista. '
   'NULL = resolvida mas ainda nao tratada (mostra pop no card). So interno escreve.';
+
+
+-- ============================================================
+-- 0037 — Pamcard: opção "Não Necessário" (pagamento por outro meio)
+-- ============================================================
+ALTER TABLE solicitacoes
+  DROP CONSTRAINT IF EXISTS solicitacoes_pamcard_status_check;
+ALTER TABLE solicitacoes
+  ADD CONSTRAINT solicitacoes_pamcard_status_check
+  CHECK (pamcard_status IN ('tem_cartao', 'nao_tem_cartao', 'nao_necessario'));
+
+ALTER TABLE solicitacoes
+  DROP CONSTRAINT IF EXISTS solicitacoes_pamcard_numero_quando_tem;
+ALTER TABLE solicitacoes
+  ADD CONSTRAINT solicitacoes_pamcard_numero_quando_tem
+  CHECK (
+    (pamcard_status = 'tem_cartao'
+      AND pamcard_numero IS NOT NULL
+      AND pamcard_numero ~ '^[0-9]{10,16}$')
+    OR
+    (pamcard_status IN ('nao_tem_cartao', 'nao_necessario') AND pamcard_numero IS NULL)
+  );
+
+
+-- ============================================================
+-- 0038 — Parceiro: documento unificado (aceita CPF ou CNPJ)
+-- ============================================================
+-- Renomeia parceiros.cnpj -> documento e adiciona tipo_pessoa (PF/PJ),
+-- espelhando o que a 0019 fez em parceiro_subcontratadas.
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+     where table_schema = 'public' and table_name = 'parceiros' and column_name = 'cnpj'
+  ) and not exists (
+    select 1 from information_schema.columns
+     where table_schema = 'public' and table_name = 'parceiros' and column_name = 'documento'
+  ) then
+    alter table public.parceiros rename column cnpj to documento;
+  end if;
+end$$;
+
+alter table public.parceiros add column if not exists tipo_pessoa text;
+alter table public.parceiros drop constraint if exists parceiros_tipo_pessoa_check;
+alter table public.parceiros
+  add constraint parceiros_tipo_pessoa_check
+  check (tipo_pessoa is null or tipo_pessoa in ('PF','PJ'));
+
+update public.parceiros
+   set tipo_pessoa = case length(regexp_replace(coalesce(documento,''), '\D', '', 'g'))
+                       when 11 then 'PF'
+                       when 14 then 'PJ'
+                       else tipo_pessoa
+                     end
+ where tipo_pessoa is null and documento is not null;
+
+
+-- ============================================================
+-- 0039 — Portal: cadastro de cartões Pamcard (parceiro_pamcards)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS parceiro_pamcards (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  parceiro_id uuid NOT NULL REFERENCES parceiros(id) ON DELETE CASCADE,
+  numero text NOT NULL,
+  apelido text,
+  ativo boolean NOT NULL DEFAULT true,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  created_by uuid REFERENCES auth.users(id),
+  UNIQUE (parceiro_id, numero)
+);
+
+ALTER TABLE parceiro_pamcards DROP CONSTRAINT IF EXISTS parceiro_pamcards_numero_formato;
+ALTER TABLE parceiro_pamcards
+  ADD CONSTRAINT parceiro_pamcards_numero_formato CHECK (numero ~ '^[0-9]{10,16}$');
+
+CREATE INDEX IF NOT EXISTS idx_parceiro_pamcards_parceiro ON parceiro_pamcards(parceiro_id);
+
+DROP TRIGGER IF EXISTS trg_parceiro_pamcards_updated ON parceiro_pamcards;
+CREATE TRIGGER trg_parceiro_pamcards_updated
+  BEFORE UPDATE ON parceiro_pamcards FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+DROP TRIGGER IF EXISTS aud_parceiro_pamcards ON parceiro_pamcards;
+CREATE TRIGGER aud_parceiro_pamcards
+  AFTER INSERT OR UPDATE OR DELETE ON parceiro_pamcards FOR EACH ROW EXECUTE FUNCTION audit_trigger();
+
+ALTER TABLE parceiro_pamcards ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS parceiro_pamcards_parceiro_select ON parceiro_pamcards;
+DROP POLICY IF EXISTS parceiro_pamcards_parceiro_insert ON parceiro_pamcards;
+DROP POLICY IF EXISTS parceiro_pamcards_parceiro_update ON parceiro_pamcards;
+DROP POLICY IF EXISTS parceiro_pamcards_parceiro_delete ON parceiro_pamcards;
+DROP POLICY IF EXISTS parceiro_pamcards_interno_select ON parceiro_pamcards;
+CREATE POLICY parceiro_pamcards_parceiro_select ON parceiro_pamcards FOR SELECT TO authenticated
+  USING (parceiro_id = get_current_parceiro_id());
+CREATE POLICY parceiro_pamcards_parceiro_insert ON parceiro_pamcards FOR INSERT TO authenticated
+  WITH CHECK (parceiro_id = get_current_parceiro_id());
+CREATE POLICY parceiro_pamcards_parceiro_update ON parceiro_pamcards FOR UPDATE TO authenticated
+  USING (parceiro_id = get_current_parceiro_id()) WITH CHECK (parceiro_id = get_current_parceiro_id());
+CREATE POLICY parceiro_pamcards_parceiro_delete ON parceiro_pamcards FOR DELETE TO authenticated
+  USING (parceiro_id = get_current_parceiro_id());
+CREATE POLICY parceiro_pamcards_interno_select ON parceiro_pamcards FOR SELECT TO authenticated
+  USING (is_interno());
 
 
 -- =====================================================================

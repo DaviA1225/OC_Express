@@ -8,7 +8,11 @@ import type { Database, Tables, TablesInsert, TablesUpdate } from '@sislog/share
  *  precisa ser informado apenas no INSERT (a policy WITH CHECK exige). */
 export type ParceiroCrudTable = keyof Pick<
   Database['public']['Tables'],
-  'parceiro_motoristas' | 'parceiro_veiculos' | 'parceiro_carretas' | 'parceiro_subcontratadas'
+  | 'parceiro_motoristas'
+  | 'parceiro_veiculos'
+  | 'parceiro_carretas'
+  | 'parceiro_subcontratadas'
+  | 'parceiro_pamcards'
 >
 
 interface ListParams {
@@ -167,6 +171,7 @@ export function traduzirErroBanco(error: unknown): string {
     if (e.message?.includes('cpf')) return 'Esse CPF já está cadastrado.'
     if (e.message?.includes('cnpj')) return 'Esse CNPJ já está cadastrado.'
     if (e.message?.includes('documento')) return 'Esse CPF/CNPJ já está cadastrado.'
+    if (e.message?.includes('numero')) return 'Esse número de Pamcard já está cadastrado.'
     if (e.message?.includes('placa')) return 'Essa placa já está cadastrada.'
     return 'Já existe um registro com esses dados.'
   }

@@ -22,8 +22,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { isValidCnpj, isValidTelefone } from '@/lib/validators'
-import { formatCnpj, formatTelefone } from '@/lib/utils'
+import { isValidDocumento, isValidTelefone, tipoPessoa } from '@/lib/validators'
+import { formatDocumento, formatTelefone } from '@/lib/utils'
 import type { Tables } from '@/types/database.types'
 
 type Row = Tables<'parceiros'>
@@ -33,7 +33,10 @@ const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 const schema = z.object({
   razao_social: z.string().min(2, 'Informe a razão social'),
-  cnpj: z.string().min(1, 'Informe o CNPJ').refine(isValidCnpj, 'CNPJ inválido'),
+  documento: z
+    .string()
+    .min(1, 'Informe o CPF ou CNPJ')
+    .refine(isValidDocumento, 'CPF ou CNPJ inválido'),
   codigo_interno: z.string().optional(),
   contato_principal_nome: z.string().optional(),
   contato_principal_telefone: z
@@ -59,7 +62,7 @@ export default function ParceirosPage() {
     showInactive: state.showInactive,
     page: state.page,
     pageSize: state.pageSize,
-    searchColumns: ['razao_social', 'cnpj', 'codigo_interno'],
+    searchColumns: ['razao_social', 'documento', 'codigo_interno'],
     orderBy: 'razao_social',
     ascending: true,
   })
@@ -78,7 +81,7 @@ export default function ParceirosPage() {
 
   const columns: ColumnDef<Row>[] = [
     { header: 'Razão social', accessor: (r) => r.razao_social },
-    { header: 'CNPJ', accessor: (r) => r.cnpj, className: 'text-muted-foreground' },
+    { header: 'CPF / CNPJ', accessor: (r) => r.documento, className: 'text-muted-foreground' },
     { header: 'Código interno', accessor: (r) => r.codigo_interno ?? '—', className: 'text-muted-foreground' },
     { header: 'Contato', accessor: (r) => r.contato_principal_nome ?? '—' },
   ]
@@ -94,7 +97,7 @@ export default function ParceirosPage() {
         totalActive={totalActive.data ?? 0}
         searchValue={state.search}
         onSearchChange={state.setSearch}
-        searchPlaceholder="Buscar por razão social, CNPJ ou código"
+        searchPlaceholder="Buscar por razão social, CPF/CNPJ ou código"
         showInactive={state.showInactive}
         onShowInactiveChange={state.setShowInactive}
         columns={columns}
@@ -152,7 +155,8 @@ export default function ParceirosPage() {
             id: editing?.id,
             values: {
               razao_social: values.razao_social.trim(),
-              cnpj: formatCnpj(values.cnpj),
+              documento: formatDocumento(values.documento),
+              tipo_pessoa: tipoPessoa(values.documento),
               codigo_interno: values.codigo_interno?.trim() || null,
               contato_principal_nome: values.contato_principal_nome?.trim() || null,
               contato_principal_telefone: values.contato_principal_telefone
@@ -252,7 +256,7 @@ function ParceiroForm({ open, onOpenChange, editing, onSubmit }: FormProps) {
     if (open) {
       reset({
         razao_social: editing?.razao_social ?? '',
-        cnpj: editing?.cnpj ?? '',
+        documento: editing?.documento ?? '',
         codigo_interno: editing?.codigo_interno ?? '',
         contato_principal_nome: editing?.contato_principal_nome ?? '',
         contato_principal_telefone: editing?.contato_principal_telefone ?? '',
@@ -262,7 +266,7 @@ function ParceiroForm({ open, onOpenChange, editing, onSubmit }: FormProps) {
     }
   }, [open, editing, reset])
 
-  const cnpj = watch('cnpj') ?? ''
+  const documento = watch('documento') ?? ''
   const tel = watch('contato_principal_telefone') ?? ''
 
   return (
@@ -287,16 +291,16 @@ function ParceiroForm({ open, onOpenChange, editing, onSubmit }: FormProps) {
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label htmlFor="cnpj">CNPJ *</Label>
+                <Label htmlFor="documento">CPF / CNPJ *</Label>
                 <Input
-                  id="cnpj"
-                  value={cnpj}
-                  onChange={(e) => setValue('cnpj', formatCnpj(e.target.value), { shouldValidate: true })}
-                  placeholder="00.000.000/0000-00"
+                  id="documento"
+                  value={documento}
+                  onChange={(e) => setValue('documento', formatDocumento(e.target.value), { shouldValidate: true })}
+                  placeholder="CPF ou CNPJ"
                   inputMode="numeric"
                 />
-                {errors.cnpj && (
-                  <p className="text-[11px] text-destructive">{errors.cnpj.message}</p>
+                {errors.documento && (
+                  <p className="text-[11px] text-destructive">{errors.documento.message}</p>
                 )}
               </div>
               <div className="space-y-1.5">

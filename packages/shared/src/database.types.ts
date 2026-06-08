@@ -495,7 +495,8 @@ export interface Database {
         Row: {
           id: string
           razao_social: string
-          cnpj: string
+          documento: string
+          tipo_pessoa: 'PF' | 'PJ' | null
           contato_principal_nome: string | null
           contato_principal_telefone: string | null
           contato_principal_email: string | null
@@ -511,7 +512,8 @@ export interface Database {
         Insert: {
           id?: string
           razao_social: string
-          cnpj: string
+          documento: string
+          tipo_pessoa?: 'PF' | 'PJ' | null
           contato_principal_nome?: string | null
           contato_principal_telefone?: string | null
           contato_principal_email?: string | null
@@ -675,6 +677,29 @@ export interface Database {
           created_by?: string | null
         }
         Update: Partial<Database['public']['Tables']['parceiro_carretas']['Insert']>
+      }
+      parceiro_pamcards: {
+        Row: {
+          id: string
+          parceiro_id: string
+          numero: string
+          apelido: string | null
+          ativo: boolean
+          created_at: string
+          updated_at: string
+          created_by: string | null
+        }
+        Insert: {
+          id?: string
+          parceiro_id: string
+          numero: string
+          apelido?: string | null
+          ativo?: boolean
+          created_at?: string
+          updated_at?: string
+          created_by?: string | null
+        }
+        Update: Partial<Database['public']['Tables']['parceiro_pamcards']['Insert']>
       }
     }
     Views: {
