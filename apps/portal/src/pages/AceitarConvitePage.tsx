@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Eye, EyeOff, Loader2, ShieldCheck } from 'lucide-react'
+import type { EmailOtpType } from '@supabase/supabase-js'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -32,6 +33,18 @@ export default function AceitarConvitePage() {
   // Evita chamar Date.now() direto no render (regra react-hooks/purity).
   const [agoraMs] = React.useState(() => Date.now())
 
+  // Link de convite no padrão token_hash: o e-mail aponta para
+  // /aceitar-convite?token_hash=…&type=invite e a verificação acontece aqui no
+  // JavaScript (verifyOtp), não numa requisição GET ao /auth/v1/verify do
+  // Supabase. Assim, scanners de e-mail corporativo (Outlook Safe Links,
+  // Mimecast, Proofpoint) que pré-clicam o link fazem só um GET "burro" na
+  // página e NÃO consomem mais o token de uso único — que era o que fazia o
+  // convite "expirar" antes de o usuário clicar.
+  const [verifyState, setVerifyState] = React.useState<'verifying' | 'ok' | 'failed' | 'none'>(
+    () => (new URLSearchParams(window.location.search).get('token_hash') ? 'verifying' : 'none'),
+  )
+  const [graceExpired, setGraceExpired] = React.useState(false)
+
   const {
     register,
     handleSubmit,
@@ -41,7 +54,45 @@ export default function AceitarConvitePage() {
     defaultValues: { senha: '', confirmar: '' },
   })
 
-  if (loading) return <PortalLoader />
+  React.useEffect(() => {
+    if (verifyState !== 'verifying') return
+    const params = new URLSearchParams(window.location.search)
+    // verifyState só inicia em 'verifying' quando token_hash existe na URL;
+    // o fallback '' é defensivo — verifyOtp devolve erro e cai em 'failed'.
+    const tokenHash = params.get('token_hash') ?? ''
+    const type = (params.get('type') ?? 'invite') as EmailOtpType
+    let cancelled = false
+    supabase.auth.verifyOtp({ token_hash: tokenHash, type }).then(({ error }) => {
+      if (cancelled) return
+      if (error) {
+        setVerifyState('failed')
+        return
+      }
+      // Tira o token da URL — evita reverificar num reload e remove o token do histórico.
+      window.history.replaceState({}, '', '/aceitar-convite')
+      setVerifyState('ok')
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [verifyState])
+
+  // Depois do verifyOtp, o vínculo do parceiro (parceiroUsuario) carrega de
+  // forma assíncrona no useAuth. Damos uma folga antes de tratar como inválido,
+  // pra não piscar "convite inválido" no caminho feliz.
+  React.useEffect(() => {
+    if (verifyState !== 'ok' || parceiroUsuario) return
+    const t = setTimeout(() => setGraceExpired(true), 6000)
+    return () => clearTimeout(t)
+  }, [verifyState, parceiroUsuario])
+
+  if (loading || verifyState === 'verifying') return <PortalLoader />
+
+  // Token inválido/expirado/já usado.
+  if (verifyState === 'failed') return <ConviteInvalido />
+
+  // Verificou com sucesso, mas o vínculo ainda está chegando — segura no loader.
+  if (verifyState === 'ok' && !parceiroUsuario && !graceExpired) return <PortalLoader />
 
   // Sem sessão = o link expirou ou nunca foi clicado de fato.
   if (!session) return <ConviteInvalido />
