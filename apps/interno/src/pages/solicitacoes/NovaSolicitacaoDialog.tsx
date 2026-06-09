@@ -74,6 +74,23 @@ const schema = z
     observacoes: z.string().optional(),
   })
   .superRefine((v, ctx) => {
+    // Última carreta e subcontratada são obrigatórias na composição (vale para
+    // ambos os tipos): a OC precisa da placa da última carreta e de quem é a
+    // transportadora subcontratada.
+    if (!v.carreta_id) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['carreta_id'],
+        message: 'Última carreta é obrigatória',
+      })
+    }
+    if (!v.subcontratada_id) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['subcontratada_id'],
+        message: 'Subcontratada é obrigatória',
+      })
+    }
     if (v.tipo === 'carregamento') {
       if (!v.solicitante_telefone || !isValidTelefone(v.solicitante_telefone)) {
         ctx.addIssue({
@@ -419,18 +436,21 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, onCreated }: Props) 
                     )}
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Última Carreta</Label>
+                    <Label>Última Carreta *</Label>
                     <Combobox
                       options={carretaOptions}
                       value={carretaId}
                       onChange={(v) => setValue('carreta_id', v, { shouldValidate: true })}
-                      placeholder="Opcional"
+                      placeholder="Buscar pela placa"
                       searchPlaceholder="Buscar carreta"
                       emptyMessage="Nenhuma carreta encontrada."
                       loading={carretas.isLoading}
                       onCreateNew={(s) => setQcCar({ open: true, placa: s })}
                       createNewLabel="Cadastrar nova carreta"
                     />
+                    {errors.carreta_id && (
+                      <p className="text-[11px] text-destructive">{errors.carreta_id.message}</p>
+                    )}
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
@@ -468,7 +488,7 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, onCreated }: Props) 
                   implementos (ANTT). Em branco, a OC traz só cavalo e última carreta.
                 </p>
                 <div className="space-y-1.5">
-                  <Label>Subcontratada</Label>
+                  <Label>Subcontratada *</Label>
                   <Combobox
                     options={subcontratadaOptions}
                     value={subcontratadaId}
@@ -481,6 +501,9 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, onCreated }: Props) 
                   <p className="text-[11px] text-muted-foreground">
                     Por padrão usa a subcontratada do cavalo. Pode ser ajustada.
                   </p>
+                  {errors.subcontratada_id && (
+                    <p className="text-[11px] text-destructive">{errors.subcontratada_id.message}</p>
+                  )}
                 </div>
               </Section>
 

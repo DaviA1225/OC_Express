@@ -711,6 +711,15 @@ function MotoristaVeiculoCard({ solicitacao, editable, onSave }: CardProps) {
   const subOpts: ComboboxOption[] = (subcontratadas.data ?? []).map((s) => ({ value: s.id, label: s.razao_social, hint: s.documento ?? undefined }))
 
   const submit = async () => {
+    // Última carreta e subcontratada são obrigatórias na composição da OC.
+    if (!carreta) {
+      toast.error('Última carreta é obrigatória.')
+      return
+    }
+    if (!subcontratada) {
+      toast.error('Subcontratada é obrigatória.')
+      return
+    }
     setSaving(true)
     try {
       await onSave({
@@ -758,9 +767,9 @@ function MotoristaVeiculoCard({ solicitacao, editable, onSave }: CardProps) {
                 placeholder="Selecionar" loading={veiculos.isLoading} />
             </div>
             <div className="space-y-1.5">
-              <Label>Última Carreta</Label>
+              <Label>Última Carreta *</Label>
               <Combobox options={carOpts} value={carreta} onChange={setCarreta}
-                placeholder="Opcional" loading={carretas.isLoading} />
+                placeholder="Buscar pela placa" loading={carretas.isLoading} />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -779,7 +788,7 @@ function MotoristaVeiculoCard({ solicitacao, editable, onSave }: CardProps) {
             1ª Carreta e Dolly são opcionais — preencha conforme a composição (ANTT).
           </p>
           <div className="space-y-1.5">
-            <Label>Subcontratada</Label>
+            <Label>Subcontratada *</Label>
             <Combobox options={subOpts} value={subcontratada} onChange={setSubcontratada}
               placeholder="Pré-preenchida pelo cavalo" loading={subcontratadas.isLoading} />
             <p className="text-[11px] text-muted-foreground">Por padrão usa a subcontratada do cavalo.</p>
