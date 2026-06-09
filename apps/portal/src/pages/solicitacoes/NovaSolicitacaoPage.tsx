@@ -50,10 +50,10 @@ const schema = z
   .object({
     parceiro_motorista_id: z.string().min(1, 'Selecione o motorista'),
     parceiro_veiculo_id: z.string().min(1, 'Selecione o cavalo'),
-    parceiro_carreta_id: z.string(),
+    parceiro_carreta_id: z.string().min(1, 'Selecione a última carreta'),
     parceiro_primeira_carreta_id: z.string(),
     parceiro_dolly_id: z.string(),
-    parceiro_subcontratada_id: z.string(),
+    parceiro_subcontratada_id: z.string().min(1, 'Selecione a subcontratada'),
     cliente_id: z.string().min(1, 'Selecione o cliente'),
     pamcard_status: z.enum(['tem_cartao', 'nao_tem_cartao', 'nao_necessario']),
     pamcard_numero: z.string().optional(),
@@ -295,14 +295,15 @@ export default function NovaSolicitacaoPage() {
               error={errors.parceiro_veiculo_id?.message}
             />
             <ComboField
-              label="Última Carreta"
-              placeholder="Selecionar carreta (opcional)"
+              label="Última Carreta *"
+              placeholder="Selecionar carreta"
               options={carretaOptions}
               loading={carretas.isLoading}
               value={watch('parceiro_carreta_id')}
               onChange={(val) => set('parceiro_carreta_id', val ?? '')}
               onCreateNew={(s) => setQcCarreta(s)}
               createNewLabel="Cadastrar nova carreta"
+              error={errors.parceiro_carreta_id?.message}
             />
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -332,14 +333,15 @@ export default function NovaSolicitacaoPage() {
             implementos (exigência ANTT). Em branco, a OC traz só cavalo e última carreta.
           </p>
           <ComboField
-            label="Subcontratada"
-            placeholder="Selecionar subcontratada (opcional)"
+            label="Subcontratada *"
+            placeholder="Selecionar subcontratada"
             options={subcontratadaOptions}
             loading={subcontratadas.isLoading}
             value={watch('parceiro_subcontratada_id')}
             onChange={(val) => set('parceiro_subcontratada_id', val ?? '')}
             onCreateNew={(s) => setQcSubcontratada(s)}
             createNewLabel="Cadastrar nova subcontratada"
+            error={errors.parceiro_subcontratada_id?.message}
           />
         </Section>
 
