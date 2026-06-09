@@ -14,13 +14,20 @@ import {
   Users,
   Search,
   BarChart3,
+  Gauge,
   ShieldAlert,
   ChevronsLeft,
   ChevronsRight,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
-import { canViewAuditoria, canViewUsuarios, canViewRelatorios, canViewSeguranca } from '@/features/auth/permissions'
+import {
+  canViewAuditoria,
+  canViewUsuarios,
+  canViewRelatorios,
+  canViewProdutividade,
+  canViewSeguranca,
+} from '@/features/auth/permissions'
 import { usePamcardPendenteCount } from '@/features/solicitacoes/useSolicitacoes'
 
 interface NavItem {
@@ -47,6 +54,7 @@ const cadastros: NavItem[] = [
 
 const sistemaAdmin: NavItem = { to: '/cadastros/usuarios', label: 'Usuários', icon: Users }
 const sistemaRelatorios: NavItem = { to: '/relatorios', label: 'Relatórios', icon: BarChart3 }
+const sistemaProdutividade: NavItem = { to: '/relatorios-internos', label: 'Relatórios Internos', icon: Gauge }
 const sistemaAuditoria: NavItem = { to: '/auditoria', label: 'Auditoria', icon: Search }
 const sistemaSeguranca: NavItem = { to: '/seguranca', label: 'Segurança', icon: ShieldAlert }
 
@@ -62,6 +70,7 @@ export function SidebarContent({ collapsed, onToggleCollapse, onNavigate, classN
   const showUsuarios = canViewUsuarios(profile)
   const showAuditoria = canViewAuditoria(profile)
   const showRelatorios = canViewRelatorios(profile)
+  const showProdutividade = canViewProdutividade(profile)
   const showSeguranca = canViewSeguranca(profile)
   const pamcardPendente = usePamcardPendenteCount()
   const pamcardPendenteCount = pamcardPendente.data ?? 0
@@ -113,13 +122,20 @@ export function SidebarContent({ collapsed, onToggleCollapse, onNavigate, classN
           ))}
         </ul>
 
-        {(showUsuarios || showAuditoria || showRelatorios || showSeguranca) && (
+        {(showUsuarios || showAuditoria || showRelatorios || showProdutividade || showSeguranca) && (
           <>
             <SectionLabel collapsed={collapsed}>Sistema</SectionLabel>
             <ul className="space-y-0.5">
               {showRelatorios && (
                 <NavListItem
                   item={sistemaRelatorios}
+                  collapsed={collapsed}
+                  onNavigate={onNavigate}
+                />
+              )}
+              {showProdutividade && (
+                <NavListItem
+                  item={sistemaProdutividade}
                   collapsed={collapsed}
                   onNavigate={onNavigate}
                 />

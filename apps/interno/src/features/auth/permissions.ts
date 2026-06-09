@@ -19,6 +19,15 @@ export function canViewRelatorios(p: PerfilRow | null): boolean {
   return is(p, 'admin', 'gerente', 'supervisor', 'analista')
 }
 
+/**
+ * Relatórios internos (produtividade nominal da equipe): só gestão —
+ * admin, gerente, supervisor. Mostra desempenho pessoa a pessoa, então não é
+ * exposto a analista/assistente (que aparecem no próprio relatório).
+ */
+export function canViewProdutividade(p: PerfilRow | null): boolean {
+  return is(p, 'admin', 'gerente', 'supervisor')
+}
+
 /** Usuários: somente admin. */
 export function canViewUsuarios(p: PerfilRow | null): boolean {
   return is(p, 'admin')
