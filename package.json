@@ -10,9 +10,12 @@
   "scripts": {
     "dev": "npm run dev --workspace @sislog/interno",
     "dev:portal": "npm run dev --workspace @sislog/portal",
+    "dev:agente": "npm run dev --workspace @sislog/agente-whatsapp",
     "build": "npm run build --workspace @sislog/interno",
     "build:portal": "npm run build --workspace @sislog/portal",
+    "build:all": "npm run build && npm run build:portal && npm run typecheck:agente",
     "lint": "npm run lint --workspace @sislog/interno",
+    "typecheck:agente": "npm run typecheck --workspace @sislog/agente-whatsapp",
     "pentest:rls": "node scripts/pentest-rls.mjs"
   }
 }
