@@ -166,3 +166,36 @@ body.density-compact ul.divide-y > li {
     @apply text-[10px] font-medium uppercase tracking-[0.5px] text-muted-foreground;
   }
 }
+
+/* Mapa de clientes (Leaflet) — pin sem caixa branca e rótulo permanente */
+.cliente-pin-icon {
+  background: transparent;
+  border: none;
+}
+
+.cliente-tooltip.leaflet-tooltip {
+  max-width: 180px;
+  overflow: hidden;
+  padding: 2px 7px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.95);
+  color: #111827;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+}
+.cliente-tooltip.leaflet-tooltip-top::before {
+  border-top-color: rgba(255, 255, 255, 0.95);
+}
+.dark .cliente-tooltip.leaflet-tooltip {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(30, 41, 59, 0.96);
+  color: #e5e7eb;
+}
+.dark .cliente-tooltip.leaflet-tooltip-top::before {
+  border-top-color: rgba(30, 41, 59, 0.96);
+}

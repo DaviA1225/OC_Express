@@ -1,6 +1,6 @@
 import * as React from 'react'
-import { MapContainer, TileLayer, CircleMarker, Popup, useMap } from 'react-leaflet'
-import { LatLngBounds } from 'leaflet'
+import { MapContainer, TileLayer, Marker, Tooltip, Popup, useMap } from 'react-leaflet'
+import { LatLngBounds, divIcon, type DivIcon } from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { Loader2, MapPinned, Truck } from 'lucide-react'
 import { STATUS_LABELS } from '@/features/solicitacoes/status'
@@ -12,6 +12,42 @@ import type { ClienteMapaPonto } from '@/features/clientes/useClientesMapa'
 // há pontos suficientes para calcular um enquadramento.
 const BRASIL_CENTRO: [number, number] = [-14.5, -52]
 const BRASIL_ZOOM = 4
+
+// Pin de localização (SVG inline). Cor muda pelo status de liberação para que
+// cada localidade comunique de imediato se está liberada (verde) ou bloqueada
+// (vermelho). Quando há veículos carregando, um badge mostra a quantidade.
+const FILL = { liberado: '#16a34a', bloqueado: '#ef4444' } as const
+const STROKE = { liberado: '#15803d', bloqueado: '#991b1b' } as const
+
+const iconCache = new Map<string, DivIcon>()
+
+function pinIcon(liberado: boolean, carregando: number): DivIcon {
+  const key = `${liberado ? 'L' : 'B'}-${carregando}`
+  const cached = iconCache.get(key)
+  if (cached) return cached
+  const fill = liberado ? FILL.liberado : FILL.bloqueado
+  const stroke = liberado ? STROKE.liberado : STROKE.bloqueado
+  const badge =
+    carregando > 0
+      ? `<span style="position:absolute;top:-4px;right:-5px;display:flex;align-items:center;justify-content:center;min-width:14px;height:14px;padding:0 3px;border-radius:7px;background:#2563eb;color:#fff;font:700 9px/1 ui-sans-serif,system-ui;border:1.5px solid #fff;box-shadow:0 1px 2px rgba(0,0,0,.3);">${carregando}</span>`
+      : ''
+  const html = `<div style="position:relative;width:21px;height:28px;filter:drop-shadow(0 1px 1.5px rgba(0,0,0,.35));">
+    <svg width="21" height="28" viewBox="0 0 24 32" xmlns="http://www.w3.org/2000/svg">
+      <path d="M12 0C5.37 0 0 5.37 0 12c0 8.4 12 20 12 20s12-11.6 12-20C24 5.37 18.63 0 12 0z" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/>
+      <circle cx="12" cy="12" r="4.6" fill="#fff"/>
+    </svg>
+    ${badge}
+  </div>`
+  const icon = divIcon({
+    html,
+    className: 'cliente-pin-icon',
+    iconSize: [21, 28],
+    iconAnchor: [10, 28],
+    popupAnchor: [0, -25],
+  })
+  iconCache.set(key, icon)
+  return icon
+}
 
 function formatFrete(value: number | null): string {
   if (value == null) return '—'
@@ -56,11 +92,21 @@ export function ClientesMapa({ pontos, isLoading, semCoordenadas }: Props) {
           <MapPinned className="h-3.5 w-3.5" />
           {pontos.length} {pontos.length === 1 ? 'cliente no mapa' : 'clientes no mapa'}
         </span>
-        {semCoordenadas > 0 && (
-          <span className="text-amber-700 dark:text-amber-400">
-            {semCoordenadas} sem latitude/longitude (não aparecem)
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <LegendaItem cor="#16a34a" label="Liberado" />
+          <LegendaItem cor="#ef4444" label="Bloqueado" />
+          <span className="inline-flex items-center gap-1.5">
+            <span className="flex h-4 min-w-4 items-center justify-center rounded-full border-2 border-white bg-blue-600 px-1 text-[9px] font-bold leading-none text-white shadow">
+              n
+            </span>
+            veículos carregando
           </span>
-        )}
+          {semCoordenadas > 0 && (
+            <span className="text-amber-700 dark:text-amber-400">
+              {semCoordenadas} sem coordenadas (não aparecem)
+            </span>
+          )}
+        </div>
       </div>
 
       <div className="relative h-[70vh] min-h-[420px] overflow-hidden rounded-lg border bg-background">
@@ -82,21 +128,19 @@ export function ClientesMapa({ pontos, isLoading, semCoordenadas }: Props) {
           />
           <FitBounds pontos={pontos} />
           {pontos.map((p) => (
-            <CircleMarker
+            <Marker
               key={p.id}
-              center={[p.latitude, p.longitude]}
-              radius={8}
-              pathOptions={{
-                color: '#b91c1c',
-                fillColor: '#ef4444',
-                fillOpacity: 0.85,
-                weight: 2,
-              }}
+              position={[p.latitude, p.longitude]}
+              icon={pinIcon(p.liberado, p.carregando.length)}
+              zIndexOffset={p.carregando.length > 0 ? 1000 : 0}
             >
+              <Tooltip permanent direction="top" offset={[0, -28]} className="cliente-tooltip">
+                {p.razao_social}
+              </Tooltip>
               <Popup>
                 <PopupConteudo p={p} />
               </Popup>
-            </CircleMarker>
+            </Marker>
           ))}
         </MapContainer>
       </div>
@@ -164,6 +208,18 @@ function PopupConteudo({ p }: { p: ClienteMapaPonto }) {
         )}
       </div>
     </div>
+  )
+}
+
+function LegendaItem({ cor, label }: { cor: string; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span
+        className="inline-block h-3 w-3 rounded-full border border-black/20"
+        style={{ background: cor }}
+      />
+      {label}
+    </span>
   )
 }
 
