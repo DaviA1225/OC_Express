@@ -32,12 +32,12 @@ export const PORTAL_STATUS: Record<SolicitacaoStatus, PortalStatusInfo> = {
   },
   oc_gerada: {
     badge: 'OC pronta',
-    label: 'OC pronta — verifique seu WhatsApp/e-mail',
+    label: 'OC pronta — baixe pelo portal',
     className: 'bg-emerald-100 text-emerald-800',
   },
   oc_enviada: {
     badge: 'OC pronta',
-    label: 'OC pronta — verifique seu WhatsApp/e-mail',
+    label: 'OC pronta — baixe pelo portal',
     className: 'bg-emerald-100 text-emerald-800',
   },
   finalizada: {
