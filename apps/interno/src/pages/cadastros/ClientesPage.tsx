@@ -3,8 +3,10 @@ import { useSearchParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Loader2, MapPin } from 'lucide-react'
+import { Loader2, MapPin, Search as SearchIcon, Map as MapIcon, List as ListIcon } from 'lucide-react'
 import { CrudListPage, useCrudListState, type ColumnDef } from '@/components/shared/CrudListPage'
+import { ClientesMapa } from './ClientesMapa'
+import { useClientesMapaMinerio } from '@/features/clientes/useClientesMapa'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { useCrudList, useActiveCount, useUpsertRow, useToggleActive, useDeleteRow, useBulkToggleActive, useBulkDeleteRows } from '@/features/crud/useCrudQueries'
 import { useAuth } from '@/hooks/useAuth'
@@ -179,6 +181,20 @@ export default function ClientesPage() {
       { replace: true },
     )
 
+  // Mapa só existe na aba de minério; em retorno cai sempre na lista.
+  const view: 'lista' | 'mapa' =
+    tipo === 'minerio' && params.get('view') === 'mapa' ? 'mapa' : 'lista'
+  const setView = (v: 'lista' | 'mapa') =>
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        if (v === 'mapa') next.set('view', 'mapa')
+        else next.delete('view')
+        return next
+      },
+      { replace: true },
+    )
+
   const state = useCrudListState()
 
   const equals = TIPO_FILTER[tipo]
@@ -193,6 +209,20 @@ export default function ClientesPage() {
     equals,
   })
   const totalActive = useActiveCount('clientes', equals)
+
+  // Dados do mapa (clientes de minério com coordenadas). Só busca quando a aba
+  // é minério, para não consultar à toa na aba de retorno.
+  const mapa = useClientesMapaMinerio(view === 'mapa')
+  const pontosFiltrados = React.useMemo(() => {
+    const todos = mapa.data ?? []
+    const termo = state.debouncedSearch.trim().toLowerCase()
+    if (!termo) return todos
+    return todos.filter((p) =>
+      [p.razao_social, p.cidade].some((v) => v?.toLowerCase().includes(termo)),
+    )
+  }, [mapa.data, state.debouncedSearch])
+  const semCoordenadas = Math.max(0, (totalActive.data ?? 0) - (mapa.data?.length ?? 0))
+
   const upsert = useUpsertRow('clientes', tipo === 'minerio' ? 'Cliente de minério' : 'Cliente de retorno')
   const toggle = useToggleActive('clientes', 'Cliente')
   const remove = useDeleteRow('clientes', 'Cliente')
@@ -269,34 +299,59 @@ export default function ClientesPage() {
   return (
     <>
       <div className="space-y-4">
-        <Tabs value={tipo} onChange={setTipo} />
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <Tabs value={tipo} onChange={setTipo} />
+          {tipo === 'minerio' && <ViewToggle value={view} onChange={setView} />}
+        </div>
 
-        <CrudListPage<Row>
-          title={titulo}
-          newButtonLabel={canEdit ? novoLabel : undefined}
-          onNew={canEdit ? () => { setEditing(null); setOpen(true) } : undefined}
-          rows={list.data?.data}
-          isLoading={list.isLoading}
-          totalActive={totalActive.data ?? 0}
-          searchValue={state.search}
-          onSearchChange={state.setSearch}
-          searchPlaceholder="Buscar por razão social ou cidade"
-          showInactive={state.showInactive}
-          onShowInactiveChange={state.setShowInactive}
-          columns={columns}
-          rowLabel={(r) => r.razao_social}
-          onEdit={canEdit ? (r) => { setEditing(r); setOpen(true) } : undefined}
-          onToggleActive={canEdit ? (r) => setConfirmRow(r) : undefined}
-          onDelete={canEdit ? (r) => setDeleteRow(r) : undefined}
-          onBulkToggleActive={canBulk ? async (ids, ativo) => { await bulkToggle.mutateAsync({ ids, ativo }) } : undefined}
-          onBulkDelete={canBulk ? async (ids) => { await bulkDelete.mutateAsync({ ids }) } : undefined}
-          emptyTitle={emptyTitle}
-          emptyDescription={emptyDescription}
-          page={state.page}
-          pageSize={state.pageSize}
-          totalCount={list.data?.count ?? 0}
-          onPageChange={state.setPage}
-        />
+        {view === 'mapa' ? (
+          <div className="space-y-3 rounded-lg border bg-background p-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h1 className="text-[15px] font-semibold text-foreground">{titulo}</h1>
+              <div className="relative w-full max-w-[320px]">
+                <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={state.search}
+                  onChange={(e) => state.setSearch(e.target.value)}
+                  placeholder="Buscar por razão social ou cidade"
+                  className="pl-9"
+                />
+              </div>
+            </div>
+            <ClientesMapa
+              pontos={pontosFiltrados}
+              isLoading={mapa.isLoading}
+              semCoordenadas={semCoordenadas}
+            />
+          </div>
+        ) : (
+          <CrudListPage<Row>
+            title={titulo}
+            newButtonLabel={canEdit ? novoLabel : undefined}
+            onNew={canEdit ? () => { setEditing(null); setOpen(true) } : undefined}
+            rows={list.data?.data}
+            isLoading={list.isLoading}
+            totalActive={totalActive.data ?? 0}
+            searchValue={state.search}
+            onSearchChange={state.setSearch}
+            searchPlaceholder="Buscar por razão social ou cidade"
+            showInactive={state.showInactive}
+            onShowInactiveChange={state.setShowInactive}
+            columns={columns}
+            rowLabel={(r) => r.razao_social}
+            onEdit={canEdit ? (r) => { setEditing(r); setOpen(true) } : undefined}
+            onToggleActive={canEdit ? (r) => setConfirmRow(r) : undefined}
+            onDelete={canEdit ? (r) => setDeleteRow(r) : undefined}
+            onBulkToggleActive={canBulk ? async (ids, ativo) => { await bulkToggle.mutateAsync({ ids, ativo }) } : undefined}
+            onBulkDelete={canBulk ? async (ids) => { await bulkDelete.mutateAsync({ ids }) } : undefined}
+            emptyTitle={emptyTitle}
+            emptyDescription={emptyDescription}
+            page={state.page}
+            pageSize={state.pageSize}
+            totalCount={list.data?.count ?? 0}
+            onPageChange={state.setPage}
+          />
+        )}
       </div>
 
       <ClienteForm
@@ -418,6 +473,39 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
     >
       {children}
     </button>
+  )
+}
+
+function ViewToggle({ value, onChange }: { value: 'lista' | 'mapa'; onChange: (v: 'lista' | 'mapa') => void }) {
+  return (
+    <div className="inline-flex items-center rounded-md border p-0.5" role="group" aria-label="Modo de exibição">
+      <button
+        type="button"
+        onClick={() => onChange('lista')}
+        aria-pressed={value === 'lista'}
+        title="Ver em lista"
+        className={cn(
+          'inline-flex items-center gap-1.5 rounded px-2.5 py-1 text-[12px] font-medium transition-colors',
+          value === 'lista' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground',
+        )}
+      >
+        <ListIcon className="h-4 w-4" />
+        Lista
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange('mapa')}
+        aria-pressed={value === 'mapa'}
+        title="Ver no mapa"
+        className={cn(
+          'inline-flex items-center gap-1.5 rounded px-2.5 py-1 text-[12px] font-medium transition-colors',
+          value === 'mapa' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground',
+        )}
+      >
+        <MapIcon className="h-4 w-4" />
+        Mapa
+      </button>
+    </div>
   )
 }
 
