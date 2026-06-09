@@ -3,7 +3,7 @@ import { Link, useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { ArrowLeft, X, AlertCircle, Check, Undo2, Loader2 } from 'lucide-react'
+import { ArrowLeft, X, AlertCircle, Check, Undo2, Loader2, Download, FileText } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -18,6 +18,7 @@ import { podeCancelar } from '@/features/solicitacoes/status'
 import {
   useSolicitacaoPortal,
   useCancelarSolicitacao,
+  useBaixarOC,
   useMotoristasBase,
   useVeiculosBase,
   useCarretasBase,
@@ -37,6 +38,7 @@ export default function SolicitacaoDetailPage() {
   const navigate = useNavigate()
   const detalhe = useSolicitacaoPortal(id)
   const cancelar = useCancelarSolicitacao()
+  const baixarOC = useBaixarOC()
   const pendencia = usePendenciaAberta(id)
   const [confirmOpen, setConfirmOpen] = React.useState(false)
 
@@ -119,6 +121,23 @@ export default function SolicitacaoDetailPage() {
         ? 'Não necessário (pagamento por outro meio)'
         : 'Não tem cartão (solicitado à LHG)'
 
+  const ocPronta = (['oc_gerada', 'oc_enviada', 'finalizada'] as SolicitacaoStatus[]).includes(
+    sol.status as SolicitacaoStatus,
+  )
+
+  // Abre a aba ANTES do await (gesto do usuário) para escapar do bloqueador de
+  // pop-up; depois aponta para o signed URL devolvido pela Edge Function.
+  const handleBaixarOC = async () => {
+    const win = window.open('', '_blank')
+    try {
+      const url = await baixarOC.mutateAsync(sol.id as string)
+      if (win) win.location.href = url
+      else window.location.href = url
+    } catch {
+      win?.close()
+    }
+  }
+
   return (
     <div className="mx-auto w-full max-w-[720px]">
       {back}
@@ -142,6 +161,36 @@ export default function SolicitacaoDetailPage() {
         <PendenciaBanner
           pendencia={pendencia.data}
         />
+      )}
+
+      {ocPronta && (
+        <section className="mt-4 rounded-lg border border-emerald-300 bg-emerald-50 p-5 dark:border-emerald-900/60 dark:bg-emerald-950/30">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-start gap-2.5">
+              <FileText className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+              <div>
+                <h2 className="text-[15px] font-semibold text-emerald-900 dark:text-emerald-200">
+                  Ordem de Carregamento pronta
+                </h2>
+                <p className="mt-0.5 text-[12px] text-emerald-800 dark:text-emerald-300">
+                  Baixe a OC em PDF direto pelo portal.
+                </p>
+              </div>
+            </div>
+            <Button
+              onClick={handleBaixarOC}
+              disabled={baixarOC.isPending}
+              className="bg-emerald-600 text-white hover:bg-emerald-700"
+            >
+              {baixarOC.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4" />
+              )}
+              Baixar OC (PDF)
+            </Button>
+          </div>
+        </section>
       )}
 
       <section className="mt-4 rounded-lg border bg-background p-5">
@@ -301,7 +350,7 @@ function buildTimeline(sol: PortalSolicitacao): TimelineStep[] {
   return [
     { label: 'Solicitação enviada', at: sol.created_at, done: true },
     { label: 'Em processamento pela LHG', at: null, done: emProcesso },
-    { label: 'OC pronta — enviada por WhatsApp/e-mail', at: sol.enviada_em, done: ocPronta },
+    { label: 'OC pronta — baixe pelo portal', at: sol.enviada_em, done: ocPronta },
     { label: 'Concluída', at: sol.finalizada_em, done: concluida },
   ]
 }

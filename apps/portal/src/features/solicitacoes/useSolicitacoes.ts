@@ -166,6 +166,62 @@ export function useCriarSolicitacao() {
   })
 }
 
+// --- Download da OC ----------------------------------------------------------
+
+/** Extrai o corpo JSON de um erro de Edge Function (FunctionsHttpError guarda
+ *  o Response em `.context`). Devolve null se não der para ler. */
+async function extractFunctionErrorBody(
+  err: unknown,
+): Promise<{ error?: string; detalhe?: string } | null> {
+  try {
+    const ctx = (err as { context?: Response }).context
+    if (ctx && typeof ctx.json === 'function') {
+      const body = await ctx.clone().json()
+      if (body && typeof body === 'object') return body as { error?: string; detalhe?: string }
+    }
+  } catch {
+    /* ignora — cai no fallback */
+  }
+  return null
+}
+
+function traduzErroOc(code: string | undefined): string {
+  switch (code) {
+    case 'oc_indisponivel':
+      return 'A OC ainda não está disponível para esta solicitação.'
+    case 'forbidden':
+      return 'Você não tem acesso a esta OC.'
+    case 'solicitacao_nao_encontrada':
+      return 'Solicitação não encontrada.'
+    case 'sessao_invalida':
+      return 'Sessão expirada. Recarregue a página e entre novamente.'
+    default:
+      return 'Não foi possível baixar a OC. Tente novamente.'
+  }
+}
+
+/** Pede à Edge Function `baixar-oc` um signed URL curto do PDF da OC. O bucket
+ *  `ocs-pdf` é privado e só o time interno tem acesso direto (migration 0026);
+ *  a função autoriza o parceiro dono da solicitação e assina o link no servidor. */
+export function useBaixarOC() {
+  return useMutation({
+    mutationFn: async (solicitacaoId: string): Promise<string> => {
+      const { data, error } = await supabase.functions.invoke<{ url?: string; error?: string }>(
+        'baixar-oc',
+        { body: { solicitacao_id: solicitacaoId } },
+      )
+      if (error) {
+        const fnBody = await extractFunctionErrorBody(error)
+        throw new Error(traduzErroOc(fnBody?.error))
+      }
+      if (data?.error) throw new Error(traduzErroOc(data.error))
+      if (!data?.url) throw new Error('Resposta sem link da OC.')
+      return data.url
+    },
+    onError: (e: Error) => toast.error(e.message),
+  })
+}
+
 /** Cancela a própria solicitação. A RLS só permite enquanto `status='recebida'`. */
 export function useCancelarSolicitacao() {
   const qc = useQueryClient()
