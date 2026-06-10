@@ -26,16 +26,29 @@ type ParceiroBaseTable =
  *  solicitação antiga pode apontar para um registro já desativado). Usa a
  *  mesma chave invalidada por `useUpsertParceiroRow`, então o quick-create
  *  reflete na hora. */
+// Sem limite explícito, o PostgREST corta a resposta no teto padrão (1000) e
+// registros além disso somem do seletor de solicitação em silêncio (foi o que
+// aconteceu com as carretas no app interno). Paginamos até esgotar para que a
+// base inteira do parceiro sempre carregue, por menor que seja hoje.
+const PARCEIRO_BASE_PAGE_SIZE = 1000
+
 function useParceiroBase<T extends ParceiroBaseTable>(table: T, orderBy: string) {
   return useQuery({
     queryKey: ['parceiro-options', table],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from(table)
-        .select('*')
-        .order(orderBy as never, { ascending: true } as never)
-      if (error) throw error
-      return (data ?? []) as unknown as Tables<T>[]
+      const all: Tables<T>[] = []
+      for (let from = 0; ; from += PARCEIRO_BASE_PAGE_SIZE) {
+        const { data, error } = await supabase
+          .from(table)
+          .select('*')
+          .order(orderBy as never, { ascending: true } as never)
+          .range(from, from + PARCEIRO_BASE_PAGE_SIZE - 1)
+        if (error) throw error
+        const rows = (data ?? []) as unknown as Tables<T>[]
+        all.push(...rows)
+        if (rows.length < PARCEIRO_BASE_PAGE_SIZE) break
+      }
+      return all
     },
   })
 }
