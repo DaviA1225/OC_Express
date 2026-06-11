@@ -283,7 +283,7 @@ function MaterialForm({ open, onOpenChange, editing, onSubmit }: FormProps) {
               )}
             </div>
 
-            <div className="rounded-md border bg-background px-3 py-2.5">
+            <div className="rounded-md border bg-card px-3 py-2.5">
               <label className="flex items-start gap-2.5 cursor-pointer">
                 <Checkbox
                   checked={!!requerInstrucao}

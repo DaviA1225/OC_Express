@@ -221,7 +221,7 @@ function addDays(d: Date, days: number): Date {
 
 function PeriodoTabs({ value, onChange }: { value: PeriodoPreset; onChange: (v: PeriodoPreset) => void }) {
   return (
-    <div className="inline-flex rounded-lg border bg-background p-1" role="tablist">
+    <div className="inline-flex rounded-lg border bg-card p-1" role="tablist">
       {PRESETS.map((p) => (
         <button
           key={p.value}
@@ -260,7 +260,7 @@ function KpiCard({
 }: KpiCardProps) {
   const delta = computeDelta(value, previous)
   return (
-    <div className="rounded-lg border bg-background p-4">
+    <div className="rounded-lg border bg-card p-4">
       <div className="flex items-start justify-between gap-2">
         <p className="text-[11px] font-medium uppercase tracking-[0.5px] text-muted-foreground">
           {label}
@@ -344,7 +344,7 @@ interface CardProps {
 
 function Card({ title, subtitle, action, children }: CardProps) {
   return (
-    <section className="rounded-lg border bg-background">
+    <section className="rounded-lg border bg-card">
       <header className="flex items-center justify-between border-b px-4 py-3">
         <div>
           <h2 className="text-[14px] font-medium text-foreground">{title}</h2>

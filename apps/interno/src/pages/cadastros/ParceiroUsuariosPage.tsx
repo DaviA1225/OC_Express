@@ -140,7 +140,7 @@ export default function ParceiroUsuariosPage() {
   }
   if (!parceiroQ.data) {
     return (
-      <div className="mx-auto max-w-md rounded-lg border bg-background p-8 text-center">
+      <div className="mx-auto max-w-md rounded-lg border bg-card p-8 text-center">
         <h2 className="text-[15px] font-semibold text-foreground">Parceiro não encontrado</h2>
         <p className="mt-1.5 text-[13px] text-muted-foreground">
           O parceiro pode ter sido excluído ou o link está incorreto.
@@ -189,7 +189,7 @@ export default function ParceiroUsuariosPage() {
         )}
       </div>
 
-      <div className="overflow-hidden rounded-lg border bg-background">
+      <div className="overflow-hidden rounded-lg border bg-card">
         <Table>
           <TableHeader>
             <TableRow>

@@ -106,7 +106,7 @@ export function SolicitacaoDetailPage() {
 
   if (!detail.data) {
     return (
-      <div className="rounded-lg border bg-background p-6 text-center text-[13px] text-muted-foreground">
+      <div className="rounded-lg border bg-card p-6 text-center text-[13px] text-muted-foreground">
         Solicitação não encontrada.
         <div className="mt-3">
           <Button variant="outline" onClick={() => navigate('/solicitacoes')}>
@@ -564,7 +564,7 @@ function CardShell({
   children: React.ReactNode
 }) {
   return (
-    <section className="rounded-lg border bg-background">
+    <section className="rounded-lg border bg-card">
       <header className="flex items-center justify-between border-b px-4 py-2">
         <div className="flex items-center gap-2">
           <h2 className="text-[14px] font-medium text-foreground">{title}</h2>
@@ -1221,7 +1221,7 @@ function PamcardCard({ solicitacao, editable, onSave }: CardProps) {
   })
 
   return (
-    <section className="rounded-lg border bg-background">
+    <section className="rounded-lg border bg-card">
       <header className="flex items-center justify-between border-b px-4 py-2">
         <div className="flex items-center gap-2">
           <CreditCard className="h-4 w-4 text-muted-foreground" />
@@ -1380,7 +1380,7 @@ function TimelineCard({ solicitacao }: { solicitacao: CardProps['solicitacao'] }
   if (solicitacao.status === 'cancelada') items.push({ when: solicitacao.updated_at, label: 'Cancelada' })
 
   return (
-    <section className="rounded-lg border bg-background">
+    <section className="rounded-lg border bg-card">
       <header className="flex items-center justify-between border-b px-4 py-2">
         <h2 className="text-[14px] font-medium text-foreground">Linha do tempo</h2>
       </header>
@@ -1480,7 +1480,7 @@ function DevolverParceiroForm({
 function PendenciasCard({ pendencias }: { pendencias: Pendencia[] }) {
   const marcarVista = useMarcarPendenciaVista()
   return (
-    <section className="rounded-lg border bg-background">
+    <section className="rounded-lg border bg-card">
       <header className="flex items-center justify-between border-b px-4 py-2">
         <h2 className="text-[14px] font-medium text-foreground">Pendências com o parceiro</h2>
       </header>
@@ -1573,7 +1573,7 @@ function AvisarParceiroCard({ solicitacao }: { solicitacao: CardProps['solicitac
   }
 
   return (
-    <section className="rounded-lg border bg-background">
+    <section className="rounded-lg border bg-card">
       <header className="border-b px-4 py-2">
         <h2 className="text-[14px] font-medium text-foreground">Avisar o parceiro</h2>
       </header>

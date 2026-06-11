@@ -19,7 +19,7 @@
     --background: 0 0% 100%;             /* #FFFFFF */
     --foreground: 220 20% 13%;           /* grafite near-black neutro */
 
-    --card: 0 0% 100%;
+    --card: 220 22% 97.5%;               /* tom ardósia sutil p/ cards destacarem do painel branco */
     --card-foreground: 220 20% 13%;
 
     --popover: 0 0% 100%;
