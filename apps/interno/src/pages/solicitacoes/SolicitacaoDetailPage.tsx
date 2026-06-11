@@ -13,6 +13,7 @@ import { Combobox, type ComboboxOption } from '@/components/shared/Combobox'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import {
   Dialog, DialogContent, DialogHeader, DialogBody, DialogFooter, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog'
@@ -1197,6 +1198,157 @@ function PamcardNumeroForm({
   )
 }
 
+type PamcardStatus = 'tem_cartao' | 'nao_tem_cartao' | 'nao_necessario'
+
+// Edição completa do Pamcard: permite corrigir a OPÇÃO escolhida na criação
+// (tem cartão / não tem / não necessário) e o número. É uma ferramenta de
+// correção do dado original — diferente do botão "Cartão providenciado", que
+// registra a ação da equipe com rastreabilidade (providenciado_por/em).
+function PamcardEditarDialog({
+  open,
+  onOpenChange,
+  solicitacao,
+  onConfirm,
+}: {
+  open: boolean
+  onOpenChange: (o: boolean) => void
+  solicitacao: CardProps['solicitacao']
+  onConfirm: (values: Partial<Tables<'solicitacoes'>>) => Promise<void>
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        {open && (
+          <PamcardEditarForm
+            key={`${solicitacao.pamcard_status}:${solicitacao.pamcard_numero ?? ''}`}
+            initialStatus={solicitacao.pamcard_status as PamcardStatus}
+            initialNumero={solicitacao.pamcard_numero ?? ''}
+            onCancel={() => onOpenChange(false)}
+            onConfirm={async (values) => {
+              await onConfirm(values)
+              onOpenChange(false)
+            }}
+          />
+        )}
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function PamcardEditarForm({
+  initialStatus,
+  initialNumero,
+  onCancel,
+  onConfirm,
+}: {
+  initialStatus: PamcardStatus
+  initialNumero: string
+  onCancel: () => void
+  onConfirm: (values: Partial<Tables<'solicitacoes'>>) => Promise<void>
+}) {
+  const [status, setStatus] = React.useState<PamcardStatus>(initialStatus)
+  const [numero, setNumero] = React.useState(initialNumero)
+  const [erro, setErro] = React.useState<string | null>(null)
+  const [saving, setSaving] = React.useState(false)
+
+  const validar = (v: string): string | null => {
+    if (!/^[0-9]+$/.test(v)) return 'O Pamcard deve conter apenas números'
+    if (v.length < 10) return 'O Pamcard deve ter no mínimo 10 dígitos'
+    if (v.length > 16) return 'O Pamcard deve ter no máximo 16 dígitos'
+    return null
+  }
+
+  const submit = async () => {
+    if (status === 'tem_cartao') {
+      const e = validar(numero)
+      if (e) {
+        setErro(e)
+        return
+      }
+    }
+    setSaving(true)
+    try {
+      // Coerência com a constraint do banco: número só com 'tem_cartao';
+      // nos outros casos o número deve ser NULL.
+      await onConfirm(
+        status === 'tem_cartao'
+          ? { pamcard_status: 'tem_cartao', pamcard_numero: numero }
+          : { pamcard_status: status, pamcard_numero: null },
+      )
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <>
+      <DialogHeader>
+        <DialogTitle>Editar Pamcard</DialogTitle>
+        <DialogDescription>
+          Corrija a opção de pagamento ou o número do cartão desta solicitação.
+        </DialogDescription>
+      </DialogHeader>
+      <DialogBody className="space-y-4">
+        <div className="space-y-1.5">
+          <Label>Cartão *</Label>
+          <RadioGroup
+            value={status}
+            onValueChange={(v) => {
+              setStatus(v as PamcardStatus)
+              setErro(null)
+            }}
+            className="flex flex-col gap-2 pt-1"
+          >
+            <label className="flex items-center gap-2 text-[13px]">
+              <RadioGroupItem value="tem_cartao" />
+              Tem cartão
+            </label>
+            <label className="flex items-center gap-2 text-[13px]">
+              <RadioGroupItem value="nao_tem_cartao" />
+              Não tem cartão (solicitar)
+            </label>
+            <label className="flex items-center gap-2 text-[13px]">
+              <RadioGroupItem value="nao_necessario" />
+              Não necessário (pagamento por outro meio)
+            </label>
+          </RadioGroup>
+        </div>
+        {status === 'tem_cartao' && (
+          <div className="space-y-1.5">
+            <Label htmlFor="pamcard-editar">Número do cartão *</Label>
+            <Input
+              id="pamcard-editar"
+              autoFocus
+              value={numero}
+              onChange={(e) => {
+                setNumero(e.target.value.replace(/\D/g, '').slice(0, 16))
+                setErro(null)
+              }}
+              onBlur={() => setErro(validar(numero))}
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={16}
+              placeholder="Ex: 441781209999"
+            />
+            {erro && <p className="text-[11px] text-destructive">{erro}</p>}
+          </div>
+        )}
+      </DialogBody>
+      <DialogFooter>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={onCancel} disabled={saving}>
+            Cancelar
+          </Button>
+          <Button onClick={submit} disabled={saving}>
+            {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+            Salvar
+          </Button>
+        </div>
+      </DialogFooter>
+    </>
+  )
+}
+
 function PamcardCard({ solicitacao, editable, onSave }: CardProps) {
   const { profile } = useAuth()
   const temCartao = solicitacao.pamcard_status === 'tem_cartao'
@@ -1227,7 +1379,7 @@ function PamcardCard({ solicitacao, editable, onSave }: CardProps) {
           <CreditCard className="h-4 w-4 text-muted-foreground" />
           <h2 className="text-[14px] font-medium text-foreground">Pamcard</h2>
         </div>
-        {temCartao && !providenciado && podeAlterar && (
+        {podeAlterar && !providenciado && (
           <Button variant="ghost" size="sm" onClick={() => setEditarOpen(true)} aria-label="Editar Pamcard">
             <Pencil className="h-4 w-4" />
           </Button>
@@ -1295,15 +1447,13 @@ function PamcardCard({ solicitacao, editable, onSave }: CardProps) {
         )}
       </div>
 
-      <PamcardNumeroDialog
+      <PamcardEditarDialog
         open={editarOpen}
         onOpenChange={setEditarOpen}
-        title="Editar número do Pamcard"
-        description="Atualize o número do cartão informado pelo solicitante."
-        initialNumero={solicitacao.pamcard_numero ?? ''}
-        onConfirm={async (numero) => {
-          await onSave({ pamcard_numero: numero })
-          toast.success('Número do Pamcard atualizado')
+        solicitacao={solicitacao}
+        onConfirm={async (values) => {
+          await onSave(values)
+          toast.success('Pamcard atualizado')
         }}
       />
       <PamcardNumeroDialog
