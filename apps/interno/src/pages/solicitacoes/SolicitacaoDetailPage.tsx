@@ -1269,11 +1269,19 @@ function PamcardEditarForm({
     setSaving(true)
     try {
       // Coerência com a constraint do banco: número só com 'tem_cartao';
-      // nos outros casos o número deve ser NULL.
+      // nos outros casos o número deve ser NULL. Ao deixar de ser 'tem_cartao'
+      // também limpamos a rastreabilidade de providência — senão sobraria um
+      // carimbo providenciado_por/em sem cartão, e o índice de pendência
+      // (que exige providenciado_em IS NULL) não voltaria a contar a solicitação.
       await onConfirm(
         status === 'tem_cartao'
           ? { pamcard_status: 'tem_cartao', pamcard_numero: numero }
-          : { pamcard_status: status, pamcard_numero: null },
+          : {
+              pamcard_status: status,
+              pamcard_numero: null,
+              pamcard_providenciado_por: null,
+              pamcard_providenciado_em: null,
+            },
       )
     } finally {
       setSaving(false)
@@ -1379,7 +1387,7 @@ function PamcardCard({ solicitacao, editable, onSave }: CardProps) {
           <CreditCard className="h-4 w-4 text-muted-foreground" />
           <h2 className="text-[14px] font-medium text-foreground">Pamcard</h2>
         </div>
-        {podeAlterar && !providenciado && (
+        {podeAlterar && (
           <Button variant="ghost" size="sm" onClick={() => setEditarOpen(true)} aria-label="Editar Pamcard">
             <Pencil className="h-4 w-4" />
           </Button>
