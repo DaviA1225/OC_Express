@@ -357,7 +357,7 @@ export function SolicitacoesListPage() {
         </div>
       </div>
 
-      <div className="space-y-3 rounded-lg border bg-background p-3">
+      <div className="space-y-3 rounded-lg border bg-card p-3">
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative flex-1 min-w-[220px]">
             <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -445,7 +445,7 @@ export function SolicitacoesListPage() {
                   'rounded-full border px-2.5 py-0.5 text-[11px] transition-colors',
                   active
                     ? 'border-primary bg-primary text-primary-foreground'
-                    : 'border-border bg-background text-muted-foreground hover:bg-muted',
+                    : 'border-border bg-card text-muted-foreground hover:bg-muted',
                 )}
               >
                 {STATUS_LABELS[s]}
@@ -458,7 +458,7 @@ export function SolicitacoesListPage() {
       {list.isLoading && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="rounded-lg border bg-background p-4">
+            <div key={i} className="rounded-lg border bg-card p-4">
               <Skeleton className="h-5 w-1/2 mb-3" />
               <Skeleton className="h-3 w-3/4 mb-2" />
               <Skeleton className="h-3 w-2/3 mb-2" />
@@ -469,7 +469,7 @@ export function SolicitacoesListPage() {
       )}
 
       {!list.isLoading && (list.data?.data.length ?? 0) === 0 && (
-        <div className="rounded-lg border bg-background py-2">
+        <div className="rounded-lg border bg-card py-2">
           <EmptyState
             icon={Inbox}
             title={hasFilters ? 'Nada encontrado com esses filtros' : 'Nenhuma solicitação ainda'}
@@ -539,7 +539,7 @@ export function SolicitacoesListPage() {
               ))}
             </div>
           ) : (
-            <div className="divide-y rounded-lg border bg-background">
+            <div className="divide-y rounded-lg border bg-card">
               {list.data!.data.map((row) => (
                 <SolicitacaoListaRow
                   key={row.id}
@@ -618,7 +618,7 @@ function SolicitacaoCard({ row, sinalPendencia, selectable, selected, onToggleSe
   return (
     <div
       className={cn(
-        'rounded-lg border bg-background p-4 transition-colors hover:border-primary/40',
+        'rounded-lg border bg-card p-4 transition-all hover:border-primary/60 hover:bg-accent hover:shadow-md',
         selectable && selected && 'border-primary bg-primary/5',
         !selected && sinal === 'parceiro_respondeu' && 'border-emerald-400 ring-1 ring-emerald-200 dark:border-emerald-700 dark:ring-emerald-900/50',
         !selected && sinal === 'aguardando_parceiro' && 'border-orange-300 dark:border-orange-900/60',

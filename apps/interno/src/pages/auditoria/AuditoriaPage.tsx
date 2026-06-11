@@ -251,7 +251,7 @@ export default function AuditoriaPage() {
           </Button>
         </div>
 
-        <div className="space-y-3 rounded-lg border bg-background p-3">
+        <div className="space-y-3 rounded-lg border bg-card p-3">
           <div className="flex flex-wrap items-end gap-3">
             <div className="space-y-1">
               <Label className="text-[11px] uppercase tracking-[0.5px] text-muted-foreground">Período</Label>
@@ -288,7 +288,7 @@ export default function AuditoriaPage() {
           />
         </div>
 
-        <div className="rounded-lg border bg-background">
+        <div className="rounded-lg border bg-card">
           <Table>
             <TableHeader>
               <TableRow>
@@ -391,7 +391,7 @@ function PeriodoSelect({ value, onChange }: { value: Periodo; onChange: (v: Peri
       <select
         value={value}
         onChange={(e) => onChange(e.target.value as Periodo)}
-        className="h-9 appearance-none rounded-md border bg-background pl-3 pr-8 text-[13px] focus:outline-none focus:ring-2 focus:ring-ring"
+        className="h-9 appearance-none rounded-md border bg-card pl-3 pr-8 text-[13px] focus:outline-none focus:ring-2 focus:ring-ring"
       >
         {(Object.keys(PERIODO_LABELS) as Periodo[]).map((p) => (
           <option key={p} value={p}>{PERIODO_LABELS[p]}</option>
@@ -425,7 +425,7 @@ function FilterChips({ label, options, value, onToggle }: FilterChipsProps) {
                 'rounded-full border px-3 py-1 text-[12px] transition-colors',
                 active
                   ? 'border-primary bg-primary text-primary-foreground'
-                  : 'border-border bg-background text-foreground/80 hover:bg-muted',
+                  : 'border-border bg-card text-foreground/80 hover:bg-muted',
               )}
             >
               {o.label}
@@ -460,7 +460,7 @@ function UsuarioFilter({ usuarios, value, onToggle }: UsuarioFilterProps) {
                 'rounded-full border px-3 py-1 text-[12px] transition-colors',
                 active
                   ? 'border-primary bg-primary text-primary-foreground'
-                  : 'border-border bg-background text-foreground/80 hover:bg-muted',
+                  : 'border-border bg-card text-foreground/80 hover:bg-muted',
               )}
             >
               {u.nome_completo}

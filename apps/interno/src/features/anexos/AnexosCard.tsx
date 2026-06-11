@@ -69,7 +69,7 @@ export function AnexosCard({ solicitacaoId, editable }: Props) {
   const items = list.data ?? []
 
   return (
-    <section className="rounded-lg border bg-background">
+    <section className="rounded-lg border bg-card">
       <header className="flex items-center justify-between border-b px-4 py-2">
         <div className="flex items-center gap-2">
           <Paperclip className="h-4 w-4 text-muted-foreground" />

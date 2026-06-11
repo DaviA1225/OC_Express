@@ -106,10 +106,10 @@ export function GlobalSearchDialog({ open, onOpenChange }: Props) {
                 <div className="px-4 py-8 text-center text-[13px] text-muted-foreground">
                   Digite ao menos 2 caracteres para buscar.
                   <p className="mt-1 text-[11px]">
-                    Dica: <kbd className="rounded border bg-background px-1">↑</kbd>{' '}
-                    <kbd className="rounded border bg-background px-1">↓</kbd> navegar ·{' '}
-                    <kbd className="rounded border bg-background px-1">Enter</kbd> abrir ·{' '}
-                    <kbd className="rounded border bg-background px-1">Esc</kbd> fechar
+                    Dica: <kbd className="rounded border bg-card px-1">↑</kbd>{' '}
+                    <kbd className="rounded border bg-card px-1">↓</kbd> navegar ·{' '}
+                    <kbd className="rounded border bg-card px-1">Enter</kbd> abrir ·{' '}
+                    <kbd className="rounded border bg-card px-1">Esc</kbd> fechar
                   </p>
                 </div>
               )}
@@ -159,7 +159,7 @@ export function GlobalSearchDialog({ open, onOpenChange }: Props) {
             <div className="flex items-center justify-between border-t px-3 py-2 text-[11px] text-muted-foreground">
               <span>Busca global</span>
               <span>
-                <kbd className="rounded border bg-background px-1">Esc</kbd> para fechar
+                <kbd className="rounded border bg-card px-1">Esc</kbd> para fechar
               </span>
             </div>
           </Command>

@@ -157,7 +157,7 @@ export default function SegurancaPage() {
       <DestaqueFalhas24h count={falhas24h.data ?? null} loading={falhas24h.isLoading} />
 
       {/* Filtros */}
-      <div className="space-y-3 rounded-lg border bg-background p-3">
+      <div className="space-y-3 rounded-lg border bg-card p-3">
         <div className="flex flex-wrap items-end gap-3">
           <div className="space-y-1">
             <Label className="text-[11px] uppercase tracking-[0.5px] text-muted-foreground">Período</Label>
@@ -191,7 +191,7 @@ export default function SegurancaPage() {
       </div>
 
       {/* Tabela */}
-      <div className="rounded-lg border bg-background">
+      <div className="rounded-lg border bg-card">
         <Table>
           <TableHeader>
             <TableRow>
@@ -271,7 +271,7 @@ function DestaqueFalhas24h({ count, loading }: { count: number | null; loading: 
     <div
       className={cn(
         'flex items-center gap-3 rounded-lg border p-3',
-        alarmante ? 'border-amber-300 bg-amber-50' : 'border-border bg-background',
+        alarmante ? 'border-amber-300 bg-amber-50' : 'border-border bg-card',
       )}
     >
       <span
@@ -302,7 +302,7 @@ function PeriodoSelect({ value, onChange }: { value: Periodo; onChange: (v: Peri
       <select
         value={value}
         onChange={(e) => onChange(e.target.value as Periodo)}
-        className="h-9 appearance-none rounded-md border bg-background pl-3 pr-8 text-[13px] focus:outline-none focus:ring-2 focus:ring-ring"
+        className="h-9 appearance-none rounded-md border bg-card pl-3 pr-8 text-[13px] focus:outline-none focus:ring-2 focus:ring-ring"
       >
         {VALID_PERIODOS.map((p) => (
           <option key={p} value={p}>{PERIODO_LABELS[p]}</option>
@@ -335,7 +335,7 @@ function FilterChips({ label, options, value, onToggle }: FilterChipsProps) {
                 'rounded-full border px-3 py-1 text-[12px] transition-colors',
                 active
                   ? 'border-primary bg-primary text-primary-foreground'
-                  : 'border-border bg-background text-foreground/80 hover:bg-muted',
+                  : 'border-border bg-card text-foreground/80 hover:bg-muted',
               )}
             >
               {o.label}

@@ -89,7 +89,7 @@ function PerfilHeader() {
   const nome = profile?.nome_completo ?? user?.email ?? 'Usuário'
   const inicial = nome.trim().charAt(0).toUpperCase() || '?'
   return (
-    <section className="flex items-center gap-4 rounded-lg border bg-background p-4">
+    <section className="flex items-center gap-4 rounded-lg border bg-card p-4">
       <Avatar className="h-14 w-14">
         <AvatarFallback className="text-[18px]">{inicial}</AvatarFallback>
       </Avatar>
@@ -321,7 +321,7 @@ interface CardProps {
 
 function Card({ icon, title, subtitle, children }: CardProps) {
   return (
-    <section className="rounded-lg border bg-background">
+    <section className="rounded-lg border bg-card">
       <header className="flex items-center gap-2 border-b px-4 py-3">
         <span className="flex h-7 w-7 items-center justify-center rounded-md bg-muted text-foreground/80">
           {icon}

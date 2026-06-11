@@ -108,10 +108,12 @@ export function AppLayout() {
             realtimeStatus={realtimeStatus}
           />
         </div>
-        <main className="flex-1 overflow-y-auto bg-muted/30 px-3 py-4 print:overflow-visible print:bg-transparent print:p-0 sm:px-4 sm:py-5 md:px-6 md:py-6">
-          <NovaSolicitacaoProvider>
-            <Outlet />
-          </NovaSolicitacaoProvider>
+        <main className="flex-1 overflow-y-auto bg-muted/60 p-3 print:overflow-visible print:bg-transparent print:p-0 sm:p-4 md:p-6">
+          <div className="min-h-full rounded-xl border bg-background p-4 shadow-sm print:rounded-none print:border-0 print:p-0 print:shadow-none sm:p-5 md:p-6">
+            <NovaSolicitacaoProvider>
+              <Outlet />
+            </NovaSolicitacaoProvider>
+          </div>
         </main>
       </div>
 

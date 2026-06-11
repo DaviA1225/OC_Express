@@ -305,7 +305,7 @@ export default function ClientesPage() {
         </div>
 
         {view === 'mapa' ? (
-          <div className="space-y-3 rounded-lg border bg-background p-3">
+          <div className="space-y-3 rounded-lg border bg-card p-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h1 className="text-[15px] font-semibold text-foreground">{titulo}</h1>
               <div className="relative w-full max-w-[320px]">
@@ -446,7 +446,7 @@ interface TabsProps {
 
 function Tabs({ value, onChange }: TabsProps) {
   return (
-    <div className="inline-flex rounded-lg border bg-background p-1" role="tablist">
+    <div className="inline-flex rounded-lg border bg-card p-1" role="tablist">
       <TabButton active={value === 'minerio'} onClick={() => onChange('minerio')}>
         Carga de Minério
       </TabButton>
@@ -762,7 +762,7 @@ function OperacionalDialog({ row, onOpenChange, onSubmit }: OperacionalDialogPro
                 Tipos de carreta aceitos
               </Label>
               <div className="space-y-2">
-                <div className="flex h-10 items-center justify-between rounded-md border bg-background px-3">
+                <div className="flex h-10 items-center justify-between rounded-md border bg-card px-3">
                   <span className="text-[13px] text-foreground">Caçamba</span>
                   <Switch
                     checked={cacamba}
@@ -770,7 +770,7 @@ function OperacionalDialog({ row, onOpenChange, onSubmit }: OperacionalDialogPro
                     aria-label="Aceita caçamba"
                   />
                 </div>
-                <div className="flex h-10 items-center justify-between rounded-md border bg-background px-3">
+                <div className="flex h-10 items-center justify-between rounded-md border bg-card px-3">
                   <span className="text-[13px] text-foreground">Graneleiro</span>
                   <Switch
                     checked={graneleiro}

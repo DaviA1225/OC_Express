@@ -109,7 +109,7 @@ export function ClientesMapa({ pontos, isLoading, semCoordenadas }: Props) {
         </div>
       </div>
 
-      <div className="relative h-[70vh] min-h-[420px] overflow-hidden rounded-lg border bg-background">
+      <div className="relative h-[70vh] min-h-[420px] overflow-hidden rounded-lg border bg-card">
         {isLoading && (
           <div className="absolute inset-0 z-[1000] flex items-center justify-center bg-background/60">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />

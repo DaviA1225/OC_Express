@@ -137,7 +137,7 @@ export function WhatsAppEnvioDialog({ open, onOpenChange, solicitacao }: Props) 
                     'rounded-md border px-3 py-1.5 text-left text-[12px] transition-colors',
                     destinoIdx === i
                       ? 'border-primary bg-primary/5 text-foreground'
-                      : 'border-border bg-background text-foreground/80 hover:bg-muted',
+                      : 'border-border bg-card text-foreground/80 hover:bg-muted',
                   )}
                 >
                   <div className="font-medium">{d.label}</div>
@@ -151,7 +151,7 @@ export function WhatsAppEnvioDialog({ open, onOpenChange, solicitacao }: Props) 
                   'rounded-md border px-3 py-1.5 text-left text-[12px] transition-colors',
                   destinoIdx === -1
                     ? 'border-primary bg-primary/5 text-foreground'
-                    : 'border-border bg-background text-foreground/80 hover:bg-muted',
+                    : 'border-border bg-card text-foreground/80 hover:bg-muted',
                 )}
               >
                 <div className="font-medium">Outro número</div>

@@ -44,7 +44,7 @@ function ConnectionError({ onRetry }: { onRetry: () => Promise<void> }) {
   }
   return (
     <div className="flex min-h-full items-center justify-center bg-muted px-4">
-      <div className="w-full max-w-md rounded-xl border bg-background p-6 text-center shadow-overlay">
+      <div className="w-full max-w-md rounded-xl border bg-card p-6 text-center shadow-overlay">
         <h2 className="text-[18px] font-medium text-foreground">Não foi possível carregar seu acesso</h2>
         <p className="mt-2 text-[13px] text-muted-foreground">
           Houve uma falha de conexão ao verificar seu perfil. Sua conta continua ativa —
@@ -61,7 +61,7 @@ function ConnectionError({ onRetry }: { onRetry: () => Promise<void> }) {
 function AwaitingApproval() {
   return (
     <div className="flex min-h-full items-center justify-center bg-muted px-4">
-      <div className="w-full max-w-md rounded-xl border bg-background p-6 text-center shadow-overlay">
+      <div className="w-full max-w-md rounded-xl border bg-card p-6 text-center shadow-overlay">
         <h2 className="text-[18px] font-medium text-foreground">Aguardando liberação</h2>
         <p className="mt-2 text-[13px] text-muted-foreground">
           Sua conta ainda não tem perfil de acesso. Peça ao administrador para liberar o
@@ -75,7 +75,7 @@ function AwaitingApproval() {
 function DeactivatedAccount() {
   return (
     <div className="flex min-h-full items-center justify-center bg-muted px-4">
-      <div className="w-full max-w-md rounded-xl border bg-background p-6 text-center shadow-overlay">
+      <div className="w-full max-w-md rounded-xl border bg-card p-6 text-center shadow-overlay">
         <h2 className="text-[18px] font-medium text-foreground">Conta desativada</h2>
         <p className="mt-2 text-[13px] text-muted-foreground">
           Seu acesso ao SisLog foi desativado. Procure o administrador.
