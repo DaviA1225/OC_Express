@@ -15,6 +15,7 @@ import {
   Search,
   BarChart3,
   Gauge,
+  Activity,
   ShieldAlert,
   ChevronsLeft,
   ChevronsRight,
@@ -26,6 +27,7 @@ import {
   canViewUsuarios,
   canViewRelatorios,
   canViewProdutividade,
+  canViewAtividade,
   canViewSeguranca,
 } from '@/features/auth/permissions'
 import { usePamcardPendenteCount } from '@/features/solicitacoes/useSolicitacoes'
@@ -55,6 +57,7 @@ const cadastros: NavItem[] = [
 const sistemaAdmin: NavItem = { to: '/cadastros/usuarios', label: 'Usuários', icon: Users }
 const sistemaRelatorios: NavItem = { to: '/relatorios', label: 'Relatórios', icon: BarChart3 }
 const sistemaProdutividade: NavItem = { to: '/relatorios-internos', label: 'Relatórios Internos', icon: Gauge }
+const sistemaAtividade: NavItem = { to: '/atividade', label: 'Atividade da Equipe', icon: Activity }
 const sistemaAuditoria: NavItem = { to: '/auditoria', label: 'Auditoria', icon: Search }
 const sistemaSeguranca: NavItem = { to: '/seguranca', label: 'Segurança', icon: ShieldAlert }
 
@@ -71,6 +74,7 @@ export function SidebarContent({ collapsed, onToggleCollapse, onNavigate, classN
   const showAuditoria = canViewAuditoria(profile)
   const showRelatorios = canViewRelatorios(profile)
   const showProdutividade = canViewProdutividade(profile)
+  const showAtividade = canViewAtividade(profile)
   const showSeguranca = canViewSeguranca(profile)
   const pamcardPendente = usePamcardPendenteCount()
   const pamcardPendenteCount = pamcardPendente.data ?? 0
@@ -122,7 +126,7 @@ export function SidebarContent({ collapsed, onToggleCollapse, onNavigate, classN
           ))}
         </ul>
 
-        {(showUsuarios || showAuditoria || showRelatorios || showProdutividade || showSeguranca) && (
+        {(showUsuarios || showAuditoria || showRelatorios || showProdutividade || showAtividade || showSeguranca) && (
           <>
             <SectionLabel collapsed={collapsed}>Sistema</SectionLabel>
             <ul className="space-y-0.5">
@@ -136,6 +140,13 @@ export function SidebarContent({ collapsed, onToggleCollapse, onNavigate, classN
               {showProdutividade && (
                 <NavListItem
                   item={sistemaProdutividade}
+                  collapsed={collapsed}
+                  onNavigate={onNavigate}
+                />
+              )}
+              {showAtividade && (
+                <NavListItem
+                  item={sistemaAtividade}
                   collapsed={collapsed}
                   onNavigate={onNavigate}
                 />

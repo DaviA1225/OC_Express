@@ -28,6 +28,7 @@ const AuditoriaPage = lazy(() => import('@/pages/auditoria/AuditoriaPage'))
 const SegurancaPage = lazy(() => import('@/pages/seguranca/SegurancaPage'))
 const RelatoriosPage = lazy(() => import('@/pages/relatorios/RelatoriosPage'))
 const RelatoriosInternosPage = lazy(() => import('@/pages/relatorios/RelatoriosInternosPage'))
+const AtividadeEquipePage = lazy(() => import('@/pages/atividade/AtividadeEquipePage'))
 const PerfilPage = lazy(() => import('@/pages/perfil/PerfilPage'))
 const NotFoundPage = lazy(() => import('@/pages/errors/NotFoundPage'))
 
@@ -75,6 +76,9 @@ export default function App() {
                 </Route>
                 <Route element={<PerfilRoute allowed={['admin', 'gerente', 'supervisor']} />}>
                   <Route path="/relatorios-internos" element={<RelatoriosInternosPage />} />
+                </Route>
+                <Route element={<PerfilRoute allowed={['admin', 'gerente', 'supervisor']} />}>
+                  <Route path="/atividade" element={<AtividadeEquipePage />} />
                 </Route>
                 <Route element={<PerfilRoute allowed={['admin', 'gerente', 'supervisor']} />}>
                   <Route path="/auditoria" element={<AuditoriaPage />} />

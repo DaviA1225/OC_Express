@@ -28,6 +28,11 @@ export function canViewProdutividade(p: PerfilRow | null): boolean {
   return is(p, 'admin', 'gerente', 'supervisor')
 }
 
+/** Atividade da equipe (painel do "agora"): mesma gestão da produtividade. */
+export function canViewAtividade(p: PerfilRow | null): boolean {
+  return is(p, 'admin', 'gerente', 'supervisor')
+}
+
 /** Usuários: somente admin. */
 export function canViewUsuarios(p: PerfilRow | null): boolean {
   return is(p, 'admin')
