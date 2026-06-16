@@ -1,0 +1,72 @@
+name: DB Migrations (Supabase)
+
+# Garante que toda migration em supabase/migrations/ chegue ao banco REMOTO,
+# sem depender de alguém lembrar de rodar `db push` à mão (causa recorrente de
+# "migration commitada ≠ aplicada" — ex.: 0027, 0037).
+#
+#  • Pull Request  → roda `db push --dry-run`: só LISTA o que seria aplicado.
+#                    Vira um check no PR mostrando o drift entre repo e remoto.
+#  • Push na main  → roda `db push`: APLICA as migrations pendentes no remoto.
+#
+# Pré-requisitos (Settings → Secrets and variables → Actions → New secret):
+#   SUPABASE_ACCESS_TOKEN  — Account → Access Tokens em supabase.com/dashboard
+#   SUPABASE_DB_PASSWORD   — senha do banco (Project → Settings → Database)
+# O project ref não é segredo (já versionado em supabase/.temp); fica abaixo.
+#
+# ⚠️ Ordem com o deploy do front (Vercel autodeploy na main): para migrations
+# ADITIVAS (índices, colunas novas nullable, tabelas novas) a ordem não importa.
+# Para mudanças QUEBRA-COMPAT (rename/drop de coluna que o front lê), use o
+# padrão expand/contract: 1) PR só com a coluna nova + front lendo das duas;
+# 2) depois de aplicado e o front no ar, PR que remove a antiga. Nunca renomeie
+# e troque o front no mesmo merge.
+
+on:
+  push:
+    branches: [main]
+    paths: ['supabase/migrations/**']
+  pull_request:
+    paths: ['supabase/migrations/**']
+
+# Evita dois pushes na main aplicando migrations ao mesmo tempo.
+concurrency:
+  group: db-migrate-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  SUPABASE_PROJECT_ID: pwufbvneqfyyqnmfxzyw
+  SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+  SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+
+jobs:
+  dry-run:
+    name: Drift check (dry-run)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Link ao projeto remoto
+        run: supabase link --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Migrations que seriam aplicadas
+        run: |
+          echo "Diferença local x remoto:"
+          supabase migration list --linked
+          echo "----"
+          echo "Dry-run do push (nada é aplicado):"
+          supabase db push --dry-run
+
+  push:
+    name: Aplicar migrations no remoto
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Link ao projeto remoto
+        run: supabase link --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Push das migrations
+        run: supabase db push
