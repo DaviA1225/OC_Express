@@ -3,7 +3,7 @@ import { Link, useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { ArrowLeft, X, AlertCircle, Check, Undo2, Loader2, Download, FileText } from 'lucide-react'
+import { ArrowLeft, X, Pencil, AlertCircle, Check, Undo2, Loader2, Download, FileText } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -14,7 +14,7 @@ import { StatusBadge } from '@/components/solicitacoes/StatusBadge'
 import { AnexosCard } from '@/features/anexos/AnexosCard'
 import { cn } from '@/lib/utils'
 import { formatNumeroOC, formatarPamcardParaExibicao } from '@/lib/utils'
-import { podeCancelar } from '@/features/solicitacoes/status'
+import { podeCancelar, podeEditar } from '@/features/solicitacoes/status'
 import {
   useSolicitacaoPortal,
   useCancelarSolicitacao,
@@ -149,11 +149,23 @@ export default function SolicitacaoDetailPage() {
           </h1>
           <StatusBadge status={sol.status} variant="full" />
         </div>
-        {podeCancelar(sol.status) && (
-          <Button variant="outline" onClick={() => setConfirmOpen(true)}>
-            <X className="h-4 w-4" />
-            Cancelar solicitação
-          </Button>
+        {(podeEditar(sol.status) || podeCancelar(sol.status)) && (
+          <div className="flex items-center gap-2">
+            {podeEditar(sol.status) && (
+              <Button variant="outline" asChild>
+                <Link to={`/solicitacoes/${sol.id}/editar`}>
+                  <Pencil className="h-4 w-4" />
+                  Editar
+                </Link>
+              </Button>
+            )}
+            {podeCancelar(sol.status) && (
+              <Button variant="outline" onClick={() => setConfirmOpen(true)}>
+                <X className="h-4 w-4" />
+                Cancelar solicitação
+              </Button>
+            )}
+          </div>
         )}
       </div>
 

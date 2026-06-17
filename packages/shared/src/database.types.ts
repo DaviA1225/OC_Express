@@ -41,6 +41,7 @@ export type TipoEventoPortal =
   | 'portal_login_falha'
   | 'portal_logout'
   | 'portal_solicitacao_criada'
+  | 'portal_solicitacao_editada'
   | 'portal_solicitacao_cancelada'
   | 'portal_senha_alterada'
   | 'portal_usuario_convidado'

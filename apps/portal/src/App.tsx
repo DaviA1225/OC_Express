@@ -9,6 +9,7 @@ import LoginPage from '@/pages/LoginPage'
 const SolicitacoesPage = lazy(() => import('@/pages/solicitacoes/SolicitacoesListPage'))
 const NovaSolicitacaoPage = lazy(() => import('@/pages/solicitacoes/NovaSolicitacaoPage'))
 const SolicitacaoDetailPage = lazy(() => import('@/pages/solicitacoes/SolicitacaoDetailPage'))
+const EditarSolicitacaoPage = lazy(() => import('@/pages/solicitacoes/EditarSolicitacaoPage'))
 const MotoristasPage = lazy(() => import('@/pages/cadastros/MotoristasPage'))
 const VeiculosPage = lazy(() => import('@/pages/cadastros/VeiculosPage'))
 const CarretasPage = lazy(() => import('@/pages/cadastros/CarretasPage'))
@@ -30,6 +31,7 @@ export function App() {
             <Route element={<PortalLayout />}>
               <Route path="/solicitacoes" element={<SolicitacoesPage />} />
               <Route path="/solicitacoes/nova" element={<NovaSolicitacaoPage />} />
+              <Route path="/solicitacoes/:id/editar" element={<EditarSolicitacaoPage />} />
               <Route path="/solicitacoes/:id" element={<SolicitacaoDetailPage />} />
               <Route path="/motoristas" element={<MotoristasPage />} />
               <Route path="/veiculos" element={<VeiculosPage />} />
