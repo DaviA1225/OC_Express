@@ -25,7 +25,7 @@ on:
     branches: [main]
     paths: ['supabase/migrations/**']
   pull_request:
-    paths: ['supabase/migrations/**']
+    paths: ['supabase/migrations/**', '.github/workflows/db-migrate.yml']
 
 # Evita dois pushes na main aplicando migrations ao mesmo tempo.
 concurrency:
