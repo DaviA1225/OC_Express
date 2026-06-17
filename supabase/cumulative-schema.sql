@@ -1,5 +1,5 @@
 -- =====================================================================
--- OC Express / SisLog LHG — Schema cumulativo (migrations 0001 → 0040)
+-- OC Express / SisLog LHG — Schema cumulativo (migrations 0001 → 0042)
 -- =====================================================================
 --
 -- Este arquivo agrega TODAS as migrations num único script IDEMPOTENTE.
@@ -249,7 +249,7 @@ BEGIN
   END IF;
   RETURN NULL;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
 
 -- 7 audit triggers nas tabelas internas
 DO $$
@@ -2363,6 +2363,39 @@ BEGIN
     EXECUTE format('CREATE POLICY %I ON %I FOR DELETE TO authenticated USING (parceiro_id = get_current_parceiro_id())', t || '_parceiro_delete', t);
   END LOOP;
 END $$;
+
+
+-- ============================================================
+-- 0041 — Indices de performance (FKs sem indice + compostos)
+-- ============================================================
+-- O Postgres nao cria indice automatico em coluna de FK; estas fecham as
+-- lacunas das telas quentes (joins, filtros, ordenacao) e protegem o DELETE
+-- nos pais parceiro_*. Idempotente (IF NOT EXISTS / IF EXISTS).
+CREATE INDEX IF NOT EXISTS idx_solicitacoes_cliente   ON solicitacoes(cliente_id);
+CREATE INDEX IF NOT EXISTS idx_solicitacoes_material  ON solicitacoes(material_id);
+CREATE INDEX IF NOT EXISTS idx_solicitacoes_motorista ON solicitacoes(motorista_id);
+CREATE INDEX IF NOT EXISTS idx_solicitacoes_veiculo   ON solicitacoes(veiculo_id);
+CREATE INDEX IF NOT EXISTS idx_solicitacoes_carreta   ON solicitacoes(carreta_id);
+CREATE INDEX IF NOT EXISTS idx_solicitacoes_parceiro_motorista        ON solicitacoes(parceiro_motorista_id);
+CREATE INDEX IF NOT EXISTS idx_solicitacoes_parceiro_veiculo          ON solicitacoes(parceiro_veiculo_id);
+CREATE INDEX IF NOT EXISTS idx_solicitacoes_parceiro_carreta          ON solicitacoes(parceiro_carreta_id);
+CREATE INDEX IF NOT EXISTS idx_solicitacoes_parceiro_primeira_carreta ON solicitacoes(parceiro_primeira_carreta_id);
+CREATE INDEX IF NOT EXISTS idx_solicitacoes_parceiro_dolly            ON solicitacoes(parceiro_dolly_id);
+CREATE INDEX IF NOT EXISTS idx_solicitacoes_parceiro_subcontratada    ON solicitacoes(parceiro_subcontratada_id);
+CREATE INDEX IF NOT EXISTS idx_solicitacoes_parceiro_usuario          ON solicitacoes(parceiro_usuario_id);
+CREATE INDEX IF NOT EXISTS idx_solicitacoes_status_created ON solicitacoes(status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_log_auditoria_tabela_created ON log_auditoria(tabela, created_at DESC);
+DROP INDEX IF EXISTS idx_log_auditoria_tabela;
+
+
+-- ============================================================
+-- 0042 — Seguranca: fixa search_path da audit_trigger (DEFINER)
+-- ============================================================
+-- audit_trigger() e SECURITY DEFINER e roda em ~20 tabelas. Sem search_path
+-- fixo era vetor de hijacking (function_search_path_mutable no linter do
+-- Supabase). A definicao acima ja inclui o SET; este ALTER garante a correcao
+-- mesmo em bancos onde a funcao foi criada antes desta secao. Idempotente.
+ALTER FUNCTION audit_trigger() SET search_path = public, pg_temp;
 
 
 -- =====================================================================

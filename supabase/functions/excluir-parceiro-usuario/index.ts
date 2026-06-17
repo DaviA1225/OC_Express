@@ -33,26 +33,45 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+// CORS endurecido: substitui o curinga '*' por allowlist. Origens extras
+// podem ser adicionadas via secret ALLOWED_ORIGINS (separadas por virgula).
+const ALLOWED_ORIGINS = [
+  'https://oc-express.vercel.app',
+  'https://oc-sislog-portal.vercel.app',
+  'http://localhost:5173',
+  'http://localhost:5174',
+  ...(Deno.env.get('ALLOWED_ORIGINS') ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean),
+]
+
+function corsHeaders(origin: string | null): Record<string, string> {
+  const allow = origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0]
+  return {
+    'Access-Control-Allow-Origin': allow,
+    'Vary': 'Origin',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  }
 }
 
 interface ExcluirBody {
   parceiro_usuario_id?: string
 }
 
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-  })
-}
+// (helper json definido por requisicao dentro do handler — ver Deno.serve)
 
 Deno.serve(async (req) => {
+  const CORS = corsHeaders(req.headers.get('Origin'))
+  const json = (body: unknown, status = 200): Response =>
+    new Response(JSON.stringify(body), {
+      status,
+      headers: { ...CORS, 'Content-Type': 'application/json' },
+    })
+
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: CORS_HEADERS })
+    return new Response('ok', { headers: CORS })
   }
   if (req.method !== 'POST') {
     return json({ error: 'method_not_allowed' }, 405)
