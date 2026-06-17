@@ -2504,6 +2504,79 @@ END;
 $$;
 
 
+-- ============================================================
+-- 0044 — Portal: editar/cancelar solicitacao via RPC SECURITY DEFINER
+-- ============================================================
+-- O parceiro NAO tem policy de SELECT em solicitacoes (le so a view
+-- portal_solicitacoes). No Postgres, UPDATE ... WHERE id=... so acha a linha se
+-- ela for visivel via SELECT; sem isso, edicao e cancelamento do parceiro
+-- afetavam 0 linhas SEM erro. Rotamos a escrita por funcoes SECURITY DEFINER
+-- (rodam como dono, bypass de RLS) que validam posse + status no corpo, sem
+-- expor colunas internas. Idempotente.
+CREATE OR REPLACE FUNCTION portal_editar_solicitacao(
+  p_id uuid, p_motorista uuid, p_veiculo uuid, p_carreta uuid,
+  p_primeira_carreta uuid, p_dolly uuid, p_subcontratada uuid, p_cliente uuid,
+  p_pamcard_status text, p_pamcard_numero text, p_observacoes text
+)
+RETURNS uuid
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_parceiro uuid := get_current_parceiro_id();
+BEGIN
+  IF v_parceiro IS NULL THEN
+    RAISE EXCEPTION 'Sessao de parceiro nao identificada.' USING ERRCODE = '42501';
+  END IF;
+  UPDATE solicitacoes SET
+    parceiro_motorista_id        = p_motorista,
+    parceiro_veiculo_id          = p_veiculo,
+    parceiro_carreta_id          = p_carreta,
+    parceiro_primeira_carreta_id = p_primeira_carreta,
+    parceiro_dolly_id            = p_dolly,
+    parceiro_subcontratada_id    = p_subcontratada,
+    cliente_id                   = p_cliente,
+    pamcard_status               = p_pamcard_status,
+    pamcard_numero               = p_pamcard_numero,
+    observacoes                  = p_observacoes
+  WHERE id = p_id AND origem = 'parceiro'
+    AND parceiro_id = v_parceiro AND status = 'recebida';
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Solicitacao nao encontrada ou nao editavel (ja em processamento).'
+      USING ERRCODE = 'PT409';
+  END IF;
+  RETURN p_id;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION portal_cancelar_solicitacao(p_id uuid)
+RETURNS uuid
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_parceiro uuid := get_current_parceiro_id();
+BEGIN
+  IF v_parceiro IS NULL THEN
+    RAISE EXCEPTION 'Sessao de parceiro nao identificada.' USING ERRCODE = '42501';
+  END IF;
+  UPDATE solicitacoes SET status = 'cancelada'
+  WHERE id = p_id AND origem = 'parceiro'
+    AND parceiro_id = v_parceiro AND status = 'recebida';
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Solicitacao nao encontrada ou nao cancelavel (ja em processamento).'
+      USING ERRCODE = 'PT409';
+  END IF;
+  RETURN p_id;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION portal_editar_solicitacao(uuid,uuid,uuid,uuid,uuid,uuid,uuid,uuid,text,text,text) FROM public;
+REVOKE ALL ON FUNCTION portal_cancelar_solicitacao(uuid) FROM public;
+GRANT EXECUTE ON FUNCTION portal_editar_solicitacao(uuid,uuid,uuid,uuid,uuid,uuid,uuid,uuid,text,text,text) TO authenticated;
+GRANT EXECUTE ON FUNCTION portal_cancelar_solicitacao(uuid) TO authenticated;
+
+
 -- =====================================================================
 -- 12. Operacional / vinculos de usuario (one-time setup)
 -- =====================================================================
