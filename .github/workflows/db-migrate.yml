@@ -47,22 +47,14 @@ jobs:
       - uses: supabase/setup-cli@v1
         with:
           version: latest
-      - name: Diagnostico da API (temporario)
-        run: |
-          echo "Tamanho do access token (chars): ${#SUPABASE_ACCESS_TOKEN}"
-          echo "Tamanho do db password (chars): ${#SUPABASE_DB_PASSWORD}"
-          echo "[1] api.supabase.com SEM auth:"
-          curl -s -o /dev/null -w "  http_code=%{http_code} time=%{time_total}s\n" \
-            "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_ID" || echo "  curl erro $?"
-          echo "[2] api.github.com (controle de rede):"
-          curl -s -o /dev/null -w "  http_code=%{http_code} time=%{time_total}s\n" \
-            "https://api.github.com" || echo "  curl erro $?"
-          echo "[3] api.supabase.com COM auth (verboso, sem vazar token):"
-          curl -sS -o /dev/null \
-            "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_ID" \
-            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" 2>&1 | head -5 || true
       - name: Link ao projeto remoto
-        run: supabase link --project-ref "$SUPABASE_PROJECT_ID" --debug
+        run: supabase link --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Reconciliacao one-off do historico (REMOVER apos rodar 1x)
+        run: |
+          echo "Marca como aplicadas as migrations que ja estavam no schema (via SQL Editor):"
+          supabase migration repair --status applied 0034 0035 0036 0037 0038 0039 0040 0041
+          echo "Aplica a unica genuinamente pendente (0032, idempotente):"
+          supabase db push --include-all
       - name: Migrations que seriam aplicadas
         run: |
           echo "Diferença local x remoto:"
