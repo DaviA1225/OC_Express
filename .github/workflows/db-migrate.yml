@@ -47,6 +47,14 @@ jobs:
       - uses: supabase/setup-cli@v1
         with:
           version: latest
+      - name: Diagnostico da API (temporario)
+        run: |
+          echo "Tamanho do access token (chars): ${#SUPABASE_ACCESS_TOKEN}"
+          echo "Tamanho do db password (chars): ${#SUPABASE_DB_PASSWORD}"
+          echo "Conectividade + status HTTP da Management API:"
+          curl -s -o /dev/null -w "  http_code=%{http_code} time=%{time_total}s\n" \
+            "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_ID" \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" || echo "  curl falhou (rede)"
       - name: Link ao projeto remoto
         run: supabase link --project-ref "$SUPABASE_PROJECT_ID" --debug
       - name: Migrations que seriam aplicadas
