@@ -49,12 +49,6 @@ jobs:
           version: latest
       - name: Link ao projeto remoto
         run: supabase link --project-ref "$SUPABASE_PROJECT_ID"
-      - name: Reconciliacao one-off do historico (REMOVER apos rodar 1x)
-        run: |
-          echo "Marca como aplicadas as migrations que ja estavam no schema (via SQL Editor):"
-          supabase migration repair --status applied 0034 0035 0036 0037 0038 0039 0040 0041
-          echo "Aplica a unica genuinamente pendente (0032, idempotente):"
-          supabase db push --include-all
       - name: Migrations que seriam aplicadas
         run: |
           echo "Diferença local x remoto:"
