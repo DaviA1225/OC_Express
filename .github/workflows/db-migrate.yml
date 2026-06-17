@@ -48,7 +48,7 @@ jobs:
         with:
           version: latest
       - name: Link ao projeto remoto
-        run: supabase link --project-ref "$SUPABASE_PROJECT_ID"
+        run: supabase link --project-ref "$SUPABASE_PROJECT_ID" --debug
       - name: Migrations que seriam aplicadas
         run: |
           echo "Diferença local x remoto:"
