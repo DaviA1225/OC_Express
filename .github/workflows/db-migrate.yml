@@ -51,10 +51,16 @@ jobs:
         run: |
           echo "Tamanho do access token (chars): ${#SUPABASE_ACCESS_TOKEN}"
           echo "Tamanho do db password (chars): ${#SUPABASE_DB_PASSWORD}"
-          echo "Conectividade + status HTTP da Management API:"
+          echo "[1] api.supabase.com SEM auth:"
           curl -s -o /dev/null -w "  http_code=%{http_code} time=%{time_total}s\n" \
+            "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_ID" || echo "  curl erro $?"
+          echo "[2] api.github.com (controle de rede):"
+          curl -s -o /dev/null -w "  http_code=%{http_code} time=%{time_total}s\n" \
+            "https://api.github.com" || echo "  curl erro $?"
+          echo "[3] api.supabase.com COM auth (verboso, sem vazar token):"
+          curl -sS -o /dev/null \
             "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_ID" \
-            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" || echo "  curl falhou (rede)"
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" 2>&1 | head -5 || true
       - name: Link ao projeto remoto
         run: supabase link --project-ref "$SUPABASE_PROJECT_ID" --debug
       - name: Migrations que seriam aplicadas
