@@ -62,6 +62,13 @@ export function podeCancelar(status: SolicitacaoStatus | null): boolean {
   return status === 'recebida'
 }
 
+/** O parceiro só pode editar enquanto a solicitação ainda está em `recebida`
+ *  (antes de a LHG começar a processar). A policy RLS garante a regra no banco
+ *  — aqui é só a UI. Editar a mesma linha preserva a posição na fila. */
+export function podeEditar(status: SolicitacaoStatus | null): boolean {
+  return status === 'recebida'
+}
+
 // --- Filtro de status (agrupa os status internos como o parceiro os enxerga) ---
 
 export type StatusFiltro =

@@ -4,7 +4,7 @@ import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import {
   AlertTriangle, ChevronLeft, ChevronRight, ChevronDown,
-  Eraser, Inbox, LogIn, LogOut, FileText, X, KeyRound,
+  Eraser, Inbox, LogIn, LogOut, FileText, FilePen, X, KeyRound,
   ShieldAlert, UserPlus, UserMinus, Circle,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -352,6 +352,7 @@ const TIPO_VISUAL: Record<TipoEventoPortal, { className: string; icon: React.Rea
   portal_login_falha: { className: 'bg-red-100 text-red-800', icon: <AlertTriangle className="h-3 w-3" /> },
   portal_logout: { className: 'bg-slate-100 text-slate-700', icon: <LogOut className="h-3 w-3" /> },
   portal_solicitacao_criada: { className: 'bg-blue-100 text-blue-800', icon: <FileText className="h-3 w-3" /> },
+  portal_solicitacao_editada: { className: 'bg-indigo-100 text-indigo-800', icon: <FilePen className="h-3 w-3" /> },
   portal_solicitacao_cancelada: { className: 'bg-amber-100 text-amber-800', icon: <X className="h-3 w-3" /> },
   portal_senha_alterada: { className: 'bg-purple-100 text-purple-800', icon: <KeyRound className="h-3 w-3" /> },
   portal_usuario_convidado: { className: 'bg-teal-100 text-teal-800', icon: <UserPlus className="h-3 w-3" /> },

@@ -179,6 +179,45 @@ export function useCriarSolicitacao() {
   })
 }
 
+export interface EditarSolicitacaoInput extends NovaSolicitacaoInput {
+  id: string
+}
+
+/** Edita uma solicitação ainda não processada. A RLS só permite enquanto
+ *  `status='recebida'` e mantendo o mesmo parceiro/origem — editar a mesma
+ *  linha preserva `created_at`/`numero_interno`, então a fila não muda. */
+export function useEditarSolicitacao() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: EditarSolicitacaoInput): Promise<string> => {
+      const { id, ...campos } = input
+      const { error } = await supabase
+        .from('solicitacoes')
+        .update({
+          parceiro_motorista_id: campos.parceiro_motorista_id,
+          parceiro_veiculo_id: campos.parceiro_veiculo_id,
+          parceiro_carreta_id: campos.parceiro_carreta_id,
+          parceiro_primeira_carreta_id: campos.parceiro_primeira_carreta_id,
+          parceiro_dolly_id: campos.parceiro_dolly_id,
+          parceiro_subcontratada_id: campos.parceiro_subcontratada_id,
+          cliente_id: campos.cliente_id,
+          pamcard_status: campos.pamcard_status,
+          pamcard_numero: campos.pamcard_numero,
+          observacoes: campos.observacoes,
+        } as never)
+        .eq('id', id)
+      if (error) throw error
+      return id
+    },
+    onSuccess: (id) => {
+      qc.invalidateQueries({ queryKey: ['portal-solicitacoes'] })
+      void registrarEvento('portal_solicitacao_editada', { solicitacao_id: id })
+      toast.success('Solicitação atualizada')
+    },
+    onError: (e: unknown) => toast.error(traduzirErroBanco(e)),
+  })
+}
+
 // --- Download da OC ----------------------------------------------------------
 
 /** Extrai o corpo JSON de um erro de Edge Function (FunctionsHttpError guarda
