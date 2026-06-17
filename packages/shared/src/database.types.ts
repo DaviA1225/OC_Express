@@ -752,6 +752,26 @@ export interface Database {
         Args: Record<string, never>
         Returns: string | null
       }
+      portal_editar_solicitacao: {
+        Args: {
+          p_id: string
+          p_motorista: string
+          p_veiculo: string
+          p_carreta: string | null
+          p_primeira_carreta: string | null
+          p_dolly: string | null
+          p_subcontratada: string | null
+          p_cliente: string
+          p_pamcard_status: string
+          p_pamcard_numero: string | null
+          p_observacoes: string | null
+        }
+        Returns: string
+      }
+      portal_cancelar_solicitacao: {
+        Args: { p_id: string }
+        Returns: string
+      }
     }
     Enums: Record<string, never>
   }
