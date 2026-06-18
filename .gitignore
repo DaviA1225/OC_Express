@@ -28,3 +28,6 @@ node_modules/
 # Supabase
 supabase/.temp/
 supabase/.claude/
+
+# Pasta de trabalho do backfill de PDFs (originais/processados/previews)
+backfill/
