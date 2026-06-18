@@ -67,8 +67,8 @@ interface RawPendencia {
 export function useNotifications() {
   return useQuery({
     queryKey: ['notifications'],
-    refetchInterval: 60_000,
-    refetchIntervalInBackground: true,
+    refetchInterval: 120_000,
+    refetchIntervalInBackground: false,
     staleTime: 30_000,
     queryFn: async (): Promise<NotificationItem[]> => {
       const cutoffSlaAtraso = isoNowMinusHours(SLA_ALERT_HOURS)

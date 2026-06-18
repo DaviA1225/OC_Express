@@ -12,8 +12,8 @@ export type Pendencia = Tables<'solicitacao_pendencias'>
 export function usePendenciasAbertas() {
   return useQuery({
     queryKey: ['pendencias-abertas'],
-    refetchInterval: 60_000,
-    refetchIntervalInBackground: true,
+    refetchInterval: 120_000,
+    refetchIntervalInBackground: false,
     queryFn: async (): Promise<Pendencia[]> => {
       const { data, error } = await supabase
         .from('solicitacao_pendencias')
@@ -31,8 +31,8 @@ export function usePendenciaAberta(solicitacaoId: string | undefined) {
   return useQuery({
     queryKey: ['pendencia-aberta', solicitacaoId],
     enabled: !!solicitacaoId,
-    refetchInterval: 45_000,
-    refetchIntervalInBackground: true,
+    refetchInterval: 90_000,
+    refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
     queryFn: async (): Promise<Pendencia | null> => {
       const { data, error } = await supabase

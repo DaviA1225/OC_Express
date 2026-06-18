@@ -69,7 +69,7 @@ export function useClientesMapaMinerio(enabled = true) {
   return useQuery({
     enabled,
     queryKey: ['clientes-mapa-minerio'],
-    refetchInterval: 30_000,
+    refetchInterval: 60_000,
     queryFn: async (): Promise<ClienteMapaPonto[]> => {
       const { data: clientesData, error: clientesErr } = await supabase
         .from('clientes')

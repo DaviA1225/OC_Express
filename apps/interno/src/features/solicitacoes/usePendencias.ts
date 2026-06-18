@@ -16,8 +16,8 @@ export type PendenciaSinal = 'aguardando_parceiro' | 'parceiro_respondeu'
 export function usePendenciasSinais() {
   return useQuery({
     queryKey: ['pendencias', 'sinais'],
-    refetchInterval: 60_000,
-    refetchIntervalInBackground: true,
+    refetchInterval: 120_000,
+    refetchIntervalInBackground: false,
     queryFn: async (): Promise<Map<string, PendenciaSinal>> => {
       const { data, error } = await supabase
         .from('solicitacao_pendencias')
