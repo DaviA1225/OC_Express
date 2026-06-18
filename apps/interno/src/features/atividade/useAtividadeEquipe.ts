@@ -210,8 +210,8 @@ export function useAtividadeEquipe() {
   return useQuery({
     queryKey: ['atividade-equipe'],
     // Retrato do agora: revalida sozinho enquanto o painel está aberto.
-    refetchInterval: 30_000,
-    staleTime: 15_000,
+    refetchInterval: 60_000,
+    staleTime: 30_000,
     queryFn: async (): Promise<AtividadeEquipeResult> => {
       const desde = new Date(Date.now() - JANELA_DIAS * 86_400_000).toISOString()
       const [perfisRes, events] = await Promise.all([
