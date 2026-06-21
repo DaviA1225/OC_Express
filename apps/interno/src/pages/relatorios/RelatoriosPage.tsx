@@ -14,7 +14,7 @@ import {
   BarChart,
   Bar,
 } from 'recharts'
-import { ClipboardCheck, ClipboardList, Hourglass, Percent, Download, Loader2 } from 'lucide-react'
+import { ClipboardCheck, ClipboardList, Hourglass, Percent, Download, Loader2, AlertTriangle, RotateCcw } from 'lucide-react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { toast } from 'sonner'
@@ -51,7 +51,7 @@ const PRESETS: { value: PeriodoPreset; label: string }[] = [
 
 const VALID_PRESETS = PRESETS.map((p) => p.value)
 
-const MATERIAL_COLORS = ['#3b82f6', '#f59e0b', '#10b981', '#6366f1', '#ec4899', '#14b8a6', '#a855f7', '#f97316']
+const MATERIAL_COLORS = ['#FF5100', '#3b82f6', '#f59e0b', '#10b981', '#6366f1', '#ec4899', '#14b8a6', '#a855f7']
 
 export default function RelatoriosPage() {
   const [params, setParams] = useSearchParams()
@@ -177,33 +177,46 @@ export default function RelatoriosPage() {
         </div>
       </div>
 
+      {ds.isError && (
+        <div className="flex flex-col items-center justify-center gap-2 rounded-lg border bg-card py-16 text-center">
+          <AlertTriangle className="h-6 w-6 text-red-500" />
+          <p className="text-[14px] font-semibold text-foreground">Não foi possível carregar os relatórios</p>
+          <p className="max-w-sm text-[13px] text-muted-foreground">Verifique a conexão e tente novamente.</p>
+          <Button variant="outline" size="sm" onClick={() => { void ds.refetch() }} className="mt-1">
+            <RotateCcw className="h-4 w-4" /> Tentar de novo
+          </Button>
+        </div>
+      )}
+
+      {!ds.isError && (
+      <>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard
           label="Total de OCs"
           value={kpis?.total ?? 0}
-          icon={<ClipboardList className="h-4 w-4 text-blue-600" />}
-          accent="bg-blue-50"
+          icon={<ClipboardList className="h-4 w-4 text-foreground/70" />}
+          accent="bg-muted/60 border"
           isLoading={ds.isLoading}
         />
         <KpiCard
           label="Finalizadas"
           value={kpis?.finalizadas ?? 0}
-          icon={<ClipboardCheck className="h-4 w-4 text-emerald-600" />}
-          accent="bg-emerald-50"
+          icon={<ClipboardCheck className="h-4 w-4 text-foreground/70" />}
+          accent="bg-muted/60 border"
           isLoading={ds.isLoading}
         />
         <KpiCard
           label="Taxa de finalização"
           value={kpis ? `${(kpis.taxaFinalizacao * 100).toFixed(1)}%` : '—'}
-          icon={<Percent className="h-4 w-4 text-indigo-600" />}
-          accent="bg-indigo-50"
+          icon={<Percent className="h-4 w-4 text-foreground/70" />}
+          accent="bg-muted/60 border"
           isLoading={ds.isLoading}
         />
         <KpiCard
           label="Tempo médio (criada → finalizada)"
           value={kpis?.tempoMedioHoras != null ? `${kpis.tempoMedioHoras.toFixed(1)} h` : '—'}
-          icon={<Hourglass className="h-4 w-4 text-amber-600" />}
-          accent="bg-amber-50"
+          icon={<Hourglass className="h-4 w-4 text-foreground/70" />}
+          accent="bg-muted/60 border"
           isLoading={ds.isLoading}
         />
       </div>
@@ -240,6 +253,8 @@ export default function RelatoriosPage() {
       <Card title="Distribuição por material" subtitle="Participação de cada material no volume total">
         <MaterialDonut data={distribMaterial} isLoading={ds.isLoading} />
       </Card>
+      </>
+      )}
     </div>
   )
 }
@@ -335,9 +350,9 @@ function VolumeChart({ data, isLoading }: VolumeChartProps) {
     label: format(new Date(d.dia), 'dd/MM', { locale: ptBR }),
   }))
   return (
-    <div className="h-[260px] w-full">
+    <div className="h-[260px] w-full" role="group" aria-label="Volume diário de OCs criadas e finalizadas no período">
       <ResponsiveContainer>
-        <LineChart data={formatted} margin={{ top: 8, right: 16, left: -10, bottom: 0 }}>
+        <LineChart accessibilityLayer data={formatted} margin={{ top: 8, right: 16, left: -10, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
           <XAxis dataKey="label" tick={{ fontSize: 11 }} />
           <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
@@ -355,7 +370,7 @@ function VolumeChart({ data, isLoading }: VolumeChartProps) {
           <Line
             type="monotone"
             dataKey="total"
-            stroke="#3b82f6"
+            stroke="#FF5100"
             strokeWidth={2}
             dot={{ r: 2 }}
             activeDot={{ r: 4 }}
@@ -372,7 +387,7 @@ function VolumeChart({ data, isLoading }: VolumeChartProps) {
       </ResponsiveContainer>
       <div className="mt-2 flex items-center justify-center gap-4 text-[11px] text-muted-foreground">
         <span className="flex items-center gap-1.5">
-          <span className="h-1.5 w-3 rounded-full bg-[#3b82f6]" /> Total criadas
+          <span className="h-1.5 w-3 rounded-full bg-[#FF5100]" /> Total criadas
         </span>
         <span className="flex items-center gap-1.5">
           <span className="h-1.5 w-3 rounded-full bg-[#10b981]" /> Finalizadas
@@ -452,30 +467,30 @@ function TmaChart({ entries, isLoading }: TmaChartProps) {
   }))
   return (
     <div className="space-y-3">
-      <div className="h-[240px] w-full">
+      <div className="h-[240px] w-full" role="group" aria-label="Tempo médio até sair de cada status (média e mediana, em horas)">
         <ResponsiveContainer>
-          <BarChart data={data} margin={{ top: 8, right: 16, left: -10, bottom: 0 }}>
+          <BarChart accessibilityLayer data={data} margin={{ top: 8, right: 16, left: -10, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
             <XAxis dataKey="label" tick={{ fontSize: 11 }} interval={0} />
             <YAxis
               tick={{ fontSize: 11 }}
-              label={{ value: 'horas', angle: -90, position: 'insideLeft', fontSize: 11, fill: '#64748b' }}
+              label={{ value: 'horas', angle: -90, position: 'insideLeft', fontSize: 11, fill: '#6B7280' }}
             />
             <Tooltip
               contentStyle={{ fontSize: 12, borderRadius: 6 }}
               formatter={(value, name) => [`${Number(value).toFixed(1)} h`, name === 'media' ? 'Média' : 'Mediana']}
             />
-            <Bar dataKey="media" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-            <Bar dataKey="mediana" fill="#94a3b8" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="media" fill="#FF5100" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="mediana" fill="#6B7280" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>
       <div className="flex items-center justify-center gap-4 text-[11px] text-muted-foreground">
         <span className="flex items-center gap-1.5">
-          <span className="h-1.5 w-3 rounded-full bg-[#3b82f6]" /> Média
+          <span className="h-1.5 w-3 rounded-full bg-[#FF5100]" /> Média
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="h-1.5 w-3 rounded-full bg-[#94a3b8]" /> Mediana
+          <span className="h-1.5 w-3 rounded-full bg-[#6B7280]" /> Mediana
         </span>
       </div>
       <ul className="grid grid-cols-1 gap-1 text-[11px] text-muted-foreground sm:grid-cols-2 md:grid-cols-3">
@@ -511,7 +526,7 @@ function MaterialDonut({ data, isLoading }: MaterialDonutProps) {
   const chartData = data.map((d) => ({ name: d.label, value: d.total }))
   return (
     <div className="grid grid-cols-1 items-center gap-4 sm:grid-cols-[200px_1fr]">
-      <div className="relative h-[200px]">
+      <div className="relative h-[200px]" role="img" aria-label="Distribuição de OCs por material; detalhada na legenda ao lado">
         <ResponsiveContainer>
           <PieChart>
             <Pie data={chartData} dataKey="value" nameKey="name" innerRadius={55} outerRadius={85} paddingAngle={2} stroke="none">
