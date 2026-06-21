@@ -22,10 +22,13 @@ import {
   AlertTriangle,
   Inbox,
   ArrowRight,
+  RefreshCw,
+  Info,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Tooltip as UITooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   useRelatorioDataset,
   calcKPIs,
@@ -117,46 +120,73 @@ export default function DashboardPage() {
         <PeriodoTabs value={preset} onChange={setPreset} />
       </div>
 
-      {atrasadas > 0 && (
-        <Link
+      {/* Estado operacional — "agora" (herói da operação) */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <KpiCard
+          label="Pendentes em aberto"
+          hint="Solicitações ainda na fila: recebida, em emissão ou instrução emitida."
+          value={pendentesAtuais}
+          subValue="Fila aguardando atendimento"
+          icon={<Inbox className="h-[18px] w-[18px]" />}
+          accent="text-foreground/70"
+          isLoading={estado.isLoading}
+          isError={estado.isError}
+          onRetry={() => { void estado.refetch() }}
+          to="/solicitacoes?status=recebida,em_cadastro,instrucao_emitida"
+          size="lg"
+        />
+        <KpiCard
+          label="Atrasadas"
+          hint="Pendentes há mais de 8 horas — fora do prazo de atendimento."
+          value={atrasadas}
+          subValue={
+            atrasadas > 0
+              ? 'Pendentes há mais de 8 horas — prioridade'
+              : 'Nenhuma fora do prazo'
+          }
+          icon={<AlertTriangle className="h-[18px] w-[18px]" />}
+          accent="text-foreground/70"
+          isLoading={estado.isLoading}
+          isError={estado.isError}
+          onRetry={() => { void estado.refetch() }}
           to="/solicitacoes?atrasadas=1"
-          className="flex items-center gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-[13px] transition-colors hover:bg-red-100 dark:border-red-900/60 dark:bg-red-950/40 dark:hover:bg-red-950/60"
-        >
-          <AlertTriangle className="h-4 w-4 shrink-0 text-red-600 dark:text-red-400" />
-          <div className="min-w-0 flex-1">
-            <p className="font-medium text-red-800 dark:text-red-200">
-              {atrasadas} {atrasadas === 1 ? 'solicitação atrasada' : 'solicitações atrasadas'}
-            </p>
-            <p className="text-[11px] text-red-700/80 dark:text-red-300/80">
-              Pendentes há mais de 8 horas — atender com prioridade.
-            </p>
-          </div>
-          <ArrowRight className="h-4 w-4 shrink-0 text-red-600 dark:text-red-400" />
-        </Link>
-      )}
+          size="lg"
+          tone="alert"
+        />
+      </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* Volume no período (contexto histórico) */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <KpiCard
           label="Total de OCs"
+          hint="Solicitações criadas no período selecionado."
           value={kpis?.total}
           previous={kpisAnt?.total}
           icon={<ClipboardList className="h-4 w-4" />}
           accent="text-foreground/70"
           isLoading={ds.isLoading}
+          isError={ds.isError}
+          onRetry={() => { void ds.refetch() }}
+          to="/solicitacoes"
           higherIsBetter
         />
         <KpiCard
           label="Finalizadas"
+          hint="Solicitações concluídas no período."
           value={kpis?.finalizadas}
           subValue={kpis ? `${(kpis.taxaFinalizacao * 100).toFixed(0)}% de conclusão` : undefined}
           previous={kpisAnt?.finalizadas}
           icon={<ClipboardCheck className="h-4 w-4" />}
           accent="text-foreground/70"
           isLoading={ds.isLoading}
+          isError={ds.isError}
+          onRetry={() => { void ds.refetch() }}
+          to="/solicitacoes?status=finalizada"
           higherIsBetter
         />
         <KpiCard
           label="Tempo médio"
+          hint="Tempo médio da criação até a finalização da OC, no período."
           value={kpis?.tempoMedioHoras != null ? Number(kpis.tempoMedioHoras.toFixed(1)) : null}
           unit="h"
           subValue="Criada → finalizada"
@@ -164,49 +194,36 @@ export default function DashboardPage() {
           icon={<Hourglass className="h-4 w-4" />}
           accent="text-foreground/70"
           isLoading={ds.isLoading}
+          isError={ds.isError}
+          onRetry={() => { void ds.refetch() }}
+          to="/relatorios"
           higherIsBetter={false}
-        />
-        <KpiCard
-          label="Pendentes em aberto"
-          value={pendentesAtuais}
-          subValue="Estado atual da fila"
-          icon={<Inbox className="h-4 w-4" />}
-          accent="text-foreground/70"
-          isLoading={estado.isLoading}
         />
       </div>
 
       <Card title="Volume de OCs" subtitle={periodo.label}>
-        <VolumeChart data={porDia} isLoading={ds.isLoading} />
+        <VolumeChart data={porDia} isLoading={ds.isLoading} isError={ds.isError} onRetry={() => { void ds.refetch() }} />
       </Card>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card title="Solicitações por status" subtitle="Total acumulado">
-          <StatusDonut data={breakdown.data ?? []} isLoading={breakdown.isLoading} />
+          <StatusDonut data={breakdown.data ?? []} isLoading={breakdown.isLoading} isError={breakdown.isError} onRetry={() => { void breakdown.refetch() }} />
         </Card>
         <Card
           title="Top clientes"
           subtitle={periodo.label}
-          action={
-            <Link
-              to="/relatorios"
-              className="inline-flex items-center gap-1 text-[12px] font-medium text-primary hover:underline"
-            >
-              Ver relatórios
-              <ArrowRight className="h-3 w-3" />
-            </Link>
-          }
+          action={<VerRelatoriosLink />}
         >
-          <TopList items={topClientesItems} isLoading={ds.isLoading} emptyMessage="Sem clientes no período." />
+          <TopList items={topClientesItems} isLoading={ds.isLoading} isError={ds.isError} onRetry={() => { void ds.refetch() }} emptyMessage="Sem clientes no período." />
         </Card>
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Card title="Top motoristas" subtitle={periodo.label}>
-          <TopList items={topMotoristasItems} isLoading={ds.isLoading} emptyMessage="Sem motoristas no período." />
+        <Card title="Top motoristas" subtitle={periodo.label} action={<VerRelatoriosLink />}>
+          <TopList items={topMotoristasItems} isLoading={ds.isLoading} isError={ds.isError} onRetry={() => { void ds.refetch() }} emptyMessage="Sem motoristas no período." />
         </Card>
-        <Card title="Top subcontratadas" subtitle={periodo.label}>
-          <TopList items={topSubcontratadasItems} isLoading={ds.isLoading} emptyMessage="Sem subcontratadas no período." />
+        <Card title="Top subcontratadas" subtitle={periodo.label} action={<VerRelatoriosLink />}>
+          <TopList items={topSubcontratadasItems} isLoading={ds.isLoading} isError={ds.isError} onRetry={() => { void ds.refetch() }} emptyMessage="Sem subcontratadas no período." />
         </Card>
       </div>
     </div>
@@ -217,6 +234,18 @@ function addDays(d: Date, days: number): Date {
   const r = new Date(d)
   r.setDate(r.getDate() + days)
   return r
+}
+
+function VerRelatoriosLink() {
+  return (
+    <Link
+      to="/relatorios"
+      className="inline-flex items-center gap-1 text-[12px] font-medium text-primary hover:underline"
+    >
+      Ver relatórios
+      <ArrowRight className="h-3 w-3" />
+    </Link>
+  )
 }
 
 function PeriodoTabs({ value, onChange }: { value: PeriodoPreset; onChange: (v: PeriodoPreset) => void }) {
@@ -251,29 +280,59 @@ interface KpiCardProps {
   previous?: number | null | undefined
   icon: React.ReactNode
   accent: string
+  hint?: string
   isLoading: boolean
+  isError?: boolean
+  onRetry?: () => void
   higherIsBetter?: boolean
+  to?: string
+  size?: 'md' | 'lg'
+  tone?: 'default' | 'alert'
 }
 
 function KpiCard({
-  label, value, unit, subValue, previous, icon, accent, isLoading, higherIsBetter,
+  label, value, unit, subValue, previous, icon, accent, hint, isLoading,
+  isError, onRetry, higherIsBetter, to, size = 'md', tone = 'default',
 }: KpiCardProps) {
   const delta = computeDelta(value, previous)
-  return (
-    <div className="rounded-lg border bg-card p-4">
+  const isLg = size === 'lg'
+  const isAlert = tone === 'alert' && (value ?? 0) > 0
+  const interactive = !!to && !isError
+
+  const inner = (
+    <>
       <div className="flex items-start justify-between gap-2">
-        <p className="text-[11px] font-medium uppercase tracking-[0.5px] text-muted-foreground">
-          {label}
-        </p>
-        <span className={cn('flex h-8 w-8 items-center justify-center rounded-md border bg-muted/60', accent)}>
+        <div className="flex min-w-0 items-center gap-1.5">
+          <p className={cn(
+            'font-medium uppercase tracking-[0.5px]',
+            isLg ? 'text-[12px]' : 'text-[11px]',
+            isAlert ? 'text-red-700 dark:text-red-300' : 'text-muted-foreground',
+          )}>
+            {label}
+          </p>
+          {hint && <MetricHint text={hint} />}
+        </div>
+        <span className={cn(
+          'flex items-center justify-center rounded-md border',
+          isLg ? 'h-9 w-9' : 'h-8 w-8',
+          isAlert
+            ? 'border-red-200 bg-red-100 text-red-600 dark:border-red-900/60 dark:bg-red-950/50 dark:text-red-300'
+            : cn('bg-muted/60', accent),
+        )}>
           {icon}
         </span>
       </div>
       {isLoading ? (
-        <Skeleton className="mt-3 h-9 w-24" />
+        <Skeleton className={cn('mt-3', isLg ? 'h-11 w-28' : 'h-9 w-24')} />
+      ) : isError ? (
+        <KpiError onRetry={onRetry} />
       ) : (
         <div className="mt-2 flex items-baseline gap-1">
-          <span className="text-[28px] font-medium tabular-nums leading-none text-foreground">
+          <span className={cn(
+            'font-medium tabular-nums leading-none',
+            isLg ? 'text-[36px]' : 'text-[28px]',
+            isAlert ? 'text-red-700 dark:text-red-300' : 'text-foreground',
+          )}>
             {value == null ? '—' : value}
           </span>
           {unit && value != null && (
@@ -281,11 +340,76 @@ function KpiCard({
           )}
         </div>
       )}
-      {!isLoading && subValue && (
-        <p className="mt-1.5 text-[11px] text-muted-foreground">{subValue}</p>
+      {!isLoading && !isError && subValue && (
+        <p className={cn(
+          'mt-1.5 text-[11px]',
+          isAlert ? 'text-red-600/90 dark:text-red-300/80' : 'text-muted-foreground',
+        )}>
+          {subValue}
+        </p>
       )}
-      {!isLoading && delta != null && higherIsBetter !== undefined && (
+      {!isLoading && !isError && delta != null && higherIsBetter !== undefined && (
         <DeltaPill delta={delta} higherIsBetter={higherIsBetter} />
+      )}
+    </>
+  )
+
+  const base = cn(
+    'block rounded-lg border p-4 transition-colors',
+    isAlert ? 'border-red-200 bg-red-50 dark:border-red-900/60 dark:bg-red-950/30' : 'bg-card',
+    interactive && (isAlert
+      ? 'hover:bg-red-100 dark:hover:bg-red-950/50'
+      : 'hover:border-primary/40 hover:bg-muted/30'),
+  )
+
+  if (interactive && to) {
+    return (
+      <Link
+        to={to}
+        className={cn(base, 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring')}
+      >
+        {inner}
+      </Link>
+    )
+  }
+  return <div className={base}>{inner}</div>
+}
+
+function KpiError({ onRetry }: { onRetry?: () => void }) {
+  return (
+    <div className="mt-2">
+      <p className="flex items-center gap-1.5 text-[13px] font-medium text-red-700 dark:text-red-300">
+        <AlertTriangle className="h-3.5 w-3.5 shrink-0" /> Erro ao carregar
+      </p>
+      {onRetry && (
+        <button
+          type="button"
+          onClick={(e) => { e.preventDefault(); onRetry() }}
+          className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
+        >
+          <RefreshCw className="h-3 w-3" /> Tentar de novo
+        </button>
+      )}
+    </div>
+  )
+}
+
+function ChartError({ onRetry, height }: { onRetry?: () => void; height: number }) {
+  return (
+    <div
+      className="flex flex-col items-center justify-center gap-2 text-center"
+      style={{ height }}
+    >
+      <AlertTriangle className="h-5 w-5 text-red-500" />
+      <p className="text-[13px] font-medium text-foreground">Não foi possível carregar</p>
+      {onRetry && (
+        <button
+          type="button"
+          onClick={onRetry}
+          className="inline-flex items-center gap-1 text-[12px] font-medium text-primary hover:underline"
+        >
+          <RefreshCw className="h-3 w-3" /> Tentar de novo
+        </button>
       )}
     </div>
   )
@@ -335,6 +459,26 @@ function DeltaPill({
   )
 }
 
+function MetricHint({ text }: { text: string }) {
+  return (
+    <UITooltip>
+      <TooltipTrigger asChild>
+        <span
+          tabIndex={0}
+          aria-label={text}
+          onClick={(e) => { e.preventDefault(); e.stopPropagation() }}
+          className="inline-flex shrink-0 cursor-help text-muted-foreground/60 transition-colors hover:text-muted-foreground focus-visible:text-foreground focus-visible:outline-none"
+        >
+          <Info className="h-3 w-3" />
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="top" className="max-w-[220px] text-[12px] font-normal normal-case tracking-normal">
+        {text}
+      </TooltipContent>
+    </UITooltip>
+  )
+}
+
 interface CardProps {
   title: string
   subtitle?: string
@@ -360,10 +504,13 @@ function Card({ title, subtitle, action, children }: CardProps) {
 interface VolumeChartProps {
   data: { dia: string; total: number; finalizadas: number }[]
   isLoading: boolean
+  isError?: boolean
+  onRetry?: () => void
 }
 
-function VolumeChart({ data, isLoading }: VolumeChartProps) {
+function VolumeChart({ data, isLoading, isError, onRetry }: VolumeChartProps) {
   if (isLoading) return <Skeleton className="h-[260px] w-full" />
+  if (isError) return <ChartError onRetry={onRetry} height={260} />
   if (data.length === 0) {
     return (
       <div className="flex h-[240px] items-center justify-center text-[13px] text-muted-foreground">
@@ -376,9 +523,12 @@ function VolumeChart({ data, isLoading }: VolumeChartProps) {
     label: format(new Date(d.dia), 'dd/MM', { locale: ptBR }),
   }))
   return (
-    <div className="h-[260px] w-full">
+    <div className="h-[260px] w-full" role="group" aria-label="Volume de OCs por dia no período">
+      <p className="sr-only">
+        Gráfico de linha com o número de OCs criadas e finalizadas por dia no período selecionado.
+      </p>
       <ResponsiveContainer>
-        <LineChart data={formatted} margin={{ top: 8, right: 16, left: -10, bottom: 0 }}>
+        <LineChart accessibilityLayer data={formatted} margin={{ top: 8, right: 16, left: -10, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
           <XAxis dataKey="label" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
           <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
@@ -409,8 +559,9 @@ function VolumeChart({ data, isLoading }: VolumeChartProps) {
   )
 }
 
-function StatusDonut({ data, isLoading }: { data: StatusBreakdownItem[]; isLoading: boolean }) {
+function StatusDonut({ data, isLoading, isError, onRetry }: { data: StatusBreakdownItem[]; isLoading: boolean; isError?: boolean; onRetry?: () => void }) {
   if (isLoading) return <Skeleton className="h-[220px] w-full" />
+  if (isError) return <ChartError onRetry={onRetry} height={220} />
   if (data.length === 0) {
     return (
       <div className="flex h-[220px] items-center justify-center text-[13px] text-muted-foreground">
@@ -422,7 +573,7 @@ function StatusDonut({ data, isLoading }: { data: StatusBreakdownItem[]; isLoadi
   const chartData = data.map((d) => ({ name: STATUS_LABELS[d.status], value: d.count, status: d.status }))
   return (
     <div className="space-y-3">
-      <div className="relative h-[180px]">
+      <div className="relative h-[180px]" role="img" aria-label="Distribuição de solicitações por status; detalhada na legenda abaixo">
         <ResponsiveContainer>
           <PieChart>
             <Pie
@@ -473,10 +624,14 @@ function StatusDonut({ data, isLoading }: { data: StatusBreakdownItem[]; isLoadi
 function TopList({
   items,
   isLoading,
+  isError,
+  onRetry,
   emptyMessage,
 }: {
   items: TopItem[]
   isLoading: boolean
+  isError?: boolean
+  onRetry?: () => void
   emptyMessage: string
 }) {
   if (isLoading) {
@@ -488,6 +643,7 @@ function TopList({
       </div>
     )
   }
+  if (isError) return <ChartError onRetry={onRetry} height={180} />
   if (items.length === 0) {
     return (
       <div className="flex h-[180px] items-center justify-center text-[13px] text-muted-foreground">
