@@ -30,6 +30,7 @@ interface ComboboxProps {
   createNewLabel?: string
   disabled?: boolean
   allowClear?: boolean
+  ariaLabel?: string
 }
 
 export function Combobox({
@@ -44,6 +45,7 @@ export function Combobox({
   createNewLabel,
   disabled,
   allowClear = true,
+  ariaLabel,
 }: ComboboxProps) {
   const [open, setOpen] = React.useState(false)
   const [search, setSearch] = React.useState('')
@@ -56,6 +58,7 @@ export function Combobox({
           type="button"
           variant="outline"
           role="combobox"
+          aria-label={ariaLabel}
           aria-expanded={open}
           disabled={disabled}
           className={cn(

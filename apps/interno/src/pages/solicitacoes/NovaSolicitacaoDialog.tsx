@@ -404,6 +404,7 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, onCreated }: Props) 
                   <Label>Motorista *</Label>
                   <Combobox
                     options={motoristaOptions}
+                    ariaLabel="Motorista"
                     value={motoristaId || null}
                     onChange={(v) => setValue('motorista_id', v ?? '', { shouldValidate: true })}
                     placeholder="Buscar motorista por nome ou CPF"
@@ -422,6 +423,7 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, onCreated }: Props) 
                     <Label>Cavalo *</Label>
                     <Combobox
                       options={veiculoOptions}
+                      ariaLabel="Cavalo"
                       value={veiculoId || null}
                       onChange={(v) => setValue('veiculo_id', v ?? '', { shouldValidate: true })}
                       placeholder="Buscar pela placa"
@@ -440,6 +442,7 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, onCreated }: Props) 
                     <Combobox
                       options={carretaOptions}
                       value={carretaId}
+                      ariaLabel="Última carreta"
                       onChange={(v) => setValue('carreta_id', v, { shouldValidate: true })}
                       placeholder="Buscar pela placa"
                       searchPlaceholder="Buscar carreta"
@@ -459,6 +462,7 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, onCreated }: Props) 
                     <Combobox
                       options={carretaOptions}
                       value={primeiraCarretaId}
+                      ariaLabel="Primeira carreta"
                       onChange={(v) => setValue('primeira_carreta_id', v, { shouldValidate: true })}
                       placeholder="Opcional"
                       searchPlaceholder="Buscar carreta"
@@ -473,6 +477,7 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, onCreated }: Props) 
                     <Combobox
                       options={carretaOptions}
                       value={dollyId}
+                      ariaLabel="Dolly"
                       onChange={(v) => setValue('dolly_id', v, { shouldValidate: true })}
                       placeholder="Opcional"
                       searchPlaceholder="Buscar dolly"
@@ -491,6 +496,7 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, onCreated }: Props) 
                   <Label>Subcontratada *</Label>
                   <Combobox
                     options={subcontratadaOptions}
+                    ariaLabel="Subcontratada"
                     value={subcontratadaId}
                     onChange={(v) => setValue('subcontratada_id', v, { shouldValidate: true })}
                     placeholder="Pré-preenchida pelo cavalo"
@@ -513,6 +519,7 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, onCreated }: Props) 
                     <Label>Cliente *</Label>
                     <Combobox
                       options={clienteOptions}
+                      ariaLabel="Cliente"
                       value={watch('cliente_id') || null}
                       onChange={(v) => setValue('cliente_id', v ?? '', { shouldValidate: true })}
                       placeholder="Buscar cliente"
@@ -532,7 +539,7 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, onCreated }: Props) 
                       value={materialSubtipo ?? undefined}
                       onValueChange={(v) => setValue('material_subtipo', v as MaterialSubtipo, { shouldValidate: true })}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger aria-label="Tipo de minério">
                         <SelectValue placeholder="SINTER · HEMATITA · LUMP" />
                       </SelectTrigger>
                       <SelectContent>
@@ -556,7 +563,7 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, onCreated }: Props) 
                       value={localCarregamento || undefined}
                       onValueChange={(v) => setValue('local_carregamento', v, { shouldValidate: true })}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger aria-label="Local de carregamento">
                         <SelectValue placeholder="Selecionar local" />
                       </SelectTrigger>
                       <SelectContent>
@@ -576,6 +583,7 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, onCreated }: Props) 
                     <Label>Carga de retorno *</Label>
                     <Combobox
                       options={cargaRetornoOptions}
+                    ariaLabel="Carga de retorno"
                       value={cargaRetornoId}
                       onChange={(v) => setValue('carga_retorno_id', v, { shouldValidate: true })}
                       placeholder="Buscar carga de retorno"
