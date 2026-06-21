@@ -141,6 +141,8 @@ export default function SubcontratadasPage() {
         }
         rows={list.data?.data}
         isLoading={list.isLoading}
+        isError={list.isError}
+        onRetry={() => { void list.refetch() }}
         totalActive={totalActive.data ?? 0}
         searchValue={state.search}
         onSearchChange={state.setSearch}
