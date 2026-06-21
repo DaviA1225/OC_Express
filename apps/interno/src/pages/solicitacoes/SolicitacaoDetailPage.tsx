@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
-import { AlertCircle, ArrowLeft, CheckCircle2, ChevronLeft, ChevronRight, Copy, CreditCard, Loader2, Mail, MessageCircle, Pencil, RotateCcw, Undo2, X } from 'lucide-react'
+import { AlertCircle, ArrowLeft, CheckCircle2, ChevronLeft, ChevronRight, Copy, CreditCard, Loader2, Mail, MessageCircle, MoreHorizontal, Pencil, RotateCcw, Undo2, X } from 'lucide-react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { toast } from 'sonner'
@@ -18,6 +18,9 @@ import {
   Dialog, DialogContent, DialogHeader, DialogBody, DialogFooter, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
+import {
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
+} from '@/components/ui/dropdown-menu'
 import { SolicitacaoStatusBadge } from '@/components/shared/SolicitacaoStatusBadge'
 import {
   useSolicitacao,
@@ -101,6 +104,22 @@ export function SolicitacaoDetailPage() {
         <Skeleton className="h-6 w-1/3" />
         <Skeleton className="h-32 w-full" />
         <Skeleton className="h-32 w-full" />
+      </div>
+    )
+  }
+
+  if (detail.isError) {
+    return (
+      <div className="rounded-lg border bg-card p-6 text-center text-[13px] text-muted-foreground">
+        <AlertCircle className="mx-auto mb-2 h-6 w-6 text-red-500" />
+        <p className="font-medium text-foreground">Não foi possível carregar a solicitação.</p>
+        <p className="mt-1">Verifique a conexão e tente novamente.</p>
+        <div className="mt-3 flex items-center justify-center gap-2">
+          <Button variant="outline" onClick={() => { void detail.refetch() }}>
+            <RotateCcw className="h-4 w-4" /> Tentar de novo
+          </Button>
+          <Button variant="ghost" onClick={() => navigate('/solicitacoes')}>Voltar</Button>
+        </div>
       </div>
     )
   }
@@ -241,60 +260,45 @@ export function SolicitacaoDetailPage() {
               bloquearAvanco={materialPendente}
             />
           )}
-          {podeDevolver && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setOpenDevolver(true)}
-              disabled={devolver.isPending}
-              title="Devolver ao parceiro para resolver uma pendência (ex.: documento do veículo)"
-              className="border-orange-300 text-orange-700 hover:bg-orange-50 dark:border-orange-900/60 dark:text-orange-300 dark:hover:bg-orange-950/40"
-            >
-              <Undo2 className="h-4 w-4" />
-              Devolver ao parceiro
-            </Button>
-          )}
           {canEdit && canCancel(s.status) && (
             <Button variant="ghost" size="sm" onClick={() => setConfirmCancel(true)} className="text-destructive hover:text-destructive">
               <X className="h-4 w-4" />
               Cancelar
             </Button>
           )}
-          {canEdit && s.status === 'finalizada' && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setConfirmReabrir(true)}
-              disabled={transit.isPending}
-              title="Voltar status para 'Em emissão' para corrigir dados"
-            >
-              <RotateCcw className="h-4 w-4" />
-              Reabrir para correção
-            </Button>
-          )}
-          {canEdit && s.status === 'cancelada' && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setConfirmReativar(true)}
-              disabled={transit.isPending}
-              title="Voltar status para 'Recebida' para retomar o fluxo"
-            >
-              <RotateCcw className="h-4 w-4" />
-              Reativar
-            </Button>
-          )}
           {canEdit && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setConfirmDuplicate(true)}
-              disabled={duplicate.isPending}
-              title="Duplicar solicitação"
-            >
-              {duplicate.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Copy className="h-4 w-4" />}
-              Duplicar
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" title="Mais ações">
+                  <MoreHorizontal className="h-4 w-4" />
+                  <span className="hidden sm:inline">Mais</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                {podeDevolver && (
+                  <DropdownMenuItem onSelect={() => setOpenDevolver(true)} disabled={devolver.isPending}>
+                    <Undo2 className="mr-2 h-4 w-4" />
+                    Devolver ao parceiro
+                  </DropdownMenuItem>
+                )}
+                {s.status === 'finalizada' && (
+                  <DropdownMenuItem onSelect={() => setConfirmReabrir(true)} disabled={transit.isPending}>
+                    <RotateCcw className="mr-2 h-4 w-4" />
+                    Reabrir para correção
+                  </DropdownMenuItem>
+                )}
+                {s.status === 'cancelada' && (
+                  <DropdownMenuItem onSelect={() => setConfirmReativar(true)} disabled={transit.isPending}>
+                    <RotateCcw className="mr-2 h-4 w-4" />
+                    Reativar
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem onSelect={() => setConfirmDuplicate(true)} disabled={duplicate.isPending}>
+                  <Copy className="mr-2 h-4 w-4" />
+                  Duplicar
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
           <Button variant="outline" size="sm" onClick={() => navigate('/solicitacoes')}>
             <ArrowLeft className="h-4 w-4" />
@@ -570,7 +574,7 @@ function CardShell({
         <div className="flex items-center gap-2">
           <h2 className="text-[14px] font-medium text-foreground">{title}</h2>
           {saving && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-800">
+            <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
               <Loader2 className="h-2.5 w-2.5 animate-spin" />
               Salvando…
             </span>
