@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Plus, Search as SearchIcon, Inbox, Eraser, ChevronLeft, ChevronRight, X, CheckSquare, Square, Download, Loader2, Trash2, Clock, Undo2, Reply, LayoutGrid, List as ListIcon } from 'lucide-react'
+import { Plus, Search as SearchIcon, Inbox, Eraser, ChevronLeft, ChevronRight, X, CheckSquare, Square, Download, Loader2, Trash2, Clock, Undo2, Reply, AlertTriangle, RefreshCw, LayoutGrid, List as ListIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -423,6 +423,7 @@ export function SolicitacoesListPage() {
           <button
             type="button"
             onClick={() => setApenasAtrasadas(!apenasAtrasadas)}
+            aria-pressed={apenasAtrasadas}
             className={cn(
               'inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] transition-colors',
               apenasAtrasadas
@@ -441,10 +442,11 @@ export function SolicitacoesListPage() {
                 key={s}
                 type="button"
                 onClick={() => toggleStatus(s)}
+                aria-pressed={active}
                 className={cn(
                   'rounded-full border px-2.5 py-0.5 text-[11px] transition-colors',
                   active
-                    ? 'border-primary bg-primary text-primary-foreground'
+                    ? `status-${s} border-transparent font-semibold`
                     : 'border-border bg-card text-muted-foreground hover:bg-muted',
                 )}
               >
@@ -468,7 +470,22 @@ export function SolicitacoesListPage() {
         </div>
       )}
 
-      {!list.isLoading && (list.data?.data.length ?? 0) === 0 && (
+      {!list.isLoading && list.isError && (
+        <div className="rounded-lg border bg-card py-2">
+          <EmptyState
+            icon={AlertTriangle}
+            title="Não foi possível carregar"
+            description="Houve um erro ao buscar as solicitações. Verifique a conexão e tente novamente."
+            action={
+              <Button variant="outline" onClick={() => { void list.refetch() }}>
+                <RefreshCw className="h-4 w-4" /> Tentar de novo
+              </Button>
+            }
+          />
+        </div>
+      )}
+
+      {!list.isLoading && !list.isError && (list.data?.data.length ?? 0) === 0 && (
         <div className="rounded-lg border bg-card py-2">
           <EmptyState
             icon={Inbox}
@@ -487,7 +504,7 @@ export function SolicitacoesListPage() {
         </div>
       )}
 
-      {!list.isLoading && (list.data?.data.length ?? 0) > 0 && (
+      {!list.isLoading && !list.isError && (list.data?.data.length ?? 0) > 0 && (
         <>
           {canBulk && (
             <div className="flex flex-wrap items-center gap-2">
@@ -617,8 +634,13 @@ function SolicitacaoCard({ row, sinalPendencia, selectable, selected, onToggleSe
   const sinal = ativa ? sinalPendencia : null
   return (
     <div
+      role="button"
+      tabIndex={0}
+      onClick={onOpen}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen() } }}
+      aria-label={`Abrir ${formatNumeroOC(row.numero_interno)}`}
       className={cn(
-        'rounded-lg border bg-card p-4 transition-all hover:border-primary/60 hover:bg-accent hover:shadow-md',
+        'cursor-pointer rounded-lg border bg-card p-4 transition-colors hover:border-primary/60 hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
         selectable && selected && 'border-primary bg-primary/5',
         !selected && sinal === 'parceiro_respondeu' && 'border-emerald-400 ring-1 ring-emerald-200 dark:border-emerald-700 dark:ring-emerald-900/50',
         !selected && sinal === 'aguardando_parceiro' && 'border-orange-300 dark:border-orange-900/60',
@@ -629,12 +651,15 @@ function SolicitacaoCard({ row, sinalPendencia, selectable, selected, onToggleSe
       <div className="flex items-start justify-between gap-2">
         <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
           {selectable && (
-          <Checkbox
-            checked={selected}
-            onCheckedChange={onToggleSelect}
-            aria-label={`Selecionar ${formatNumeroOC(row.numero_interno)}`}
-          />
+          <span onClick={(e) => e.stopPropagation()}>
+            <Checkbox
+              checked={selected}
+              onCheckedChange={onToggleSelect}
+              aria-label={`Selecionar ${formatNumeroOC(row.numero_interno)}`}
+            />
+          </span>
           )}
+          <span className="shrink-0 text-[14px] font-medium text-primary">{formatNumeroOC(row.numero_interno)}</span>
           {sinal && <PendenciaPop sinal={sinal} />}
           {row.origem === 'parceiro'
             && row.pamcard_status === 'nao_tem_cartao'
@@ -659,7 +684,6 @@ function SolicitacaoCard({ row, sinalPendencia, selectable, selected, onToggleSe
               via {row.parceiro?.razao_social ?? 'parceiro'}
             </span>
           )}
-          <span className="text-[14px] font-medium text-primary shrink-0">{formatNumeroOC(row.numero_interno)}</span>
           {row.solicitante_nome && (
             <span className="truncate text-[13px] text-muted-foreground" title={row.solicitante_nome}>
               · Solicitante: <span className="text-foreground">{row.solicitante_nome}</span>
@@ -698,7 +722,9 @@ function SolicitacaoCard({ row, sinalPendencia, selectable, selected, onToggleSe
           {created ? format(created, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR }) : '—'}
           {row.numero_instrucao ? ` · Instr. ${row.numero_instrucao}` : ''}
         </span>
-        <Button variant="outline" size="sm" onClick={onOpen}>Abrir</Button>
+        <span className="inline-flex items-center gap-0.5 text-[12px] font-medium text-primary">
+          Abrir <ChevronRight className="h-3.5 w-3.5" />
+        </span>
       </div>
     </div>
   )
@@ -831,7 +857,7 @@ function PendenciaPop({ sinal }: { sinal: PendenciaSinal }) {
         title="O parceiro respondeu a pendência e ainda não foi tratada"
       >
         <span className="relative flex h-2 w-2">
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-75" />
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-75 motion-reduce:animate-none" />
           <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
         </span>
         <Reply className="h-3 w-3" />
