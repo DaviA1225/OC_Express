@@ -29,5 +29,12 @@ node_modules/
 supabase/.temp/
 supabase/.claude/
 
+# Claude Code — settings pessoais/locais (o settings.json compartilhado é versionado)
+.claude/settings.local.json
+
 # Pasta de trabalho do backfill de PDFs (originais/processados/previews)
 backfill/
+
+# Impeccable — cache de runtime do hook (não versionar)
+.impeccable/hook.cache.json
+.impeccable/config.local.json
