@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Plus, Search as SearchIcon, ChevronLeft, ChevronRight, Inbox, Lock, Pencil, Power, Trash2 } from 'lucide-react'
+import { Plus, Search as SearchIcon, ChevronLeft, ChevronRight, Inbox, Lock, Pencil, Power, Trash2, AlertTriangle, RotateCcw } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
@@ -33,6 +33,8 @@ export interface CrudListPageProps<T extends { id: string; ativo: boolean }> {
   headerActions?: React.ReactNode
   rows: T[] | undefined
   isLoading: boolean
+  isError?: boolean
+  onRetry?: () => void
   totalActive: number
   searchValue: string
   onSearchChange: (v: string) => void
@@ -66,6 +68,8 @@ export function CrudListPage<T extends { id: string; ativo: boolean }>(props: Cr
     headerActions,
     rows,
     isLoading,
+    isError,
+    onRetry,
     totalActive,
     searchValue,
     onSearchChange,
@@ -137,7 +141,9 @@ export function CrudListPage<T extends { id: string; ativo: boolean }>(props: Cr
         <div>
           <h1 className="text-[22px] font-semibold tracking-tight text-foreground">{title}</h1>
           <p className="text-[12px] text-muted-foreground">
-            {totalActive} {totalActive === 1 ? 'ativo' : 'ativos'}
+            {searchValue.trim()
+              ? `${totalCount} ${totalCount === 1 ? 'resultado' : 'resultados'}`
+              : `${totalActive} ${totalActive === 1 ? 'ativo' : 'ativos'}`}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -254,7 +260,29 @@ export function CrudListPage<T extends { id: string; ativo: boolean }>(props: Cr
               </>
             )}
 
-            {!isLoading && rows && rows.length === 0 && (
+            {!isLoading && isError && (
+              <TableRow>
+                <TableCell
+                  colSpan={columns.length + (hasActions ? 1 : 0) + (selectable ? 1 : 0)}
+                  className="py-0"
+                >
+                  <div className="flex flex-col items-center justify-center gap-2 py-12 text-center">
+                    <AlertTriangle className="h-6 w-6 text-red-500" />
+                    <p className="text-[14px] font-semibold text-foreground">Não foi possível carregar</p>
+                    <p className="max-w-sm text-[13px] text-muted-foreground">
+                      Houve um erro ao buscar os registros. Verifique a conexão e tente novamente.
+                    </p>
+                    {onRetry && (
+                      <Button variant="outline" size="sm" onClick={onRetry} className="mt-1">
+                        <RotateCcw className="h-4 w-4" /> Tentar de novo
+                      </Button>
+                    )}
+                  </div>
+                </TableCell>
+              </TableRow>
+            )}
+
+            {!isLoading && !isError && rows && rows.length === 0 && (
               <TableRow>
                 <TableCell
                   colSpan={columns.length + (hasActions ? 1 : 0) + (selectable ? 1 : 0)}
@@ -269,10 +297,10 @@ export function CrudListPage<T extends { id: string; ativo: boolean }>(props: Cr
               </TableRow>
             )}
 
-            {!isLoading && rows?.map((row) => (
+            {!isLoading && !isError && rows?.map((row) => (
               <TableRow
                 key={row.id}
-                className={cn(!row.ativo && 'opacity-60', selectedIds.has(row.id) && 'bg-primary/5')}
+                className={cn(!row.ativo && 'bg-muted/40 text-muted-foreground', selectedIds.has(row.id) && 'bg-primary/5')}
               >
                 {selectable && (
                   <TableCell>

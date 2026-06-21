@@ -1,0 +1,9 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [
+      "apps/interno/src/features/pdf-generator/OCDocument.tsx"
+    ],
+    "ignoreValues": []
+  }
+}
