@@ -82,7 +82,7 @@ export function SidebarContent({ collapsed, onToggleCollapse, onNavigate, classN
   return (
     <aside
       className={cn(
-        'relative z-30 flex h-full flex-col border-r bg-background shadow-[6px_0_16px_-8px_rgba(0,0,0,0.18)]',
+        'relative z-30 flex h-full flex-col border-r bg-background',
         collapsed ? 'w-16' : 'w-[220px]',
         className,
       )}

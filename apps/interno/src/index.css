@@ -165,6 +165,28 @@ body.density-compact ul.divide-y > li {
   .label-uppercase {
     @apply text-[10px] font-medium uppercase tracking-[0.5px] text-muted-foreground;
   }
+
+  /* Escala CATEGÓRICA LHG — tons industriais foscos para taxonomias (papéis,
+     tipos de evento, tipos de frete). NÃO é status: os semânticos verde/vermelho/
+     âmbar continuam reservados a sucesso/erro/aviso. Família coesa de baixa
+     saturação, em vez dos pastéis genéricos do Tailwind. Cada classe traz bg +
+     texto + cor de borda (a borda só aparece onde o utilitário `border` é aplicado). */
+  .cat-steel    { background-color: #E2E8F0; color: #334155; border-color: #CBD5E1; } /* azul-aço frio */
+  .cat-ink      { background-color: #E7E4EE; color: #423B57; border-color: #D5CFE0; } /* violeta-grafite */
+  .cat-clay     { background-color: #F0E5DC; color: #6F4A2E; border-color: #E3D2C3; } /* terracota fosca */
+  .cat-sage     { background-color: #E7EDE3; color: #48553E; border-color: #D5DECF; } /* oliva fosca */
+  .cat-brass    { background-color: #EFE8D6; color: #6A562C; border-color: #E2D8BE; } /* ocre / latão */
+  /* Origem PARCEIRO — usa o azul do portal (#1E40AF) com presença, para a equipe
+     bater o olho. É a única categórica que carrega cor de marca (a do portal), não
+     um tom fosco: a origem externa precisa destacar. */
+  .cat-partner  { background-color: #1E40AF; color: #FFFFFF; border-color: #1E3A8A; }
+
+  .dark .cat-steel { background-color: rgba(100,116,139,0.20); color: #c3d0e2; border-color: rgba(148,163,184,0.25); }
+  .dark .cat-partner { background-color: #2949C4; color: #FFFFFF; border-color: #3A5AD6; }
+  .dark .cat-ink   { background-color: rgba(120,110,150,0.22); color: #cabfe0; border-color: rgba(120,110,150,0.30); }
+  .dark .cat-clay  { background-color: rgba(196,70,18,0.18);   color: #e0a585; border-color: rgba(196,70,18,0.30); }
+  .dark .cat-sage  { background-color: rgba(120,150,108,0.20); color: #bcd0ad; border-color: rgba(120,150,108,0.30); }
+  .dark .cat-brass { background-color: rgba(180,150,80,0.18);  color: #ddc99a; border-color: rgba(180,150,80,0.30); }
 }
 
 /* Mapa de clientes (Leaflet) — pin sem caixa branca e rótulo permanente */

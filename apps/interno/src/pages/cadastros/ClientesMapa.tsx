@@ -171,10 +171,10 @@ function PopupConteudo({ p }: { p: ClienteMapaPonto }) {
 
       <div className="flex flex-col gap-1">
         {p.aceita_cacamba && (
-          <FreteLinha label="Caçamba" value={p.frete_cacamba} className="bg-amber-50 text-amber-800 border-amber-200" />
+          <FreteLinha label="Caçamba" value={p.frete_cacamba} className="cat-brass" />
         )}
         {p.aceita_graneleiro && (
-          <FreteLinha label="Graneleiro" value={p.frete_graneleiro} className="bg-sky-50 text-sky-800 border-sky-200" />
+          <FreteLinha label="Graneleiro" value={p.frete_graneleiro} className="cat-steel" />
         )}
         {!p.aceita_cacamba && !p.aceita_graneleiro && (
           <span className="text-[11px] text-muted-foreground">Sem frete configurado</span>

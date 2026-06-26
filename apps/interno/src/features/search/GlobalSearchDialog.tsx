@@ -87,7 +87,7 @@ export function GlobalSearchDialog({ open, onOpenChange }: Props) {
         />
         <DialogPrimitive.Content
           className={cn(
-            'fixed left-[50%] top-[15%] z-50 w-full max-w-[640px] translate-x-[-50%] overflow-hidden rounded-xl border bg-popover shadow-overlay duration-150',
+            'fixed left-[50%] top-[15%] z-50 w-full max-w-[640px] translate-x-[-50%] overflow-hidden rounded-lg border bg-popover shadow-overlay duration-150',
             'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
           )}
         >

@@ -51,7 +51,9 @@ const PRESETS: { value: PeriodoPreset; label: string }[] = [
 
 const VALID_PRESETS = PRESETS.map((p) => p.value)
 
-const MATERIAL_COLORS = ['#FF5100', '#3b82f6', '#f59e0b', '#10b981', '#6366f1', '#ec4899', '#14b8a6', '#a855f7']
+// Paleta de séries harmonizada à LHG — laranja de marca + tons industriais foscos
+// (aço, ocre, oliva, violeta-grafite, terracota, grafite), em vez dos brights genéricos.
+const MATERIAL_COLORS = ['#FF5100', '#4E6986', '#9A6A3B', '#5E7A52', '#6E6594', '#C44612', '#3E4A5B', '#A6552F']
 
 export default function RelatoriosPage() {
   const [params, setParams] = useSearchParams()

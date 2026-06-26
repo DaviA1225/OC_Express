@@ -2,6 +2,19 @@
 export default {
   darkMode: ['class'],
   content: ['./index.html', './src/**/*.{ts,tsx}'],
+  // Classes .status-* são aplicadas dinamicamente (`status-${s}`) no filtro de
+  // solicitações, então o scanner do Tailwind não as enxerga e purgaria as variantes
+  // do modo claro (as do dark sobrevivem por causa da classe `dark`). Safelist garante
+  // que todas as cores de status estejam sempre no bundle, em claro e escuro.
+  safelist: [
+    'status-recebida',
+    'status-em_cadastro',
+    'status-instrucao_emitida',
+    'status-oc_gerada',
+    'status-oc_enviada',
+    'status-finalizada',
+    'status-cancelada',
+  ],
   theme: {
     container: {
       center: true,

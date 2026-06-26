@@ -58,7 +58,7 @@ export default function LoginPage() {
           </div>
 
           <h1 className="font-display text-[26px] font-semibold tracking-tight text-foreground">
-            Bem-vindo
+            Acessar o sistema
           </h1>
           <p className="mt-1 text-[13px] text-muted-foreground">
             Entre com suas credenciais para acessar o SisLog.
@@ -135,44 +135,29 @@ export default function LoginPage() {
 
 function BrandPanel() {
   return (
-    <aside className="relative hidden flex-col justify-between overflow-hidden bg-gradient-to-br from-[#C44612] from-0% via-[#3A1E10] via-15% to-[#1D1E1B] to-100% p-10 text-white lg:flex">
-      {/* Padrão decorativo sutil — círculos translúcidos */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-20"
-        style={{
-          backgroundImage:
-            'radial-gradient(circle at 20% 20%, rgba(255,255,255,0.15), transparent 40%), radial-gradient(circle at 80% 80%, rgba(255,255,255,0.08), transparent 35%)',
-        }}
-      />
-
-      <header className="relative">
-        <div className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-white/10 backdrop-blur-sm ring-1 ring-white/20">
-          <img src="/favicon.svg" alt="" aria-hidden className="h-7 w-7" />
-        </div>
+    <aside className="relative hidden flex-col justify-between overflow-hidden border-r border-white/10 bg-[#1D1E1B] p-10 text-white lg:flex">
+      <header className="flex items-center gap-2.5">
+        <img src="/favicon.svg" alt="" aria-hidden className="h-7 w-7 shrink-0" />
+        <span className="text-[15px] font-semibold tracking-tight">SisLog</span>
       </header>
 
-      <div className="relative space-y-8">
-        <div className="space-y-3">
-          <p className="text-[11px] font-medium uppercase tracking-[2px] text-white/70">
-            SisLog
-          </p>
-          <h2 className="max-w-md font-display text-[34px] font-semibold leading-[1.15] tracking-tight">
-            Gestão de carregamentos com agilidade operacional.
-          </h2>
-          <p className="max-w-md text-[14px] leading-relaxed text-white/80">
-            Centralize solicitações para emissão de ordens de carregamento e acompanhe a operação
-            em tempo real, tudo num só lugar.
-          </p>
-        </div>
+      <div className="space-y-6">
+        <div className="h-0.5 w-10 bg-primary" aria-hidden />
+        <h2 className="max-w-md font-display text-[32px] font-semibold leading-[1.15] tracking-tight">
+          Gestão de carregamentos com agilidade operacional.
+        </h2>
+        <p className="max-w-md text-[14px] leading-relaxed text-white/70">
+          Centralize solicitações para emissão de ordens de carregamento e acompanhe a operação
+          em tempo real, tudo num só lugar.
+        </p>
 
-        <ul className="grid max-w-md gap-3 text-[13px] text-white/85">
+        <ul className="grid max-w-md gap-2.5 border-t border-white/10 pt-5 text-[13px] text-white/75">
           <Feature icon={Truck}>Solicitações de OCs e cargas de retorno integradas</Feature>
           <Feature icon={Banknote}>Valores de frete por cliente sempre atualizados</Feature>
         </ul>
       </div>
 
-      <footer className="relative text-[11px] text-white/60">
+      <footer className="text-[11px] text-white/45">
         © {new Date().getFullYear()} — Sistema operacional interno.
       </footer>
     </aside>
@@ -181,10 +166,8 @@ function BrandPanel() {
 
 function Feature({ icon: Icon, children }: { icon: React.ComponentType<{ className?: string }>; children: React.ReactNode }) {
   return (
-    <li className="flex items-start gap-3">
-      <span className="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-white/10 ring-1 ring-white/15">
-        <Icon className="h-3.5 w-3.5" />
-      </span>
+    <li className="flex items-start gap-2.5">
+      <Icon className="mt-0.5 h-4 w-4 shrink-0 text-white/40" />
       <span>{children}</span>
     </li>
   )

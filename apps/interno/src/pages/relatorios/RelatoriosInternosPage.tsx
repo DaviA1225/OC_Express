@@ -125,7 +125,7 @@ export default function RelatoriosInternosPage() {
         </div>
       </div>
 
-      <p className="rounded-md border border-blue-100 bg-blue-50/60 px-3 py-2 text-[12px] leading-relaxed text-blue-900">
+      <p className="rounded-md border bg-muted/50 px-3 py-2 text-[12px] leading-relaxed text-muted-foreground">
         Considera as solicitações <strong>criadas no período</strong>. Cada coluna conta em quantas solicitações a
         pessoa executou aquela etapa (<em>Em emissão</em>, <em>Gerou OC</em>, <em>Enviou OC</em>, <em>Finalizou</em>),
         sem contar em dobro reaberturas. <em>Em aberto</em> = solicitações de parceiro que ela pôs em emissão e ainda
@@ -133,11 +133,11 @@ export default function RelatoriosInternosPage() {
       </p>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-        <KpiCard label="Solicitações no período" value={totais?.solicitacoesNoPeriodo ?? 0} icon={<ClipboardList className="h-4 w-4 text-blue-600" />} accent="bg-blue-50" isLoading={q.isLoading} />
-        <KpiCard label="De parceiros" value={totais?.deParceiro ?? 0} icon={<Handshake className="h-4 w-4 text-indigo-600" />} accent="bg-indigo-50" isLoading={q.isLoading} />
-        <KpiCard label="Finalizadas" value={totais?.finalizadas ?? 0} icon={<CheckCircle2 className="h-4 w-4 text-emerald-600" />} accent="bg-emerald-50" isLoading={q.isLoading} />
-        <KpiCard label="Ainda abertas" value={totais?.abertas ?? 0} icon={<AlarmClock className="h-4 w-4 text-amber-600" />} accent="bg-amber-50" isLoading={q.isLoading} />
-        <KpiCard label="Recebidas sem ninguém pegar" value={totais?.recebidasNaoIniciadas ?? 0} icon={<TriangleAlert className="h-4 w-4 text-red-600" />} accent="bg-red-50" isLoading={q.isLoading} highlight={(totais?.recebidasNaoIniciadas ?? 0) > 0} />
+        <KpiCard label="Solicitações no período" value={totais?.solicitacoesNoPeriodo ?? 0} icon={<ClipboardList className="h-4 w-4 text-muted-foreground" />} accent="bg-muted/60" isLoading={q.isLoading} />
+        <KpiCard label="De parceiros" value={totais?.deParceiro ?? 0} icon={<Handshake className="h-4 w-4 text-muted-foreground" />} accent="bg-muted/60" isLoading={q.isLoading} />
+        <KpiCard label="Finalizadas" value={totais?.finalizadas ?? 0} icon={<CheckCircle2 className="h-4 w-4 text-muted-foreground" />} accent="bg-muted/60" isLoading={q.isLoading} />
+        <KpiCard label="Ainda abertas" value={totais?.abertas ?? 0} icon={<AlarmClock className="h-4 w-4 text-muted-foreground" />} accent="bg-muted/60" isLoading={q.isLoading} />
+        <KpiCard label="Recebidas sem ninguém pegar" value={totais?.recebidasNaoIniciadas ?? 0} icon={<TriangleAlert className="h-4 w-4 text-red-600 dark:text-red-400" />} accent="bg-red-50 dark:bg-red-950/40" isLoading={q.isLoading} highlight={(totais?.recebidasNaoIniciadas ?? 0) > 0} />
       </div>
 
       {q.isError && (

@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Compass, Home } from 'lucide-react'
+import { ArrowLeft, Home } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 export default function NotFoundPage() {
@@ -7,14 +7,10 @@ export default function NotFoundPage() {
   return (
     <div className="flex min-h-[calc(100vh-3.5rem)] items-center justify-center px-4 py-12">
       <div className="w-full max-w-lg text-center">
-        <div className="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-primary to-[#1D1E1B] text-primary-foreground shadow-sm">
-          <Compass className="h-6 w-6" />
-        </div>
-
-        <p className="text-[12px] font-medium uppercase tracking-[2px] text-primary">
-          Erro 404
+        <p className="font-display text-[72px] font-semibold leading-none tracking-tight tabular-nums text-muted-foreground/40">
+          404
         </p>
-        <h1 className="mt-2 text-[28px] font-semibold tracking-tight text-foreground">
+        <h1 className="mt-3 text-[28px] font-semibold tracking-tight text-foreground">
           Página não encontrada
         </h1>
         <p className="mt-3 text-[14px] leading-relaxed text-muted-foreground">

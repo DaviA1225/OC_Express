@@ -45,7 +45,7 @@ function TipoBadge({ tipo }: { tipo: 'PF' | 'PJ' | null }) {
     <span
       className={cn(
         'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium tracking-[0.5px]',
-        tipo === 'PJ' ? 'bg-indigo-100 text-indigo-800' : 'bg-amber-100 text-amber-800',
+        tipo === 'PJ' ? 'cat-ink' : 'cat-brass',
       )}
     >
       {tipo}
