@@ -32,6 +32,7 @@ import {
   topAtendentes,
   porMaterial,
   tmaPorStatus,
+  parseDayKey,
   periodoFromPreset,
   type PeriodoPreset,
   type PeriodoRelatorio,
@@ -349,7 +350,7 @@ function VolumeChart({ data, isLoading }: VolumeChartProps) {
   }
   const formatted = data.map((d) => ({
     ...d,
-    label: format(new Date(d.dia), 'dd/MM', { locale: ptBR }),
+    label: format(parseDayKey(d.dia), 'dd/MM', { locale: ptBR }),
   }))
   return (
     <div className="h-[260px] w-full" role="group" aria-label="Volume diário de OCs criadas e finalizadas no período">
@@ -362,7 +363,7 @@ function VolumeChart({ data, isLoading }: VolumeChartProps) {
             contentStyle={{ fontSize: 12, borderRadius: 6 }}
             labelFormatter={(_, p) => {
               const item = p?.[0]?.payload as { dia: string } | undefined
-              return item?.dia ? format(new Date(item.dia), "dd 'de' MMMM", { locale: ptBR }) : ''
+              return item?.dia ? format(parseDayKey(item.dia), "dd 'de' MMMM", { locale: ptBR }) : ''
             }}
             formatter={(value, name) => [
               `${value ?? 0}`,
