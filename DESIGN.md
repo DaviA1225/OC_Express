@@ -33,6 +33,25 @@ colors:
   status-dark-oc-enviada-fg: "#6ee7b7"
   status-dark-finalizada-fg: "#a7f3d0"
   status-dark-cancelada-fg: "#fca5a5"
+  cat-steel-bg: "#E2E8F0"
+  cat-steel-fg: "#334155"
+  cat-ink-bg: "#E7E4EE"
+  cat-ink-fg: "#423B57"
+  cat-clay-bg: "#F0E5DC"
+  cat-clay-fg: "#6F4A2E"
+  cat-sage-bg: "#E7EDE3"
+  cat-sage-fg: "#48553E"
+  cat-brass-bg: "#EFE8D6"
+  cat-brass-fg: "#6A562C"
+  chart-series-2: "#4E6986"
+  chart-series-3: "#9A6A3B"
+  chart-series-4: "#5E7A52"
+  chart-series-5: "#6E6594"
+  chart-series-6: "#C44612"
+  chart-series-7: "#3E4A5B"
+  chart-series-8: "#A6552F"
+  cat-partner-dark-bg: "#2949C4"
+  cat-partner-dark-border: "#3A5AD6"
 typography:
   display:
     fontFamily: "Kanit, 'Wanted Sans', ui-sans-serif, system-ui, sans-serif"
@@ -149,6 +168,29 @@ progressão cinza → laranja → verde: **recebida** (#475569 sobre #F1F5F9) �
 #FEF3C7) → **OC gerada** (#8F3700 sobre #F4D4BD) → **OC enviada** (#065F46 sobre
 #D1FAE5) → **finalizada** (#064E3B sobre #A7F3D0). **cancelada** sai da escala
 (#991B1B sobre #FEE2E2).
+
+### Categórica (taxonomias, não status)
+Para distinguir **categorias** que não são status nem ação — tipos de evento de
+auditoria/segurança, papéis de usuário, tipos de frete — existe uma família de tons
+**industriais foscos**, de baixa saturação, no lugar dos pastéis genéricos do
+Tailwind (azul/indigo/roxo/teal/sky). Cada um é um par fundo-claro/texto-escuro
+(classes `.cat-*` em `index.css`, com variante dark):
+- **steel** (#334155 sobre #E2E8F0) — azul-aço frio.
+- **ink** (#423B57 sobre #E7E4EE) — violeta-grafite.
+- **clay** (#6F4A2E sobre #F0E5DC) — terracota fosca.
+- **sage** (#48553E sobre #E7EDE3) — oliva fosca.
+- **brass** (#6A562C sobre #EFE8D6) — ocre/latão.
+
+**Exceção — origem parceiro** (`.cat-partner`): a marca de "solicitação criada pelo
+parceiro" é a única categórica que **não** é fosca. Ela usa o **azul do portal**
+preenchido (#FFFFFF sobre #1E40AF) para destacar à vista — a origem externa precisa
+saltar, e o azul referencia a identidade do próprio portal de onde ela veio.
+
+Os **semânticos não migram**: verde (sucesso/criação), vermelho (erro/exclusão) e
+âmbar (aviso/cancelamento) continuam carregando significado e nunca viram cor
+categórica. Para **séries de gráfico** (multi-série), a paleta começa no laranja de
+marca e segue com os mesmos tons industriais um pouco mais saturados para legibilidade:
+`#FF5100, #4E6986, #9A6A3B, #5E7A52, #6E6594, #C44612, #3E4A5B, #A6552F`.
 
 ### Named Rules
 **A Regra da Voz Única.** O laranja (e, no portal, o azul) aparece em no máximo ~10%

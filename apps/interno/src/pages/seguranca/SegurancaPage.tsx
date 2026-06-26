@@ -350,13 +350,13 @@ function FilterChips({ label, options, value, onToggle }: FilterChipsProps) {
 const TIPO_VISUAL: Record<TipoEventoPortal, { className: string; icon: React.ReactNode }> = {
   portal_login: { className: 'bg-emerald-100 text-emerald-800', icon: <LogIn className="h-3 w-3" /> },
   portal_login_falha: { className: 'bg-red-100 text-red-800', icon: <AlertTriangle className="h-3 w-3" /> },
-  portal_logout: { className: 'bg-slate-100 text-slate-700', icon: <LogOut className="h-3 w-3" /> },
-  portal_solicitacao_criada: { className: 'bg-blue-100 text-blue-800', icon: <FileText className="h-3 w-3" /> },
-  portal_solicitacao_editada: { className: 'bg-indigo-100 text-indigo-800', icon: <FilePen className="h-3 w-3" /> },
+  portal_logout: { className: 'bg-muted text-muted-foreground', icon: <LogOut className="h-3 w-3" /> },
+  portal_solicitacao_criada: { className: 'cat-steel', icon: <FileText className="h-3 w-3" /> },
+  portal_solicitacao_editada: { className: 'cat-ink', icon: <FilePen className="h-3 w-3" /> },
   portal_solicitacao_cancelada: { className: 'bg-amber-100 text-amber-800', icon: <X className="h-3 w-3" /> },
-  portal_senha_alterada: { className: 'bg-purple-100 text-purple-800', icon: <KeyRound className="h-3 w-3" /> },
-  portal_usuario_convidado: { className: 'bg-teal-100 text-teal-800', icon: <UserPlus className="h-3 w-3" /> },
-  portal_usuario_excluido: { className: 'bg-rose-100 text-rose-800', icon: <UserMinus className="h-3 w-3" /> },
+  portal_senha_alterada: { className: 'cat-clay', icon: <KeyRound className="h-3 w-3" /> },
+  portal_usuario_convidado: { className: 'cat-sage', icon: <UserPlus className="h-3 w-3" /> },
+  portal_usuario_excluido: { className: 'bg-red-100 text-red-800', icon: <UserMinus className="h-3 w-3" /> },
 }
 
 const TIPO_VISUAL_FALLBACK = { className: 'bg-muted text-muted-foreground', icon: <Circle className="h-3 w-3" /> }

@@ -80,7 +80,7 @@ export function AnexosCard({ solicitacaoId, editable }: Props) {
             </span>
           )}
           {upload.isPending && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-800">
+            <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
               <Loader2 className="h-2.5 w-2.5 animate-spin" />
               Enviando…
             </span>

@@ -87,14 +87,14 @@ function FreteCell({ row }: { row: Row }) {
     items.push({
       label: 'Caçamba',
       value: row.frete_cacamba,
-      className: 'bg-amber-50 text-amber-800 border-amber-200',
+      className: 'cat-brass',
     })
   }
   if (row.aceita_graneleiro) {
     items.push({
       label: 'Graneleiro',
       value: row.frete_graneleiro,
-      className: 'bg-sky-50 text-sky-800 border-sky-200',
+      className: 'cat-steel',
     })
   }
   if (items.length === 0) {

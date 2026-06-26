@@ -475,10 +475,10 @@ function UsuarioFilter({ usuarios, value, onToggle }: UsuarioFilterProps) {
 function AcaoBadge({ acao }: { acao: AuditAcao }) {
   const map: Record<AuditAcao, { label: string; className: string; icon: React.ReactNode }> = {
     INSERT: { label: 'Criação', className: 'bg-emerald-100 text-emerald-800', icon: <Plus className="h-3 w-3" /> },
-    UPDATE: { label: 'Edição', className: 'bg-blue-100 text-blue-800', icon: <Pencil className="h-3 w-3" /> },
+    UPDATE: { label: 'Edição', className: 'cat-steel', icon: <Pencil className="h-3 w-3" /> },
     DELETE: { label: 'Exclusão', className: 'bg-red-100 text-red-800', icon: <Trash2 className="h-3 w-3" /> },
   }
-  const m = map[acao] ?? { label: acao, className: 'bg-slate-100 text-slate-700', icon: null }
+  const m = map[acao] ?? { label: acao, className: 'bg-muted text-muted-foreground', icon: null }
   return (
     <span className={cn('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium', m.className)}>
       {m.icon}

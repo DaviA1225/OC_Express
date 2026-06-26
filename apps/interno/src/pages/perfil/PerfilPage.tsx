@@ -27,11 +27,11 @@ const PERFIL_LABEL: Record<PerfilUsuario, string> = {
 }
 
 const PERFIL_CLASSES: Record<PerfilUsuario, string> = {
-  admin: 'bg-purple-100 text-purple-800',
-  gerente: 'bg-indigo-100 text-indigo-800',
-  supervisor: 'bg-blue-100 text-blue-800',
-  analista: 'bg-amber-100 text-amber-800',
-  assistente: 'bg-slate-100 text-slate-700',
+  admin: 'cat-clay',
+  gerente: 'cat-ink',
+  supervisor: 'cat-steel',
+  analista: 'cat-brass',
+  assistente: 'bg-muted text-muted-foreground',
 }
 
 const nomeSchema = z.object({

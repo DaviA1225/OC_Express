@@ -678,7 +678,7 @@ function SolicitacaoCard({ row, sinalPendencia, selectable, selected, onToggleSe
           )}
           {row.origem === 'parceiro' && (
             <span
-              className="max-w-[150px] shrink-0 truncate rounded bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-800 dark:bg-blue-950/60 dark:text-blue-300"
+              className="max-w-[150px] shrink-0 truncate rounded cat-partner px-2 py-0.5 text-[10px] font-medium"
               title={`Solicitação criada pelo parceiro ${row.parceiro?.razao_social ?? ''}`}
             >
               via {row.parceiro?.razao_social ?? 'parceiro'}
