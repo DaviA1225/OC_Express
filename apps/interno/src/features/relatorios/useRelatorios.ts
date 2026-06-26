@@ -46,17 +46,27 @@ export function useRelatorioDataset(periodo: PeriodoRelatorio) {
     queryKey: ['relatorio', periodo.desde, periodo.ate],
     staleTime: 60_000,
     queryFn: async (): Promise<RelatorioDataset> => {
-      const { data, error } = await supabase
-        .from('solicitacoes')
-        .select(
-          'id, numero_interno, status, tipo, created_at, finalizada_em, enviada_em, cliente_id, motorista_id, material_id, veiculo_id, subcontratada_id, atendente_id',
-        )
-        .gte('created_at', periodo.desde)
-        .lt('created_at', periodo.ate)
-        .order('created_at', { ascending: true })
-        .limit(10_000)
-      if (error) throw error
-      const rows = (data ?? []) as RelatorioRow[]
+      // O PostgREST limita cada resposta a ~1000 linhas (db-max-rows) e IGNORA
+      // .limit() acima disso. Como a ordenação é por created_at ascendente, sem
+      // paginar o relatório "trava" nas 1000 OCs mais antigas e some com os dias
+      // mais recentes. Paginamos em blocos para trazer todas as OCs do período.
+      const PAGE = 1000
+      const rows: RelatorioRow[] = []
+      for (let from = 0; ; from += PAGE) {
+        const { data, error } = await supabase
+          .from('solicitacoes')
+          .select(
+            'id, numero_interno, status, tipo, created_at, finalizada_em, enviada_em, cliente_id, motorista_id, material_id, veiculo_id, subcontratada_id, atendente_id',
+          )
+          .gte('created_at', periodo.desde)
+          .lt('created_at', periodo.ate)
+          .order('created_at', { ascending: true })
+          .range(from, from + PAGE - 1)
+        if (error) throw error
+        const batch = (data ?? []) as RelatorioRow[]
+        rows.push(...batch)
+        if (batch.length < PAGE) break
+      }
 
       const clienteIds = Array.from(new Set(rows.map((r) => r.cliente_id).filter(Boolean) as string[]))
       const motoristaIds = Array.from(new Set(rows.map((r) => r.motorista_id).filter(Boolean) as string[]))
@@ -141,31 +151,38 @@ export function useStatusTransitions(periodo: PeriodoRelatorio, solicitacaoIds: 
         chunks.push(solicitacaoIds.slice(i, i + 200))
       }
       const all: StatusTransition[] = []
+      const PAGE = 1000
       for (const ch of chunks) {
-        const { data, error } = await supabase
-          .from('log_auditoria')
-          .select('registro_id, dados_antes, dados_depois, created_at')
-          .eq('tabela', 'solicitacoes')
-          .eq('acao', 'UPDATE')
-          .in('registro_id', ch)
-          .order('created_at', { ascending: true })
-          .limit(20_000)
-        if (error) throw error
-        for (const l of (data ?? []) as Array<{
-          registro_id: string
-          dados_antes: { status?: string } | null
-          dados_depois: { status?: string } | null
-          created_at: string
-        }>) {
-          const prev = l.dados_antes?.status ?? null
-          const next = l.dados_depois?.status
-          if (!next || prev === next) continue
-          all.push({
-            registro_id: l.registro_id,
-            from_status: prev,
-            to_status: next,
-            at: l.created_at,
-          })
+        // Mesmo teto de ~1000 linhas do PostgREST: um chunk de 200 solicitações
+        // pode ter muito mais de 1000 transições no log. Paginamos cada chunk.
+        for (let from = 0; ; from += PAGE) {
+          const { data, error } = await supabase
+            .from('log_auditoria')
+            .select('registro_id, dados_antes, dados_depois, created_at')
+            .eq('tabela', 'solicitacoes')
+            .eq('acao', 'UPDATE')
+            .in('registro_id', ch)
+            .order('created_at', { ascending: true })
+            .range(from, from + PAGE - 1)
+          if (error) throw error
+          const batch = (data ?? []) as Array<{
+            registro_id: string
+            dados_antes: { status?: string } | null
+            dados_depois: { status?: string } | null
+            created_at: string
+          }>
+          for (const l of batch) {
+            const prev = l.dados_antes?.status ?? null
+            const next = l.dados_depois?.status
+            if (!next || prev === next) continue
+            all.push({
+              registro_id: l.registro_id,
+              from_status: prev,
+              to_status: next,
+              at: l.created_at,
+            })
+          }
+          if (batch.length < PAGE) break
         }
       }
       return all
@@ -303,6 +320,17 @@ function dayKey(d: Date): string {
   const m = String(d.getMonth() + 1).padStart(2, '0')
   const day = String(d.getDate()).padStart(2, '0')
   return `${y}-${m}-${day}`
+}
+
+/**
+ * Converte a chave de dia "YYYY-MM-DD" para um Date no fuso LOCAL.
+ * Use isto (e não `new Date(key)`) para exibir o dia: `new Date('2026-06-20')`
+ * é interpretado como UTC meia-noite e, em fusos negativos (Brasil, UTC-3),
+ * volta um dia no `format()` — exibindo "19/06" para a barra do dia 20.
+ */
+export function parseDayKey(key: string): Date {
+  const [y, m, d] = key.split('-').map(Number)
+  return new Date(y, m - 1, d)
 }
 
 export interface TopItem { id: string; label: string; total: number }
