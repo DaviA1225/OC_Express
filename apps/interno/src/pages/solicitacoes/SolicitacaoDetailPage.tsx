@@ -139,6 +139,9 @@ export function SolicitacaoDetailPage() {
 
   const s = detail.data
   const editable = isEditable(s.status) && canEdit
+  // Solicitações vindas do portal trazem solicitante, motorista e veículo
+  // definidos pelo parceiro — a equipe interna não edita esses dados aqui.
+  const isParceiro = s.origem === 'parceiro'
   // Solicitação de parceiro chega sem material definido; ele é obrigatório para
   // sair de "recebida" (constraint solicitacoes_material_obrigatorio_apos_cadastro).
   const materialPendente = s.origem === 'parceiro' && !s.material_id && s.tipo !== 'retorno'
@@ -309,8 +312,18 @@ export function SolicitacaoDetailPage() {
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">
-          <SolicitanteCard solicitacao={s} editable={editable} onSave={(values) => update.mutateAsync({ id: s.id, values })} />
-          <MotoristaVeiculoCard solicitacao={s} editable={editable} onSave={(values) => update.mutateAsync({ id: s.id, values })} />
+          <SolicitanteCard
+            solicitacao={s}
+            editable={editable && !isParceiro}
+            lockedHint={isParceiro && editable ? 'Solicitante enviado pelo parceiro — não editável aqui.' : null}
+            onSave={(values) => update.mutateAsync({ id: s.id, values })}
+          />
+          <MotoristaVeiculoCard
+            solicitacao={s}
+            editable={editable && !isParceiro}
+            lockedHint={isParceiro && editable ? 'Motorista e veículo enviados pelo parceiro — não editáveis aqui.' : null}
+            onSave={(values) => update.mutateAsync({ id: s.id, values })}
+          />
           <DestinoMaterialCard solicitacao={s} editable={editable} onSave={(values) => update.mutateAsync({ id: s.id, values })} />
           {/* Pamcard só aparece nas solicitações vindas do portal de parceiros —
               no fluxo interno o cartão é gerenciado fora da solicitação. */}
@@ -600,9 +613,11 @@ interface CardProps {
   solicitacao: ReturnType<typeof useSolicitacao>['data'] extends infer T ? NonNullable<T> : never
   editable: boolean
   onSave: (values: Partial<Tables<'solicitacoes'>>) => Promise<unknown>
+  /** Aviso mostrado quando a edição está bloqueada (ex.: dado veio do parceiro). */
+  lockedHint?: string | null
 }
 
-function SolicitanteCard({ solicitacao, editable, onSave }: CardProps) {
+function SolicitanteCard({ solicitacao, editable, onSave, lockedHint }: CardProps) {
   const [editing, setEditing] = React.useState(false)
   const [nome, setNome] = React.useState(solicitacao.solicitante_nome ?? '')
   const [tel, setTel] = React.useState(solicitacao.solicitante_telefone ?? '')
@@ -635,10 +650,13 @@ function SolicitanteCard({ solicitacao, editable, onSave }: CardProps) {
   return (
     <CardShell title="Solicitante" editable={editable} isEditing={editing} onEdit={() => setEditing(true)} onCancel={() => setEditing(false)} saving={saving}>
       {!editing ? (
-        <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-[13px]">
-          <Field label="Nome" value={solicitacao.solicitante_nome} />
-          <Field label="Telefone" value={solicitacao.solicitante_telefone} />
-        </dl>
+        <>
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-[13px]">
+            <Field label="Nome" value={solicitacao.solicitante_nome} />
+            <Field label="Telefone" value={solicitacao.solicitante_telefone} />
+          </dl>
+          {lockedHint && <p className="mt-3 text-[11px] text-muted-foreground">{lockedHint}</p>}
+        </>
       ) : (
         <div className="space-y-3">
           <div className="grid grid-cols-[1.4fr_1fr] gap-3">
@@ -670,7 +688,7 @@ function SolicitanteCard({ solicitacao, editable, onSave }: CardProps) {
   )
 }
 
-function MotoristaVeiculoCard({ solicitacao, editable, onSave }: CardProps) {
+function MotoristaVeiculoCard({ solicitacao, editable, onSave, lockedHint }: CardProps) {
   const [editing, setEditing] = React.useState(false)
   const [motorista, setMotorista] = React.useState<string | null>(solicitacao.motorista_id)
   const [veiculo, setVeiculo] = React.useState<string | null>(solicitacao.veiculo_id)
@@ -742,22 +760,25 @@ function MotoristaVeiculoCard({ solicitacao, editable, onSave }: CardProps) {
   return (
     <CardShell title="Motorista e veículo" editable={editable} isEditing={editing} onEdit={() => setEditing(true)} onCancel={() => setEditing(false)} saving={saving}>
       {!editing ? (
-        <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-[13px]">
-          <Field
-            label="Motorista"
-            value={solicitacao.motorista?.nome_completo}
-            extra={solicitacao.motorista?.cpf}
-          />
-          <Field
-            label="Subcontratada"
-            value={solicitacao.subcontratada?.razao_social}
-            extra={solicitacao.subcontratada?.documento}
-          />
-          <Field label="Cavalo" value={solicitacao.veiculo?.placa} />
-          <Field label="1ª Carreta" value={solicitacao.primeira_carreta?.placa} />
-          <Field label="Dolly" value={solicitacao.dolly?.placa} />
-          <Field label="Última Carreta" value={solicitacao.carreta?.placa} />
-        </dl>
+        <>
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-[13px]">
+            <Field
+              label="Motorista"
+              value={solicitacao.motorista?.nome_completo}
+              extra={solicitacao.motorista?.cpf}
+            />
+            <Field
+              label="Subcontratada"
+              value={solicitacao.subcontratada?.razao_social}
+              extra={solicitacao.subcontratada?.documento}
+            />
+            <Field label="Cavalo" value={solicitacao.veiculo?.placa} />
+            <Field label="1ª Carreta" value={solicitacao.primeira_carreta?.placa} />
+            <Field label="Dolly" value={solicitacao.dolly?.placa} />
+            <Field label="Última Carreta" value={solicitacao.carreta?.placa} />
+          </dl>
+          {lockedHint && <p className="mt-3 text-[11px] text-muted-foreground">{lockedHint}</p>}
+        </>
       ) : (
         <div className="space-y-3">
           <div className="space-y-1.5">
@@ -829,7 +850,6 @@ function formatDateBR(iso: string): string {
 function DestinoMaterialCard({ solicitacao, editable, onSave }: CardProps) {
   const [editing, setEditing] = React.useState(false)
   const [cliente, setCliente] = React.useState<string | null>(solicitacao.cliente_id)
-  const [material, setMaterial] = React.useState<string>(solicitacao.material_id ?? '')
   const [subtipo, setSubtipo] = React.useState<MaterialSubtipo | null>(solicitacao.material_subtipo)
   const [localCarreg, setLocalCarreg] = React.useState<string>(solicitacao.local_carregamento ?? '')
   const [valIni, setValIni] = React.useState<string>(solicitacao.validade_inicio ?? todayISO())
@@ -846,7 +866,6 @@ function DestinoMaterialCard({ solicitacao, editable, onSave }: CardProps) {
     setLastDestinoSync({ solicitacao, editing })
     if (!editing) {
       setCliente(solicitacao.cliente_id)
-      setMaterial(solicitacao.material_id ?? '')
       setSubtipo(solicitacao.material_subtipo)
       setLocalCarreg(solicitacao.local_carregamento ?? '')
       setValIni(solicitacao.validade_inicio ?? todayISO())
@@ -857,9 +876,14 @@ function DestinoMaterialCard({ solicitacao, editable, onSave }: CardProps) {
   }
 
   const cliOpts: ComboboxOption[] = (clientes.data ?? []).map((c) => ({ value: c.id, label: c.razao_social }))
-  const materialAtual = (materiais.data ?? []).find((m) => m.id === material) ?? null
-  const exigeSubtipo = isMineralMaterial(materialAtual?.nome)
   const isRetorno = solicitacao.tipo === 'retorno'
+  // Parceiros (e o fluxo interno) só carregam minério — não faz sentido escolher
+  // o material. Ele é sempre "MINÉRIO" e o atendente só define o tipo (subtipo).
+  const materialMinerio = React.useMemo(
+    () => (materiais.data ?? []).find((m) => isMineralMaterial(m.nome)) ?? null,
+    [materiais.data],
+  )
+  const exigeSubtipo = !isRetorno
 
   if (editing && !exigeSubtipo && subtipo) {
     setSubtipo(null)
@@ -869,11 +893,22 @@ function DestinoMaterialCard({ solicitacao, editable, onSave }: CardProps) {
 
   const submit = async () => {
     if (datasInvalidas) return
+    if (!isRetorno && !subtipo) {
+      toast.error('Selecione o tipo de minério.')
+      return
+    }
+    // Preserva o material já definido; quando vazio (caso das solicitações de
+    // parceiro), resolve para o material "MINÉRIO" automaticamente.
+    const materialId = isRetorno ? null : (solicitacao.material_id ?? materialMinerio?.id ?? null)
+    if (!isRetorno && !materialId) {
+      toast.error('Material "MINÉRIO" não encontrado no cadastro. Cadastre o material antes de continuar.')
+      return
+    }
     setSaving(true)
     try {
       await onSave({
         cliente_id: cliente,
-        material_id: material || null,
+        material_id: materialId,
         material_subtipo: exigeSubtipo ? subtipo : null,
         local_carregamento: localCarreg || null,
         validade_inicio: valIni,
@@ -923,30 +958,22 @@ function DestinoMaterialCard({ solicitacao, editable, onSave }: CardProps) {
               </p>
             )}
           </div>
-          <div className={`grid gap-3 ${exigeSubtipo ? 'grid-cols-[1.4fr_1fr]' : 'grid-cols-1'}`}>
+          {exigeSubtipo && (
             <div className="space-y-1.5">
-              <Label>Material</Label>
-              <Select value={material || undefined} onValueChange={setMaterial}>
-                <SelectTrigger><SelectValue placeholder="Selecionar material" /></SelectTrigger>
+              <Label>Tipo de minério *</Label>
+              <Select value={subtipo ?? undefined} onValueChange={(v) => setSubtipo(v as MaterialSubtipo)}>
+                <SelectTrigger><SelectValue placeholder="SINTER · HEMATITA · LUMP" /></SelectTrigger>
                 <SelectContent>
-                  {(materiais.data ?? []).map((m) => (
-                    <SelectItem key={m.id} value={m.id}>{m.nome} <span className="text-muted-foreground">· {m.filial}</span></SelectItem>
-                  ))}
+                  {SUBTIPOS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                 </SelectContent>
               </Select>
+              {!materialMinerio && !solicitacao.material_id && (
+                <p className="text-[11px] text-amber-700">
+                  Nenhum material "MINÉRIO" cadastrado — verifique o cadastro de materiais.
+                </p>
+              )}
             </div>
-            {exigeSubtipo && (
-              <div className="space-y-1.5">
-                <Label>Tipo de minério</Label>
-                <Select value={subtipo ?? undefined} onValueChange={(v) => setSubtipo(v as MaterialSubtipo)}>
-                  <SelectTrigger><SelectValue placeholder="SINTER · HEMATITA · LUMP" /></SelectTrigger>
-                  <SelectContent>
-                    {SUBTIPOS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-          </div>
+          )}
           <div className="space-y-1.5">
             <Label>Local de carregamento</Label>
             <Select
