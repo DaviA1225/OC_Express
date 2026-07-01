@@ -12,6 +12,8 @@ export interface RelatorioRow {
   numero_interno: number
   status: string
   tipo: string
+  origem: string
+  parceiro_id: string | null
   created_at: string
   finalizada_em: string | null
   enviada_em: string | null
@@ -21,6 +23,11 @@ export interface RelatorioRow {
   veiculo_id: string | null
   subcontratada_id: string | null
   atendente_id: string | null
+  // Solicitações de parceiro referenciam a frota do próprio parceiro (tabelas
+  // parceiro_*), não os cadastros internos — por isso os campos paralelos.
+  parceiro_motorista_id: string | null
+  parceiro_veiculo_id: string | null
+  parceiro_subcontratada_id: string | null
 }
 
 export interface ClienteRef { razao_social: string }
@@ -29,6 +36,7 @@ export interface MaterialRef { nome: string }
 export interface VeiculoRef { placa: string }
 export interface SubcontratadaRef { razao_social: string }
 export interface AtendenteRef { nome_completo: string; perfil: string }
+export interface ParceiroRef { razao_social: string }
 
 export interface RelatorioDataset {
   rows: RelatorioRow[]
@@ -38,6 +46,29 @@ export interface RelatorioDataset {
   veiculos: Map<string, VeiculoRef>
   subcontratadas: Map<string, SubcontratadaRef>
   atendentes: Map<string, AtendenteRef>
+  parceiros: Map<string, ParceiroRef>
+  // Frota do parceiro (para resolver os tops nas solicitações de parceiro).
+  parceiroMotoristas: Map<string, MotoristaRef>
+  parceiroVeiculos: Map<string, VeiculoRef>
+  parceiroSubcontratadas: Map<string, SubcontratadaRef>
+}
+
+/**
+ * Resolve um dicionário por lista de ids, buscando em blocos. Um único `.in()`
+ * com centenas de ids gera uma URL longa demais e o PostgREST responde 400.
+ */
+async function fetchInChunks<T>(
+  ids: string[],
+  run: (chunk: string[]) => PromiseLike<{ data: T[] | null; error: unknown }>,
+  size = 120,
+): Promise<T[]> {
+  const out: T[] = []
+  for (let i = 0; i < ids.length; i += size) {
+    const { data, error } = await run(ids.slice(i, i + size))
+    if (error) throw error
+    if (data) out.push(...data)
+  }
+  return out
 }
 
 /** Busca todas as solicitações criadas no período + dicionários para resolver IDs. */
@@ -56,7 +87,7 @@ export function useRelatorioDataset(periodo: PeriodoRelatorio) {
         const { data, error } = await supabase
           .from('solicitacoes')
           .select(
-            'id, numero_interno, status, tipo, created_at, finalizada_em, enviada_em, cliente_id, motorista_id, material_id, veiculo_id, subcontratada_id, atendente_id',
+            'id, numero_interno, status, tipo, origem, parceiro_id, created_at, finalizada_em, enviada_em, cliente_id, motorista_id, material_id, veiculo_id, subcontratada_id, atendente_id, parceiro_motorista_id, parceiro_veiculo_id, parceiro_subcontratada_id',
           )
           .gte('created_at', periodo.desde)
           .lt('created_at', periodo.ate)
@@ -74,54 +105,93 @@ export function useRelatorioDataset(periodo: PeriodoRelatorio) {
       const veiculoIds = Array.from(new Set(rows.map((r) => r.veiculo_id).filter(Boolean) as string[]))
       const subcontratadaIds = Array.from(new Set(rows.map((r) => r.subcontratada_id).filter(Boolean) as string[]))
       const atendenteIds = Array.from(new Set(rows.map((r) => r.atendente_id).filter(Boolean) as string[]))
+      const parceiroIds = Array.from(new Set(rows.map((r) => r.parceiro_id).filter(Boolean) as string[]))
+      const pMotoristaIds = Array.from(new Set(rows.map((r) => r.parceiro_motorista_id).filter(Boolean) as string[]))
+      const pVeiculoIds = Array.from(new Set(rows.map((r) => r.parceiro_veiculo_id).filter(Boolean) as string[]))
+      const pSubIds = Array.from(new Set(rows.map((r) => r.parceiro_subcontratada_id).filter(Boolean) as string[]))
 
-      const [clientesData, motoristasData, materiaisData, veiculosData, subsData, atendentesData] = await Promise.all([
-        clienteIds.length > 0
-          ? supabase.from('clientes').select('id, razao_social').in('id', clienteIds)
-          : Promise.resolve({ data: [] as { id: string; razao_social: string }[], error: null }),
-        motoristaIds.length > 0
-          ? supabase.from('motoristas').select('id, nome_completo').in('id', motoristaIds)
-          : Promise.resolve({ data: [] as { id: string; nome_completo: string }[], error: null }),
-        materialIds.length > 0
-          ? supabase.from('materiais').select('id, nome').in('id', materialIds)
-          : Promise.resolve({ data: [] as { id: string; nome: string }[], error: null }),
-        veiculoIds.length > 0
-          ? supabase.from('veiculos').select('id, placa').in('id', veiculoIds)
-          : Promise.resolve({ data: [] as { id: string; placa: string }[], error: null }),
-        subcontratadaIds.length > 0
-          ? supabase.from('subcontratadas').select('id, razao_social').in('id', subcontratadaIds)
-          : Promise.resolve({ data: [] as { id: string; razao_social: string }[], error: null }),
-        atendenteIds.length > 0
-          ? supabase.from('perfis_usuarios').select('user_id, nome_completo, perfil').in('user_id', atendenteIds)
-          : Promise.resolve({ data: [] as { user_id: string; nome_completo: string; perfil: string }[], error: null }),
+      // Um único .in() com centenas de ids estoura o tamanho da URL do PostgREST
+      // (Bad Request). Períodos longos têm 700+ motoristas/veículos distintos, o
+      // que quebrava só esses dicionários — deixando os tops sem nome. Buscamos
+      // cada dicionário em blocos de ids.
+      const [
+        clientesArr,
+        motoristasArr,
+        materiaisArr,
+        veiculosArr,
+        subsArr,
+        atendentesArr,
+        parceirosArr,
+        pMotoristasArr,
+        pVeiculosArr,
+        pSubsArr,
+      ] = await Promise.all([
+        fetchInChunks<{ id: string; razao_social: string }>(clienteIds, (ch) =>
+          supabase.from('clientes').select('id, razao_social').in('id', ch),
+        ),
+        fetchInChunks<{ id: string; nome_completo: string }>(motoristaIds, (ch) =>
+          supabase.from('motoristas').select('id, nome_completo').in('id', ch),
+        ),
+        fetchInChunks<{ id: string; nome: string }>(materialIds, (ch) =>
+          supabase.from('materiais').select('id, nome').in('id', ch),
+        ),
+        fetchInChunks<{ id: string; placa: string }>(veiculoIds, (ch) =>
+          supabase.from('veiculos').select('id, placa').in('id', ch),
+        ),
+        fetchInChunks<{ id: string; razao_social: string }>(subcontratadaIds, (ch) =>
+          supabase.from('subcontratadas').select('id, razao_social').in('id', ch),
+        ),
+        fetchInChunks<{ user_id: string; nome_completo: string; perfil: string }>(atendenteIds, (ch) =>
+          supabase.from('perfis_usuarios').select('user_id, nome_completo, perfil').in('user_id', ch),
+        ),
+        fetchInChunks<{ id: string; razao_social: string }>(parceiroIds, (ch) =>
+          supabase.from('parceiros').select('id, razao_social').in('id', ch),
+        ),
+        fetchInChunks<{ id: string; nome_completo: string }>(pMotoristaIds, (ch) =>
+          supabase.from('parceiro_motoristas').select('id, nome_completo').in('id', ch),
+        ),
+        fetchInChunks<{ id: string; placa: string }>(pVeiculoIds, (ch) =>
+          supabase.from('parceiro_veiculos').select('id, placa').in('id', ch),
+        ),
+        fetchInChunks<{ id: string; razao_social: string }>(pSubIds, (ch) =>
+          supabase.from('parceiro_subcontratadas').select('id, razao_social').in('id', ch),
+        ),
       ])
 
       const clientes = new Map<string, ClienteRef>()
-      for (const c of (clientesData.data ?? []) as { id: string; razao_social: string }[]) {
-        clientes.set(c.id, { razao_social: c.razao_social })
-      }
+      for (const c of clientesArr) clientes.set(c.id, { razao_social: c.razao_social })
       const motoristas = new Map<string, MotoristaRef>()
-      for (const m of (motoristasData.data ?? []) as { id: string; nome_completo: string }[]) {
-        motoristas.set(m.id, { nome_completo: m.nome_completo })
-      }
+      for (const m of motoristasArr) motoristas.set(m.id, { nome_completo: m.nome_completo })
       const materiais = new Map<string, MaterialRef>()
-      for (const m of (materiaisData.data ?? []) as { id: string; nome: string }[]) {
-        materiais.set(m.id, { nome: m.nome })
-      }
+      for (const m of materiaisArr) materiais.set(m.id, { nome: m.nome })
       const veiculos = new Map<string, VeiculoRef>()
-      for (const v of (veiculosData.data ?? []) as { id: string; placa: string }[]) {
-        veiculos.set(v.id, { placa: v.placa })
-      }
+      for (const v of veiculosArr) veiculos.set(v.id, { placa: v.placa })
       const subcontratadas = new Map<string, SubcontratadaRef>()
-      for (const s of (subsData.data ?? []) as { id: string; razao_social: string }[]) {
-        subcontratadas.set(s.id, { razao_social: s.razao_social })
-      }
+      for (const s of subsArr) subcontratadas.set(s.id, { razao_social: s.razao_social })
       const atendentes = new Map<string, AtendenteRef>()
-      for (const a of (atendentesData.data ?? []) as { user_id: string; nome_completo: string; perfil: string }[]) {
-        atendentes.set(a.user_id, { nome_completo: a.nome_completo, perfil: a.perfil })
-      }
+      for (const a of atendentesArr) atendentes.set(a.user_id, { nome_completo: a.nome_completo, perfil: a.perfil })
+      const parceiros = new Map<string, ParceiroRef>()
+      for (const p of parceirosArr) parceiros.set(p.id, { razao_social: p.razao_social })
+      const parceiroMotoristas = new Map<string, MotoristaRef>()
+      for (const m of pMotoristasArr) parceiroMotoristas.set(m.id, { nome_completo: m.nome_completo })
+      const parceiroVeiculos = new Map<string, VeiculoRef>()
+      for (const v of pVeiculosArr) parceiroVeiculos.set(v.id, { placa: v.placa })
+      const parceiroSubcontratadas = new Map<string, SubcontratadaRef>()
+      for (const s of pSubsArr) parceiroSubcontratadas.set(s.id, { razao_social: s.razao_social })
 
-      return { rows, clientes, motoristas, materiais, veiculos, subcontratadas, atendentes }
+      return {
+        rows,
+        clientes,
+        motoristas,
+        materiais,
+        veiculos,
+        subcontratadas,
+        atendentes,
+        parceiros,
+        parceiroMotoristas,
+        parceiroVeiculos,
+        parceiroSubcontratadas,
+      }
     },
   })
 }
@@ -344,22 +414,60 @@ export function topClientes(ds: RelatorioDataset, limit = 10): TopItem[] {
   return entriesToTopItems(counts, ds.clientes, (v) => v.razao_social, limit)
 }
 
-export function topMotoristas(ds: RelatorioDataset, limit = 10): TopItem[] {
+/**
+ * Conta ocorrências por entidade resolvendo, para cada linha, ou o cadastro
+ * INTERNO ou o do PARCEIRO (frota própria). A chave leva prefixo de fonte
+ * (`i:` / `p:`) para nunca fundir um id interno com um id de parceiro.
+ */
+function topPorFonte(
+  rows: RelatorioRow[],
+  internoId: (r: RelatorioRow) => string | null,
+  internoLabel: (id: string) => string | undefined,
+  parceiroId: (r: RelatorioRow) => string | null,
+  parceiroLabel: (id: string) => string | undefined,
+  limit: number,
+): TopItem[] {
   const counts = new Map<string, number>()
-  for (const r of ds.rows) {
-    if (!r.motorista_id) continue
-    counts.set(r.motorista_id, (counts.get(r.motorista_id) ?? 0) + 1)
+  const labels = new Map<string, string>()
+  for (const r of rows) {
+    const iId = internoId(r)
+    const pId = iId ? null : parceiroId(r)
+    const key = iId ? `i:${iId}` : pId ? `p:${pId}` : null
+    if (!key) continue
+    counts.set(key, (counts.get(key) ?? 0) + 1)
+    if (!labels.has(key)) {
+      labels.set(key, (iId ? internoLabel(iId) : parceiroLabel(pId!)) ?? '—')
+    }
   }
-  return entriesToTopItems(counts, ds.motoristas, (v) => v.nome_completo, limit)
+  const arr: TopItem[] = Array.from(counts.entries()).map(([key, total]) => ({
+    id: key,
+    label: labels.get(key) ?? '—',
+    total,
+  }))
+  arr.sort((a, b) => b.total - a.total)
+  return arr.slice(0, limit)
+}
+
+export function topMotoristas(ds: RelatorioDataset, limit = 10): TopItem[] {
+  return topPorFonte(
+    ds.rows,
+    (r) => r.motorista_id,
+    (id) => ds.motoristas.get(id)?.nome_completo,
+    (r) => r.parceiro_motorista_id,
+    (id) => ds.parceiroMotoristas.get(id)?.nome_completo,
+    limit,
+  )
 }
 
 export function topVeiculos(ds: RelatorioDataset, limit = 10): TopItem[] {
-  const counts = new Map<string, number>()
-  for (const r of ds.rows) {
-    if (!r.veiculo_id) continue
-    counts.set(r.veiculo_id, (counts.get(r.veiculo_id) ?? 0) + 1)
-  }
-  return entriesToTopItems(counts, ds.veiculos, (v) => v.placa, limit)
+  return topPorFonte(
+    ds.rows,
+    (r) => r.veiculo_id,
+    (id) => ds.veiculos.get(id)?.placa,
+    (r) => r.parceiro_veiculo_id,
+    (id) => ds.parceiroVeiculos.get(id)?.placa,
+    limit,
+  )
 }
 
 export function topAtendentes(ds: RelatorioDataset, limit = 10): TopItem[] {
@@ -372,12 +480,14 @@ export function topAtendentes(ds: RelatorioDataset, limit = 10): TopItem[] {
 }
 
 export function topSubcontratadas(ds: RelatorioDataset, limit = 10): TopItem[] {
-  const counts = new Map<string, number>()
-  for (const r of ds.rows) {
-    if (!r.subcontratada_id) continue
-    counts.set(r.subcontratada_id, (counts.get(r.subcontratada_id) ?? 0) + 1)
-  }
-  return entriesToTopItems(counts, ds.subcontratadas, (v) => v.razao_social, limit)
+  return topPorFonte(
+    ds.rows,
+    (r) => r.subcontratada_id,
+    (id) => ds.subcontratadas.get(id)?.razao_social,
+    (r) => r.parceiro_subcontratada_id,
+    (id) => ds.parceiroSubcontratadas.get(id)?.razao_social,
+    limit,
+  )
 }
 
 export interface TipoBreakdownItem { tipo: string; total: number }
@@ -459,4 +569,137 @@ export function previousPeriod(periodo: PeriodoRelatorio): PeriodoRelatorio {
   const prevDesde = new Date(desde - dur)
   const prevAte = new Date(desde)
   return { desde: prevDesde.toISOString(), ate: prevAte.toISOString(), label: 'Período anterior' }
+}
+
+// ── Segmentação por origem (interno × parceiro) ────────────────────────────
+
+/** `interno` = tudo que NÃO veio do parceiro (origem interna ou e-mail). */
+export type OrigemFiltro = 'todas' | 'interno' | 'parceiro'
+
+export function filtrarPorOrigem(rows: RelatorioRow[], filtro: OrigemFiltro): RelatorioRow[] {
+  if (filtro === 'todas') return rows
+  if (filtro === 'parceiro') return rows.filter((r) => r.origem === 'parceiro')
+  return rows.filter((r) => r.origem !== 'parceiro')
+}
+
+/** Quantas solicitações cada parceiro enviou no período (e quantas finalizaram). */
+export interface ParceiroStat {
+  id: string
+  label: string
+  total: number
+  finalizadas: number
+}
+
+export function topParceiros(ds: RelatorioDataset, limit = 20): ParceiroStat[] {
+  const counts = new Map<string, { total: number; finalizadas: number }>()
+  for (const r of ds.rows) {
+    if (r.origem !== 'parceiro' || !r.parceiro_id) continue
+    const c = counts.get(r.parceiro_id) ?? { total: 0, finalizadas: 0 }
+    c.total += 1
+    if (r.status === 'finalizada') c.finalizadas += 1
+    counts.set(r.parceiro_id, c)
+  }
+  const arr: ParceiroStat[] = []
+  for (const [id, c] of counts.entries()) {
+    arr.push({ id, label: ds.parceiros.get(id)?.razao_social ?? '—', total: c.total, finalizadas: c.finalizadas })
+  }
+  arr.sort((a, b) => b.total - a.total || a.label.localeCompare(b.label))
+  return arr.slice(0, limit)
+}
+
+// ── TMA "em emissão → finalizada" (recorte para o relatório de parceiros) ───
+
+export interface TmaResumo {
+  avgHours: number | null
+  medianHours: number | null
+  count: number
+}
+
+function buildTransIndex(transitions: StatusTransition[]): Map<string, StatusTransition[]> {
+  const byId = new Map<string, StatusTransition[]>()
+  for (const t of transitions) {
+    const arr = byId.get(t.registro_id)
+    if (arr) arr.push(t)
+    else byId.set(t.registro_id, [t])
+  }
+  for (const arr of byId.values()) {
+    arr.sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime())
+  }
+  return byId
+}
+
+/**
+ * Duração (horas) entre a PRIMEIRA entrada em "em emissão" (`em_cadastro`) e a
+ * finalização. Só conta solicitações já finalizadas com a transição de emissão
+ * registrada; usa o evento de finalização do log e, na falta, `finalizada_em`.
+ */
+function duracaoEmissaoFinalizacaoH(
+  row: RelatorioRow,
+  trans: StatusTransition[] | undefined,
+): number | null {
+  if (row.status !== 'finalizada') return null
+  const arr = trans ?? []
+  const emissao = arr.find((t) => t.to_status === 'em_cadastro')
+  if (!emissao) return null
+  const fim = [...arr].reverse().find((t) => t.to_status === 'finalizada')
+  const fimMs = fim
+    ? new Date(fim.at).getTime()
+    : row.finalizada_em
+      ? new Date(row.finalizada_em).getTime()
+      : null
+  if (fimMs == null) return null
+  const h = (fimMs - new Date(emissao.at).getTime()) / 3_600_000
+  return h > 0 ? h : null
+}
+
+function resumoDuracoes(durations: number[]): TmaResumo {
+  if (durations.length === 0) return { avgHours: null, medianHours: null, count: 0 }
+  const sorted = [...durations].sort((a, b) => a - b)
+  const median =
+    sorted.length % 2 === 1
+      ? sorted[(sorted.length - 1) / 2]
+      : (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2
+  const avg = durations.reduce((a, b) => a + b, 0) / durations.length
+  return { avgHours: avg, medianHours: median, count: durations.length }
+}
+
+/** TMA emissão→finalização agregado sobre o conjunto de linhas informado. */
+export function tmaEmissaoFinalizacao(rows: RelatorioRow[], transitions: StatusTransition[]): TmaResumo {
+  const byId = buildTransIndex(transitions)
+  const durations: number[] = []
+  for (const r of rows) {
+    const d = duracaoEmissaoFinalizacaoH(r, byId.get(r.id))
+    if (d != null) durations.push(d)
+  }
+  return resumoDuracoes(durations)
+}
+
+export interface ParceiroTma {
+  id: string
+  label: string
+  resumo: TmaResumo
+}
+
+/** TMA emissão→finalização por parceiro (ordenado do mais rápido ao mais lento). */
+export function tmaEmissaoFinalizacaoPorParceiro(
+  ds: RelatorioDataset,
+  transitions: StatusTransition[],
+  limit = 20,
+): ParceiroTma[] {
+  const byId = buildTransIndex(transitions)
+  const buckets = new Map<string, number[]>()
+  for (const r of ds.rows) {
+    if (r.origem !== 'parceiro' || !r.parceiro_id) continue
+    const d = duracaoEmissaoFinalizacaoH(r, byId.get(r.id))
+    if (d == null) continue
+    const arr = buckets.get(r.parceiro_id) ?? []
+    arr.push(d)
+    buckets.set(r.parceiro_id, arr)
+  }
+  const out: ParceiroTma[] = []
+  for (const [id, arr] of buckets.entries()) {
+    out.push({ id, label: ds.parceiros.get(id)?.razao_social ?? '—', resumo: resumoDuracoes(arr) })
+  }
+  out.sort((a, b) => (a.resumo.avgHours ?? Infinity) - (b.resumo.avgHours ?? Infinity))
+  return out.slice(0, limit)
 }

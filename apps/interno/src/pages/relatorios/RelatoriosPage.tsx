@@ -11,10 +11,10 @@ import {
   PieChart,
   Pie,
   Cell,
-  BarChart,
-  Bar,
+  ComposedChart,
+  Area,
 } from 'recharts'
-import { ClipboardCheck, ClipboardList, Hourglass, Percent, Download, Loader2, AlertTriangle, RotateCcw } from 'lucide-react'
+import { ClipboardCheck, ClipboardList, Hourglass, Percent, Download, Loader2, AlertTriangle, RotateCcw, Handshake, Trophy, Timer } from 'lucide-react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { toast } from 'sonner'
@@ -32,13 +32,22 @@ import {
   topAtendentes,
   porMaterial,
   tmaPorStatus,
+  filtrarPorOrigem,
+  topParceiros,
+  tmaEmissaoFinalizacao,
+  tmaEmissaoFinalizacaoPorParceiro,
   parseDayKey,
   periodoFromPreset,
   type PeriodoPreset,
   type PeriodoRelatorio,
+  type OrigemFiltro,
   type TopItem,
   type TmaStatusEntry,
+  type ParceiroStat,
+  type ParceiroTma,
+  type TmaResumo,
 } from '@/features/relatorios/useRelatorios'
+import { formatHoras } from '@/features/relatorios/useRelatoriosInternos'
 import { STATUS_LABELS } from '@/features/solicitacoes/status'
 import { buildCsv, downloadCsv, type CsvColumn } from '@/lib/csv'
 import { cn } from '@/lib/utils'
@@ -51,6 +60,13 @@ const PRESETS: { value: PeriodoPreset; label: string }[] = [
 ]
 
 const VALID_PRESETS = PRESETS.map((p) => p.value)
+
+const ORIGENS: { value: OrigemFiltro; label: string }[] = [
+  { value: 'todas', label: 'Todas' },
+  { value: 'interno', label: 'Internas' },
+  { value: 'parceiro', label: 'Parceiros' },
+]
+const VALID_ORIGENS = ORIGENS.map((o) => o.value)
 
 // Paleta de séries harmonizada à LHG — laranja de marca + tons industriais foscos
 // (aço, ocre, oliva, violeta-grafite, terracota, grafite), em vez dos brights genéricos.
@@ -75,20 +91,54 @@ export default function RelatoriosPage() {
     )
   }
 
+  const origemRaw = params.get('o')
+  const origem: OrigemFiltro = (VALID_ORIGENS as string[]).includes(origemRaw ?? '')
+    ? (origemRaw as OrigemFiltro)
+    : 'todas'
+  const setOrigem = (o: OrigemFiltro) => {
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        if (o === 'todas') next.delete('o')
+        else next.set('o', o)
+        return next
+      },
+      { replace: true },
+    )
+  }
+
   const ds = useRelatorioDataset(periodo)
 
   const solicitacaoIds = React.useMemo(() => (ds.data?.rows ?? []).map((r) => r.id), [ds.data])
   const transitions = useStatusTransitions(periodo, solicitacaoIds)
 
-  const kpis = ds.data ? calcKPIs(ds.data.rows) : null
-  const porDia = ds.data ? calcPorDia(ds.data.rows, periodo) : []
-  const top10Clientes = ds.data ? topClientes(ds.data, 10) : []
-  const top10Motoristas = ds.data ? topMotoristas(ds.data, 10) : []
-  const top10Veiculos = ds.data ? topVeiculos(ds.data, 10) : []
-  const top10Subcontratadas = ds.data ? topSubcontratadas(ds.data, 10) : []
-  const top10Atendentes = ds.data ? topAtendentes(ds.data, 10) : []
-  const distribMaterial = ds.data ? porMaterial(ds.data) : []
-  const tmaEntries = ds.data && transitions.data ? tmaPorStatus(ds.data.rows, transitions.data) : []
+  // Dataset recortado pela origem selecionada — alimenta todos os agregados gerais.
+  const dsFiltrado = React.useMemo(() => {
+    if (!ds.data) return null
+    return { ...ds.data, rows: filtrarPorOrigem(ds.data.rows, origem) }
+  }, [ds.data, origem])
+
+  const mostrarParceiros = origem !== 'interno'
+
+  const kpis = dsFiltrado ? calcKPIs(dsFiltrado.rows) : null
+  const porDia = dsFiltrado ? calcPorDia(dsFiltrado.rows, periodo) : []
+  const top10Clientes = dsFiltrado ? topClientes(dsFiltrado, 10) : []
+  const top10Motoristas = dsFiltrado ? topMotoristas(dsFiltrado, 10) : []
+  const top10Veiculos = dsFiltrado ? topVeiculos(dsFiltrado, 10) : []
+  const top10Subcontratadas = dsFiltrado ? topSubcontratadas(dsFiltrado, 10) : []
+  const top10Atendentes = dsFiltrado ? topAtendentes(dsFiltrado, 10) : []
+  const distribMaterial = dsFiltrado ? porMaterial(dsFiltrado) : []
+  const tmaEntries = dsFiltrado && transitions.data ? tmaPorStatus(dsFiltrado.rows, transitions.data) : []
+
+  // Recortes de parceiro — sempre sobre as linhas de parceiro (independem do segmento).
+  const rankingParceiros = ds.data ? topParceiros(ds.data, 12) : []
+  const totalParceiros = rankingParceiros.reduce((acc, p) => acc + p.total, 0)
+  const tmaParceirosGeral: TmaResumo | null =
+    ds.data && transitions.data
+      ? tmaEmissaoFinalizacao(filtrarPorOrigem(ds.data.rows, 'parceiro'), transitions.data)
+      : null
+  const tmaPorParceiro: ParceiroTma[] =
+    ds.data && transitions.data ? tmaEmissaoFinalizacaoPorParceiro(ds.data, transitions.data, 12) : []
 
   const [exporting, setExporting] = React.useState(false)
   const exportCsv = () => {
@@ -101,6 +151,8 @@ export default function RelatoriosPage() {
         { header: 'Valor', accessor: (r) => r.valor },
       ]
       const linhas: { secao: string; titulo: string; valor: string }[] = []
+      linhas.push({ secao: 'Recorte', titulo: 'Origem', valor: ORIGENS.find((o) => o.value === origem)?.label ?? 'Todas' })
+      linhas.push({ secao: 'Recorte', titulo: 'Período', valor: periodo.label })
       if (kpis) {
         linhas.push({ secao: 'KPIs', titulo: 'Total de OCs', valor: String(kpis.total) })
         linhas.push({ secao: 'KPIs', titulo: 'Finalizadas', valor: String(kpis.finalizadas) })
@@ -141,6 +193,36 @@ export default function RelatoriosPage() {
           valor: `média ${t.avgHours.toFixed(1)}h · mediana ${t.medianHours.toFixed(1)}h · n=${t.count}`,
         })
       }
+      if (mostrarParceiros) {
+        if (tmaParceirosGeral) {
+          linhas.push({
+            secao: 'Parceiros',
+            titulo: 'TMA emissão→finalização (geral)',
+            valor:
+              tmaParceirosGeral.avgHours != null
+                ? `média ${formatHoras(tmaParceirosGeral.avgHours)} · mediana ${formatHoras(tmaParceirosGeral.medianHours)} · n=${tmaParceirosGeral.count}`
+                : '—',
+          })
+        }
+        for (const p of rankingParceiros) {
+          const share = totalParceiros > 0 ? Math.round((p.total / totalParceiros) * 100) : 0
+          linhas.push({
+            secao: 'Ranking de parceiros',
+            titulo: p.label,
+            valor: `${p.total} solicitações (${share}%) · ${p.finalizadas} finalizadas`,
+          })
+        }
+        for (const p of tmaPorParceiro) {
+          linhas.push({
+            secao: 'TMA emissão→finalização por parceiro',
+            titulo: p.label,
+            valor:
+              p.resumo.avgHours != null
+                ? `média ${formatHoras(p.resumo.avgHours)} · mediana ${formatHoras(p.resumo.medianHours)} · n=${p.resumo.count}`
+                : '—',
+          })
+        }
+      }
       const csv = buildCsv(linhas, cols)
       const ts = new Date()
       const stamp = `${ts.getFullYear()}${String(ts.getMonth() + 1).padStart(2, '0')}${String(ts.getDate()).padStart(2, '0')}_${String(ts.getHours()).padStart(2, '0')}${String(ts.getMinutes()).padStart(2, '0')}`
@@ -164,6 +246,9 @@ export default function RelatoriosPage() {
             {' a '}
             {format(addDays(new Date(periodo.ate), -1), "dd/MM/yyyy", { locale: ptBR })}
           </p>
+          <div className="mt-2">
+            <OrigemTabs value={origem} onChange={setOrigem} />
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <PeriodoTabs value={preset} onChange={setPreset} />
@@ -228,6 +313,27 @@ export default function RelatoriosPage() {
         <VolumeChart data={porDia} isLoading={ds.isLoading} />
       </Card>
 
+      {mostrarParceiros && (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <Card
+            title="Ranking de parceiros"
+            subtitle="Solicitações enviadas por cada parceiro no período"
+          >
+            <ParceiroRanking items={rankingParceiros} total={totalParceiros} isLoading={ds.isLoading} />
+          </Card>
+          <Card
+            title="TMA emissão → finalização"
+            subtitle="Tempo de “Em emissão” até “Finalizada” nas solicitações de parceiro"
+          >
+            <TmaEmissaoFinal
+              geral={tmaParceirosGeral}
+              porParceiro={tmaPorParceiro}
+              isLoading={ds.isLoading || transitions.isLoading}
+            />
+          </Card>
+        </div>
+      )}
+
       <Card
         title="TMA por status"
         subtitle="Tempo médio até sair de cada etapa (intervalos concluídos)"
@@ -286,6 +392,31 @@ function PeriodoTabs({ value, onChange }: { value: PeriodoPreset; onChange: (v: 
           )}
         >
           {p.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function OrigemTabs({ value, onChange }: { value: OrigemFiltro; onChange: (v: OrigemFiltro) => void }) {
+  return (
+    <div className="inline-flex rounded-lg border bg-card p-1" role="tablist" aria-label="Recorte por origem">
+      {ORIGENS.map((o) => (
+        <button
+          key={o.value}
+          type="button"
+          role="tab"
+          aria-selected={value === o.value}
+          onClick={() => onChange(o.value)}
+          title={o.value === 'interno' ? 'Solicitações que não vieram do portal de parceiros' : undefined}
+          className={cn(
+            'rounded-md px-2.5 py-1 text-[12px] font-medium transition-colors',
+            value === o.value
+              ? 'bg-primary text-primary-foreground'
+              : 'text-foreground/70 hover:bg-muted hover:text-foreground',
+          )}
+        >
+          {o.label}
         </button>
       ))}
     </div>
@@ -448,6 +579,123 @@ function TopList({ items, isLoading, emptyText }: TopListProps) {
   )
 }
 
+function ParceiroRanking({
+  items,
+  total,
+  isLoading,
+}: {
+  items: ParceiroStat[]
+  total: number
+  isLoading: boolean
+}) {
+  if (isLoading) {
+    return (
+      <div className="space-y-2">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <Skeleton key={i} className="h-7 w-full" />
+        ))}
+      </div>
+    )
+  }
+  if (items.length === 0) {
+    return (
+      <div className="flex h-[150px] flex-col items-center justify-center gap-1 text-center text-[13px] text-muted-foreground">
+        <Handshake className="h-5 w-5 text-muted-foreground/60" />
+        Nenhuma solicitação de parceiro no período.
+      </div>
+    )
+  }
+  const max = items[0]?.total ?? 1
+  return (
+    <ul className="space-y-1">
+      {items.map((p, i) => {
+        const pct = (p.total / max) * 100
+        const share = total > 0 ? Math.round((p.total / total) * 100) : 0
+        return (
+          <li key={p.id} className="flex items-center gap-2 text-[12px]">
+            <span className="flex w-5 shrink-0 items-center justify-end gap-0.5 text-right tabular-nums text-muted-foreground">
+              {i === 0 ? <Trophy className="h-3.5 w-3.5 text-amber-500" aria-label="Mais enviou" /> : `${i + 1}.`}
+            </span>
+            <div className="relative min-w-0 flex-1 rounded bg-muted">
+              <div className="h-6 rounded bg-primary/15" style={{ width: `${pct}%` }} />
+              <span className="absolute inset-0 flex items-center px-2 text-foreground">
+                <span className="truncate">{p.label}</span>
+              </span>
+            </div>
+            <span className="w-24 shrink-0 text-right text-[11px] text-muted-foreground tabular-nums">
+              {p.finalizadas}/{p.total} fin.
+            </span>
+            <span className="w-14 shrink-0 text-right font-medium text-foreground tabular-nums">
+              {p.total} <span className="text-[10px] text-muted-foreground">({share}%)</span>
+            </span>
+          </li>
+        )
+      })}
+    </ul>
+  )
+}
+
+function TmaEmissaoFinal({
+  geral,
+  porParceiro,
+  isLoading,
+}: {
+  geral: TmaResumo | null
+  porParceiro: ParceiroTma[]
+  isLoading: boolean
+}) {
+  if (isLoading) return <Skeleton className="h-[200px] w-full" />
+  if (!geral || geral.count === 0) {
+    return (
+      <div className="flex h-[180px] flex-col items-center justify-center gap-1 text-center text-[13px] text-muted-foreground">
+        <Timer className="h-5 w-5 text-muted-foreground/60" />
+        Sem solicitações de parceiro finalizadas no período.
+      </div>
+    )
+  }
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-end gap-x-8 gap-y-2 rounded-md border bg-muted/40 px-4 py-3">
+        <div>
+          <p className="text-[10px] font-medium uppercase tracking-[0.5px] text-muted-foreground">Tempo médio</p>
+          <p className="text-[24px] font-medium leading-tight text-foreground tabular-nums">
+            {formatHoras(geral.avgHours)}
+          </p>
+        </div>
+        <div>
+          <p className="text-[10px] font-medium uppercase tracking-[0.5px] text-muted-foreground">Mediana</p>
+          <p className="text-[18px] font-medium leading-tight text-foreground tabular-nums">
+            {formatHoras(geral.medianHours)}
+          </p>
+        </div>
+        <div>
+          <p className="text-[10px] font-medium uppercase tracking-[0.5px] text-muted-foreground">Finalizadas</p>
+          <p className="text-[18px] font-medium leading-tight text-foreground tabular-nums">{geral.count}</p>
+        </div>
+      </div>
+
+      {porParceiro.length > 0 && (
+        <div>
+          <p className="mb-1.5 text-[11px] font-medium uppercase tracking-[0.4px] text-muted-foreground">
+            Por parceiro · do mais rápido ao mais lento
+          </p>
+          <ul className="divide-y">
+            {porParceiro.map((p) => (
+              <li key={p.id} className="flex items-center gap-2 py-1.5 text-[12px]">
+                <span className="min-w-0 flex-1 truncate text-foreground">{p.label}</span>
+                <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">n={p.resumo.count}</span>
+                <span className="w-16 shrink-0 text-right font-medium text-foreground tabular-nums">
+                  {formatHoras(p.resumo.avgHours)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  )
+}
+
 interface TmaChartProps {
   entries: TmaStatusEntry[]
   isLoading: boolean
@@ -472,7 +720,7 @@ function TmaChart({ entries, isLoading }: TmaChartProps) {
     <div className="space-y-3">
       <div className="h-[240px] w-full" role="group" aria-label="Tempo médio até sair de cada status (média e mediana, em horas)">
         <ResponsiveContainer>
-          <BarChart accessibilityLayer data={data} margin={{ top: 8, right: 16, left: -10, bottom: 0 }}>
+          <ComposedChart accessibilityLayer data={data} margin={{ top: 8, right: 16, left: -10, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
             <XAxis dataKey="label" tick={{ fontSize: 11 }} interval={0} />
             <YAxis
@@ -483,9 +731,26 @@ function TmaChart({ entries, isLoading }: TmaChartProps) {
               contentStyle={{ fontSize: 12, borderRadius: 6 }}
               formatter={(value, name) => [`${Number(value).toFixed(1)} h`, name === 'media' ? 'Média' : 'Mediana']}
             />
-            <Bar dataKey="media" fill="#FF5100" radius={[4, 4, 0, 0]} />
-            <Bar dataKey="mediana" fill="#6B7280" radius={[4, 4, 0, 0]} />
-          </BarChart>
+            <Area
+              type="monotone"
+              dataKey="media"
+              stroke="#FF5100"
+              strokeWidth={2}
+              fill="#FF5100"
+              fillOpacity={0.12}
+              dot={{ r: 2, fill: '#FF5100' }}
+              activeDot={{ r: 4 }}
+            />
+            <Line
+              type="monotone"
+              dataKey="mediana"
+              stroke="#6B7280"
+              strokeWidth={2}
+              strokeDasharray="4 3"
+              dot={{ r: 2 }}
+              activeDot={{ r: 4 }}
+            />
+          </ComposedChart>
         </ResponsiveContainer>
       </div>
       <div className="flex items-center justify-center gap-4 text-[11px] text-muted-foreground">
