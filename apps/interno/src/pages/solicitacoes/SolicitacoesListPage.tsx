@@ -38,6 +38,11 @@ import type { SolicitacaoStatus, SolicitacaoTipo, SolicitacaoOrigem, Tables } fr
 
 type MaterialOpt = Pick<Tables<'materiais'>, 'id' | 'nome'>
 
+// Filtros ficam na URL (fonte da verdade), mas os botões "Voltar"/breadcrumb do
+// detalhe navegam para /solicitacoes "limpo". Guardamos a query em sessionStorage
+// para restaurar os filtros ao voltar sem parâmetros na URL.
+const FILTERS_STORAGE_KEY = 'solicitacoes:list-filters'
+
 const VALID_PERIODOS: PeriodoFiltro[] = ['todos', 'hoje', '7d', 'mes']
 const VALID_TIPOS: (SolicitacaoTipo | 'todos')[] = ['todos', 'carregamento', 'retorno']
 const VALID_ORIGENS: (SolicitacaoOrigem | 'todos')[] = ['todos', 'interno', 'parceiro', 'email']
@@ -83,8 +88,13 @@ export function SolicitacoesListPage() {
   const page = Math.max(1, Number(params.get('page')) || 1)
   const pageSize = 30
 
+  // true depois que o usuário mexe em algum filtro — distingue "limpou de fato"
+  // (deve apagar o storage) do primeiro render antes da restauração.
+  const interacted = React.useRef(false)
+
   const updateParams = React.useCallback(
     (mutate: (next: URLSearchParams) => void) => {
+      interacted.current = true
       setParams(
         (prev) => {
           const next = new URLSearchParams(prev)
@@ -96,6 +106,27 @@ export function SolicitacoesListPage() {
     },
     [setParams],
   )
+
+  // Restaura os filtros salvos quando a página abre sem nenhum parâmetro na URL
+  // (ex.: voltar do detalhe pelo botão "Voltar"). Só na montagem.
+  React.useEffect(() => {
+    const saved = sessionStorage.getItem(FILTERS_STORAGE_KEY)
+    if (saved && !params.toString()) {
+      setParams(new URLSearchParams(saved), { replace: true })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Persiste os filtros atuais. Não apaga no primeiro render (params vazio antes
+  // da restauração); só remove quando o usuário zera os filtros de propósito.
+  React.useEffect(() => {
+    const qs = params.toString()
+    if (qs) {
+      sessionStorage.setItem(FILTERS_STORAGE_KEY, qs)
+    } else if (interacted.current) {
+      sessionStorage.removeItem(FILTERS_STORAGE_KEY)
+    }
+  }, [params])
 
   const setSearch = (v: string) =>
     updateParams((n) => {
