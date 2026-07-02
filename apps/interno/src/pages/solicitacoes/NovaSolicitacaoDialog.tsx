@@ -128,6 +128,13 @@ const schema = z
           message: 'Selecione a carga de retorno',
         })
       }
+      if (!v.material_id) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['material_id'],
+          message: 'Selecione o material',
+        })
+      }
     }
   })
 
@@ -215,13 +222,19 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, onCreated }: Props) 
     [materiais.data],
   )
 
+  const prevTipo = React.useRef<SolicitacaoTipo | null>(null)
   React.useEffect(() => {
     if (tipo === 'carregamento' && materialMinerio) {
       setValue('material_id', materialMinerio.id, { shouldValidate: false })
     } else if (tipo === 'retorno') {
-      setValue('material_id', null, { shouldValidate: false })
+      // Ao trocar para retorno, limpa o minério herdado (uma vez) e o subtipo; o
+      // material do retorno é escolhido manualmente na lista pelo atendente.
+      if (prevTipo.current !== 'retorno') {
+        setValue('material_id', null, { shouldValidate: false })
+      }
       setValue('material_subtipo', null, { shouldValidate: false })
     }
+    prevTipo.current = tipo
   }, [tipo, materialMinerio, setValue])
 
   React.useEffect(() => {
@@ -279,12 +292,15 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, onCreated }: Props) 
     hint: [c.local_carregamento, c.cliente?.cidade && c.cliente?.uf ? `${c.cliente.cidade}/${c.cliente.uf}` : null]
       .filter(Boolean).join(' · '),
   }))
+  const materialOptions: ComboboxOption[] = (materiais.data ?? []).map((m) => ({
+    value: m.id, label: m.nome, hint: m.filial ?? undefined,
+  }))
 
   const persistSolicitacao = async (values: FormValues) => {
     const isMinerio = values.tipo === 'carregamento'
     let resolvedMaterialId: string | null = isMinerio
       ? values.material_id ?? materialMinerio?.id ?? null
-      : null
+      : values.material_id ?? null
     if (isMinerio && !resolvedMaterialId) {
       const refetched = await materiais.refetch()
       const found = (refetched.data ?? []).find((m) => isMineralMaterial(m.nome))
@@ -601,6 +617,22 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, onCreated }: Props) 
                     <p className="text-[11px] text-muted-foreground">
                       O cliente e o local de carregamento vêm da carga de retorno selecionada.
                     </p>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Material *</Label>
+                    <Combobox
+                      options={materialOptions}
+                      ariaLabel="Material"
+                      value={watch('material_id') || null}
+                      onChange={(v) => setValue('material_id', v, { shouldValidate: true })}
+                      placeholder="Selecionar material"
+                      searchPlaceholder="Buscar material"
+                      emptyMessage="Nenhum material cadastrado."
+                      loading={materiais.isLoading}
+                    />
+                    {errors.material_id && (
+                      <p className="text-[11px] text-destructive">{errors.material_id.message}</p>
+                    )}
                   </div>
                 </Section>
               )}
