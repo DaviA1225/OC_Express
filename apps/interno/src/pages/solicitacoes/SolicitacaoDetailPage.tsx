@@ -850,6 +850,7 @@ function formatDateBR(iso: string): string {
 function DestinoMaterialCard({ solicitacao, editable, onSave }: CardProps) {
   const [editing, setEditing] = React.useState(false)
   const [cliente, setCliente] = React.useState<string | null>(solicitacao.cliente_id)
+  const [material, setMaterial] = React.useState<string>(solicitacao.material_id ?? '')
   const [subtipo, setSubtipo] = React.useState<MaterialSubtipo | null>(solicitacao.material_subtipo)
   const [localCarreg, setLocalCarreg] = React.useState<string>(solicitacao.local_carregamento ?? '')
   const [valIni, setValIni] = React.useState<string>(solicitacao.validade_inicio ?? todayISO())
@@ -866,6 +867,7 @@ function DestinoMaterialCard({ solicitacao, editable, onSave }: CardProps) {
     setLastDestinoSync({ solicitacao, editing })
     if (!editing) {
       setCliente(solicitacao.cliente_id)
+      setMaterial(solicitacao.material_id ?? '')
       setSubtipo(solicitacao.material_subtipo)
       setLocalCarreg(solicitacao.local_carregamento ?? '')
       setValIni(solicitacao.validade_inicio ?? todayISO())
@@ -897,9 +899,16 @@ function DestinoMaterialCard({ solicitacao, editable, onSave }: CardProps) {
       toast.error('Selecione o tipo de minério.')
       return
     }
-    // Preserva o material já definido; quando vazio (caso das solicitações de
-    // parceiro), resolve para o material "MINÉRIO" automaticamente.
-    const materialId = isRetorno ? null : (solicitacao.material_id ?? materialMinerio?.id ?? null)
+    // Retorno: material é escolhido manualmente na lista. Minério: preserva o
+    // material já definido e, quando vazio (solicitações de parceiro), resolve
+    // para "MINÉRIO" automaticamente.
+    const materialId = isRetorno
+      ? (material || null)
+      : (solicitacao.material_id ?? materialMinerio?.id ?? null)
+    if (isRetorno && !materialId) {
+      toast.error('Selecione o material da carga de retorno.')
+      return
+    }
     if (!isRetorno && !materialId) {
       toast.error('Material "MINÉRIO" não encontrado no cadastro. Cadastre o material antes de continuar.')
       return
@@ -958,7 +967,19 @@ function DestinoMaterialCard({ solicitacao, editable, onSave }: CardProps) {
               </p>
             )}
           </div>
-          {exigeSubtipo && (
+          {isRetorno ? (
+            <div className="space-y-1.5">
+              <Label>Material *</Label>
+              <Select value={material || undefined} onValueChange={setMaterial}>
+                <SelectTrigger><SelectValue placeholder="Selecionar material" /></SelectTrigger>
+                <SelectContent>
+                  {(materiais.data ?? []).map((m) => (
+                    <SelectItem key={m.id} value={m.id}>{m.nome} <span className="text-muted-foreground">· {m.filial}</span></SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : exigeSubtipo && (
             <div className="space-y-1.5">
               <Label>Tipo de minério *</Label>
               <Select value={subtipo ?? undefined} onValueChange={(v) => setSubtipo(v as MaterialSubtipo)}>
