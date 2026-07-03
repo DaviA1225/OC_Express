@@ -1,3 +1,0 @@
-@echo off
-echo Iniciando OC Express API...
-.venv\Scripts\uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
