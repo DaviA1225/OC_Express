@@ -3,11 +3,11 @@ import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { ArrowLeft, Paperclip, Trash2, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { SolicitacaoForm } from '@/components/solicitacoes/SolicitacaoForm'
 import {
-  SolicitacaoForm,
   SOLICITACAO_FORM_DEFAULTS,
   type SolicitacaoFormValues,
-} from '@/components/solicitacoes/SolicitacaoForm'
+} from '@/components/solicitacoes/solicitacaoForm.schema'
 import { useAuth } from '@/hooks/useAuth'
 import { useCriarSolicitacao } from '@/features/solicitacoes/useSolicitacoes'
 import {
