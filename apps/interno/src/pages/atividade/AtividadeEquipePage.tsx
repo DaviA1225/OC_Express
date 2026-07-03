@@ -28,7 +28,7 @@ export default function AtividadeEquipePage() {
   const [limiar, setLimiar] = React.useState<Limiar>(30)
   const { data, isLoading, isError, error, isFetching, refetch } = useAtividadeEquipe()
 
-  const usuarios = data?.usuarios ?? []
+  const usuarios = React.useMemo(() => data?.usuarios ?? [], [data])
   const ociosos = usuarios.filter((u) => ehOcioso(u, limiar))
   const ativos = usuarios.filter((u) => !ehOcioso(u, limiar))
 
