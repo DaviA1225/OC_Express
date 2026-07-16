@@ -702,6 +702,22 @@ export interface Database {
         }
         Update: Partial<Database['public']['Tables']['parceiro_pamcards']['Insert']>
       }
+      // 0045 — linha única do kill switch / modo manutenção compartilhado.
+      system_status: {
+        Row: {
+          id: number
+          maintenance: boolean
+          message: string | null
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          maintenance?: boolean
+          message?: string | null
+          updated_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['system_status']['Insert']>
+      }
     }
     Views: {
       // Views SECURITY DEFINER do Portal de Parceiros (migrations 0017/0018).
