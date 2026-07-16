@@ -32,3 +32,31 @@ export function createSupabaseClient(
 }
 
 export type SupabaseClient = ReturnType<typeof createSupabaseClient>
+
+/** Estado do kill switch / modo manutenção compartilhado (tabela system_status). */
+export interface SystemStatus {
+  maintenance: boolean
+  message: string | null
+}
+
+/**
+ * Lê a linha única de `system_status` para o gate de manutenção dos apps.
+ *
+ * FAIL-OPEN por design: se a leitura falhar (rede, Supabase indisponível), volta
+ * `maintenance: false`. Um soluço de infra não pode, sozinho, derrubar o app —
+ * a manutenção só liga quando a flag foi explicitamente setada no banco.
+ */
+export async function fetchSystemStatus(
+  supabase: SupabaseClient,
+): Promise<SystemStatus> {
+  const { data, error } = await supabase
+    .from('system_status')
+    .select('maintenance, message')
+    .eq('id', 1)
+    .maybeSingle<SystemStatus>()
+
+  if (error || !data) {
+    return { maintenance: false, message: null }
+  }
+  return { maintenance: data.maintenance, message: data.message }
+}
