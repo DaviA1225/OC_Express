@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Clock } from 'lucide-react'
 import { fetchSystemStatus } from '@sislog/shared/supabase'
 import { supabase } from '@/lib/supabase'
 
@@ -34,26 +33,19 @@ export function MaintenanceGate({ children }: { children: ReactNode }) {
   }
 
   if (data?.maintenance) {
-    return <MaintenanceScreen message={data.message} />
+    return <MaintenanceScreen />
   }
 
   return <>{children}</>
 }
 
-function MaintenanceScreen({ message }: { message: string | null }) {
+function MaintenanceScreen() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4 py-12">
       <div className="w-full max-w-md text-center">
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full border border-border text-muted-foreground">
-          <Clock className="h-7 w-7" />
-        </div>
-        <h1 className="mt-6 text-[22px] font-semibold tracking-tight text-foreground">
+        <h1 className="text-[22px] font-semibold tracking-tight text-foreground">
           Sistema temporariamente indisponível
         </h1>
-        <p className="mt-3 text-[14px] leading-relaxed text-muted-foreground">
-          {message ??
-            'Estamos concluindo um ajuste técnico. O acesso volta em instantes — tente novamente daqui a pouco.'}
-        </p>
         <button
           type="button"
           onClick={() => window.location.reload()}
