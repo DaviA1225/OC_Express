@@ -48,13 +48,6 @@ function MaintenanceScreen() {
         <h1 className="text-[22px] font-semibold tracking-tight text-foreground">
           Sistema temporariamente indisponível
         </h1>
-        <button
-          type="button"
-          onClick={() => window.location.reload()}
-          className="mt-7 inline-flex h-9 items-center rounded-md border border-border px-4 text-[13px] font-medium text-foreground transition-colors hover:bg-muted"
-        >
-          Tentar novamente
-        </button>
       </div>
     </div>
   )
