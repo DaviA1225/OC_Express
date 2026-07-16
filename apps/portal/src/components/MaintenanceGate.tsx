@@ -44,7 +44,7 @@ function MaintenanceScreen() {
     <div className="flex min-h-screen items-center justify-center bg-background px-4 py-12">
       <div className="w-full max-w-md text-center">
         <h1 className="text-[22px] font-semibold tracking-tight text-foreground">
-          Sistema temporariamente indisponível
+          Sistema indisponível
         </h1>
       </div>
     </div>
