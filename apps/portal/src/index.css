@@ -52,16 +52,27 @@
 
     /* Radius sóbrio (institucional), alinhado ao sistema interno. */
     --radius: 0.25rem;
+
+    /* Tema escuro / superfícies "hero" (SPEC-NOVA-UI v3 / DESIGN.md §7) — valores
+       fixos usados em superfícies sempre-escuras (login) e como fim de gradiente/
+       glow. Acento do portal é o AZUL. */
+    --canvas-dark: #14171D;
+    --surface-dark: #1A1F28;
+    --elevated-dark: #232833;
+    --border-dark: rgba(255, 255, 255, 0.08);
+    --portal-blue-tint: #93B4FF;         /* fim claro do gradiente do acento azul */
+    --glow-blue: rgba(30, 64, 175, 0.22);
   }
 
   .dark {
-    --background: 222 18% 10%;
+    /* Superfícies em camadas (DESIGN.md §7): canvas → surface → elevated. */
+    --background: 220 18% 10%;           /* #14171D canvas-dark */
     --foreground: 220 16% 96%;
 
-    --card: 222 16% 13%;
+    --card: 219 21% 13%;                 /* #1A1F28 surface-dark */
     --card-foreground: 220 16% 96%;
 
-    --popover: 222 16% 14%;
+    --popover: 221 19% 17%;              /* #232833 elevated-dark */
     --popover-foreground: 220 16% 96%;
 
     --primary: 224 76% 62%;              /* azul luminoso p/ dark */

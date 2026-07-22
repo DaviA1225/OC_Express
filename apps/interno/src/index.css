@@ -52,16 +52,32 @@
     --ring: 19 100% 50%;                 /* foco em laranja LHG */
 
     --radius: 0.25rem;
+
+    /* Tema escuro / superfícies "hero" (SPEC-NOVA-UI v3) — valores FIXOS que não
+       invertem por tema, usados em superfícies sempre-escuras (login e, nas
+       próximas etapas, o tema escuro do app). Gradiente/glow são recursos
+       escassos e posicionados (ver DESIGN.md §Elevação escura). */
+    --canvas-dark: #14171D;              /* fundo raiz de superfície escura */
+    --surface-dark: #1A1F28;             /* card/painel (reaproveita o hex de ink) */
+    --elevated-dark: #232833;            /* popover/dropdown/hover no escuro */
+    --border-dark: rgba(255, 255, 255, 0.08);
+    --orange-tint: #FFB37A;              /* fim CLARO do gradiente do acento interno */
+    --glow-orange: rgba(255, 81, 0, 0.18);
+    --portal-blue-tint: #93B4FF;         /* fim claro do acento do portal */
+    --glow-blue: rgba(30, 64, 175, 0.18);
   }
 
   .dark {
-    --background: 220 16% 10%;           /* grafite escuro neutro */
+    /* Superfícies em camadas (SPEC-NOVA-UI v3 / DESIGN.md §7): canvas-dark →
+       surface-dark → elevated-dark. Dá profundidade "TransporteApp" a todo o app
+       no modo escuro, sem tocar componente a componente. */
+    --background: 220 18% 10%;           /* #14171D canvas-dark (fundo raiz) */
     --foreground: 220 14% 96%;           /* off-white neutro */
 
-    --card: 220 15% 13%;                 /* card um tom acima do bg */
+    --card: 219 21% 13%;                 /* #1A1F28 surface-dark (card/painel) */
     --card-foreground: 220 14% 96%;
 
-    --popover: 220 15% 14%;
+    --popover: 221 19% 17%;              /* #232833 elevated-dark (popover/dropdown) */
     --popover-foreground: 220 14% 96%;
 
     --primary: 21 100% 60%;              /* laranja luminoso para dark */
@@ -188,6 +204,11 @@ body.density-compact ul.divide-y > li {
   .dark .cat-sage  { background-color: rgba(120,150,108,0.20); color: #bcd0ad; border-color: rgba(120,150,108,0.30); }
   .dark .cat-brass { background-color: rgba(180,150,80,0.18);  color: #ddc99a; border-color: rgba(180,150,80,0.30); }
 }
+
+/* Recharts no modo escuro — eixos e grade legíveis sobre a superfície escura
+   (DESIGN.md §7): tick em text-secondary-dark, grade em hairline translúcido. */
+.dark .recharts-cartesian-axis-tick text { fill: #94A3B8; }
+.dark .recharts-cartesian-grid line { stroke: rgba(255, 255, 255, 0.07); }
 
 /* Mapa de clientes (Leaflet) — pin sem caixa branca e rótulo permanente */
 .cliente-pin-icon {
