@@ -79,7 +79,7 @@ export default function MateriaisPage() {
               ? 'inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800'
               : 'inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground'
           }
-          title={r.requer_instrucao ? 'Exige nº de instrução antes de gerar a OC' : 'Não exige instrução — gera OC direto'}
+          title={r.requer_instrucao ? 'Exige nº de instrução antes de gerar a OC' : 'Não exige instrução, gera OC direto'}
         >
           {r.requer_instrucao ? 'Exige' : 'Dispensa'}
         </span>

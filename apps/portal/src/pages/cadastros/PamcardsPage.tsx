@@ -200,7 +200,7 @@ function PamcardForm({ open, onOpenChange, editing, onSubmit }: FormProps) {
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="apelido">Apelido</Label>
-              <Input id="apelido" {...register('apelido')} placeholder="Opcional — ex.: Cartão João, Cofre 1" />
+              <Input id="apelido" {...register('apelido')} placeholder="Opcional, ex.: Cartão João, Cofre 1" />
             </div>
           </DialogBody>
           <DialogFooter>

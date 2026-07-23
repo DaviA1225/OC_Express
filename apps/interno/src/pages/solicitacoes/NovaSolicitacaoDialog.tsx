@@ -569,7 +569,7 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, onCreated }: Props) 
                     )}
                     {!materialMinerio && (
                       <p className="text-[11px] text-amber-700">
-                        Nenhum material "MINÉRIO" cadastrado — verifique o cadastro de materiais.
+                        Nenhum material "MINÉRIO" cadastrado, verifique o cadastro de materiais.
                       </p>
                     )}
                   </div>

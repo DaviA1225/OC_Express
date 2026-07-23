@@ -288,7 +288,7 @@ function DestaqueFalhas24h({ count, loading }: { count: number | null; loading: 
         </p>
         <p className="text-[11px] text-muted-foreground">
           {alarmante
-            ? 'Volume elevado — vale conferir se vem do mesmo email ou parceiro.'
+            ? 'Volume elevado, vale conferir se vem do mesmo email ou parceiro.'
             : 'Conta inclui tentativas com qualquer email, mesmo sem cadastro.'}
         </p>
       </div>

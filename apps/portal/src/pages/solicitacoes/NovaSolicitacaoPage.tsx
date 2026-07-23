@@ -98,7 +98,7 @@ export default function NovaSolicitacaoPage() {
     }
 
     toast.success(
-      'Solicitação enviada. A equipe LHG processará em breve — você receberá a OC pelo WhatsApp/e-mail.',
+      'Solicitação enviada. A equipe LHG processará em breve, você receberá a OC pelo WhatsApp/e-mail.',
     )
     navigate(`/solicitacoes/${novoId}`, { replace: true })
   }
@@ -139,7 +139,7 @@ export default function NovaSolicitacaoPage() {
         <section className="rounded-lg border bg-background p-5">
           <h2 className="text-[15px] font-semibold text-foreground">Anexos</h2>
           <p className="mt-0.5 text-[12px] text-muted-foreground">
-            {`Imagens ou PDF até ${(MAX_FILE_BYTES / 1024 / 1024).toFixed(0)}MB cada — ex.: documentos do motorista ou da subcontratada para cadastro na J&F. Os arquivos aparecem na seção de anexos da solicitação no sislog.`}
+            {`Imagens ou PDF até ${(MAX_FILE_BYTES / 1024 / 1024).toFixed(0)}MB cada, ex.: documentos do motorista ou da subcontratada para cadastro na J&F. Os arquivos aparecem na seção de anexos da solicitação no sislog.`}
           </p>
           <div className="mt-4 flex items-center gap-2">
             <Button

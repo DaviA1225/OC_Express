@@ -119,7 +119,7 @@ export default function AceitarConvitePage() {
     // falhar). Cliente nunca escreve direto em parceiro_usuarios.convite_aceito_em:
     // a RPC SECURITY DEFINER deriva o user_id de auth.uid() e ignora qualquer arg.
     void supabase.rpc('marcar_meu_convite_aceito')
-    toast.success('Senha definida — bem-vindo ao portal!')
+    toast.success('Senha definida, bem-vindo ao portal!')
     navigate('/solicitacoes', { replace: true })
   }
 
@@ -137,7 +137,7 @@ export default function AceitarConvitePage() {
             Defina sua senha
           </h1>
           <p className="mt-1 text-[13px] text-muted-foreground">
-            {parceiroUsuario.nome_completo} ({user?.email}) — crie uma senha forte para
+            {parceiroUsuario.nome_completo} ({user?.email}), crie uma senha forte para
             acessar o portal.
           </p>
 
@@ -255,7 +255,7 @@ function BrandPanel({ parceiroNome }: { parceiroNome?: string | null }) {
       </div>
 
       <footer className="relative text-[11px] text-white/60">
-        © {new Date().getFullYear()} LHG — Portal de Parceiros.
+        © {new Date().getFullYear()} LHG, Portal de Parceiros.
       </footer>
     </aside>
   )
