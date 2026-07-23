@@ -32,6 +32,13 @@ supabase/.claude/
 # Claude Code — settings pessoais/locais (o settings.json compartilhado é versionado)
 .claude/settings.local.json
 
+# Skills instaladas localmente. Só a `impeccable` é versionada: ela é o sistema
+# de design oficial do projeto (ver CLAUDE.md) e o hook do repo depende dela.
+# As demais são instalações pessoais de quem estiver trabalhando na máquina e
+# não devem entrar no repositório.
+.claude/skills/*
+!.claude/skills/impeccable/
+
 # Pasta de trabalho do backfill de PDFs (originais/processados/previews)
 backfill/
 
