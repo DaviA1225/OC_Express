@@ -120,46 +120,65 @@ Componentes obrigatórios a instalar:
 ### 3.1 Esqueleto principal
 Toda página autenticada compartilha o mesmo layout base:
 
-- Sidebar à esquerda: largura 220px (expandida) ou 64px (colapsada)
-- Header no topo: altura 56px, fixo
-- Área de conteúdo à direita: padding 24px, scroll vertical próprio
+- **Header no topo, full-width** (altura 56px, fixo, fundo grafite `#1D1E1B`):
+  ocupa toda a largura, pois **não há mais sidebar fixa**.
+- **Área de conteúdo** abaixo do header: padding responsivo (12–24px), scroll
+  vertical próprio, com o conteúdo dentro de um card sobre o canvas.
+- **Navegação em drawer** (hambúrguer): o menu abre como um `Sheet` sobreposto
+  à esquerda, acionado pelo botão ☰ do header — em qualquer tamanho de tela,
+  não só no mobile.
 
-### 3.2 Sidebar
-Conteúdo da sidebar, em ordem:
+### 3.2 Navegação (drawer)
+A navegação vive num **drawer** (`Sheet`, ~260px, sobreposto à esquerda), aberto
+pelo botão ☰ do header. Conteúdo, em ordem:
 
-1. Logo/nome do sistema no topo (altura 56px, alinhado ao header)
-2. Bloco operacional (sem label, no topo da lista):
-   - Dashboard
-   - Solicitações
-   - Cargas de Retorno
-3. Label "CADASTROS" (10px, uppercase, letter-spacing 0.5px, cor secondary)
-4. Bloco de cadastros:
-   - Motoristas
-   - Veículos
-   - Carretas
-   - Clientes
-   - Materiais
-   - Subcontratadas
-5. Label "SISTEMA" (mesmo estilo da label anterior)
-6. Bloco de sistema (visível apenas para admin/supervisor):
-   - Usuários (apenas admin)
-   - Auditoria
+1. Topo do drawer: logo/nome do sistema à esquerda e **botão de fechar (X)** à
+   direita, na mesma linha; as páginas vêm logo abaixo (sem linha divisória).
+2. Bloco operacional (sem label): Dashboard · Solicitações · Cargas de Retorno.
+3. Label "CADASTROS" (11px, uppercase, letter-spacing 0.5px, cor `--text-muted`).
+4. Bloco de cadastros: Motoristas · Veículos · Carretas · Clientes · Materiais ·
+   Subcontratadas · Parceiros.
+5. Label "SISTEMA" (mesmo estilo da label anterior).
+6. Bloco de sistema (visível por permissão): Relatórios · Relatórios Internos ·
+   Atividade da Equipe · Usuários (apenas admin) · Auditoria · Segurança.
 
-Cada item tem ícone do Lucide à esquerda + rótulo. Item ativo: fundo primary
-preenchido + texto branco. Item em hover: fundo muted. Botão de colapsar a
-sidebar fica no rodapé da sidebar.
+Cada página é uma **seção** própria: bloco com cantos de 8px (`border-radius`),
+**fundo sutil** (`--muted/40`), **borda hairline** (`--border`) e padding 8px 12px,
+com ícone do Lucide à esquerda + rótulo (13px, peso 500). As seções são separadas
+por **espaço vazio** (sem linha divisória).
 
-No mobile (< 768px), a sidebar vira um menu hambúrguer que abre como Sheet
-sobreposto.
+**Hover (animação suave, `duration-200 ease-out`):** a borda acende no acento
+(`--primary/40`), o fundo intensifica para `--accent` e há um leve deslize à direita
+(2px). `prefers-reduced-motion` respeitado (sem o deslize).
 
-### 3.3 Header
-Conteúdo do header, em ordem horizontal:
+O drawer ocupa a **largura total** do painel (sem borda lateral nem faixa vazia à
+direita). Espaçamento calibrado para caber sem barra de rolagem.
 
-- Esquerda: botão hambúrguer (apenas mobile) + título da tela atual
-- Centro: campo de busca global com placeholder "Buscar (Ctrl+K)" — abre um
-  Command Palette ao clicar ou usar atalho
-- Direita: avatar circular do usuário com inicial + nome + dropdown ▾
-  - Dropdown contém: "Meu perfil", separador, "Sair"
+**Item ativo:** NÃO usa fundo preenchido na cor de marca. Usa fundo `--bg-accent`
+(cinza neutro padrão do sistema), texto `--text-accent`, peso 500, e uma **barra
+vertical de 3px na borda esquerda** (via `::before`) no acento `--primary`
+(laranja) como sinal de "aqui". **Hover:** fundo sutil (`--muted`). O laranja fica
+reservado à barra do item ativo — a Regra da Voz Única (`DESIGN.md`) continua
+valendo: o acento não preenche a superfície do item.
+
+**Rodapé do drawer:** a versão do app (10px, `--text-muted`) acima de um bloco
+com **avatar de iniciais + nome + perfil** do usuário logado.
+
+### 3.3 Header (full-width, 3 zonas)
+O header ocupa toda a largura e se organiza em três zonas horizontais:
+
+- **Esquerda:** botão **"Menu"** (ícone ☰ + rótulo "Menu"), em **outline branco**
+  (borda e texto brancos sobre o header grafite, fundo transparente, hover com
+  tint branco sutil) para o usuário achar a navegação que substituiu a antiga
+  sidebar fixa; abre o drawer. Ao lado, o logo (ícone + "SisLog").
+- **Centro:** barra de busca global ("Buscar (Ctrl+K)" — abre o Command Palette).
+- **Direita:** status de rede (indicador "Ao vivo / Conectando… / Sem conexão"),
+  alternador de tema, sino de notificações e menu do usuário (avatar + nome +
+  dropdown ▾ com "Meu perfil", densidade compacta e "Sair").
+
+O header **não repete o título da página** — cada tela já tem seu próprio `h1`.
+Em telas estreitas, o texto "SisLog" e a barra de busca colapsam (a busca vira
+botão-ícone); ☰ e status de rede permanecem.
 
 ### 3.4 Breadcrumb
 Em telas de detalhe (não em listas), abaixo do header e acima do título da
