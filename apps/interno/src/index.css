@@ -80,9 +80,16 @@
     --popover: 221 19% 17%;              /* #232833 elevated-dark (popover/dropdown) */
     --popover-foreground: 220 14% 96%;
 
+    /* Acento laranja do dark: fill claro + tinta ESCURA quente (mesmo tratamento
+       do azul do portal). Branco sobre laranja NUNCA passa WCAG AA (2.3-2.7:1 em
+       qualquer L — o laranja e' luminoso demais). Tinta escura sobre o fill passa
+       (6.76:1) e o laranja-como-texto sobre card/canvas ja passava (6.4/6.8:1).
+       So no dark: no claro o botao segue branco sobre #FF5100 (ver nota abaixo).
+       `--primary-foreground` escuro vale p/ todo fill de acento (botao/avatar/
+       checkbox). Hover CLAREIA (L66), porque tinta escura pede mais luz. */
     --primary: 21 100% 60%;              /* laranja luminoso para dark */
-    --primary-hover: 19 100% 52%;
-    --primary-foreground: 0 0% 100%;
+    --primary-hover: 21 100% 66%;        /* hover CLAREIA (tinta escura) */
+    --primary-foreground: 20 50% 10%;    /* tinta escura quente do fill no dark */
 
     --secondary: 220 10% 30%;
     --secondary-foreground: 220 14% 96%;
