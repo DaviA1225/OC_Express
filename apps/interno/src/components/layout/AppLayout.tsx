@@ -11,33 +11,9 @@ const GlobalSearchDialog = React.lazy(() =>
   import('@/features/search/GlobalSearchDialog').then((m) => ({ default: m.GlobalSearchDialog })),
 )
 
-const PAGE_TITLES: Record<string, string> = {
-  '/dashboard': 'Dashboard',
-  '/solicitacoes': 'Solicitações',
-  '/cargas-retorno': 'Cargas de Retorno',
-  '/cadastros/motoristas': 'Motoristas',
-  '/cadastros/veiculos': 'Veículos',
-  '/cadastros/carretas': 'Carretas',
-  '/cadastros/clientes': 'Clientes',
-  '/cadastros/materiais': 'Materiais',
-  '/cadastros/subcontratadas': 'Subcontratadas',
-  '/cadastros/parceiros': 'Parceiros',
-  '/cadastros/usuarios': 'Usuários',
-  '/auditoria': 'Auditoria',
-  '/seguranca': 'Segurança',
-  '/relatorios': 'Relatórios',
-  '/perfil': 'Meu perfil',
-}
-
-const COLLAPSED_KEY = 'sislog.sidebar.collapsed'
-
 export function AppLayout() {
   const location = useLocation()
   const realtimeStatus = useRealtimeSubscriptions()
-  const [collapsed, setCollapsed] = React.useState(() => {
-    if (typeof window === 'undefined') return false
-    return window.localStorage.getItem(COLLAPSED_KEY) === '1'
-  })
   const [mobileOpen, setMobileOpen] = React.useState(false)
   const [searchOpen, setSearchOpen] = React.useState(false)
   const [lastPath, setLastPath] = React.useState(location.pathname)
@@ -46,10 +22,6 @@ export function AppLayout() {
     if (mobileOpen) setMobileOpen(false)
     if (searchOpen) setSearchOpen(false)
   }
-
-  React.useEffect(() => {
-    window.localStorage.setItem(COLLAPSED_KEY, collapsed ? '1' : '0')
-  }, [collapsed])
 
   // Atalhos globais (SPEC-FRONTEND 1.2)
   React.useEffect(() => {
@@ -79,30 +51,23 @@ export function AppLayout() {
     return () => window.removeEventListener('keydown', handler)
   }, [])
 
-  const pageTitle = PAGE_TITLES[location.pathname] ?? ''
-
   return (
     <div className="flex h-full print:block print:h-auto">
       <GlobalProgressBar />
-      {/* Sidebar desktop */}
-      <div className="hidden md:flex print:hidden">
-        <SidebarContent
-          collapsed={collapsed}
-          onToggleCollapse={() => setCollapsed((v) => !v)}
-        />
-      </div>
-
-      {/* Sidebar mobile (Sheet) */}
+      {/* Navegação em drawer (hamburger) — não há mais sidebar fixa. */}
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-        <SheetContent side="left" className="w-[260px] p-0">
-          <SidebarContent collapsed={false} onNavigate={() => setMobileOpen(false)} />
+        <SheetContent side="left" hideClose className="w-[260px] p-0">
+          <SidebarContent
+            collapsed={false}
+            onNavigate={() => setMobileOpen(false)}
+            onClose={() => setMobileOpen(false)}
+          />
         </SheetContent>
       </Sheet>
 
       <div className="flex min-w-0 flex-1 flex-col print:block">
         <div className="print:hidden">
           <Header
-            pageTitle={pageTitle}
             onOpenMobileMenu={() => setMobileOpen(true)}
             onOpenSearch={() => setSearchOpen(true)}
             realtimeStatus={realtimeStatus}
