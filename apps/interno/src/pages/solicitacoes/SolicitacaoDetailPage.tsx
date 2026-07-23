@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
-import { AlertCircle, ArrowLeft, CheckCircle2, ChevronLeft, ChevronRight, Copy, CreditCard, Loader2, Mail, MessageCircle, MoreHorizontal, Pencil, RotateCcw, Undo2, X } from 'lucide-react'
+import { AlertCircle, ArrowLeft, Check, CheckCircle2, ChevronLeft, ChevronRight, Copy, CreditCard, Loader2, Mail, MessageCircle, MoreHorizontal, Pencil, RotateCcw, Undo2, X } from 'lucide-react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { toast } from 'sonner'
@@ -28,7 +28,7 @@ import {
   useTransitStatus,
   useDuplicateSolicitacao,
 } from '@/features/solicitacoes/useSolicitacoes'
-import { canCancel, isEditable } from '@/features/solicitacoes/status'
+import { canCancel, isEditable, STATUS_CLASSES } from '@/features/solicitacoes/status'
 import { useAuth } from '@/hooks/useAuth'
 import { canEditSolicitacoes } from '@/features/auth/permissions'
 import { useCrudOptions } from '@/features/crud/useCrudOptions'
@@ -36,7 +36,7 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { AnexosCard } from '@/features/anexos/AnexosCard'
 import { HistoricoCard } from '@/features/solicitacoes/HistoricoCard'
-import { usePendencias, useDevolverParceiro, useMarcarPendenciaVista, type Pendencia } from '@/features/solicitacoes/usePendencias'
+import { usePendencias, useDevolverParceiro, useMarcarPendenciaVista, useMarcarPendencia, useResolverPendenciaInterna, type Pendencia } from '@/features/solicitacoes/usePendencias'
 const GerarOCDialog = React.lazy(() =>
   import('@/features/pdf-generator/GerarOCDialog').then((m) => ({ default: m.GerarOCDialog })),
 )
@@ -47,7 +47,7 @@ import { formatNumeroOC, formatTelefone, formatarPamcardParaExibicao, cn } from 
 import { isValidTelefone } from '@/lib/validators'
 import { normalizeWhatsAppPhone, buildWhatsAppLink, formatOCWhatsAppMessage } from '@/features/whatsapp/whatsapp'
 import { getOcPdfSignedUrl } from '@/features/pdf-generator/ocPdf'
-import type { MaterialSubtipo, Tables } from '@/types/database.types'
+import type { MaterialSubtipo, SolicitacaoStatus, Tables } from '@/types/database.types'
 import { isMineralMaterial } from '@/features/solicitacoes/material'
 
 type MotoristaOpt = Pick<Tables<'motoristas'>, 'id' | 'nome_completo' | 'cpf'>
@@ -79,9 +79,12 @@ export function SolicitacaoDetailPage() {
   const [openGerarOC, setOpenGerarOC] = React.useState(false)
   const [openWhats, setOpenWhats] = React.useState(false)
   const [openDevolver, setOpenDevolver] = React.useState(false)
+  const [openPendencia, setOpenPendencia] = React.useState(false)
 
   const pendencias = usePendencias(id)
   const devolver = useDevolverParceiro()
+  const marcarPendencia = useMarcarPendencia()
+  const resolverPendenciaInterna = useResolverPendenciaInterna()
   const pendenciaAberta = pendencias.data?.find((p) => p.status === 'aberta') ?? null
 
   const materialDetalhe = useQuery({
@@ -150,6 +153,11 @@ export function SolicitacaoDetailPage() {
   const podeDevolver =
     canEdit && s.origem === 'parceiro' && s.status !== 'finalizada' &&
     s.status !== 'cancelada' && !pendenciaAberta
+  // "Marcar pendência" é o equivalente interno do "devolver": para solicitações
+  // sem parceiro (origem interna/e-mail), a própria equipe abre e resolve o alerta.
+  const podeMarcarPendencia =
+    canEdit && s.origem !== 'parceiro' && s.status !== 'finalizada' &&
+    s.status !== 'cancelada' && !pendenciaAberta
 
   return (
     <div className="space-y-4">
@@ -198,12 +206,12 @@ export function SolicitacaoDetailPage() {
         </div>
       )}
 
-      {pendenciaAberta && (
+      {pendenciaAberta && isParceiro && (
         <div className="flex items-start gap-2 rounded-lg border border-orange-300 bg-orange-50 px-4 py-3 dark:border-orange-900/60 dark:bg-orange-950/40">
           <Undo2 className="mt-0.5 h-4 w-4 shrink-0 text-orange-600 dark:text-orange-400" />
           <div className="text-[13px] text-orange-900 dark:text-orange-200">
             <p className="font-medium">
-              Devolvida ao parceiro — aguardando resolução
+              Devolvida ao parceiro, aguardando resolução
               <span className="font-normal text-orange-800 dark:text-orange-300">
                 {' · desde '}
                 {format(new Date(pendenciaAberta.created_at), "dd/MM 'às' HH:mm", { locale: ptBR })}
@@ -213,6 +221,40 @@ export function SolicitacaoDetailPage() {
               Motivo: {pendenciaAberta.motivo}
             </p>
           </div>
+        </div>
+      )}
+
+      {pendenciaAberta && !isParceiro && (
+        <div className="flex items-start justify-between gap-3 rounded-lg border border-red-300 bg-red-50 px-4 py-3 dark:border-red-900/60 dark:bg-red-950/40">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-600 dark:text-red-400" />
+            <div className="text-[13px] text-red-900 dark:text-red-200">
+              <p className="font-medium">
+                Pendência aberta
+                <span className="font-normal text-red-800 dark:text-red-300">
+                  {' · desde '}
+                  {format(new Date(pendenciaAberta.created_at), "dd/MM 'às' HH:mm", { locale: ptBR })}
+                </span>
+              </p>
+              <p className="mt-0.5 text-[12px] text-red-800 dark:text-red-300">
+                Motivo: {pendenciaAberta.motivo}
+              </p>
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="shrink-0"
+            disabled={resolverPendenciaInterna.isPending}
+            onClick={() => resolverPendenciaInterna.mutate(pendenciaAberta.id)}
+          >
+            {resolverPendenciaInterna.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <CheckCircle2 className="h-4 w-4" />
+            )}
+            Resolver
+          </Button>
         </div>
       )}
 
@@ -284,6 +326,12 @@ export function SolicitacaoDetailPage() {
                     Devolver ao parceiro
                   </DropdownMenuItem>
                 )}
+                {podeMarcarPendencia && (
+                  <DropdownMenuItem onSelect={() => setOpenPendencia(true)} disabled={marcarPendencia.isPending}>
+                    <AlertCircle className="mr-2 h-4 w-4" />
+                    Marcar pendência
+                  </DropdownMenuItem>
+                )}
                 {s.status === 'finalizada' && (
                   <DropdownMenuItem onSelect={() => setConfirmReabrir(true)} disabled={transit.isPending}>
                     <RotateCcw className="mr-2 h-4 w-4" />
@@ -315,13 +363,13 @@ export function SolicitacaoDetailPage() {
           <SolicitanteCard
             solicitacao={s}
             editable={editable && !isParceiro}
-            lockedHint={isParceiro && editable ? 'Solicitante enviado pelo parceiro — não editável aqui.' : null}
+            lockedHint={isParceiro && editable ? 'Solicitante enviado pelo parceiro, não editável aqui.' : null}
             onSave={(values) => update.mutateAsync({ id: s.id, values })}
           />
           <MotoristaVeiculoCard
             solicitacao={s}
             editable={editable && !isParceiro}
-            lockedHint={isParceiro && editable ? 'Motorista e veículo enviados pelo parceiro — não editáveis aqui.' : null}
+            lockedHint={isParceiro && editable ? 'Motorista e veículo enviados pelo parceiro, não editáveis aqui.' : null}
             onSave={(values) => update.mutateAsync({ id: s.id, values })}
           />
           <DestinoMaterialCard solicitacao={s} editable={editable} onSave={(values) => update.mutateAsync({ id: s.id, values })} />
@@ -432,6 +480,17 @@ export function SolicitacaoDetailPage() {
         onConfirm={async (motivo) => {
           await devolver.mutateAsync({ solicitacaoId: s.id, motivo })
           setOpenDevolver(false)
+        }}
+      />
+
+      <MarcarPendenciaDialog
+        open={openPendencia}
+        onOpenChange={setOpenPendencia}
+        numero={formatNumeroOC(s.numero_interno)}
+        saving={marcarPendencia.isPending}
+        onConfirm={async (motivo) => {
+          await marcarPendencia.mutateAsync({ solicitacaoId: s.id, motivo })
+          setOpenPendencia(false)
         }}
       />
 
@@ -811,7 +870,7 @@ function MotoristaVeiculoCard({ solicitacao, editable, onSave, lockedHint }: Car
             </div>
           </div>
           <p className="text-[11px] text-muted-foreground">
-            1ª Carreta e Dolly são opcionais — preencha conforme a composição (ANTT).
+            1ª Carreta e Dolly são opcionais, preencha conforme a composição (ANTT).
           </p>
           <div className="space-y-1.5">
             <Label>Subcontratada *</Label>
@@ -963,7 +1022,7 @@ function DestinoMaterialCard({ solicitacao, editable, onSave }: CardProps) {
               disabled={isRetorno} />
             {isRetorno && (
               <p className="text-[11px] text-muted-foreground">
-                Definido pela carga de retorno — não pode ser alterado aqui.
+                Definido pela carga de retorno, não pode ser alterado aqui.
               </p>
             )}
           </div>
@@ -990,7 +1049,7 @@ function DestinoMaterialCard({ solicitacao, editable, onSave }: CardProps) {
               </Select>
               {!materialMinerio && !solicitacao.material_id && (
                 <p className="text-[11px] text-amber-700">
-                  Nenhum material "MINÉRIO" cadastrado — verifique o cadastro de materiais.
+                  Nenhum material "MINÉRIO" cadastrado, verifique o cadastro de materiais.
                 </p>
               )}
             </div>
@@ -1011,7 +1070,7 @@ function DestinoMaterialCard({ solicitacao, editable, onSave }: CardProps) {
             </Select>
             {isRetorno && (
               <p className="text-[11px] text-muted-foreground">
-                Definido pela carga de retorno — não pode ser alterado aqui.
+                Definido pela carga de retorno, não pode ser alterado aqui.
               </p>
             )}
           </div>
@@ -1463,7 +1522,7 @@ function PamcardCard({ solicitacao, editable, onSave }: CardProps) {
           <div>
             <dt className="text-[10px] uppercase tracking-[0.5px] text-muted-foreground">Status</dt>
             <dd className="font-medium text-muted-foreground">
-              Não necessário — pagamento por outro meio
+              Não necessário, pagamento por outro meio
             </dd>
           </div>
         )}
@@ -1580,32 +1639,50 @@ function ObservacoesCard({ solicitacao, editable, onSave }: CardProps) {
 }
 
 function TimelineCard({ solicitacao }: { solicitacao: CardProps['solicitacao'] }) {
-  const items: { when: string | null; label: string }[] = [
-    { when: solicitacao.created_at, label: 'Solicitação recebida' },
+  // Cada marco concluído vira um nó do stepper, colorido pela cor de status do
+  // evento (progressão cinza→laranja→verde de DESIGN.md, mesma fonte dos badges).
+  const items: { when: string | null; label: string; status: SolicitacaoStatus }[] = [
+    { when: solicitacao.created_at, label: 'Solicitação recebida', status: 'recebida' },
   ]
-  if (solicitacao.numero_instrucao) items.push({ when: solicitacao.updated_at, label: `Instrução ${solicitacao.numero_instrucao}` })
-  if (solicitacao.pdf_url) items.push({ when: solicitacao.updated_at, label: 'OC gerada (PDF)' })
-  if (solicitacao.enviada_em) items.push({ when: solicitacao.enviada_em, label: 'OC enviada' })
-  if (solicitacao.finalizada_em) items.push({ when: solicitacao.finalizada_em, label: 'Finalizada' })
-  if (solicitacao.status === 'cancelada') items.push({ when: solicitacao.updated_at, label: 'Cancelada' })
+  if (solicitacao.numero_instrucao) items.push({ when: solicitacao.updated_at, label: `Instrução ${solicitacao.numero_instrucao}`, status: 'instrucao_emitida' })
+  if (solicitacao.pdf_url) items.push({ when: solicitacao.updated_at, label: 'OC gerada (PDF)', status: 'oc_gerada' })
+  if (solicitacao.enviada_em) items.push({ when: solicitacao.enviada_em, label: 'OC enviada', status: 'oc_enviada' })
+  if (solicitacao.finalizada_em) items.push({ when: solicitacao.finalizada_em, label: 'Finalizada', status: 'finalizada' })
+  if (solicitacao.status === 'cancelada') items.push({ when: solicitacao.updated_at, label: 'Cancelada', status: 'cancelada' })
 
   return (
     <section className="rounded-lg border bg-card">
       <header className="flex items-center justify-between border-b px-4 py-2">
         <h2 className="text-[14px] font-medium text-foreground">Linha do tempo</h2>
       </header>
-      <ol className="space-y-3 p-4 text-[12px]">
-        {items.map((it, i) => (
-          <li key={i} className="flex items-start gap-2">
-            <span className="mt-1 inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
-            <div className="leading-tight">
-              <p className="text-foreground">{it.label}</p>
-              <p className="text-muted-foreground">
-                {it.when ? format(new Date(it.when), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR }) : '—'}
-              </p>
-            </div>
-          </li>
-        ))}
+      <ol className="space-y-0 p-4">
+        {items.map((it, i) => {
+          const last = i === items.length - 1
+          return (
+            <li key={i} className="flex gap-3">
+              <div className="flex flex-col items-center">
+                <span
+                  className={cn(
+                    'flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-black/5',
+                    STATUS_CLASSES[it.status],
+                    // Nó mais recente (estado atual) ganha um glow do acento — chama
+                    // atenção pro "agora" (DESIGN.md §7); terminal cancelada não brilha.
+                    last && it.status !== 'cancelada' && 'shadow-[0_0_12px_-1px_rgba(255,81,0,0.55)]',
+                  )}
+                >
+                  {it.status === 'cancelada' ? <X className="h-3.5 w-3.5" aria-hidden /> : <Check className="h-3.5 w-3.5" aria-hidden />}
+                </span>
+                {!last && <span className="w-px flex-1 bg-border" />}
+              </div>
+              <div className={cn('pb-4', last && 'pb-0')}>
+                <p className="text-[13px] font-medium text-foreground">{it.label}</p>
+                <p className="text-[12px] text-muted-foreground">
+                  {it.when ? format(new Date(it.when), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR }) : '—'}
+                </p>
+              </div>
+            </li>
+          )
+        })}
       </ol>
     </section>
   )
@@ -1653,7 +1730,7 @@ function DevolverParceiroForm({
         <DialogTitle>Devolver {numero} ao parceiro</DialogTitle>
         <DialogDescription>
           Descreva a pendência que impede a finalização. O parceiro recebe um
-          aviso no portal e responde quando resolver — você é notificado de volta.
+          aviso no portal e responde quando resolver, você é notificado de volta.
         </DialogDescription>
       </DialogHeader>
       <DialogBody className="space-y-1.5">
@@ -1678,6 +1755,81 @@ function DevolverParceiroForm({
             {saving && <Loader2 className="h-4 w-4 animate-spin" />}
             <Undo2 className="h-4 w-4" />
             Devolver ao parceiro
+          </Button>
+        </div>
+      </DialogFooter>
+    </>
+  )
+}
+
+// Diálogo para marcar uma pendência interna (solicitação sem parceiro). Cria uma
+// pendência aberta (migration 0035/0046, parceiro_id NULL) que a própria equipe
+// resolve — sinaliza o card em vermelho até ser resolvida.
+function MarcarPendenciaDialog({
+  open, onOpenChange, numero, saving, onConfirm,
+}: {
+  open: boolean
+  onOpenChange: (v: boolean) => void
+  numero: string
+  saving: boolean
+  onConfirm: (motivo: string) => Promise<void>
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        {open && (
+          <MarcarPendenciaForm
+            numero={numero}
+            saving={saving}
+            onCancel={() => onOpenChange(false)}
+            onConfirm={onConfirm}
+          />
+        )}
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function MarcarPendenciaForm({
+  numero, saving, onCancel, onConfirm,
+}: {
+  numero: string
+  saving: boolean
+  onCancel: () => void
+  onConfirm: (motivo: string) => Promise<void>
+}) {
+  const [motivo, setMotivo] = React.useState('')
+  return (
+    <>
+      <DialogHeader>
+        <DialogTitle>Marcar pendência em {numero}</DialogTitle>
+        <DialogDescription>
+          Descreva o que está pendente nesta solicitação. Ela fica sinalizada em
+          vermelho na lista até alguém da equipe resolver.
+        </DialogDescription>
+      </DialogHeader>
+      <DialogBody className="space-y-1.5">
+        <Label htmlFor="pendencia-motivo">Motivo da pendência *</Label>
+        <Textarea
+          id="pendencia-motivo"
+          autoFocus
+          rows={4}
+          value={motivo}
+          onChange={(e) => setMotivo(e.target.value)}
+          placeholder="Ex.: aguardando confirmação do cliente sobre o local de carregamento."
+        />
+      </DialogBody>
+      <DialogFooter>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={onCancel} disabled={saving}>Cancelar</Button>
+          <Button
+            onClick={() => onConfirm(motivo.trim())}
+            disabled={saving || motivo.trim().length === 0}
+            className="bg-red-600 text-white hover:bg-red-700"
+          >
+            {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+            <AlertCircle className="h-4 w-4" />
+            Marcar pendência
           </Button>
         </div>
       </DialogFooter>
@@ -1743,7 +1895,7 @@ function PendenciasCard({ pendencias }: { pendencias: Pendencia[] }) {
                   className="mt-1 h-7 border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-950/40"
                   disabled={marcarVista.isPending}
                   onClick={() => marcarVista.mutate(p.id)}
-                  title="Marca a resposta como vista — remove o aviso do card para toda a equipe"
+                  title="Marca a resposta como vista, remove o aviso do card para toda a equipe"
                 >
                   {marcarVista.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
                   Marcar como visto

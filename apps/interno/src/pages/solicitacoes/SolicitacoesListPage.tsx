@@ -671,10 +671,10 @@ function SolicitacaoCard({ row, sinalPendencia, selectable, selected, onToggleSe
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen() } }}
       aria-label={`Abrir ${formatNumeroOC(row.numero_interno)}`}
       className={cn(
-        'cursor-pointer rounded-lg border bg-card p-4 transition-colors hover:border-primary/60 hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+        'relative cursor-pointer rounded-lg border border-slate-400 bg-card p-4 transition-[box-shadow,border-color,background-color] duration-200 ease-out hover:z-10 hover:border-primary/60 hover:bg-muted/30 hover:shadow-xl dark:border-slate-700 dark:hover:bg-[var(--elevated-dark)] dark:hover:shadow-[0_16px_40px_-8px_rgba(0,0,0,0.85)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
         selectable && selected && 'border-primary bg-primary/5',
         !selected && sinal === 'parceiro_respondeu' && 'border-emerald-400 ring-1 ring-emerald-200 dark:border-emerald-700 dark:ring-emerald-900/50',
-        !selected && sinal === 'aguardando_parceiro' && 'border-orange-300 dark:border-orange-900/60',
+        !selected && sinal === 'aguardando_parceiro' && 'border-red-400 ring-1 ring-red-200 dark:border-red-900/60 dark:ring-red-900/40',
         !selected && !sinal && sla?.severity === 'alert' && 'border-red-300 dark:border-red-900/60',
         !selected && !sinal && sla?.severity === 'warning' && 'border-amber-300 dark:border-amber-900/60',
       )}
@@ -774,7 +774,7 @@ function SolicitacaoListaRow({ row, sinalPendencia, selectable, selected, onTogg
   return (
     <div
       className={cn(
-        'flex items-center gap-3 px-3 py-2.5 transition-colors hover:bg-muted/50',
+        'relative flex items-center gap-3 rounded-md px-3 py-2.5 transition-all duration-200 ease-out hover:-translate-y-0.5 hover:bg-muted/50 hover:shadow-sm motion-reduce:hover:translate-y-0 motion-reduce:hover:shadow-none',
         selectable && selected && 'bg-primary/5',
       )}
     >
@@ -892,17 +892,17 @@ function PendenciaPop({ sinal }: { sinal: PendenciaSinal }) {
           <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
         </span>
         <Reply className="h-3 w-3" />
-        Parceiro respondeu
+        Respondido
       </span>
     )
   }
   return (
     <span
-      className="inline-flex shrink-0 items-center gap-1 rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-medium text-orange-800 dark:bg-orange-950/60 dark:text-orange-300"
-      title="Devolvida ao parceiro — aguardando ele resolver"
+      className="inline-flex shrink-0 items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-800 dark:bg-red-950/60 dark:text-red-300"
+      title="Pendência aberta nesta solicitação"
     >
       <Undo2 className="h-3 w-3" />
-      Aguardando parceiro
+      Pendência
     </span>
   )
 }
@@ -916,7 +916,7 @@ function SlaBadge({ sla }: { sla: SlaInfo }) {
   return (
     <span
       className={cn('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium', cls)}
-      title={`${titulo} — pendente ${sla.label}`}
+      title={`${titulo}, pendente ${sla.label}`}
     >
       <Clock className="h-3 w-3" />
       {sla.label}

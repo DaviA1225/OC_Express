@@ -421,7 +421,8 @@ export interface Database {
         Row: {
           id: string
           solicitacao_id: string
-          parceiro_id: string
+          // Nullable (migration 0046): NULL em pendência de origem interna (sem parceiro).
+          parceiro_id: string | null
           motivo: string
           status: SolicitacaoPendenciaStatus
           resposta_parceiro: string | null
@@ -437,7 +438,7 @@ export interface Database {
         Insert: {
           id?: string
           solicitacao_id: string
-          parceiro_id?: string
+          parceiro_id?: string | null
           motivo: string
           status?: SolicitacaoPendenciaStatus
           resposta_parceiro?: string | null

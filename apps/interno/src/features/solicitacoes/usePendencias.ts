@@ -78,6 +78,57 @@ export function usePendencias(solicitacaoId: string | undefined) {
   })
 }
 
+/** Marca uma pendência INTERNA numa solicitação sem parceiro (origem interna):
+ *  um alerta que a própria equipe abre e resolve, sem loop com o portal. Mesmo
+ *  overlay das pendências de parceiro, mas `parceiro_id` fica NULL (migration
+ *  0046) — o trigger deriva NULL da solicitação interna. */
+export function useMarcarPendencia() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ solicitacaoId, motivo }: { solicitacaoId: string; motivo: string }) => {
+      const { error } = await supabase
+        .from('solicitacao_pendencias')
+        .insert({ solicitacao_id: solicitacaoId, motivo } as never)
+      if (error) throw error
+    },
+    onSuccess: (_data, { solicitacaoId }) => {
+      qc.invalidateQueries({ queryKey: ['pendencias', solicitacaoId] })
+      qc.invalidateQueries({ queryKey: ['pendencias'] })
+      qc.invalidateQueries({ queryKey: ['notifications'] })
+      toast.success('Pendência registrada nesta solicitação.')
+    },
+    onError: (e: unknown) => {
+      const msg = e instanceof Error ? e.message : 'Erro ao registrar pendência'
+      toast.error(msg)
+    },
+  })
+}
+
+/** Resolve uma pendência interna (a própria equipe fecha). Marca também
+ *  `vista_equipe_em` para NÃO cair no sinal verde "Respondido" da lista, que é
+ *  específico do loop do parceiro (resposta ainda não tratada). */
+export function useResolverPendenciaInterna() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (pendenciaId: string) => {
+      const { error } = await supabase
+        .from('solicitacao_pendencias')
+        .update({ status: 'resolvida', vista_equipe_em: new Date().toISOString() } as never)
+        .eq('id', pendenciaId)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['pendencias'] })
+      qc.invalidateQueries({ queryKey: ['notifications'] })
+      toast.success('Pendência resolvida.')
+    },
+    onError: (e: unknown) => {
+      const msg = e instanceof Error ? e.message : 'Erro ao resolver pendência'
+      toast.error(msg)
+    },
+  })
+}
+
 /** Devolve a solicitação ao parceiro criando uma pendência aberta. Os campos
  *  parceiro_id/criada_por são preenchidos por trigger (migration 0035). */
 export function useDevolverParceiro() {
