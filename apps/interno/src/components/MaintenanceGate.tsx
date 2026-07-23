@@ -15,6 +15,11 @@ import { supabase } from '@/lib/supabase'
  * rede, então um soluço do Supabase não derruba o app sozinho.
  */
 export function MaintenanceGate({ children }: { children: ReactNode }) {
+  // Em desenvolvimento (dev server Vite) o gate é ignorado: a equipe precisa
+  // trabalhar mesmo com a manutenção ligada em produção. No build de produção
+  // `import.meta.env.DEV` é false, então o bloqueio continua valendo normalmente.
+  const isDev = import.meta.env.DEV
+
   const { data, isLoading } = useQuery({
     queryKey: ['system-status'],
     queryFn: () => fetchSystemStatus(supabase),
@@ -22,7 +27,12 @@ export function MaintenanceGate({ children }: { children: ReactNode }) {
     refetchOnWindowFocus: true,
     staleTime: 0,
     retry: 0,
+    enabled: !isDev,
   })
+
+  if (isDev) {
+    return <>{children}</>
+  }
 
   // Enquanto a primeira leitura não resolve, um loader neutro (parece boot
   // normal) — evita piscar o app antes de bloquear quando a manutenção está on.
