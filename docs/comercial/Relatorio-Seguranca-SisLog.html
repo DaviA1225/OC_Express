@@ -1,0 +1,435 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<title>Relatório de Segurança — SisLog LHG</title>
+<style>
+  /* Fonte do PDF docs/comercial/Relatorio-Seguranca-SisLog.pdf.
+     Para gerar o PDF: abrir no navegador → Imprimir → Salvar como PDF,
+     papel A4, margens padrão, "Gráficos de fundo" LIGADO. */
+
+  :root {
+    --azul: #1E40AF;
+    --azul-claro: #2952CC;
+    --texto: #1F2430;
+    --suave: #5B6472;
+    --linha: #D7DCE5;
+    --faixa: #EEF2FB;
+    --verde: #157347;
+    --ambar: #B45309;
+  }
+
+  @page { size: A4; margin: 18mm 16mm; }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 10.5pt;
+    line-height: 1.5;
+    color: var(--texto);
+  }
+
+  /* ---------- capa ---------- */
+  .capa {
+    height: 247mm;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    text-align: center;
+    page-break-after: always;
+  }
+  .capa h1 {
+    font-size: 34pt;
+    color: var(--azul);
+    margin: 0 0 14px;
+    letter-spacing: -0.5px;
+  }
+  .capa .sub { font-size: 14pt; color: var(--suave); margin-bottom: 22px; }
+  .capa .regua { width: 120px; height: 3px; background: var(--azul); margin: 0 auto 30px; }
+  .capa .linha2 { font-size: 12pt; color: var(--texto); margin-bottom: 120px; }
+  .capa .rodape { font-size: 10.5pt; color: var(--suave); line-height: 1.8; }
+  .capa .conf { font-size: 8pt; color: var(--suave); margin-top: 10px; }
+
+  /* ---------- cabeçalho / rodapé de página ---------- */
+  .faixa-topo {
+    background: var(--azul);
+    color: #fff;
+    font-size: 8.5pt;
+    font-weight: bold;
+    padding: 7px 12px;
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 26px;
+  }
+  .faixa-topo .dir { font-weight: normal; }
+
+  .pagina { page-break-after: always; }
+  .pagina:last-child { page-break-after: auto; }
+
+  .rodape-pagina {
+    border-top: 1px solid var(--linha);
+    margin-top: 28px;
+    padding-top: 7px;
+    font-size: 8pt;
+    color: var(--suave);
+    display: flex;
+    justify-content: space-between;
+  }
+
+  /* ---------- tipografia ---------- */
+  h2 {
+    font-size: 17pt;
+    color: var(--azul);
+    margin: 26px 0 4px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid var(--azul);
+  }
+  h2:first-of-type { margin-top: 0; }
+  h3 { font-size: 12pt; color: var(--azul-claro); margin: 20px 0 6px; }
+  p { margin: 10px 0; text-align: justify; }
+  ul { margin: 10px 0; padding-left: 18px; }
+  li { margin: 5px 0; }
+  code { font-family: "Courier New", monospace; font-size: 9.5pt; }
+  strong { color: var(--texto); }
+
+  .nota { font-size: 8.5pt; color: var(--suave); text-align: justify; }
+
+  .destaque {
+    background: var(--faixa);
+    border-left: 3px solid var(--azul);
+    padding: 12px 14px;
+    margin: 14px 0;
+  }
+  .destaque p { margin: 0; }
+
+  /* ---------- tabelas ---------- */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 14px 0;
+    font-size: 9.5pt;
+  }
+  th {
+    background: var(--azul);
+    color: #fff;
+    text-align: left;
+    padding: 8px 10px;
+    font-size: 9.5pt;
+  }
+  td { padding: 9px 10px; vertical-align: top; border-bottom: 1px solid var(--linha); }
+  tbody tr:nth-child(even) { background: #F6F8FC; }
+
+  .ok { color: var(--verde); font-weight: bold; }
+  .pend { color: var(--ambar); font-weight: bold; }
+  .col-sev { width: 52px; }
+  .col-status { width: 88px; }
+</style>
+</head>
+<body>
+
+<!-- ======================= CAPA ======================= -->
+<section class="capa">
+  <h1>Relatório de Segurança</h1>
+  <div class="sub">SisLog LHG — Sistema de Ordens de Carregamento</div>
+  <div class="regua"></div>
+  <div class="linha2">Auditoria, achados e correções aplicadas</div>
+  <div class="rodape">
+    LHG Logística / OC Express Transportes<br />
+    Julho de 2026 · Versão 2.0
+  </div>
+  <div class="conf">Documento confidencial — apoio à due diligence de TI</div>
+</section>
+
+<!-- ======================= PÁGINA 2 ======================= -->
+<section class="pagina">
+  <div class="faixa-topo">
+    <span>SisLog LHG — Relatório de Segurança</span>
+    <span class="dir">OC Express Transportes</span>
+  </div>
+
+  <h2>1. Escopo e metodologia</h2>
+  <p>
+    Este relatório consolida a auditoria de segurança do <strong>SisLog</strong> realizada em junho de 2026 e a
+    <strong>revisão de acompanhamento de julho de 2026</strong>, que cobriu as funcionalidades entregues no
+    intervalo. A avaliação abrange as três aplicações (sistema interno, portal de parceiros e agente de
+    WhatsApp) e a camada de dados (PostgreSQL/Supabase).
+  </p>
+  <p>A revisão de junho cobriu:</p>
+  <ul>
+    <li>Isolamento de dados entre a LHG e a transportadora concorrente (RLS por linha).</li>
+    <li>Autorização e exposição de credenciais nas funções de borda (Edge Functions).</li>
+    <li>Funções privilegiadas no banco (<code>SECURITY DEFINER</code>) e vetores de escalonamento.</li>
+    <li>Webhook público do WhatsApp (assinatura e integridade).</li>
+    <li>Vulnerabilidades em dependências e cabeçalhos de segurança HTTP.</li>
+  </ul>
+  <p>A revisão de julho acrescentou:</p>
+  <ul>
+    <li>Caminhos de escrita do portal de parceiros criados após a auditoria (funções validadas no banco).</li>
+    <li>Mecanismo de congelamento operacional (modo manutenção) e suas permissões.</li>
+    <li>Sinalização de pendências entre equipe interna e parceiro, incluindo o caso sem parceiro envolvido.</li>
+    <li>Política de conteúdo (CSP), item deixado explicitamente em aberto no ciclo anterior.</li>
+  </ul>
+  <p class="nota">
+    A revisão foi feita por inspeção de código, análise das políticas de RLS e do teste de penetração
+    automatizado já existente no projeto.
+  </p>
+
+  <h2>2. Sumário executivo</h2>
+  <p>
+    A arquitetura de segurança do SisLog é <strong>sólida e acima da média</strong> para sistemas neste
+    estágio. O isolamento do concorrente é testado automaticamente, as funções de borda autorizam
+    corretamente cada chamada e a chave privilegiada do banco nunca é exposta ao navegador.
+  </p>
+  <div class="destaque">
+    <p>
+      A auditoria de junho identificou <strong>4 itens de correção</strong> (2 de prioridade alta, 2 de
+      hardening), <strong>todos corrigidos e em produção</strong>. A revisão de julho identificou
+      <strong>1 item adicional</strong>, de severidade média e natureza de integridade (não de vazamento de
+      dados), <strong>corrigido e validado</strong> por cenários de regressão incorporados à suíte
+      automatizada. Permanecem itens de
+      <strong>configuração de plataforma</strong> (senha mínima no servidor, MFA), detalhados no item 6.
+    </p>
+  </div>
+  <p>
+    O ciclo de julho é, em si, um indicador relevante para esta avaliação: a revisão foi motivada pela entrega
+    de novas funcionalidades, e não por incidente. O processo de revisão recorrente está estabelecido.
+  </p>
+
+  <h2>3. Controles de segurança existentes</h2>
+  <ul>
+    <li><strong>Row Level Security</strong> habilitada em todas as tabelas (isolamento por linha).</li>
+    <li>
+      <strong>Teste de penetração automatizado</strong> reexecutável: <strong>115/115 cenários aprovados</strong>
+      na execução de julho de 2026, validando que um parceiro nunca acessa dados de outro nem a base interna.
+      A suíte cresceu de 49 para 115 cenários desde a auditoria anterior.
+    </li>
+    <li>
+      <strong>Isolamento por coluna</strong> do concorrente via views <code>SECURITY DEFINER</code> (o parceiro
+      não recebe leitura direta da tabela de solicitações).
+    </li>
+    <li>
+      <strong>Escrita do portal por funções validadas</strong>: alterações do parceiro passam por funções que
+      verificam posse e estado do registro no servidor, em vez de escrita direta na tabela.
+    </li>
+    <li>
+      <strong>Edge Functions autorizam de verdade</strong>: validam o token do chamador, conferem o perfil
+      (interno/admin do parceiro) e restringem o escopo ao próprio parceiro.
+    </li>
+    <li>
+      <strong>Chave privilegiada (service role) nunca no frontend</strong>: o cliente carrega apenas a chave
+      anônima.
+    </li>
+    <li><strong>Webhook do WhatsApp</strong> com assinatura HMAC e comparação em tempo constante.</li>
+    <li>
+      <strong>Armazenamento privado</strong> (PDFs das OCs e anexos) com acesso escopado por dono e URLs
+      assinadas de curta duração.
+    </li>
+    <li><strong>Auditoria dedicada</strong> de eventos (logins, criações, cancelamentos) e limite diário anti-abuso.</li>
+    <li>
+      <strong>Congelamento operacional</strong> (modo manutenção) acionável sem novo deploy, cuja permissão de
+      escrita é restrita à credencial administrativa. Nenhum usuário do sistema, interno ou parceiro,
+      consegue acioná-lo.
+    </li>
+    <li>
+      <strong>Cabeçalhos de segurança HTTP</strong> nas duas aplicações web, incluindo política de conteúdo
+      (CSP) em modo de monitoramento.
+    </li>
+  </ul>
+
+  <div class="rodape-pagina">
+    <span>LHG Logística — confidencial</span>
+    <span>Página 2</span>
+  </div>
+</section>
+
+<!-- ======================= PÁGINA 3 ======================= -->
+<section class="pagina">
+  <div class="faixa-topo">
+    <span>SisLog LHG — Relatório de Segurança</span>
+    <span class="dir">OC Express Transportes</span>
+  </div>
+
+  <h2>4. Achados de junho de 2026 e correções aplicadas</h2>
+  <table>
+    <thead>
+      <tr>
+        <th class="col-sev">Sev.</th>
+        <th>Achado</th>
+        <th>Correção aplicada</th>
+        <th class="col-status">Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Alta</td>
+        <td>Função de auditoria privilegiada (<code>SECURITY DEFINER</code>) sem <code>search_path</code> fixo, um vetor de escalonamento de privilégio.</td>
+        <td><code>search_path</code> fixado na função. Era a única função do sistema nessa condição.</td>
+        <td class="ok">Corrigido</td>
+      </tr>
+      <tr>
+        <td>Alta</td>
+        <td>Vulnerabilidade conhecida (CVE) em dependência de terceiros (injeção CRLF).</td>
+        <td>Dependência atualizada. Verificação de produção passou a reportar <strong>zero</strong> vulnerabilidades.</td>
+        <td class="ok">Corrigido</td>
+      </tr>
+      <tr>
+        <td>Média</td>
+        <td>CORS permissivo (curinga) nas funções de borda. Risco real baixo (exigem token), mas é apontamento de hardening.</td>
+        <td>Substituído por lista de origens permitidas (allowlist) nas 4 funções.</td>
+        <td class="ok">Corrigido</td>
+      </tr>
+      <tr>
+        <td>Baixa</td>
+        <td>Ausência de cabeçalhos de segurança HTTP nas aplicações web.</td>
+        <td>Adicionados HSTS, proteção contra clickjacking, nosniff, Referrer-Policy, Permissions-Policy e COOP.</td>
+        <td class="ok">Corrigido</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>5. Achado da revisão de julho de 2026</h2>
+  <table>
+    <thead>
+      <tr>
+        <th class="col-sev">Sev.</th>
+        <th>Achado</th>
+        <th>Correção</th>
+        <th class="col-status">Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Média</td>
+        <td>
+          A regra que autoriza o parceiro a registrar uma solicitação validava a titularidade do registro, mas
+          não restringia os campos de controle interno (situação do pedido, responsável pelo atendimento,
+          marcações de documentação). Um parceiro autenticado poderia, por chamada direta à API, registrar uma
+          solicitação já marcada como concluída.
+        </td>
+        <td>
+          A regra passou a fixar a situação inicial do registro, e uma validação no servidor descarta qualquer
+          campo de controle interno enviado pelo parceiro, além de conferir que o usuário informado pertence à
+          própria empresa.
+        </td>
+        <td class="ok">Corrigido</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="destaque">
+    <p>
+      <strong>Alcance do achado.</strong> O item é de <strong>integridade de processo</strong>, não de
+      confidencialidade: em nenhum momento houve acesso a dados de outro parceiro ou da base interna. O
+      isolamento entre empresas (objeto central desta avaliação) permaneceu íntegro, e a verificação
+      confirmou que os demais caminhos de escrita do portal já eram validados no servidor.
+    </p>
+  </div>
+
+  <div class="destaque">
+    <p>
+      <strong>Verificação da correção.</strong> O achado foi reproduzido em ambiente controlado antes da
+      correção e quatro cenários de regressão foram incorporados à suíte automatizada, cobrindo o eixo que
+      ainda não era testado: a integridade dos campos dentro do próprio registro do parceiro. Após a correção,
+      a suíte completa passou em <strong>115 de 115 cenários</strong>. Os cenários ficam permanentes, de modo
+      que uma regressão futura seja detectada automaticamente.
+    </p>
+  </div>
+
+  <h3>Itens verificados e sem apontamento no ciclo de julho</h3>
+  <ul>
+    <li>Funções de escrita do portal: validam titularidade e estado do registro, com <code>search_path</code> fixo.</li>
+    <li>Modo manutenção: sem permissão de escrita para qualquer usuário do sistema.</li>
+    <li>Sinalização de pendências: pendências internas permanecem invisíveis ao parceiro por construção.</li>
+    <li>
+      Referência do arquivo PDF da ordem de carregamento: confirmado que a leitura é resolvida contra o
+      armazenamento privado do próprio sistema, sem possibilidade de apontar para destino externo.
+    </li>
+  </ul>
+
+  <div class="rodape-pagina">
+    <span>LHG Logística — confidencial</span>
+    <span>Página 3</span>
+  </div>
+</section>
+
+<!-- ======================= PÁGINA 4 ======================= -->
+<section class="pagina">
+  <div class="faixa-topo">
+    <span>SisLog LHG — Relatório de Segurança</span>
+    <span class="dir">OC Express Transportes</span>
+  </div>
+
+  <h2>6. Itens pendentes — configuração de plataforma</h2>
+  <p>
+    Itens que dependem de configuração no painel da plataforma (não de código) e são recomendados antes da
+    disponibilização final:
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th>Recomendação</th>
+        <th>Benefício</th>
+        <th class="col-status">Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Tamanho mínimo de senha (12) imposto no servidor + bloqueio de senhas vazadas</td>
+        <td>Fecha a validação que hoje é só no cliente.</td>
+        <td class="pend">Pendente</td>
+      </tr>
+      <tr>
+        <td>Autenticação em dois fatores (MFA) para usuários internos</td>
+        <td>Padrão de segurança corporativo.</td>
+        <td class="pend">Pendente</td>
+      </tr>
+      <tr>
+        <td>Captcha no login</td>
+        <td>Mitigação de força-bruta automatizada.</td>
+        <td class="pend">Implementado, aguarda ativação</td>
+      </tr>
+      <tr>
+        <td>Limite de requisições por IP/minuto</td>
+        <td>Defesa adicional contra abuso.</td>
+        <td class="pend">Planejado</td>
+      </tr>
+      <tr>
+        <td>Política de conteúdo (CSP) em modo de bloqueio</td>
+        <td>Mitiga injeção de script e carregamento de recurso não autorizado.</td>
+        <td class="pend">Em monitoramento</td>
+      </tr>
+    </tbody>
+  </table>
+  <p class="nota">
+    A CSP foi publicada primeiro em <strong>modo de monitoramento</strong>: as violações são registradas sem
+    bloquear o recurso, o que permite validar a política contra o uso real das duas aplicações antes de
+    promovê-la a bloqueio efetivo. É a prática recomendada para aplicações em operação.
+  </p>
+
+  <h2>7. Conclusão</h2>
+  <div class="destaque">
+    <p>
+      O sistema apresenta uma base de segurança robusta e testada. Os achados das duas revisões foram tratados
+      no código e os itens remanescentes são ajustes de configuração de baixo esforço. Tão relevante quanto os
+      achados individuais é o processo: o SisLog passou por duas revisões de segurança em dois meses, a segunda
+      motivada por entrega de funcionalidade e não por incidente, com correção desenvolvida no mesmo ciclo da
+      identificação. Com a implementação das recomendações do item 6, a postura de segurança atende aos
+      requisitos esperados para operação com dados sensíveis em ambiente corporativo.
+    </p>
+  </div>
+
+  <p class="nota">
+    Documento preparado pela LHG para apoio à avaliação técnica do cliente. As correções citadas constam do
+    histórico de alterações do repositório e podem ser auditadas por solicitação.
+  </p>
+
+  <div class="rodape-pagina">
+    <span>LHG Logística — confidencial</span>
+    <span>Página 4</span>
+  </div>
+</section>
+
+</body>
+</html>

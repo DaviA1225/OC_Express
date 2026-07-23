@@ -1,5 +1,5 @@
 -- =====================================================================
--- OC Express / SisLog LHG — Schema cumulativo (migrations 0001 → 0042)
+-- OC Express / SisLog LHG — Schema cumulativo (migrations 0001 → 0047)
 -- =====================================================================
 --
 -- Este arquivo agrega TODAS as migrations num único script IDEMPOTENTE.
@@ -10,6 +10,17 @@
 --
 -- Quando criar uma migration nova em supabase/migrations/, refletir aqui
 -- (no fim, antes da secao "Operacional / vinculos de usuario").
+--
+-- ATENCAO — replay num remoto JA POPULADO: varios CHECK IN(...) sao re-adicionados
+-- em blocos de migrations antigas. Se um bloco usar a lista ANTIGA de valores, o
+-- ADD CONSTRAINT aborta (SQLSTATE 23514) contra linhas que ja usam valores novos,
+-- e como o SQL Editor roda tudo em UMA transacao, da rollback de TUDO — inclusive a
+-- migration nova colada no fim (sintoma: "rodou mas nada aplicou"). Por isso os
+-- blocos antigos de solicitacoes.origem e eventos_portal.tipo_evento ja usam a
+-- lista FINAL (superset). REGRA SEGURA: para aplicar UMA migration nova num remoto
+-- vivo, rode SO o bloco isolado dela no SQL Editor do projeto REMOTO
+-- (https://supabase.com/dashboard/project/pwufbvneqfyyqnmfxzyw/sql) — nao dependa
+-- de replayar este arquivo inteiro.
 --
 -- Estrutura:
 --   1. Helpers (funcoes auxiliares)
@@ -385,7 +396,10 @@ ALTER TABLE solicitacoes
   DROP CONSTRAINT IF EXISTS solicitacoes_origem_check;
 ALTER TABLE solicitacoes
   ADD CONSTRAINT solicitacoes_origem_check
-  CHECK (origem IN ('interno', 'parceiro', 'email'));
+  -- Lista FINAL (inclui 'whatsapp', migration 0032) mesmo neste bloco antigo:
+  -- num remoto ja populado, re-adicionar a lista curta abortaria (23514) se
+  -- houvesse linhas 'whatsapp'/'email'. Superset mantem o replay seguro.
+  CHECK (origem IN ('interno', 'parceiro', 'email', 'whatsapp'));
 ALTER TABLE solicitacoes
   DROP CONSTRAINT IF EXISTS solicitacoes_pamcard_numero_quando_tem;
 ALTER TABLE solicitacoes
@@ -1133,15 +1147,21 @@ CREATE TRIGGER trg_solicitacoes_rate_limit_diario
 -- ============================================================
 
 ALTER TABLE eventos_portal DROP CONSTRAINT IF EXISTS eventos_portal_tipo_evento_check;
+-- Lista FINAL (inclui 'portal_solicitacao_editada' e 'portal_usuario_excluido',
+-- migrations 0031/0043) mesmo neste bloco antigo (0023): re-adicionar a lista
+-- curta num remoto ja populado aborta (23514) porque ja existem linhas desses
+-- tipos, dando rollback de TODA a transacao do SQL Editor. Superset = replay seguro.
 ALTER TABLE eventos_portal ADD CONSTRAINT eventos_portal_tipo_evento_check
   CHECK (tipo_evento IN (
     'portal_login',
     'portal_login_falha',
     'portal_logout',
     'portal_solicitacao_criada',
+    'portal_solicitacao_editada',
     'portal_solicitacao_cancelada',
     'portal_senha_alterada',
-    'portal_usuario_convidado'
+    'portal_usuario_convidado',
+    'portal_usuario_excluido'
   ));
 
 -- ============================================================
@@ -1773,11 +1793,13 @@ ALTER TABLE solicitacoes
 
 ALTER TABLE eventos_portal DROP CONSTRAINT IF EXISTS eventos_portal_tipo_evento_check;
 ALTER TABLE eventos_portal ADD CONSTRAINT eventos_portal_tipo_evento_check
+  -- Lista FINAL (superset) tambem neste bloco intermediario: replay seguro.
   CHECK (tipo_evento IN (
     'portal_login',
     'portal_login_falha',
     'portal_logout',
     'portal_solicitacao_criada',
+    'portal_solicitacao_editada',
     'portal_solicitacao_cancelada',
     'portal_senha_alterada',
     'portal_usuario_convidado',
@@ -2575,6 +2597,145 @@ REVOKE ALL ON FUNCTION portal_editar_solicitacao(uuid,uuid,uuid,uuid,uuid,uuid,u
 REVOKE ALL ON FUNCTION portal_cancelar_solicitacao(uuid) FROM public;
 GRANT EXECUTE ON FUNCTION portal_editar_solicitacao(uuid,uuid,uuid,uuid,uuid,uuid,uuid,uuid,text,text,text) TO authenticated;
 GRANT EXECUTE ON FUNCTION portal_cancelar_solicitacao(uuid) TO authenticated;
+
+
+-- ============================================================
+-- 0045 — Kill switch / modo manutencao compartilhado (interno + portal)
+-- ============================================================
+-- Tabela de linha unica lida pelos dois apps no boot para congelar o acesso
+-- durante um deploy. SELECT liberado para anon+authenticated (precisa ser lido
+-- pre-login); NENHUMA policy de escrita -> so service_role / SQL Editor liga a
+-- flag. Toggle: UPDATE public.system_status SET maintenance = true|false WHERE id = 1;
+
+CREATE TABLE IF NOT EXISTS public.system_status (
+  id          integer PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+  maintenance boolean NOT NULL DEFAULT false,
+  message     text,
+  updated_at  timestamptz NOT NULL DEFAULT now()
+);
+
+INSERT INTO public.system_status (id, maintenance, message)
+VALUES (1, false, NULL)
+ON CONFLICT (id) DO NOTHING;
+
+ALTER TABLE public.system_status ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS system_status_select_todos ON public.system_status;
+CREATE POLICY system_status_select_todos
+  ON public.system_status
+  FOR SELECT
+  TO anon, authenticated
+  USING (true);
+
+GRANT SELECT ON public.system_status TO anon, authenticated;
+
+
+-- ============================================================
+-- 0046 — Pendencia interna: pendencia em solicitacao SEM parceiro
+-- ============================================================
+-- Torna solicitacao_pendencias.parceiro_id anulavel para permitir pendencia em
+-- solicitacao de origem interna (a propria equipe abre e resolve; sem loop com o
+-- portal). O trigger ja deriva NULL da solicitacao interna. RLS do parceiro
+-- segue segura: parceiro_id = get_current_parceiro_id() nunca casa com NULL.
+-- Idempotente: DROP NOT NULL e no-op se a coluna ja for anulavel.
+
+ALTER TABLE solicitacao_pendencias
+  ALTER COLUMN parceiro_id DROP NOT NULL;
+
+COMMENT ON COLUMN solicitacao_pendencias.parceiro_id IS
+  'Denormalizado da solicitacao (trigger). NULL quando a solicitacao e de origem '
+  'interna (pendencia que a propria equipe abre e resolve). Chave do RLS do '
+  'parceiro — NULL nunca casa, entao o parceiro nao ve pendencias internas.';
+
+NOTIFY pgrst, 'reload schema';
+
+
+-- ============================================================
+-- 0047 — Endurece o INSERT do parceiro em solicitacoes
+-- ============================================================
+-- A policy solicitacoes_parceiro_insert (0018, re-criada na secao 9 acima) so
+-- fixava origem e parceiro_id. Como INSERT nao depende de policy de SELECT, ele
+-- e o unico caminho de escrita direta que funciona de verdade para o parceiro —
+-- e aceitava qualquer valor nas colunas do dominio interno (status, atendente,
+-- PDF, flags de CTe/MDFe). Achado da varredura de 2026-07-21; confirmado por
+-- scripts/pentest-rls.mjs (retorno com status 'finalizada' gravava).
+--
+-- Este bloco vem DEPOIS da secao 9 de proposito: ele substitui as duas policies
+-- do parceiro pela versao endurecida, entao o estado final vale mesmo com o
+-- arquivo inteiro replayado.
+--
+-- ATENCAO ao editar a lista de NEW.<coluna> do trigger: PL/pgSQL NAO valida
+-- essas referencias na criacao da funcao. Uma coluna inexistente cria a funcao
+-- sem erro e derruba TODO insert de parceiro em runtime com 42703 (aconteceu com
+-- NEW.pamcard, que virou pamcard_status/pamcard_numero). Confira contra o schema
+-- real antes de aplicar.
+
+DROP POLICY IF EXISTS solicitacoes_parceiro_insert ON solicitacoes;
+CREATE POLICY solicitacoes_parceiro_insert ON solicitacoes FOR INSERT TO authenticated
+  WITH CHECK (
+    origem = 'parceiro'
+    AND parceiro_id = get_current_parceiro_id()
+    AND status = 'recebida'
+  );
+
+-- UPDATE: nada a endurecer aqui. A 0043 (bloco acima) ja substituiu
+-- solicitacoes_parceiro_cancel por solicitacoes_parceiro_edit_cancel, cujo
+-- WITH CHECK ja limita o estado final a ('recebida','cancelada'). O DROP abaixo
+-- so remove o nome legado, caso ele exista no remoto.
+DROP POLICY IF EXISTS solicitacoes_parceiro_cancel ON solicitacoes;
+
+CREATE OR REPLACE FUNCTION solicitacao_sanitizar_insert_externo()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  IF is_interno() THEN
+    RETURN NEW;
+  END IF;
+
+  NEW.status                    := 'recebida';
+  NEW.atendente_id              := NULL;
+  NEW.documentado_por           := NULL;
+  NEW.documentado_em            := NULL;
+  NEW.pdf_url                   := NULL;
+  NEW.enviada_em                := NULL;
+  NEW.finalizada_em             := NULL;
+  NEW.numero_instrucao          := NULL;
+  NEW.cte_emitido               := false;
+  NEW.mdfe_emitido              := false;
+  NEW.vale_pedagio              := false;
+  NEW.created_by                := auth.uid();
+  NEW.pamcard_providenciado_em  := NULL;
+  NEW.pamcard_providenciado_por := NULL;
+  NEW.observacoes_internas      := NULL;
+  NEW.external_msg_id           := NULL;
+
+  IF NEW.parceiro_usuario_id IS NOT NULL THEN
+    IF NOT EXISTS (
+      SELECT 1 FROM parceiro_usuarios
+      WHERE id = NEW.parceiro_usuario_id
+        AND parceiro_id = NEW.parceiro_id
+    ) THEN
+      RAISE EXCEPTION 'Usuario informado nao pertence a este parceiro.'
+        USING ERRCODE = '42501';
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+COMMENT ON FUNCTION solicitacao_sanitizar_insert_externo() IS
+  'Zera as colunas de dominio interno (status, atendente, pdf, flags, datas) em '
+  'INSERTs feitos por quem nao e interno, e valida a posse de parceiro_usuario_id. '
+  'A policy de INSERT do parceiro so fixava origem/parceiro_id (migration 0047).';
+
+DROP TRIGGER IF EXISTS trg_solicitacoes_sanitizar_externo ON solicitacoes;
+CREATE TRIGGER trg_solicitacoes_sanitizar_externo
+  BEFORE INSERT ON solicitacoes
+  FOR EACH ROW EXECUTE FUNCTION solicitacao_sanitizar_insert_externo();
+
+NOTIFY pgrst, 'reload schema';
 
 
 -- =====================================================================
