@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-06-20T19:05:00.000Z",
+  "generatedAt": "2026-07-23T12:00:00.000Z",
   "title": "Design System: SisLog LHG",
   "extensions": {
     "colorMeta": {
@@ -10,11 +10,43 @@
         "canonical": "#FF5100",
         "tonalRamp": ["#3A1300", "#5E2100", "#8A3100", "#C24300", "#FF5100", "#FF7A3D", "#FFA375", "#FFD2B8"]
       },
+      "orange-deep": {
+        "role": "primary",
+        "displayName": "Laranja Queimado",
+        "canonical": "#D3641A",
+        "tonalRamp": ["#2E1305", "#4A1F08", "#6E2F0C", "#9B4413", "#D3641A", "#E38845", "#EDAE7E", "#F6D4BC"]
+      },
+      "orange-strong": {
+        "role": "primary",
+        "displayName": "Laranja Texto (AA)",
+        "canonical": "#CC4100",
+        "tonalRamp": ["#2E0F00", "#4D1900", "#742600", "#9E3300", "#CC4100", "#FF5100", "#FF7A3D", "#FFA375"]
+      },
+      "orange-tint": {
+        "role": "primary",
+        "displayName": "Laranja Tom-Claro (fim do gradiente escuro)",
+        "canonical": "#FFB37A"
+      },
       "ink": {
         "role": "neutral",
         "displayName": "Grafite Tinta",
         "canonical": "#1A1F28",
         "tonalRamp": ["#0E1118", "#1A1F28", "#2B303B", "#3D4350", "#565D6B", "#6B7280", "#9097A1", "#C3C8CF"]
+      },
+      "graphite-bar": {
+        "role": "neutral",
+        "displayName": "Grafite Barra",
+        "canonical": "#1D1E1B"
+      },
+      "slate-500": {
+        "role": "neutral",
+        "displayName": "Ardósia 500",
+        "canonical": "#6B7280"
+      },
+      "accent-gray": {
+        "role": "neutral",
+        "displayName": "Cinza Acento",
+        "canonical": "#EDEFF2"
       },
       "canvas": {
         "role": "neutral",
@@ -22,23 +54,76 @@
         "canonical": "#F5F7F9",
         "tonalRamp": ["#6B7280", "#8A929C", "#B4BAC2", "#D5D9DE", "#E1E4EA", "#EDEFF2", "#F5F7F9", "#FFFFFF"]
       },
+      "border": {
+        "role": "neutral",
+        "displayName": "Borda Hairline",
+        "canonical": "#E1E4EA"
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Superfície",
+        "canonical": "#FFFFFF"
+      },
       "portal-blue": {
         "role": "primary",
         "displayName": "Azul Portal",
         "canonical": "#1E40AF",
         "tonalRamp": ["#0C193F", "#122356", "#18316F", "#1E40AF", "#3457C9", "#5B79DB", "#8FA4E9", "#C3D0F5"]
+      },
+      "portal-blue-deep": {
+        "role": "primary",
+        "displayName": "Azul Portal Escuro",
+        "canonical": "#1E3A8A"
+      },
+      "portal-blue-tint": {
+        "role": "primary",
+        "displayName": "Azul Tom-Claro (fim do gradiente escuro)",
+        "canonical": "#93B4FF"
+      },
+      "canvas-dark": {
+        "role": "neutral",
+        "displayName": "Canvas Escuro",
+        "canonical": "#14171D",
+        "tonalRamp": ["#0B0E14", "#14171D", "#1A1F28", "#232833", "#2E3540", "#40485570", "#6B7280", "#94A3B8"]
+      },
+      "surface-dark": {
+        "role": "neutral",
+        "displayName": "Superfície Escura",
+        "canonical": "#1A1F28"
+      },
+      "elevated-dark": {
+        "role": "neutral",
+        "displayName": "Superfície Escura Elevada",
+        "canonical": "#232833"
+      },
+      "border-dark": {
+        "role": "neutral",
+        "displayName": "Hairline Escuro",
+        "canonical": "rgba(255,255,255,0.08)"
+      },
+      "glow-orange": {
+        "role": "primary",
+        "displayName": "Glow Laranja",
+        "canonical": "rgba(255,81,0,0.18)"
+      },
+      "glow-blue": {
+        "role": "primary",
+        "displayName": "Glow Azul",
+        "canonical": "rgba(30,64,175,0.18)"
       }
     },
     "typographyMeta": {
-      "display": { "displayName": "Display (Kanit)", "purpose": "Títulos de tela e números grandes; peso industrial." },
-      "body": { "displayName": "Corpo (Wanted Sans)", "purpose": "Conteúdo, formulários e células de tabela." },
-      "label": { "displayName": "Label", "purpose": "Rótulos UPPERCASE de KPI e seções de cadastro." }
+      "display": { "displayName": "Display (Kanit)", "purpose": "Títulos de tela e números grandes; peso industrial, teto 600." },
+      "body": { "displayName": "Corpo (Wanted Sans)", "purpose": "Conteúdo, formulários e células de tabela; 13–14px." },
+      "label": { "displayName": "Label", "purpose": "Rótulos UPPERCASE 11px de KPI e seções de cadastro — única situação de maiúsculas." }
     },
     "shadows": [
-      { "name": "overlay", "value": "0 4px 12px rgba(0,0,0,0.08)", "purpose": "Única sombra do sistema: apenas modais, popovers e dropdowns. Cards são planos." }
+      { "name": "overlay", "value": "0 4px 12px rgba(0,0,0,0.08)", "purpose": "Única sombra do modo claro: apenas modais, popovers e dropdowns. Cards são planos." },
+      { "name": "overlay-dark", "value": "0 24px 60px -12px rgba(0,0,0,0.75)", "purpose": "Elevação de overlay no tema escuro (login, dropdowns sobre canvas-dark)." }
     ],
     "motion": [
-      { "name": "color-200", "value": "color 200ms ease-out", "purpose": "Transição padrão de cor (hover, foco, mudança de status). Sem bounce/elastic." }
+      { "name": "color-200", "value": "color 200ms ease-out", "purpose": "Transição padrão de cor (hover, foco, mudança de status). Sem bounce/elastic." },
+      { "name": "shadow-200", "value": "box-shadow 200ms ease-out", "purpose": "Elevação por sombra no hover de cards (SolicitacaoCard) — sem transform, que borra o texto." }
     ],
     "breakpoints": [
       { "name": "sm", "value": "640px" },
@@ -51,9 +136,9 @@
       "name": "Primary Button",
       "kind": "button",
       "refersTo": "button-primary",
-      "description": "Ação primária. Único uso do acento laranja cheio; cantos retos.",
+      "description": "Ação primária. Único uso do acento cheio; cantos retos. No modo ESCURO o texto é escuro sobre o acento claro (inversão WCAG AA — branco sobre o laranja/azul luminoso falha).",
       "html": "<button class=\"ds-btn-primary\">Nova solicitação</button>",
-      "css": ".ds-btn-primary { display:inline-flex; align-items:center; gap:8px; height:36px; padding:0 12px; background:#FF5100; color:#FFFFFF; font-family:'Wanted Sans',system-ui,sans-serif; font-size:13px; font-weight:500; border:none; border-radius:2px; cursor:pointer; transition:background 200ms ease-out; } .ds-btn-primary:hover { background:#D3641A; } .ds-btn-primary:focus-visible { outline:none; box-shadow:0 0 0 1px #FFFFFF, 0 0 0 3px #FF5100; }"
+      "css": ".ds-btn-primary { display:inline-flex; align-items:center; gap:8px; height:36px; padding:0 12px; background:#FF5100; color:#231005; font-family:'Wanted Sans',system-ui,sans-serif; font-size:13px; font-weight:500; border:none; border-radius:2px; cursor:pointer; transition:background 200ms ease-out; } .ds-btn-primary:hover { background:#D3641A; } .ds-btn-primary:focus-visible { outline:none; box-shadow:0 0 0 1px #FFFFFF, 0 0 0 3px #FF5100; }"
     },
     {
       "name": "Outline Button",
@@ -75,7 +160,7 @@
       "name": "Surface Card",
       "kind": "card",
       "refersTo": "card",
-      "description": "Container plano: hairline + canvas atrás, sem sombra.",
+      "description": "Container plano: hairline + canvas atrás, sem sombra em repouso.",
       "html": "<div class=\"ds-card\"><p class=\"ds-card-label\">TOTAL DE OCs</p><p class=\"ds-card-value\">128</p></div>",
       "css": ".ds-card { background:#FFFFFF; border:1px solid #E1E4EA; border-radius:4px; padding:16px; font-family:'Wanted Sans',system-ui,sans-serif; } .ds-card-label { margin:0; font-size:11px; font-weight:500; letter-spacing:0.5px; text-transform:uppercase; color:#6B7280; } .ds-card-value { margin:8px 0 0; font-size:28px; line-height:1; color:#1A1F28; font-variant-numeric:tabular-nums; }"
     },
@@ -83,35 +168,44 @@
       "name": "Status Badge",
       "kind": "chip",
       "refersTo": "status-badge",
-      "description": "Componente assinatura: par fundo-claro/texto-escuro do mesmo tom; cor nunca é o único sinal.",
+      "description": "Componente assinatura: par fundo-claro/texto-escuro do mesmo tom; cor nunca é o único sinal. No escuro, fundo = cor-do-texto a 12%, borda a 30%.",
       "html": "<span class=\"ds-status\">OC enviada</span>",
       "css": ".ds-status { display:inline-flex; align-items:center; padding:2px 8px; border-radius:9999px; background:#D1FAE5; color:#065F46; font-family:'Wanted Sans',system-ui,sans-serif; font-size:12px; font-weight:500; transition:background 200ms ease-out, color 200ms ease-out; }"
     },
     {
-      "name": "Sidebar Nav Item (active)",
+      "name": "Drawer Nav Item (active)",
       "kind": "nav",
       "refersTo": "nav-item-active",
-      "description": "Item ativo da nav lateral: fundo laranja translúcido, texto laranja, barra à esquerda.",
+      "description": "Item ativo do drawer (interno): fundo ACCENT CINZA NEUTRO (não a cor de marca) + barra vertical 3px laranja à esquerda via ::before. A cor de marca fica reservada à barra-indicador, não ao fundo.",
       "html": "<a class=\"ds-nav-active\">Solicitações</a>",
-      "css": ".ds-nav-active { position:relative; display:flex; align-items:center; gap:8px; height:36px; padding:0 8px 0 12px; border-radius:4px; background:rgba(255,81,0,0.10); color:#C44612; font-family:'Wanted Sans',system-ui,sans-serif; font-size:13px; font-weight:500; text-decoration:none; } .ds-nav-active::before { content:''; position:absolute; left:0; top:50%; transform:translateY(-50%); width:4px; height:20px; border-radius:0 9999px 9999px 0; background:#FF5100; }"
+      "css": ".ds-nav-active { position:relative; display:flex; align-items:center; gap:8px; height:36px; padding:0 12px; border-radius:8px; background:#EDEFF2; color:#1A1F28; font-family:'Wanted Sans',system-ui,sans-serif; font-size:13px; font-weight:500; text-decoration:none; } .ds-nav-active::before { content:''; position:absolute; left:0; top:50%; transform:translateY(-50%); width:3px; height:20px; border-radius:0 9999px 9999px 0; background:#FF5100; }"
+    },
+    {
+      "name": "Menu Button (header)",
+      "kind": "button",
+      "refersTo": "button-menu",
+      "description": "Entrada da navegação no header grafite: outline BRANCO (borda e texto brancos, fundo transparente). Não usa o acento — preserva a Voz Única para ações primárias.",
+      "html": "<button class=\"ds-btn-menu\">☰ Menu</button>",
+      "css": ".ds-btn-menu { display:inline-flex; align-items:center; gap:8px; height:36px; padding:0 12px; background:transparent; color:#FFFFFF; font-family:'Wanted Sans',system-ui,sans-serif; font-size:13px; font-weight:500; border:1px solid rgba(255,255,255,0.4); border-radius:2px; cursor:pointer; transition:background 200ms ease-out; } .ds-btn-menu:hover { background:rgba(255,255,255,0.1); }"
     }
   ],
   "narrative": {
     "northStar": "A Sala de Controle",
-    "overview": "O SisLog não é um produto de vitrine — é o painel onde uma operação de transporte roda. A estética é a de uma sala de controle industrial: estrutura grafite neutra, densidade alta, informação legível à distância de um relance, e um único sinal quente — o laranja LHG #FF5100 — usado com parcimônia. O sistema rejeita o look de IA/template SaaS (gradientes, chips pastel, cards aninhados, saudação consumer, Inter-para-tudo, ícone em quadradinho, eyebrow uppercase) e também o extremo oposto, a planilha disfarçada.",
+    "overview": "O SisLog não é um produto de vitrine — é o painel onde uma operação de transporte roda. A estética é a de uma sala de controle industrial: estrutura grafite neutra, densidade alta, informação legível à distância de um relance, e um único sinal quente — o laranja LHG #FF5100 — usado com parcimônia. O sistema rejeita o look de IA/template SaaS (gradientes, chips pastel, cards aninhados, saudação consumer, Inter-para-tudo, ícone em quadradinho, eyebrow uppercase) e também o extremo oposto, a planilha disfarçada. Uma extensão de MODO ESCURO (SPEC-NOVA-UI v3) relaxa a regra do plano-por-padrão só em pontos escassos e posicionados (glow/gradiente), sempre tom-claro→sólido do mesmo acento.",
     "keyCharacteristics": [
       "Estrutura grafite neutra; laranja como acento único (≤10% da tela).",
       "Densidade alta a serviço da velocidade: padding 12–16px, corpo 13–14px.",
       "Plano por padrão; separação por hairline, não por sombra.",
       "Cantos retos (2–4px); institucional, não fofo.",
       "Tipografia industrial (Kanit display + Wanted Sans corpo).",
-      "Status nunca só por cor; sempre rótulo + tom."
+      "Status nunca só por cor; sempre rótulo + tom.",
+      "Acento como TEXTO usa tom mais escuro (orange-strong #CC4100) para WCAG AA; como FILL preserva #FF5100 com tinta escura no botão."
     ],
     "rules": [
       { "name": "A Regra da Voz Única", "body": "O laranja (azul no portal) aparece em no máximo ~10% de qualquer tela. Sua raridade é o que o torna um sinal de ação.", "section": "colors" },
       { "name": "A Regra do Tinte Frio", "body": "Neutros levam um leve toque na direção H220 (frio), nunca para o quente por default. O calor vem do acento, da tipografia e do conteúdo — nunca do fundo.", "section": "colors" },
       { "name": "A Regra do Peso-Teto", "body": "Nada acima de 600. O peso institucional vem do tracking apertado e da estrutura, não de 700/800.", "section": "typography" },
-      { "name": "A Regra do Plano-Por-Padrão", "body": "Superfícies são planas em repouso. Sombra só quando algo está literalmente sobreposto (modal/dropdown).", "section": "elevation" }
+      { "name": "A Regra do Plano-Por-Padrão", "body": "Superfícies são planas em repouso. Sombra só quando algo está literalmente sobreposto (modal/dropdown). Relaxada só no modo escuro, em pontos escassos (glow/gradiente).", "section": "elevation" }
     ],
     "dos": [
       "Do reservar o laranja #FF5100 (azul #1E40AF no portal) para ação primária, estado ativo e foco — ≤10% da tela.",
@@ -119,16 +213,17 @@
       "Do manter densidade alta: padding 12–16px, corpo 13–14px, sem espaço morto.",
       "Do usar cantos retos (2px controles, 4px superfícies) e tabular-nums em números.",
       "Do acompanhar todo status de rótulo + ícone, nunca só de cor (WCAG AA, corpo ≥ 4.5:1).",
+      "Do usar o acento COMO TEXTO no tom escuro (orange-strong) e tinta escura no botão de acento — o #FF5100 puro falha AA como texto/branco.",
       "Do dar alternativa prefers-reduced-motion a toda animação."
     ],
     "donts": [
-      "Don't usar gradientes diagonais chamativos em headers ou superfícies.",
-      "Don't usar chips de ícone pastel coloridos competindo entre si.",
+      "Don't usar gradientes em superfícies grandes nem de duas cores diferentes. Exceção única: modo escuro, device pontual tom-claro→sólido do MESMO acento (wordmark do login, número hero de KPI).",
+      "Don't usar chips de ícone pastel coloridos competindo entre si — ícones de KPI são monocromáticos.",
       "Don't aninhar card dentro de card, nem repetir grades de cards idênticos sem fim.",
       "Don't colocar saudação consumer ('Boa tarde, fulano') em tela de operação.",
       "Don't usar Inter para tudo, ícone em quadradinho acima de cada título, ou eyebrow UPPERCASE sobre cada seção.",
       "Don't usar border-left/right > 1px como stripe colorido em cards, itens de lista ou callouts.",
-      "Don't dar sombra decorativa a cards (plano por padrão).",
+      "Don't dar sombra decorativa a cards (plano por padrão; sombra só em modal/dropdown).",
       "Don't virar planilha disfarçada: toda tela tem fluxo e foco."
     ]
   }

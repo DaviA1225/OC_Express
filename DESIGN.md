@@ -52,6 +52,15 @@ colors:
   chart-series-8: "#A6552F"
   cat-partner-dark-bg: "#2949C4"
   cat-partner-dark-border: "#3A5AD6"
+  canvas-dark: "#14171D"
+  surface-dark: "#1A1F28"
+  elevated-dark: "#232833"
+  border-dark: "rgba(255,255,255,0.08)"
+  orange-tint: "#FFB37A"
+  glow-orange: "rgba(255,81,0,0.18)"
+  portal-blue-tint: "#93B4FF"
+  glow-blue: "rgba(30,64,175,0.18)"
+  status-dark-em-emissao-fg: "#FFA366"
 typography:
   display:
     fontFamily: "Kanit, 'Wanted Sans', ui-sans-serif, system-ui, sans-serif"
@@ -281,10 +290,24 @@ para "dar profundidade decorativa" a um card é proibida.
 - **Focus:** ring 2px laranja (`ring-ring`), offset 1px.
 
 ### Navigation
-- **Sidebar (interno):** 220px, recolhível a 64px. Item ativo = fundo `primary/10` +
-  texto laranja + barra vertical laranja à esquerda (indicador de nav, pseudo-
-  elemento — não é stripe decorativo de card). Labels de seção UPPERCASE 10px.
-- **Top nav (portal):** horizontal, item ativo = texto azul + sublinhado azul de 2px.
+- **Navegação (interno):** em **drawer** (`Sheet` ~260px), aberto pelo botão ☰ do
+  header — não há mais sidebar fixa 220px/64px. Cada item é um bloco (raio 8px,
+  padding 9px 12px, ícone Lucide + rótulo 13px peso 500). **Item ativo** = fundo
+  `accent` (cinza neutro, NÃO a cor de marca) + texto `accent-foreground` + peso
+  500 + **barra vertical de 3px** à esquerda no laranja `primary` (indicador de
+  nav via pseudo-elemento `::before`, não stripe decorativo de card). Hover = fundo
+  `muted` sutil. Labels de seção UPPERCASE 11px `muted-foreground`. Rodapé do drawer:
+  versão do app + bloco avatar/nome/perfil do usuário. Ver `SPEC-FRONTEND.md` §3.2.
+- **Header (interno):** full-width, 3 zonas — esquerda (botão **"Menu"**: ☰ +
+  rótulo, em **outline branco** — borda e texto brancos sobre o header grafite,
+  fundo transparente — como entrada da navegação que substituiu a sidebar + logo),
+  centro (busca global), direita (status de rede + tema + notificações + menu do
+  usuário). Não repete o título da página (cada tela tem seu próprio `h1`). O botão
+  "Menu" segue a linguagem branca do header (não usa o acento), preservando a Voz
+  Única para ações primárias.
+- **Top nav (portal):** horizontal, item ativo = texto azul + sublinhado azul de 2px
+  (com leve glow do azul no tema escuro, ver §7). O portal tem alternador de tema
+  próprio no header.
 
 ## 6. Do's and Don'ts
 
@@ -300,8 +323,11 @@ para "dar profundidade decorativa" a um card é proibida.
 - **Do** dar alternativa `prefers-reduced-motion` a toda animação (crossfade/instantâneo).
 
 ### Don't:
-- **Don't** usar gradientes diagonais chamativos em headers ou superfícies — a barra
-  superior é grafite sólido #1D1E1B, chapado.
+- **Don't** usar gradientes em superfícies grandes (headers, fundos de card, botões)
+  nem gradiente de duas cores diferentes. No modo claro, a barra superior segue
+  grafite sólido #1D1E1B, chapado. **Exceção única — modo escuro (§7):** gradiente é
+  permitido como device pontual (tom-claro→sólido do MESMO acento) em pontos
+  específicos (wordmark do login, número "hero" de KPI); nunca em tudo.
 - **Don't** usar chips de ícone pastel coloridos (esmeralda/âmbar/roxo) competindo —
   ícones de KPI são monocromáticos.
 - **Don't** aninhar card dentro de card, nem repetir grades de cards idênticos sem fim.
@@ -312,3 +338,48 @@ para "dar profundidade decorativa" a um card é proibida.
   itens de lista ou callouts.
 - **Don't** dar sombra decorativa a cards (plano por padrão; sombra só em modal/dropdown).
 - **Don't** virar "planilha disfarçada": toda tela tem fluxo e foco, não só grade de células.
+
+## 7. Tema Escuro (extensão — SPEC-NOVA-UI v3)
+
+O SisLog ganha uma versão **escura, com profundidade em camadas, gradiente e glow**,
+recolorida com os acentos do próprio sistema (laranja no interno, azul no portal) —
+referência de composição em `docs/SPEC-NOVA-UI.md`. Isso é uma **extensão do modo
+escuro** (já existente via `ThemeToggle`), não a substituição do modo claro: as
+seções 1–6 continuam valendo para o modo claro e para as regras que não mudam
+(Voz Única, densidade, cantos retos 2–4px, status sempre com rótulo, peso-teto 600).
+
+**O que muda do modo claro:** a Regra do Plano-Por-Padrão (§4) é relaxada **só no
+escuro e só nos pontos abaixo** — gradiente e glow entram como recursos **escassos e
+posicionados**, na mesma lógica da Voz Única (se está em tudo, para de significar).
+
+### Superfícies escuras (tokens fixos, não invertem por tema)
+- **canvas-dark** (#14171D): fundo raiz de superfície escura (papel do canvas claro).
+- **surface-dark** (#1A1F28): card/painel/input (reaproveita o hex de `ink`).
+- **elevated-dark** (#232833): popover, dropdown, tooltip, linha em hover.
+- **border-dark** (rgba(255,255,255,0.08)): hairline no escuro.
+
+### Acento no escuro
+- Sólido: laranja #FF5100 (interno) / azul #1E40AF (portal), como no claro.
+- Tom claro do acento (fim do gradiente): **orange-tint** #FFB37A / **portal-blue-tint**
+  #93B4FF. Gradiente é sempre *tom-claro → sólido do mesmo acento*, nunca duas cores.
+- Glow: **glow-orange** rgba(255,81,0,0.18) / **glow-blue** rgba(30,64,175,0.18) —
+  sombra difusa atrás de um elemento em destaque.
+
+### Badge de status no escuro
+Mesma fórmula do claro, translúcida: fundo = cor-do-texto a 12%, borda a 30%, texto =
+`status-dark-*-fg` (já no frontmatter; `status-dark-em-emissao-fg` #FFA366 acrescido
+aqui para completar a escala). A cor nunca é o único sinal — rótulo sempre presente.
+
+### Onde gradiente/glow ENTRAM (e só aqui)
+- **Orb de glow** atrás do card de login (um único, `blur`, ~15–18%, cor do acento).
+- **Wordmark do login** em gradiente tom-claro→sólido do acento.
+- **Número "hero"** dos 2 KPIs de estado do Dashboard (Pendentes/Atrasadas).
+- **Glow funcional** onde já há mudança de tom por regra de negócio (card "Atrasadas"
+  ativo, nó mais recente do TimelineCard) — reforço de atenção, não decoração.
+- **Caixa do ícone de KPI** com gradiente sutil do acento (acento/20→acento/5).
+- **Barra do ranking Top N** com preenchimento em gradiente sólido→70% do acento.
+
+### Onde NÃO entram (mantido plano/sólido)
+Fundo de cards de dado (tabelas, `SolicitacaoCard`, cadastros), botões, badges de
+status, e qualquer superfície normal. `backdrop-blur`/glass só em overlays que já
+flutuam (modal/dropdown/popover) — exatamente onde §4 já permite sombra.
