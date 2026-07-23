@@ -8,7 +8,12 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { TurnstileWidget, type TurnstileHandle } from '@/components/TurnstileWidget'
 import { useAuth } from '@/hooks/useAuth'
+
+// Chave pública do Turnstile. Quando ausente, o captcha fica desligado e o login
+// segue como antes — o gate real é habilitado no Dashboard do Supabase.
+const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined
 
 const loginSchema = z.object({
   email: z.string().min(1, 'Informe seu e-mail').email('E-mail inválido'),
@@ -32,6 +37,9 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = React.useState(false)
   const [capsOn, setCapsOn] = React.useState(false)
   const [submitting, setSubmitting] = React.useState(false)
+  const [captchaToken, setCaptchaToken] = React.useState<string | null>(null)
+  const turnstileRef = React.useRef<TurnstileHandle>(null)
+  const captchaEnabled = Boolean(TURNSTILE_SITE_KEY)
 
   const {
     register,
@@ -47,10 +55,17 @@ export default function LoginPage() {
   }
 
   const onSubmit = async (values: LoginValues) => {
+    if (captchaEnabled && !captchaToken) {
+      toast.error('Confirme que você não é um robô.')
+      return
+    }
     setSubmitting(true)
-    const { error } = await signIn(values.email, values.password)
+    const { error } = await signIn(values.email, values.password, captchaToken ?? undefined)
     setSubmitting(false)
     if (error) {
+      // Token do Turnstile é de uso único: descarta e emite um novo desafio.
+      turnstileRef.current?.reset()
+      setCaptchaToken(null)
       toast.error(error)
       return
     }
@@ -58,22 +73,42 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-full items-center justify-center bg-[#1D1E1B] px-4 py-10">
-      <div className="w-full max-w-[380px]">
-        <div className="relative rounded-[4px] border border-border bg-background p-8 shadow-[0_18px_50px_-12px_rgba(0,0,0,0.65)]">
+    <div className="relative flex min-h-full items-center justify-center overflow-hidden bg-[#F5F7F9] px-4 py-10 dark:bg-[var(--canvas-dark)]">
+      {/* Glow orb: um único brilho difuso do acento atrás do card — o "hero" da
+          sessão. Recurso escasso (só aqui), como manda o SPEC-NOVA-UI §4. No
+          claro é um calor suave; no escuro, um glow mais presente. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute left-1/2 top-1/2 h-[440px] w-[440px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[rgba(255,81,0,0.08)] blur-[130px] dark:bg-[var(--glow-orange)]"
+      />
+      {/* Profundidade: um calor sutil vindo do topo, sem virar superfície chapada. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_100%_70%_at_50%_-10%,rgba(255,81,0,0.05),transparent_55%)]"
+      />
+      <div className="relative w-full max-w-[380px]">
+        <div className="relative overflow-hidden rounded-[4px] border border-border bg-white p-8 shadow-[0_18px_50px_-12px_rgba(0,0,0,0.18)] dark:border-[var(--border-dark)] dark:bg-[var(--surface-dark)] dark:shadow-[0_24px_60px_-12px_rgba(0,0,0,0.75)]">
           {ENV_LABEL && (
-            <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-[3px] border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700">
-              <span className="h-1.5 w-1.5 rounded-full bg-amber-500" aria-hidden />
+            <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-[3px] border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-300">
+              <span className="h-1.5 w-1.5 rounded-full bg-amber-500 dark:bg-amber-400" aria-hidden />
               {ENV_LABEL}
             </span>
           )}
+
+          {/* Wordmark — único destaque tipográfico da tela: gradiente tom-claro→
+              sólido do MESMO acento (laranja), nunca duas cores diferentes. */}
+          <div className="mb-6 flex items-center gap-2.5">
+            <img src="/favicon.svg" alt="" aria-hidden className="h-8 w-8" />
+            <span className="bg-gradient-to-r from-[#FF5100] to-[#D3641A] bg-clip-text font-display text-[20px] font-semibold tracking-tight text-transparent dark:from-[var(--orange-tint)] dark:to-[#FF5100]">
+              SisLog
+            </span>
+          </div>
           {step === 'welcome' ? (
             <div
               key="welcome"
               className="animate-in fade-in slide-in-from-bottom-1 duration-200 motion-reduce:animate-none"
             >
-              <img src="/favicon.svg" alt="" aria-hidden className="h-9 w-9" />
-              <h1 className="mt-5 font-display text-[22px] font-semibold tracking-tight text-foreground">
+              <h1 className="font-display text-[22px] font-semibold tracking-tight text-foreground">
                 Acessar o sistema
               </h1>
               <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
@@ -166,7 +201,21 @@ export default function LoginPage() {
                   )}
                 </div>
 
-                <Button type="submit" className="h-10 w-full" disabled={submitting}>
+                {captchaEnabled && (
+                  <TurnstileWidget
+                    ref={turnstileRef}
+                    siteKey={TURNSTILE_SITE_KEY!}
+                    onVerify={setCaptchaToken}
+                    onExpire={() => setCaptchaToken(null)}
+                    onError={() => setCaptchaToken(null)}
+                  />
+                )}
+
+                <Button
+                  type="submit"
+                  className="h-10 w-full"
+                  disabled={submitting || (captchaEnabled && !captchaToken)}
+                >
                   {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
                   {submitting ? 'Entrando…' : 'Entrar'}
                 </Button>
@@ -176,17 +225,17 @@ export default function LoginPage() {
         </div>
 
         <div className="mt-5 space-y-1 text-center">
-          <p className="text-[11px] text-white/45">
+          <p className="text-[11px] text-muted-foreground">
             Acesso restrito a usuários autorizados · sessões registradas
           </p>
-          <p className="text-[11px] text-white/35">
+          <p className="text-[11px] text-muted-foreground/70">
             LHG Logística · SisLog {APP_VERSION} ·{' '}
             <button
               type="button"
               onClick={() =>
                 toast.info('Em caso de problemas de acesso, contate o administrador do sistema.')
               }
-              className="font-medium text-white/55 underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[#1D1E1B]"
+              className="font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-[#F5F7F9] dark:focus-visible:ring-offset-[var(--canvas-dark)]"
             >
               Suporte
             </button>

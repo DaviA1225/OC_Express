@@ -12,7 +12,11 @@ interface AuthContextValue {
   /** A última tentativa de carregar o perfil falhou (erro transitório/rede). */
   profileError: boolean
   loading: boolean
-  signIn: (email: string, password: string) => Promise<{ error: string | null }>
+  signIn: (
+    email: string,
+    password: string,
+    captchaToken?: string,
+  ) => Promise<{ error: string | null }>
   signOut: () => Promise<void>
   refreshProfile: () => Promise<void>
 }
@@ -114,8 +118,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [loadProfile])
 
-  const signIn: AuthContextValue['signIn'] = async (email, password) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+  const signIn: AuthContextValue['signIn'] = async (email, password, captchaToken) => {
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+      options: captchaToken ? { captchaToken } : undefined,
+    })
     if (error) return { error: traduzirErroAuth(error.message) }
     return { error: null }
   }
@@ -163,5 +171,6 @@ function traduzirErroAuth(msg: string): string {
   if (m.includes('invalid login credentials')) return 'E-mail ou senha incorretos.'
   if (m.includes('email not confirmed')) return 'Confirme seu e-mail antes de entrar.'
   if (m.includes('too many requests')) return 'Muitas tentativas. Aguarde alguns instantes.'
+  if (m.includes('captcha')) return 'Falha na verificação de segurança. Recarregue a página e tente novamente.'
   return 'Não foi possível entrar. Tente novamente.'
 }
