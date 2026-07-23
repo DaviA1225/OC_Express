@@ -8,7 +8,12 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { TurnstileWidget, type TurnstileHandle } from '@/components/TurnstileWidget'
 import { useAuth } from '@/hooks/useAuth'
+
+// Chave pública do Turnstile. Quando ausente, o captcha fica desligado e o login
+// segue como antes — o gate real é habilitado no Dashboard do Supabase.
+const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined
 
 const loginSchema = z.object({
   email: z.string().min(1, 'Informe seu e-mail').email('E-mail inválido'),
@@ -25,6 +30,9 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = React.useState(false)
   const [capsOn, setCapsOn] = React.useState(false)
   const [submitting, setSubmitting] = React.useState(false)
+  const [captchaToken, setCaptchaToken] = React.useState<string | null>(null)
+  const turnstileRef = React.useRef<TurnstileHandle>(null)
+  const captchaEnabled = Boolean(TURNSTILE_SITE_KEY)
 
   const {
     register,
@@ -40,10 +48,17 @@ export default function LoginPage() {
   }
 
   const onSubmit = async (values: LoginValues) => {
+    if (captchaEnabled && !captchaToken) {
+      toast.error('Confirme que você não é um robô.')
+      return
+    }
     setSubmitting(true)
-    const { error } = await signIn(values.email, values.password)
+    const { error } = await signIn(values.email, values.password, captchaToken ?? undefined)
     setSubmitting(false)
     if (error) {
+      // Token do Turnstile é de uso único: descarta e emite um novo desafio.
+      turnstileRef.current?.reset()
+      setCaptchaToken(null)
       toast.error(error)
       return
     }
@@ -51,19 +66,34 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-full items-center justify-center bg-[#1E3A8A] px-4 py-10">
-      <div className="w-full max-w-[380px]">
-        <div className="rounded-[4px] border border-border bg-background p-8 shadow-[0_18px_50px_-12px_rgba(0,0,0,0.5)]">
+    <div className="relative flex min-h-full items-center justify-center overflow-hidden bg-[#F5F7F9] px-4 py-10 dark:bg-[var(--canvas-dark)]">
+      {/* Glow orb azul atrás do card — "hero" da entrada do parceiro (SPEC-NOVA-UI §4). */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute left-1/2 top-1/2 h-[440px] w-[440px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[rgba(30,64,175,0.10)] blur-[130px] dark:bg-[var(--glow-blue)]"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_100%_70%_at_50%_-10%,rgba(30,64,175,0.06),transparent_55%)]"
+      />
+      <div className="relative w-full max-w-[380px]">
+        <div className="relative overflow-hidden rounded-[4px] border border-border bg-white p-8 shadow-[0_18px_50px_-12px_rgba(0,0,0,0.18)] dark:border-[var(--border-dark)] dark:bg-[var(--surface-dark)] dark:shadow-[0_24px_60px_-12px_rgba(0,0,0,0.75)]">
+          {/* Wordmark — destaque tipográfico único: gradiente tom-claro→sólido do azul. */}
+          <div className="mb-6 flex items-center gap-2.5">
+            <div className="inline-flex h-9 w-9 items-center justify-center rounded-[4px] bg-primary text-[13px] font-semibold text-primary-foreground">
+              LHG
+            </div>
+            <span className="bg-gradient-to-r from-[#1E40AF] to-[#1E3A8A] bg-clip-text font-display text-[16px] font-semibold leading-tight tracking-tight text-transparent dark:from-[var(--portal-blue-tint)] dark:to-[#1E40AF]">
+              Portal Parceiros LHG
+            </span>
+          </div>
           {step === 'welcome' ? (
             <div
               key="welcome"
               className="animate-in fade-in slide-in-from-bottom-1 duration-200 motion-reduce:animate-none"
             >
-              <div className="inline-flex h-9 w-9 items-center justify-center rounded-[4px] bg-primary text-[13px] font-semibold text-primary-foreground">
-                LHG
-              </div>
-              <h1 className="mt-5 font-display text-[22px] font-semibold tracking-tight text-foreground">
-                Portal Parceiros LHG
+              <h1 className="font-display text-[22px] font-semibold tracking-tight text-foreground">
+                Acessar o portal
               </h1>
               <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
                 Acesso para transportadoras parceiras da LHG.
@@ -143,7 +173,21 @@ export default function LoginPage() {
                   )}
                 </div>
 
-                <Button type="submit" className="h-10 w-full" disabled={submitting}>
+                {captchaEnabled && (
+                  <TurnstileWidget
+                    ref={turnstileRef}
+                    siteKey={TURNSTILE_SITE_KEY!}
+                    onVerify={setCaptchaToken}
+                    onExpire={() => setCaptchaToken(null)}
+                    onError={() => setCaptchaToken(null)}
+                  />
+                )}
+
+                <Button
+                  type="submit"
+                  className="h-10 w-full"
+                  disabled={submitting || (captchaEnabled && !captchaToken)}
+                >
                   {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
                   {submitting ? 'Entrando…' : 'Entrar'}
                 </Button>
@@ -151,24 +195,24 @@ export default function LoginPage() {
 
               <p className="mt-5 text-[12px] leading-relaxed text-muted-foreground">
                 Esqueceu a senha? Procure o administrador da sua transportadora ou o suporte
-                da LHG — o portal não tem recuperação automática.
+                da LHG, o portal não tem recuperação automática.
               </p>
             </div>
           )}
         </div>
 
         <div className="mt-5 space-y-1 text-center">
-          <p className="text-[11px] text-white/50">
+          <p className="text-[11px] text-muted-foreground">
             Acesso restrito a transportadoras parceiras · sessões registradas
           </p>
-          <p className="text-[11px] text-white/40">
-            © {new Date().getFullYear()} LHG Logística — Portal de Parceiros ·{' '}
+          <p className="text-[11px] text-muted-foreground/70">
+            © {new Date().getFullYear()} LHG Logística, Portal de Parceiros ·{' '}
             <button
               type="button"
               onClick={() =>
                 toast.info('Procure o administrador da sua transportadora ou o suporte da LHG.')
               }
-              className="font-medium text-white/60 underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[#1E3A8A]"
+              className="font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-[#F5F7F9] dark:focus-visible:ring-offset-[var(--canvas-dark)]"
             >
               Suporte
             </button>
