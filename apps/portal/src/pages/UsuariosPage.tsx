@@ -42,7 +42,7 @@ function computarSituacao(u: Usuario): { label: string; className: string } {
   if (!u.convite_aceito_em) {
     return {
       label: 'Aguardando',
-      className: 'inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800',
+      className: 'inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800 dark:bg-amber-950/50 dark:text-amber-300',
     }
   }
   return {
@@ -150,7 +150,7 @@ export default function UsuariosPage() {
     },
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ['parceiro-usuarios'] })
-      toast.success(`Usuário ${data?.email ?? ''} excluído — e-mail liberado para reuso`)
+      toast.success(`Usuário ${data?.email ?? ''} excluído, e-mail liberado para reuso`)
     },
     onError: (e: Error) => toast.error(e.message),
   })
@@ -255,7 +255,7 @@ export default function UsuariosPage() {
                           size="sm"
                           onClick={() => setExcluirRow(u)}
                           className="gap-1 text-destructive hover:text-destructive"
-                          title="Apaga definitivamente — libera o e-mail para reuso em outro parceiro"
+                          title="Apaga definitivamente, libera o e-mail para reuso em outro parceiro"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                           Excluir
@@ -384,7 +384,7 @@ function EditarPerfilForm({
       <DialogHeader>
         <DialogTitle>Editar perfil</DialogTitle>
         <DialogDescription>
-          {usuario.nome_completo} — defina o nível de acesso ao portal.
+          {usuario.nome_completo}, defina o nível de acesso ao portal.
         </DialogDescription>
       </DialogHeader>
       <DialogBody className="space-y-1.5">
@@ -392,8 +392,8 @@ function EditarPerfilForm({
         <Select value={perfil} onValueChange={(v) => setPerfil(v as ParceiroPerfil)}>
           <SelectTrigger id="perfil"><SelectValue /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="operador_parceiro">Operador — cria solicitações e cadastros</SelectItem>
-            <SelectItem value="admin_parceiro">Administrador — também gerencia usuários</SelectItem>
+            <SelectItem value="operador_parceiro">Operador, cria solicitações e cadastros</SelectItem>
+            <SelectItem value="admin_parceiro">Administrador, também gerencia usuários</SelectItem>
           </SelectContent>
         </Select>
       </DialogBody>
@@ -531,8 +531,8 @@ function ConvidarForm({
           <Select value={perfil} onValueChange={(v) => setPerfil(v as ParceiroPerfil)}>
             <SelectTrigger id="convite-perfil"><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="operador_parceiro">Operador — cria solicitações e cadastros</SelectItem>
-              <SelectItem value="admin_parceiro">Administrador — também gerencia usuários</SelectItem>
+              <SelectItem value="operador_parceiro">Operador, cria solicitações e cadastros</SelectItem>
+              <SelectItem value="admin_parceiro">Administrador, também gerencia usuários</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -560,10 +560,10 @@ function traduzirErroConvite(code: string, detalhe?: string): string {
     case 'sessao_invalida': return 'Sua sessão expirou. Saia e entre de novo.'
     case 'forbidden': return 'Você não tem permissão para convidar usuários.'
     case 'parceiro_nao_encontrado': return 'Parceiro alvo não encontrado.'
-    case 'parceiro_inativo': return 'Parceiro inativo — não é possível convidar.'
+    case 'parceiro_inativo': return 'Parceiro inativo, não é possível convidar.'
     case 'email_ja_cadastrado': return 'Este e-mail já está vinculado a um usuário do portal.'
     case 'email_inativo_existente':
-      return 'Este e-mail é de um usuário desativado — reative-o em vez de convidar de novo.'
+      return 'Este e-mail é de um usuário desativado, reative-o em vez de convidar de novo.'
     case 'falha_no_convite': return `Não foi possível enviar o convite${detalhe ? `: ${detalhe}` : ''}.`
     case 'falha_no_insert': return 'Convite emitido, mas falhou ao salvar o vínculo. Procure o suporte.'
     default: return detalhe || 'Erro ao processar o convite.'
