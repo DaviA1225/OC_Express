@@ -75,14 +75,17 @@
     --popover: 221 19% 17%;              /* #232833 elevated-dark */
     --popover-foreground: 220 16% 96%;
 
-    /* Acento azul do dark: L=56% (era 62%). O 62% falhava WCAG AA no botao
-       primario (branco/azul = 3.87:1). Em 56% sobe para 4.95:1. Nenhum L unico
-       satisfaz botao (exige L<=58) E azul-como-texto-em-card (exige L>=64) — o
-       botao (fill sem affordance secundaria) tem prioridade; o azul-texto (links,
-       nav) tem sublinhado/barra como affordance redundante (WCAG 1.4.1). */
-    --primary: 224 76% 56%;              /* azul luminoso p/ dark (AA no botao) */
-    --primary-hover: 226 71% 48%;
-    --primary-foreground: 0 0% 100%;
+    /* Acento azul do dark: L=64% + FOREGROUND ESCURO no fill (WCAG AA total).
+       Nenhum azul unico com texto BRANCO fecha os dois usos do acento — o botao
+       (branco/azul) exige L<=58, o azul-como-texto-em-card exige L>=64. A saida e
+       inverter o botao no dark: fill azul claro (L=64) + tinta escura (navy). Assim
+       o MESMO azul serve de fill (tinta escura passa: 5.0:1) e de texto sobre card
+       (4.63:1) e canvas (5.03:1). O botao inverte so no dark; no claro segue
+       branco sobre #1E40AF. `--primary-foreground` escuro vale p/ todo fill de
+       acento (botao, avatar, logo, checkbox) — tinta consistente. */
+    --primary: 224 76% 64%;              /* azul claro p/ dark */
+    --primary-hover: 224 76% 70%;        /* hover CLAREIA (tinta escura pede + luz) */
+    --primary-foreground: 222 47% 11%;   /* navy — tinta do fill no dark */
 
     --secondary: 222 12% 30%;
     --secondary-foreground: 220 16% 96%;
@@ -104,7 +107,7 @@
 
     --border: 222 12% 22%;
     --input: 222 12% 22%;
-    --ring: 224 76% 56%;
+    --ring: 224 76% 64%;
   }
 }
 
