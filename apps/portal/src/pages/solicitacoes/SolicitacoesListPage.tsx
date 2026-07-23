@@ -142,7 +142,7 @@ export default function SolicitacoesListPage() {
       </div>
 
       {bloqueado && (
-        <div className="flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4 text-amber-900">
+        <div className="flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4 text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200">
           <Lock className="mt-0.5 h-4 w-4 shrink-0" />
           <div className="space-y-1">
             <p className="text-[13px] font-semibold">
@@ -200,7 +200,7 @@ export default function SolicitacoesListPage() {
             description={
               temFiltro
                 ? 'Ajuste os filtros para ver outras solicitações.'
-                : 'Crie sua primeira solicitação de carregamento — ela vai direto para a equipe da LHG.'
+                : 'Crie sua primeira solicitação de carregamento, ela vai direto para a equipe da LHG.'
             }
             action={
               !temFiltro && !bloqueado && (
@@ -242,7 +242,7 @@ function SolicitacaoCard({ view, temPendencia }: { view: SolicitacaoView; temPen
       to={`/solicitacoes/${sol.id}`}
       className={cn(
         'flex flex-col gap-3 rounded-lg border bg-background p-4 transition-colors hover:border-primary/40 hover:bg-accent/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-        temPendencia && 'border-orange-300 ring-1 ring-orange-200 dark:border-orange-900/60 dark:ring-orange-900/40',
+        temPendencia && 'border-red-400 ring-1 ring-red-200 dark:border-red-900/60 dark:ring-red-900/40',
       )}
     >
       <div className="flex items-start justify-between gap-2">
@@ -252,13 +252,13 @@ function SolicitacaoCard({ view, temPendencia }: { view: SolicitacaoView; temPen
         <StatusBadge status={sol.status} />
       </div>
       {temPendencia && (
-        <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-orange-100 px-2 py-0.5 text-[11px] font-semibold text-orange-800 dark:bg-orange-950/60 dark:text-orange-300">
+        <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-semibold text-red-800 dark:bg-red-950/60 dark:text-red-300">
           <span className="relative flex h-2 w-2">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-orange-500 opacity-75" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-orange-500" />
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
           </span>
           <Undo2 className="h-3 w-3" />
-          Ação necessária
+          Pendência
         </span>
       )}
       <p className="text-[11px] text-muted-foreground">Enviada em {enviada}</p>

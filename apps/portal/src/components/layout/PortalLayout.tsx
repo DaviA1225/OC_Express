@@ -1,6 +1,7 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { ChevronDown, LogOut, User } from 'lucide-react'
+import { ChevronDown, LogOut, User, Sun, Moon } from 'lucide-react'
 import { useAuth, hasPerfilParceiro } from '@/hooks/useAuth'
+import { useTheme } from '@/hooks/useTheme'
 import { cn } from '@/lib/utils'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import {
@@ -56,9 +57,9 @@ export function PortalLayout() {
   }
 
   return (
-    <div className="flex min-h-full flex-col bg-muted/40">
+    <div className="flex min-h-full flex-col bg-muted/40 dark:bg-background">
       {/* Header — 56px */}
-      <header className="flex h-14 shrink-0 items-center justify-between border-b bg-background px-4 sm:px-6">
+      <header className="flex h-14 shrink-0 items-center justify-between border-b bg-card px-4 sm:px-6">
         <div className="flex items-center gap-2.5">
           <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-[12px] font-semibold text-primary-foreground">
             LHG
@@ -72,6 +73,7 @@ export function PortalLayout() {
         </div>
 
         <div className="flex items-center gap-1.5">
+        <ThemeToggle />
         <PendenciasBell />
         <DropdownMenu>
           <DropdownMenuTrigger className="flex items-center gap-2 rounded-md px-1.5 py-1 outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">
@@ -114,7 +116,7 @@ export function PortalLayout() {
       </header>
 
       {/* Navegação horizontal — 44px */}
-      <nav className="flex h-11 shrink-0 items-center gap-1 overflow-x-auto border-b bg-background px-2 sm:px-5">
+      <nav className="flex h-11 shrink-0 items-center gap-1 overflow-x-auto border-b bg-card px-2 sm:px-5">
         {navItems.map((item) => (
           <NavLink
             key={item.to}
@@ -123,7 +125,7 @@ export function PortalLayout() {
               cn(
                 'relative flex h-11 items-center whitespace-nowrap px-3 text-[13px] font-medium transition-colors',
                 isActive
-                  ? 'text-primary after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:rounded-full after:bg-primary after:content-[""]'
+                  ? 'text-primary after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:rounded-full after:bg-primary after:shadow-[0_0_8px_0_rgba(96,152,255,0.55)] after:content-[""]'
                   : 'text-muted-foreground hover:text-foreground',
               )
             }
@@ -138,7 +140,7 @@ export function PortalLayout() {
         <Outlet />
       </main>
 
-      <footer className="shrink-0 border-t bg-background px-6 py-3">
+      <footer className="shrink-0 border-t bg-card px-6 py-3">
         <p className="text-[11px] text-muted-foreground">
           Precisa de ajuda?{' '}
           <a href={`mailto:${SUPORTE_EMAIL}`} className="font-medium text-primary hover:underline">
@@ -156,5 +158,21 @@ export function PortalLayout() {
         </p>
       </footer>
     </div>
+  )
+}
+
+function ThemeToggle() {
+  const { theme, toggle } = useTheme()
+  const isDark = theme === 'dark'
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      aria-label={isDark ? 'Mudar para modo claro' : 'Mudar para modo escuro'}
+      title={isDark ? 'Modo claro' : 'Modo escuro'}
+      className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+    </button>
   )
 }

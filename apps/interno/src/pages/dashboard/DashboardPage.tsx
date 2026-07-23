@@ -138,11 +138,11 @@ export default function DashboardPage() {
         />
         <KpiCard
           label="Atrasadas"
-          hint="Pendentes há mais de 8 horas — fora do prazo de atendimento."
+          hint="Pendentes há mais de 8 horas, fora do prazo de atendimento."
           value={atrasadas}
           subValue={
             atrasadas > 0
-              ? 'Pendentes há mais de 8 horas — prioridade'
+              ? 'Pendentes há mais de 8 horas, prioridade'
               : 'Nenhuma fora do prazo'
           }
           icon={<AlertTriangle className="h-[18px] w-[18px]" />}
@@ -300,6 +300,22 @@ function KpiCard({
   const isAlert = tone === 'alert' && (value ?? 0) > 0
   const interactive = !!to && !isError
 
+  // Número "hero" (KPIs de estado: Pendentes/Atrasadas) ganha gradiente do acento
+  // — só no modo escuro (DESIGN.md §7). Modo claro segue sólido.
+  const numberCls = cn(
+    'font-medium tabular-nums leading-none',
+    isLg ? 'text-[36px]' : 'text-[28px]',
+    // Não-hero: cor sólida (segue o tema).
+    !isLg && (isAlert ? 'text-red-700 dark:text-red-300' : 'text-foreground'),
+    // Hero (Pendentes/Atrasadas): número em gradiente do acento nos DOIS modos —
+    // claro usa tons escuros legíveis no branco, escuro usa tons claros (DESIGN.md §7).
+    isLg && 'bg-gradient-to-br bg-clip-text text-transparent',
+    isLg &&
+      (isAlert
+        ? 'from-[#EF4444] to-[#B91C1C] dark:from-[#FF9B9B] dark:to-[#EF4444]'
+        : 'from-[#FF5100] to-[#D3641A] dark:from-[var(--orange-tint)] dark:to-[#FF5100]'),
+  )
+
   const inner = (
     <>
       <div className="flex items-start justify-between gap-2">
@@ -318,7 +334,7 @@ function KpiCard({
           isLg ? 'h-9 w-9' : 'h-8 w-8',
           isAlert
             ? 'border-red-200 bg-red-100 text-red-600 dark:border-red-900/60 dark:bg-red-950/50 dark:text-red-300'
-            : cn('bg-muted/60', accent),
+            : cn('border-primary/15 bg-gradient-to-br from-primary/15 to-primary/[0.04] dark:from-primary/20 dark:to-primary/5', accent),
         )}>
           {icon}
         </span>
@@ -329,11 +345,7 @@ function KpiCard({
         <KpiError onRetry={onRetry} />
       ) : (
         <div className="mt-2 flex items-baseline gap-1">
-          <span className={cn(
-            'font-medium tabular-nums leading-none',
-            isLg ? 'text-[36px]' : 'text-[28px]',
-            isAlert ? 'text-red-700 dark:text-red-300' : 'text-foreground',
-          )}>
+          <span className={numberCls}>
             {value == null ? '—' : value}
           </span>
           {unit && value != null && (
@@ -357,7 +369,9 @@ function KpiCard({
 
   const base = cn(
     'block rounded-lg border p-4 transition-colors',
-    isAlert ? 'border-red-200 bg-red-50 dark:border-red-900/60 dark:bg-red-950/30' : 'bg-card',
+    isAlert
+      ? 'border-red-200 bg-red-50 shadow-[0_0_30px_-8px_rgba(239,68,68,0.28)] dark:border-red-900/60 dark:bg-red-950/30 dark:shadow-[0_0_36px_-6px_rgba(239,68,68,0.4)]'
+      : 'bg-card',
     interactive && (isAlert
       ? 'hover:bg-red-100 dark:hover:bg-red-950/50'
       : 'hover:border-primary/40 hover:bg-muted/30'),
@@ -661,7 +675,7 @@ function TopList({
           <li key={it.id} className="flex items-center gap-2 text-[12px]">
             <span className="w-4 text-right tabular-nums text-muted-foreground">{i + 1}.</span>
             <div className="relative min-w-0 flex-1 rounded bg-muted">
-              <div className="h-6 rounded bg-primary/15" style={{ width: `${pct}%` }} />
+              <div className="h-6 rounded bg-gradient-to-r from-primary/30 to-primary/[0.08]" style={{ width: `${pct}%` }} />
               <span className="absolute inset-0 flex items-center px-2 text-foreground">
                 <span className="truncate">{it.label}</span>
               </span>
