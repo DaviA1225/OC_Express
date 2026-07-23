@@ -57,6 +57,11 @@
     --input: 220 14% 90%;
     --ring: 19 100% 50%;                 /* foco em laranja LHG */
 
+    /* Laranja escuro SÓ para texto (text-primary-strong). O #FF5100 é vibrante
+       demais como texto em fundo claro (3.1:1); L=40 passa AA (4.6-4.9:1). Fills,
+       borda e foco seguem #FF5100. */
+    --primary-strong: 19 100% 40%;
+
     --radius: 0.25rem;
 
     /* Tema escuro / superfícies "hero" (SPEC-NOVA-UI v3) — valores FIXOS que não
@@ -118,6 +123,10 @@
     --border: 220 12% 22%;               /* contraste de borda um pouco mais visível */
     --input: 220 12% 22%;
     --ring: 21 100% 60%;
+
+    /* No dark o laranja-texto já passa (6.4:1 sobre card); o strong iguala o
+       --primary para manter o brilho no escuro. */
+    --primary-strong: 21 100% 60%;
   }
 }
 

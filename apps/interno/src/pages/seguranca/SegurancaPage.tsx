@@ -377,7 +377,7 @@ function DetalhesCell({ row }: { row: EventoPortalRowResolved }) {
       {row.solicitacao_id && (
         <Link
           to={`/solicitacoes/${row.solicitacao_id}`}
-          className="text-[12px] font-medium text-primary hover:underline"
+          className="text-[12px] font-medium text-primary-strong hover:underline"
         >
           {row.numero_interno_solicitacao
             ? `Solicitação #${String(row.numero_interno_solicitacao).padStart(4, '0')}`

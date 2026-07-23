@@ -154,7 +154,7 @@ export function Combobox({
                         setOpen(false)
                         onCreateNew(search)
                       }}
-                      className="text-primary"
+                      className="text-primary-strong"
                     >
                       <Plus className="mr-2 h-3.5 w-3.5" />
                       {createNewLabel ?? `Cadastrar novo "${search}"`}

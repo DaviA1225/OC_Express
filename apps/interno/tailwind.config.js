@@ -36,6 +36,10 @@ export default {
           DEFAULT: 'hsl(var(--primary))',
           foreground: 'hsl(var(--primary-foreground))',
           hover: 'hsl(var(--primary-hover))',
+          // Laranja mais escuro para o acento COMO TEXTO (text-primary-strong).
+          // O #FF5100 (--primary) é vibrante demais como texto em fundo claro
+          // (3.1:1); este passa WCAG AA (4.6-4.9:1). O fill segue #FF5100.
+          strong: 'hsl(var(--primary-strong))',
         },
         secondary: {
           DEFAULT: 'hsl(var(--secondary))',

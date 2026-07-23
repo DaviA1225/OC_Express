@@ -1097,7 +1097,7 @@ function AbrirPdfLink({ stored }: { stored: string }) {
       type="button"
       onClick={abrir}
       disabled={loading}
-      className="text-primary hover:underline disabled:opacity-60"
+      className="text-primary-strong hover:underline disabled:opacity-60"
     >
       {loading ? 'Abrindo…' : 'Abrir PDF'}
     </button>
