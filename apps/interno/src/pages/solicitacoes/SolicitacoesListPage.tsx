@@ -690,7 +690,7 @@ function SolicitacaoCard({ row, sinalPendencia, selectable, selected, onToggleSe
             />
           </span>
           )}
-          <span className="shrink-0 text-[14px] font-medium text-primary">{formatNumeroOC(row.numero_interno)}</span>
+          <span className="shrink-0 text-[14px] font-medium text-primary-strong">{formatNumeroOC(row.numero_interno)}</span>
           {sinal && <PendenciaPop sinal={sinal} />}
           {row.origem === 'parceiro'
             && row.pamcard_status === 'nao_tem_cartao'
@@ -753,7 +753,7 @@ function SolicitacaoCard({ row, sinalPendencia, selectable, selected, onToggleSe
           {created ? format(created, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR }) : '—'}
           {row.numero_instrucao ? ` · Instr. ${row.numero_instrucao}` : ''}
         </span>
-        <span className="inline-flex items-center gap-0.5 text-[12px] font-medium text-primary">
+        <span className="inline-flex items-center gap-0.5 text-[12px] font-medium text-primary-strong">
           Abrir <ChevronRight className="h-3.5 w-3.5" />
         </span>
       </div>
@@ -790,7 +790,7 @@ function SolicitacaoListaRow({ row, sinalPendencia, selectable, selected, onTogg
         onClick={onOpen}
         className="flex min-w-0 flex-1 items-center gap-2 text-left"
       >
-        <span className="shrink-0 text-[13px] font-medium text-primary">{formatNumeroOC(row.numero_interno)}</span>
+        <span className="shrink-0 text-[13px] font-medium text-primary-strong">{formatNumeroOC(row.numero_interno)}</span>
         {sinal && <PendenciaPop sinal={sinal} />}
         {row.origem === 'parceiro'
           && row.pamcard_status === 'nao_tem_cartao'

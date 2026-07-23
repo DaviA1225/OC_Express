@@ -101,7 +101,7 @@ export function NotificationsBell() {
         >
           <Bell className="h-5 w-5" />
           {total > 0 && (
-            <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-white px-1 text-[10px] font-semibold text-primary ring-1 ring-primary">
+            <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-white px-1 text-[10px] font-semibold text-primary-strong ring-1 ring-primary">
               {total > 99 ? '99+' : total}
             </span>
           )}
@@ -160,7 +160,7 @@ export function NotificationsBell() {
                         <Icon className={cn('mt-0.5 h-4 w-4 shrink-0', kindIconColor(kind))} />
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
-                            <span className="text-[12px] font-medium tabular-nums text-primary">
+                            <span className="text-[12px] font-medium tabular-nums text-primary-strong">
                               {formatNumeroOC(item.numero_interno)}
                             </span>
                             <span className="text-[11px] text-muted-foreground">{item.age_label}</span>

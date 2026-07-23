@@ -194,7 +194,7 @@ function PopupConteudo({ p }: { p: ClienteMapaPonto }) {
               const placas = [c.veiculo, c.carreta].filter(Boolean).join(' / ')
               return (
                 <li key={c.id} className="text-[11px] leading-tight">
-                  <span className="font-medium text-primary">{formatNumeroOC(c.numero_interno)}</span>
+                  <span className="font-medium text-primary-strong">{formatNumeroOC(c.numero_interno)}</span>
                   {' · '}
                   <span className="text-foreground">{placas || 'sem placa'}</span>
                   {c.motorista && <span className="text-muted-foreground"> · {c.motorista}</span>}

@@ -133,7 +133,7 @@ export default function LoginPage() {
                         e.preventDefault()
                         toast.info('Funcionalidade em desenvolvimento.')
                       }}
-                      className="text-[12px] font-medium text-primary hover:underline"
+                      className="text-[12px] font-medium text-primary-strong hover:underline"
                     >
                       Esqueci minha senha
                     </a>

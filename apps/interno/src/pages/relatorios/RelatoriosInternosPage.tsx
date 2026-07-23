@@ -335,7 +335,7 @@ function ParadasList({
           <li key={a.solicitacaoId} className="flex items-center gap-3 py-2 text-[12px]">
             <Link
               to={`/solicitacoes/${a.solicitacaoId}`}
-              className="w-16 shrink-0 font-medium text-primary hover:underline tabular-nums"
+              className="w-16 shrink-0 font-medium text-primary-strong hover:underline tabular-nums"
             >
               #{String(a.numero_interno).padStart(4, '0')}
             </Link>

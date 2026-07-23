@@ -52,21 +52,40 @@
 
     /* Radius sóbrio (institucional), alinhado ao sistema interno. */
     --radius: 0.25rem;
+
+    /* Tema escuro / superfícies "hero" (SPEC-NOVA-UI v3 / DESIGN.md §7) — valores
+       fixos usados em superfícies sempre-escuras (login) e como fim de gradiente/
+       glow. Acento do portal é o AZUL. */
+    --canvas-dark: #14171D;
+    --surface-dark: #1A1F28;
+    --elevated-dark: #232833;
+    --border-dark: rgba(255, 255, 255, 0.08);
+    --portal-blue-tint: #93B4FF;         /* fim claro do gradiente do acento azul */
+    --glow-blue: rgba(30, 64, 175, 0.22);
   }
 
   .dark {
-    --background: 222 18% 10%;
+    /* Superfícies em camadas (DESIGN.md §7): canvas → surface → elevated. */
+    --background: 220 18% 10%;           /* #14171D canvas-dark */
     --foreground: 220 16% 96%;
 
-    --card: 222 16% 13%;
+    --card: 219 21% 13%;                 /* #1A1F28 surface-dark */
     --card-foreground: 220 16% 96%;
 
-    --popover: 222 16% 14%;
+    --popover: 221 19% 17%;              /* #232833 elevated-dark */
     --popover-foreground: 220 16% 96%;
 
-    --primary: 224 76% 62%;              /* azul luminoso p/ dark */
-    --primary-hover: 226 71% 52%;
-    --primary-foreground: 0 0% 100%;
+    /* Acento azul do dark: L=64% + FOREGROUND ESCURO no fill (WCAG AA total).
+       Nenhum azul unico com texto BRANCO fecha os dois usos do acento — o botao
+       (branco/azul) exige L<=58, o azul-como-texto-em-card exige L>=64. A saida e
+       inverter o botao no dark: fill azul claro (L=64) + tinta escura (navy). Assim
+       o MESMO azul serve de fill (tinta escura passa: 5.0:1) e de texto sobre card
+       (4.63:1) e canvas (5.03:1). O botao inverte so no dark; no claro segue
+       branco sobre #1E40AF. `--primary-foreground` escuro vale p/ todo fill de
+       acento (botao, avatar, logo, checkbox) — tinta consistente. */
+    --primary: 224 76% 64%;              /* azul claro p/ dark */
+    --primary-hover: 224 76% 70%;        /* hover CLAREIA (tinta escura pede + luz) */
+    --primary-foreground: 222 47% 11%;   /* navy — tinta do fill no dark */
 
     --secondary: 222 12% 30%;
     --secondary-foreground: 220 16% 96%;
@@ -88,7 +107,7 @@
 
     --border: 222 12% 22%;
     --input: 222 12% 22%;
-    --ring: 224 76% 62%;
+    --ring: 224 76% 64%;
   }
 }
 

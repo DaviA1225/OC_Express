@@ -66,7 +66,7 @@ export default function AtividadeEquipePage() {
                 className={cn(
                   'rounded px-2 py-1 text-[12px] font-medium transition-colors',
                   limiar === m
-                    ? 'bg-primary/10 text-primary'
+                    ? 'bg-primary/10 text-primary-strong'
                     : 'text-muted-foreground hover:text-foreground',
                 )}
                 title={`Marcar como ocioso após ${m} min sem ação`}

@@ -241,7 +241,7 @@ function VerRelatoriosLink() {
   return (
     <Link
       to="/relatorios"
-      className="inline-flex items-center gap-1 text-[12px] font-medium text-primary hover:underline"
+      className="inline-flex items-center gap-1 text-[12px] font-medium text-primary-strong hover:underline"
     >
       Ver relatórios
       <ArrowRight className="h-3 w-3" />
@@ -386,7 +386,7 @@ function KpiError({ onRetry }: { onRetry?: () => void }) {
         <button
           type="button"
           onClick={(e) => { e.preventDefault(); onRetry() }}
-          className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
+          className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-primary-strong hover:underline"
         >
           <RefreshCw className="h-3 w-3" /> Tentar de novo
         </button>
@@ -407,7 +407,7 @@ function ChartError({ onRetry, height }: { onRetry?: () => void; height: number 
         <button
           type="button"
           onClick={onRetry}
-          className="inline-flex items-center gap-1 text-[12px] font-medium text-primary hover:underline"
+          className="inline-flex items-center gap-1 text-[12px] font-medium text-primary-strong hover:underline"
         >
           <RefreshCw className="h-3 w-3" /> Tentar de novo
         </button>

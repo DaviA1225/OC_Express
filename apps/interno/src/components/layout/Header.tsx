@@ -120,7 +120,7 @@ export function Header({ pageTitle, onOpenMobileMenu, onOpenSearch, realtimeStat
           <DropdownMenuItem onClick={(e) => { e.preventDefault(); toggleDensity() }}>
             <Rows3 className="mr-2 h-4 w-4" />
             <span className="flex-1">Densidade compacta</span>
-            {density === 'compact' && <Check className="ml-2 h-3.5 w-3.5 text-primary" />}
+            {density === 'compact' && <Check className="ml-2 h-3.5 w-3.5 text-primary-strong" />}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={handleSignOut} className="text-destructive focus:text-destructive">

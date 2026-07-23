@@ -149,7 +149,7 @@ function MapaCell({ row }: { row: Row }) {
       href={url}
       target="_blank"
       rel="noreferrer noopener"
-      className="inline-flex items-center gap-1 text-[12px] text-primary hover:underline"
+      className="inline-flex items-center gap-1 text-[12px] text-primary-strong hover:underline"
       onClick={(e) => e.stopPropagation()}
     >
       <MapPin className="h-3 w-3" />
