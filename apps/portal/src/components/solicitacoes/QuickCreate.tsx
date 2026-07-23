@@ -144,7 +144,7 @@ export function QuickCreateMotorista({ open, onOpenChange, parceiroId, defaultVa
       open={open}
       onOpenChange={onOpenChange}
       title="Novo motorista"
-      description="Cadastro rápido — você pode completar os dados depois em Motoristas."
+      description="Cadastro rápido, você pode completar os dados depois em Motoristas."
       isSubmitting={upsert.isPending}
       onSubmit={submit}
     >
@@ -218,7 +218,7 @@ function QuickCreatePlaca({
       open={open}
       onOpenChange={onOpenChange}
       title={title}
-      description="Cadastro rápido — você pode completar os dados depois."
+      description="Cadastro rápido, você pode completar os dados depois."
       isSubmitting={upsert.isPending}
       onSubmit={submit}
     >
@@ -317,7 +317,7 @@ export function QuickCreatePamcard({ open, onOpenChange, parceiroId, defaultValu
       open={open}
       onOpenChange={onOpenChange}
       title="Novo cartão Pamcard"
-      description="Cadastro rápido — você pode completar os dados depois em Cartões Pamcard."
+      description="Cadastro rápido, você pode completar os dados depois em Cartões Pamcard."
       isSubmitting={upsert.isPending}
       onSubmit={submit}
     >
@@ -333,7 +333,7 @@ export function QuickCreatePamcard({ open, onOpenChange, parceiroId, defaultValu
         />
       </Field>
       <Field label="Apelido" htmlFor="qc-pam-apelido">
-        <Input id="qc-pam-apelido" {...register('apelido')} placeholder="Opcional — ex.: Cartão João" />
+        <Input id="qc-pam-apelido" {...register('apelido')} placeholder="Opcional, ex.: Cartão João" />
       </Field>
     </QuickShell>
   )
@@ -378,7 +378,7 @@ export function QuickCreateSubcontratada({ open, onOpenChange, parceiroId, defau
       open={open}
       onOpenChange={onOpenChange}
       title="Nova subcontratada"
-      description="Cadastro rápido (PF ou PJ) — você pode completar depois."
+      description="Cadastro rápido (PF ou PJ), você pode completar depois."
       isSubmitting={upsert.isPending}
       onSubmit={submit}
     >

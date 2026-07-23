@@ -130,7 +130,7 @@ export default function CargasRetornoPage() {
         showInactive={state.showInactive}
         onShowInactiveChange={state.setShowInactive}
         columns={columns}
-        rowLabel={(r) => `${clienteById.get(r.cliente_id)?.razao_social ?? 'Cliente'} — ${r.local_carregamento}`}
+        rowLabel={(r) => `${clienteById.get(r.cliente_id)?.razao_social ?? 'Cliente'}, ${r.local_carregamento}`}
         onEdit={canEdit ? (r) => { setEditing(r); setOpen(true) } : undefined}
         onToggleActive={canEdit ? (r) => setConfirmRow(r) : undefined}
         onDelete={canEdit ? (r) => setDeleteRow(r) : undefined}

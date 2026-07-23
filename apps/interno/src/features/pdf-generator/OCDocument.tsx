@@ -278,7 +278,7 @@ export function OCDocument({ data }: { data: OCData }) {
         </View>
 
         {/* IMPORTANTE */}
-        <Text style={styles.importanteTitulo}>IMPORTANTE — LEIA COM ATENÇÃO</Text>
+        <Text style={styles.importanteTitulo}>IMPORTANTE, LEIA COM ATENÇÃO</Text>
         <View style={styles.importanteBox}>
           <Text style={styles.destaque}>
             Após descarregar, enviar Foto do comprovante para baixa do MDFE.
@@ -300,7 +300,7 @@ export function OCDocument({ data }: { data: OCData }) {
         </View>
 
         <Text style={styles.rodape}>
-          Documento gerado eletronicamente — {data.empresa}
+          Documento gerado eletronicamente, {data.empresa}
         </Text>
       </Page>
     </Document>

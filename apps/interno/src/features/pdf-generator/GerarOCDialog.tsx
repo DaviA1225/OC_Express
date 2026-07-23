@@ -96,7 +96,7 @@ export function GerarOCDialog({ open, onOpenChange, solicitacao, material, onSav
         : `${materialNome} - ${subtipo}`
       : materialNome
     const motoristaLinha = motoristaCpf
-      ? `${motoristaNome} — CPF ${motoristaCpf}`
+      ? `${motoristaNome}, CPF ${motoristaCpf}`
       : motoristaNome
     return {
       numero: pad4(solicitacao.numero_interno),
@@ -210,7 +210,7 @@ export function GerarOCDialog({ open, onOpenChange, solicitacao, material, onSav
           <DialogHeader>
             <DialogTitle>Material não vinculado</DialogTitle>
             <DialogDescription>
-              Vincule um material à solicitação antes de gerar a OC — o CNPJ e a filial vêm do material.
+              Vincule um material à solicitação antes de gerar a OC, o CNPJ e a filial vêm do material.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

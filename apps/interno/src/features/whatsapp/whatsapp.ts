@@ -47,7 +47,7 @@ export function formatOCWhatsAppMessage(s: SolicitacaoListRow, pdfUrl?: string |
   linhas.push('')
 
   if (s.motorista?.nome_completo) {
-    const cpf = s.motorista.cpf ? ` — CPF ${s.motorista.cpf}` : ''
+    const cpf = s.motorista.cpf ? `, CPF ${s.motorista.cpf}` : ''
     linhas.push(`Motorista: ${s.motorista.nome_completo}${cpf}`)
   }
   if (s.veiculo?.placa) linhas.push(`Cavalo: ${s.veiculo.placa}`)
@@ -62,7 +62,7 @@ export function formatOCWhatsAppMessage(s: SolicitacaoListRow, pdfUrl?: string |
     linhas.push(`Destino: ${s.cliente.razao_social}${cidade ? ` (${cidade})` : ''}`)
   }
   if (s.material?.nome) {
-    const subtipo = s.material_subtipo ? ` — ${s.material_subtipo}` : ''
+    const subtipo = s.material_subtipo ? `, ${s.material_subtipo}` : ''
     linhas.push(`Material: ${s.material.nome}${subtipo}`)
   }
   if (s.numero_instrucao) linhas.push(`Instrução: ${s.numero_instrucao}`)
@@ -94,13 +94,13 @@ export function listarDestinosWhatsApp(s: SolicitacaoListRow): WhatsAppDestino[]
   const tel = s.motorista?.telefone
   if (tel) {
     const norm = normalizeWhatsAppPhone(tel)
-    if (norm) out.push({ label: `Motorista — ${s.motorista?.nome_completo ?? ''}`.trim(), phone: norm, raw: tel })
+    if (norm) out.push({ label: `Motorista, ${s.motorista?.nome_completo ?? ''}`.trim(), phone: norm, raw: tel })
   }
   if (s.solicitante_telefone) {
     const norm = normalizeWhatsAppPhone(s.solicitante_telefone)
     if (norm) {
       out.push({
-        label: `Solicitante — ${s.solicitante_nome ?? 'sem nome'}`.trim(),
+        label: `Solicitante, ${s.solicitante_nome ?? 'sem nome'}`.trim(),
         phone: norm,
         raw: s.solicitante_telefone,
       })

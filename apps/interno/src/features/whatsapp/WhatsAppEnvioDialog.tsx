@@ -188,7 +188,7 @@ export function WhatsAppEnvioDialog({ open, onOpenChange, solicitacao }: Props) 
               className="font-mono text-[12px]"
             />
             <p className="text-[11px] text-muted-foreground">
-              Edite à vontade — a mensagem aparece exatamente assim no WhatsApp.
+              Edite à vontade, a mensagem aparece exatamente assim no WhatsApp.
             </p>
           </div>
         </DialogBody>

@@ -131,7 +131,7 @@ export function useGlobalSearch(query: string, enabled: boolean) {
           out.push({
             type: 'solicitacao',
             id: r.id,
-            label: `${numero}${hint ? ` — ${hint}` : ''}`,
+            label: `${numero}${hint ? `, ${hint}` : ''}`,
             hint: r.status,
             href: `/solicitacoes/${r.id}`,
           })

@@ -287,7 +287,7 @@ export default function ClientesPage() {
     { header: 'Mapa', accessor: (r) => <MapaCell row={r} /> },
   ]
 
-  const titulo = tipo === 'minerio' ? 'Clientes — Carga de Minério' : 'Clientes — Carga de Retorno'
+  const titulo = tipo === 'minerio' ? 'Clientes, Carga de Minério' : 'Clientes, Carga de Retorno'
   const novoLabel = tipo === 'minerio' ? 'Novo cliente de minério' : 'Novo cliente de retorno'
   const emptyTitle = tipo === 'minerio'
     ? 'Nenhum cliente de minério cadastrado'
@@ -782,7 +782,7 @@ function OperacionalDialog({ row, onOpenChange, onSubmit }: OperacionalDialogPro
                 </div>
                 {!cacamba && !graneleiro && (
                   <p className="text-[11px] text-amber-700">
-                    Atenção: nenhum tipo selecionado — esse cliente não receberá carregamentos.
+                    Atenção: nenhum tipo selecionado, esse cliente não receberá carregamentos.
                   </p>
                 )}
               </div>

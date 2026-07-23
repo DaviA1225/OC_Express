@@ -146,13 +146,13 @@ export default function RelatoriosInternosPage() {
         </div>
       )}
 
-      <Card title="Produtividade por atendente" subtitle="Quantas solicitações cada um tocou em cada etapa, o tempo médio para finalizar e o que ficou parado — ordenado por finalizações">
+      <Card title="Produtividade por atendente" subtitle="Quantas solicitações cada um tocou em cada etapa, o tempo médio para finalizar e o que ficou parado, ordenado por finalizações">
         <ProdutividadeTable usuarios={usuarios} isLoading={q.isLoading} />
       </Card>
 
       <Card
         title="Paradas na mão de alguém"
-        subtitle="Solicitações de parceiro pegas e ainda não finalizadas — da mais parada para a menos"
+        subtitle="Solicitações de parceiro pegas e ainda não finalizadas, da mais parada para a menos"
       >
         <ParadasList abertas={abertas} isLoading={q.isLoading} />
       </Card>

@@ -221,7 +221,7 @@ export default function ParceirosPage() {
         title="Excluir parceiro?"
         description={
           deleteRow
-            ? `O cadastro de "${deleteRow.razao_social}" será removido permanentemente, junto com seus usuários, motoristas, veículos, carretas e subcontratadas. Essa ação não pode ser desfeita. Se houver solicitações vinculadas, a exclusão será bloqueada — desative o parceiro nesse caso.`
+            ? `O cadastro de "${deleteRow.razao_social}" será removido permanentemente, junto com seus usuários, motoristas, veículos, carretas e subcontratadas. Essa ação não pode ser desfeita. Se houver solicitações vinculadas, a exclusão será bloqueada, desative o parceiro nesse caso.`
             : ''
         }
         confirmLabel="Sim, excluir"
@@ -352,7 +352,7 @@ function ParceiroForm({ open, onOpenChange, editing, onSubmit }: FormProps) {
                 id="observacoes_internas"
                 rows={2}
                 {...register('observacoes_internas')}
-                placeholder="Visível apenas para a equipe LHG — o parceiro não vê este campo."
+                placeholder="Visível apenas para a equipe LHG, o parceiro não vê este campo."
               />
             </div>
           </DialogBody>

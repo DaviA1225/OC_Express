@@ -47,7 +47,7 @@ function ConnectionError({ onRetry }: { onRetry: () => Promise<void> }) {
       <div className="w-full max-w-md rounded-lg border bg-card p-6 text-center shadow-overlay">
         <h2 className="text-[18px] font-medium text-foreground">Não foi possível carregar seu acesso</h2>
         <p className="mt-2 text-[13px] text-muted-foreground">
-          Houve uma falha de conexão ao verificar seu perfil. Sua conta continua ativa —
+          Houve uma falha de conexão ao verificar seu perfil. Sua conta continua ativa,
           tente novamente.
         </p>
         <Button className="mt-4" onClick={handleRetry} disabled={retrying}>
