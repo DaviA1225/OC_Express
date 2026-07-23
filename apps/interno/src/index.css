@@ -27,7 +27,13 @@
 
     --primary: 19 100% 50%;              /* #FF5100 laranja LHG — acento */
     --primary-hover: 21 79% 47%;         /* #D3641A laranja queimado */
-    --primary-foreground: 0 0% 100%;
+    /* Tinta ESCURA quente no fill de acento (mesma inversao do dark). Branco
+       sobre #FF5100 falha WCAG AA (3.27:1 — o laranja da marca e' luminoso demais
+       p/ texto branco); tinta escura passa (5.38:1 no botao, 4.52:1 no hover).
+       Vale p/ todo fill de acento (botao/avatar/checkbox/logo). O laranja-como-
+       TEXTO (links, chips, icones) e' outra categoria: icones passam como UI
+       (3:1) e o texto tem affordance redundante (barra/ring/sublinhado). */
+    --primary-foreground: 20 50% 10%;
 
     --secondary: 220 16% 20%;            /* grafite escuro neutro */
     --secondary-foreground: 0 0% 100%;
