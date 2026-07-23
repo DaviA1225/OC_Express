@@ -3,7 +3,7 @@ import { Link, useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { ArrowLeft, X, Pencil, AlertCircle, Check, Undo2, Loader2, Download, FileText } from 'lucide-react'
+import { ArrowLeft, X, Pencil, AlertCircle, Check, Undo2, Loader2, Download, FileText, Copy } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -12,6 +12,7 @@ import { EmptyState } from '@/components/shared/EmptyState'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { StatusBadge } from '@/components/solicitacoes/StatusBadge'
 import { AnexosCard } from '@/features/anexos/AnexosCard'
+import { HistoricoCard } from '@/features/solicitacoes/HistoricoCard'
 import { cn } from '@/lib/utils'
 import { formatNumeroOC, formatarPamcardParaExibicao } from '@/lib/utils'
 import { podeCancelar, podeEditar } from '@/features/solicitacoes/status'
@@ -24,6 +25,7 @@ import {
   useCarretasBase,
   useSubcontratadasBase,
   useClientesPublicos,
+  useDuplicarSolicitacao,
   type PortalSolicitacao,
 } from '@/features/solicitacoes/useSolicitacoes'
 import { usePendenciaAberta, useResolverPendencia } from '@/features/solicitacoes/usePendencias'
@@ -38,9 +40,11 @@ export default function SolicitacaoDetailPage() {
   const navigate = useNavigate()
   const detalhe = useSolicitacaoPortal(id)
   const cancelar = useCancelarSolicitacao()
+  const duplicar = useDuplicarSolicitacao()
   const baixarOC = useBaixarOC()
   const pendencia = usePendenciaAberta(id)
   const [confirmOpen, setConfirmOpen] = React.useState(false)
+  const [confirmDup, setConfirmDup] = React.useState(false)
 
   const motoristas = useMotoristasBase()
   const veiculos = useVeiculosBase()
@@ -116,7 +120,7 @@ export default function SolicitacaoDetailPage() {
 
   const pamcard =
     sol.pamcard_status === 'tem_cartao'
-      ? `Tem cartão${sol.pamcard_numero ? ` — ${formatarPamcardParaExibicao(sol.pamcard_numero)}` : ''}`
+      ? `Tem cartão${sol.pamcard_numero ? `, ${formatarPamcardParaExibicao(sol.pamcard_numero)}` : ''}`
       : sol.pamcard_status === 'nao_necessario'
         ? 'Não necessário (pagamento por outro meio)'
         : 'Não tem cartão (solicitado à LHG)'
@@ -149,24 +153,26 @@ export default function SolicitacaoDetailPage() {
           </h1>
           <StatusBadge status={sol.status} variant="full" />
         </div>
-        {(podeEditar(sol.status) || podeCancelar(sol.status)) && (
-          <div className="flex items-center gap-2">
-            {podeEditar(sol.status) && (
-              <Button variant="outline" asChild>
-                <Link to={`/solicitacoes/${sol.id}/editar`}>
-                  <Pencil className="h-4 w-4" />
-                  Editar
-                </Link>
-              </Button>
-            )}
-            {podeCancelar(sol.status) && (
-              <Button variant="outline" onClick={() => setConfirmOpen(true)}>
-                <X className="h-4 w-4" />
-                Cancelar solicitação
-              </Button>
-            )}
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setConfirmDup(true)} disabled={duplicar.isPending}>
+            {duplicar.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Copy className="h-4 w-4" />}
+            Duplicar
+          </Button>
+          {podeEditar(sol.status) && (
+            <Button variant="outline" asChild>
+              <Link to={`/solicitacoes/${sol.id}/editar`}>
+                <Pencil className="h-4 w-4" />
+                Editar
+              </Link>
+            </Button>
+          )}
+          {podeCancelar(sol.status) && (
+            <Button variant="outline" onClick={() => setConfirmOpen(true)}>
+              <X className="h-4 w-4" />
+              Cancelar solicitação
+            </Button>
+          )}
+        </div>
       </div>
 
       {pendencia.data && (
@@ -212,7 +218,7 @@ export default function SolicitacaoDetailPage() {
           <DataRow label="Cliente" value={cliente?.razao_social ?? 'Não identificado'} />
           <DataRow
             label="Motorista"
-            value={motorista ? `${motorista.nome_completo} — ${motorista.cpf}` : 'Não identificado'}
+            value={motorista ? `${motorista.nome_completo}, ${motorista.cpf}` : 'Não identificado'}
           />
           <DataRow label="Cavalo" value={placaTipo(veiculo?.placa, veiculo?.tipo)} />
           <DataRow
@@ -255,6 +261,19 @@ export default function SolicitacaoDetailPage() {
         />
       </div>
 
+      <div className="mt-3">
+        <HistoricoCard
+          solicitacaoId={sol.id as string}
+          parceiroMotoristaId={sol.parceiro_motorista_id}
+          parceiroVeiculoId={sol.parceiro_veiculo_id}
+          clienteId={sol.cliente_id}
+          motoristaNome={motorista?.nome_completo ?? null}
+          veiculoPlaca={veiculo?.placa ?? null}
+          clienteNomePorId={(cid) => clientes.data?.find((c) => c.id === cid)?.razao_social ?? '—'}
+          veiculoPlacaPorId={(vid) => veiculos.data?.find((v) => v.id === vid)?.placa ?? '—'}
+        />
+      </div>
+
       <ConfirmDialog
         open={confirmOpen}
         onOpenChange={setConfirmOpen}
@@ -266,6 +285,20 @@ export default function SolicitacaoDetailPage() {
         onConfirm={async () => {
           await cancelar.mutateAsync(sol.id as string)
           navigate('/solicitacoes')
+        }}
+      />
+
+      <ConfirmDialog
+        open={confirmDup}
+        onOpenChange={setConfirmDup}
+        title="Duplicar solicitação?"
+        description={`Será criada uma nova solicitação com os mesmos dados${sol.numero_interno != null ? ` de ${formatNumeroOC(sol.numero_interno)}` : ''} (motorista, veículo, composição, cliente, pamcard e observações). Ela entra como "Recebida" e vai para a equipe da LHG.`}
+        confirmLabel="Sim, duplicar"
+        cancelLabel="Voltar"
+        onConfirm={async () => {
+          const novoId = await duplicar.mutateAsync({ sourceId: sol.id as string })
+          setConfirmDup(false)
+          navigate(`/solicitacoes/${novoId}`)
         }}
       />
     </div>
@@ -362,13 +395,17 @@ function buildTimeline(sol: PortalSolicitacao): TimelineStep[] {
   return [
     { label: 'Solicitação enviada', at: sol.created_at, done: true },
     { label: 'Em processamento pela LHG', at: null, done: emProcesso },
-    { label: 'OC pronta — baixe pelo portal', at: sol.enviada_em, done: ocPronta },
+    { label: 'OC pronta, baixe pelo portal', at: sol.enviada_em, done: ocPronta },
     { label: 'Concluída', at: sol.finalizada_em, done: concluida },
   ]
 }
 
 function Timeline({ sol, solicitante }: { sol: PortalSolicitacao; solicitante: string }) {
   const steps = buildTimeline(sol)
+  // Nó mais recente concluído = estado atual; ganha um glow do acento (azul),
+  // menos quando a solicitação foi cancelada (estado terminal). DESIGN.md §7.
+  const lastDoneIndex = steps.reduce((acc, s, i) => (s.done ? i : acc), -1)
+  const cancelada = sol.status === 'cancelada'
   return (
     <ol className="mt-4 space-y-0">
       {steps.map((step, i) => {
@@ -382,6 +419,7 @@ function Timeline({ sol, solicitante }: { sol: PortalSolicitacao; solicitante: s
                   step.done
                     ? 'border-primary bg-primary text-primary-foreground'
                     : 'border-border bg-muted text-muted-foreground',
+                  i === lastDoneIndex && !cancelada && 'shadow-[0_0_12px_-1px_rgba(30,64,175,0.6)]',
                 )}
               >
                 {step.done ? <Check className="h-3.5 w-3.5" /> : <span className="h-1.5 w-1.5 rounded-full bg-current" />}

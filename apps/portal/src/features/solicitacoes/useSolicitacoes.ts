@@ -180,6 +180,61 @@ export function useCriarSolicitacao() {
   })
 }
 
+/** Duplica uma solicitação: cria uma nova com os mesmos dados do parceiro
+ *  (motorista, veículo, composição, cliente, pamcard, observações). O status
+ *  volta a 'recebida' e o material fica em branco — a equipe interna redefine no
+ *  processamento, igual ao create. Mesma via de INSERT direto (o parceiro tem
+ *  policy de INSERT mas não de SELECT, então geramos o id no cliente). */
+export function useDuplicarSolicitacao() {
+  const qc = useQueryClient()
+  const { parceiro, parceiroUsuario } = useAuth()
+
+  return useMutation<string, unknown, { sourceId: string }>({
+    mutationFn: async ({ sourceId }): Promise<string> => {
+      if (!parceiro?.id || !parceiroUsuario?.id) {
+        throw new Error('Sessão do parceiro não identificada. Recarregue a página.')
+      }
+      const { data: source, error: fetchErr } = await supabase
+        .from('portal_solicitacoes')
+        .select('*')
+        .eq('id', sourceId)
+        .maybeSingle()
+      if (fetchErr) throw fetchErr
+      if (!source) throw new Error('Solicitação original não encontrada.')
+      const src = source as PortalSolicitacao
+
+      const id = crypto.randomUUID()
+      const { error } = await supabase.from('solicitacoes').insert({
+        id,
+        tipo: src.tipo,
+        origem: 'parceiro',
+        status: 'recebida',
+        parceiro_id: parceiro.id,
+        parceiro_usuario_id: parceiroUsuario.id,
+        parceiro_motorista_id: src.parceiro_motorista_id,
+        parceiro_veiculo_id: src.parceiro_veiculo_id,
+        parceiro_carreta_id: src.parceiro_carreta_id,
+        parceiro_primeira_carreta_id: src.parceiro_primeira_carreta_id,
+        parceiro_dolly_id: src.parceiro_dolly_id,
+        parceiro_subcontratada_id: src.parceiro_subcontratada_id,
+        cliente_id: src.cliente_id,
+        material_id: null,
+        pamcard_status: src.pamcard_status,
+        pamcard_numero: src.pamcard_numero,
+        observacoes: src.observacoes,
+      } as never)
+      if (error) throw error
+      return id
+    },
+    onSuccess: (id) => {
+      qc.invalidateQueries({ queryKey: ['portal-solicitacoes'] })
+      void registrarEvento('portal_solicitacao_criada', { solicitacao_id: id })
+      toast.success('Solicitação duplicada.')
+    },
+    onError: (e: unknown) => toast.error(traduzirErroBanco(e)),
+  })
+}
+
 export interface EditarSolicitacaoInput extends NovaSolicitacaoInput {
   id: string
 }
