@@ -1,11 +1,13 @@
 import * as React from 'react'
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
+import { Loader2, ShieldCheck } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { BrandedLoader } from '@/components/shared/BrandedLoader'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 
 export function ProtectedRoute() {
-  const { session, profile, profileError, loading, refreshProfile } = useAuth()
+  const { session, profile, profileError, loading, mfaRequired, verifyMfa, signOut, refreshProfile } = useAuth()
   const location = useLocation()
 
   if (loading) {
@@ -14,6 +16,12 @@ export function ProtectedRoute() {
 
   if (!session) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />
+  }
+
+  // Step-up: usuário autenticou por senha (aal1) mas tem 2FA ativo — exige o
+  // código antes de liberar o app. Vale mesmo se navegar direto por URL.
+  if (mfaRequired) {
+    return <MfaChallenge onVerify={verifyMfa} onCancel={signOut} />
   }
 
   if (!profile) {
@@ -30,6 +38,71 @@ export function ProtectedRoute() {
   }
 
   return <Outlet />
+}
+
+function MfaChallenge({
+  onVerify,
+  onCancel,
+}: {
+  onVerify: (code: string) => Promise<{ error: string | null }>
+  onCancel: () => Promise<void>
+}) {
+  const [code, setCode] = React.useState('')
+  const [erro, setErro] = React.useState<string | null>(null)
+  const [verificando, setVerificando] = React.useState(false)
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (code.trim().length < 6) return
+    setVerificando(true)
+    setErro(null)
+    const { error } = await onVerify(code)
+    setVerificando(false)
+    if (error) {
+      setErro(error)
+      setCode('')
+    }
+  }
+
+  return (
+    <div className="flex min-h-full items-center justify-center bg-muted px-4">
+      <div className="w-full max-w-sm rounded-lg border bg-card p-6 shadow-overlay">
+        <div className="flex items-center gap-2.5">
+          <span className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10 text-primary-strong">
+            <ShieldCheck className="h-4 w-4" />
+          </span>
+          <h2 className="text-[16px] font-medium text-foreground">Verificação em duas etapas</h2>
+        </div>
+        <p className="mt-3 text-[13px] leading-relaxed text-muted-foreground">
+          Digite o código de 6 dígitos do seu app autenticador para concluir o acesso.
+        </p>
+        <form onSubmit={submit} className="mt-4 space-y-3" noValidate>
+          <Input
+            value={code}
+            onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            autoFocus
+            placeholder="000000"
+            className="text-center text-[18px] tracking-[0.3em] tabular-nums"
+            aria-label="Código de verificação"
+          />
+          {erro && <p className="text-[12px] text-destructive">{erro}</p>}
+          <Button type="submit" className="w-full" disabled={verificando || code.length < 6}>
+            {verificando && <Loader2 className="h-4 w-4 animate-spin" />}
+            {verificando ? 'Verificando…' : 'Verificar e entrar'}
+          </Button>
+        </form>
+        <button
+          type="button"
+          onClick={() => onCancel()}
+          className="mt-3 w-full text-[12px] text-muted-foreground hover:text-foreground"
+        >
+          Usar outra conta
+        </button>
+      </div>
+    </div>
+  )
 }
 
 function ConnectionError({ onRetry }: { onRetry: () => Promise<void> }) {
