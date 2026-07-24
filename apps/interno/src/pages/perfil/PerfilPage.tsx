@@ -2,8 +2,8 @@ import * as React from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { useMutation } from '@tanstack/react-query'
-import { Loader2, Mail, Shield, User as UserIcon, Eye, EyeOff } from 'lucide-react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Loader2, Mail, Shield, ShieldCheck, User as UserIcon, Eye, EyeOff, Check } from 'lucide-react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { toast } from 'sonner'
@@ -15,6 +15,9 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/lib/supabase'
 import { traduzirErroBanco } from '@/features/crud/useCrudQueries'
+import {
+  listVerifiedTotp, enrollTotp, verifyTotp, unenroll, traduzirErroMfa, type EnrollResult,
+} from '@/features/auth/mfa'
 import { cn } from '@/lib/utils'
 import type { PerfilUsuario } from '@/types/database.types'
 
@@ -80,7 +83,155 @@ export default function PerfilPage() {
       />
 
       <SegurancaCard email={user?.email ?? ''} />
+
+      <TwoFactorCard />
     </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Verificação em duas etapas (TOTP). Opt-in: o usuário ativa quando quiser.
+// Depois de ativo, o login passa a exigir o código (gate no ProtectedRoute).
+// ---------------------------------------------------------------------------
+function TwoFactorCard() {
+  const qc = useQueryClient()
+  const { data: factors, isLoading } = useQuery({
+    queryKey: ['mfa-factors'],
+    queryFn: listVerifiedTotp,
+    staleTime: 0,
+  })
+  const ativo = (factors?.length ?? 0) > 0
+
+  // Estado do fluxo de ativação: null = idle; senão, o QR/secret pendentes.
+  const [enroll, setEnroll] = React.useState<EnrollResult | null>(null)
+  const [code, setCode] = React.useState('')
+  const [erro, setErro] = React.useState<string | null>(null)
+  const [busy, setBusy] = React.useState(false)
+
+  const iniciar = async () => {
+    setBusy(true); setErro(null)
+    try {
+      setEnroll(await enrollTotp())
+      setCode('')
+    } catch (e) {
+      setErro(traduzirErroMfa(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const confirmar = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!enroll || code.trim().length < 6) return
+    setBusy(true); setErro(null)
+    try {
+      await verifyTotp(enroll.factorId, code)
+      setEnroll(null); setCode('')
+      await qc.invalidateQueries({ queryKey: ['mfa-factors'] })
+      toast.success('Verificação em duas etapas ativada.')
+    } catch (err) {
+      setErro(traduzirErroMfa(err)); setCode('')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const cancelar = async () => {
+    // O fator não verificado é limpo no próximo enroll; aqui só fecha o fluxo.
+    setEnroll(null); setCode(''); setErro(null)
+  }
+
+  const desativar = async () => {
+    if (!factors?.length) return
+    setBusy(true); setErro(null)
+    try {
+      for (const f of factors) await unenroll(f.id)
+      await qc.invalidateQueries({ queryKey: ['mfa-factors'] })
+      toast.success('Verificação em duas etapas desativada.')
+    } catch (err) {
+      toast.error(traduzirErroMfa(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Card
+      icon={<ShieldCheck className="h-4 w-4" />}
+      title="Verificação em duas etapas"
+      subtitle="Um código do app autenticador, além da senha, no login."
+    >
+      {isLoading ? (
+        <Skeleton className="h-10 w-full" />
+      ) : enroll ? (
+        <form onSubmit={confirmar} className="space-y-4" noValidate>
+          <p className="text-[13px] text-muted-foreground">
+            Escaneie o QR no seu app autenticador (Google Authenticator, Authy, 1Password…) e
+            digite o código de 6 dígitos para confirmar.
+          </p>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+            <div
+              className="h-40 w-40 shrink-0 rounded-md border bg-white p-2 [&>svg]:h-full [&>svg]:w-full"
+              // QR vem do Supabase como SVG inline (origem confiável, self-contained).
+              dangerouslySetInnerHTML={{ __html: enroll.qrSvg }}
+            />
+            <div className="min-w-0 flex-1 space-y-3">
+              <div>
+                <Label className="text-[11px]">Ou digite a chave manualmente</Label>
+                <code className="mt-1 block break-all rounded bg-muted px-2 py-1.5 text-[12px] tabular-nums text-foreground">
+                  {enroll.secret}
+                </code>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="mfa-code">Código de verificação</Label>
+                <Input
+                  id="mfa-code"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  placeholder="000000"
+                  className="max-w-[160px] text-center text-[16px] tracking-[0.3em] tabular-nums"
+                />
+                {erro && <p className="text-[11px] text-destructive">{erro}</p>}
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center justify-end gap-2">
+            <Button type="button" variant="ghost" onClick={cancelar} disabled={busy}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={busy || code.length < 6}>
+              {busy && <Loader2 className="h-4 w-4 animate-spin" />}
+              Ativar
+            </Button>
+          </div>
+        </form>
+      ) : ativo ? (
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2 text-[13px]">
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-success/15 text-success">
+              <Check className="h-3.5 w-3.5" />
+            </span>
+            <span className="text-foreground">Ativa. Seu login pede o código do app.</span>
+          </div>
+          <Button variant="outline" onClick={desativar} disabled={busy}>
+            {busy && <Loader2 className="h-4 w-4 animate-spin" />}
+            Desativar
+          </Button>
+        </div>
+      ) : (
+        <div className="flex items-center justify-between gap-4">
+          <p className="text-[13px] text-muted-foreground">
+            Não ativada. Recomendada para proteger sua conta contra acesso indevido.
+          </p>
+          <Button onClick={iniciar} disabled={busy}>
+            {busy && <Loader2 className="h-4 w-4 animate-spin" />}
+            Ativar 2FA
+          </Button>
+        </div>
+      )}
+    </Card>
   )
 }
 

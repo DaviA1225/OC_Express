@@ -1,6 +1,7 @@
 import * as React from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
+import { getAal, listVerifiedTotp, verifyTotp, type AalState } from '@/features/auth/mfa'
 import type { Tables, PerfilUsuario } from '@/types/database.types'
 
 type PerfilRow = Tables<'perfis_usuarios'>
@@ -12,11 +13,15 @@ interface AuthContextValue {
   /** A última tentativa de carregar o perfil falhou (erro transitório/rede). */
   profileError: boolean
   loading: boolean
+  /** Sessão em aal1 mas o usuário tem fator TOTP verificado — precisa do código. */
+  mfaRequired: boolean
   signIn: (
     email: string,
     password: string,
     captchaToken?: string,
   ) => Promise<{ error: string | null }>
+  /** Conclui o step-up de 2FA (challenge+verify do fator verificado). */
+  verifyMfa: (code: string) => Promise<{ error: string | null }>
   signOut: () => Promise<void>
   refreshProfile: () => Promise<void>
 }
@@ -60,6 +65,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = React.useState<PerfilRow | null>(null)
   const [profileError, setProfileError] = React.useState(false)
   const [loading, setLoading] = React.useState(true)
+  const [aal, setAal] = React.useState<AalState>({ current: null, next: null })
+
+  const refreshAal = React.useCallback(async (currentSession: Session | null) => {
+    if (!currentSession?.user) {
+      setAal({ current: null, next: null })
+      return
+    }
+    setAal(await getAal())
+  }, [])
 
   const loadProfile = React.useCallback(async (currentSession: Session | null) => {
     if (!currentSession?.user) {
@@ -88,9 +102,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!active) return
       setSession(data.session)
       try {
-        await loadProfile(data.session)
+        await Promise.all([loadProfile(data.session), refreshAal(data.session)])
       } catch (err) {
-        console.error('[useAuth] loadProfile (getSession) failed', err)
+        console.error('[useAuth] load (getSession) failed', err)
       } finally {
         if (active) setLoading(false)
       }
@@ -104,8 +118,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(s)
       setTimeout(() => {
         if (!active) return
-        loadProfile(s)
-          .catch((err) => console.error('[useAuth] loadProfile (authChange) failed', err))
+        Promise.all([loadProfile(s), refreshAal(s)])
+          .catch((err) => console.error('[useAuth] load (authChange) failed', err))
           .finally(() => {
             if (active) setLoading(false)
           })
@@ -116,7 +130,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       active = false
       subscription.subscription.unsubscribe()
     }
-  }, [loadProfile])
+  }, [loadProfile, refreshAal])
 
   const signIn: AuthContextValue['signIn'] = async (email, password, captchaToken) => {
     const { error } = await supabase.auth.signInWithPassword({
@@ -139,13 +153,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await loadProfile(session)
   }
 
+  // Faz o step-up: pega o fator TOTP verificado, verifica o código, e reavalia o
+  // AAL (que sobe para aal2 e libera o ProtectedRoute).
+  const verifyMfa: AuthContextValue['verifyMfa'] = async (code) => {
+    try {
+      const [factor] = await listVerifiedTotp()
+      if (!factor) return { error: 'Nenhum fator de autenticação ativo.' }
+      await verifyTotp(factor.id, code)
+      await refreshAal(session)
+      return { error: null }
+    } catch (err) {
+      const { traduzirErroMfa } = await import('@/features/auth/mfa')
+      return { error: traduzirErroMfa(err) }
+    }
+  }
+
+  // Só exige step-up quem TEM fator verificado (next=aal2) e ainda está em aal1.
+  // Quem não ativou 2FA fica em aal1/aal1 e não é bloqueado (opt-in).
+  const mfaRequired = aal.current === 'aal1' && aal.next === 'aal2'
+
   const value: AuthContextValue = {
     session,
     user: session?.user ?? null,
     profile,
     profileError,
     loading,
+    mfaRequired,
     signIn,
+    verifyMfa,
     signOut,
     refreshProfile,
   }
