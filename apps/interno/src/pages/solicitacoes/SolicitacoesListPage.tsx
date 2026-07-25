@@ -671,7 +671,8 @@ function SolicitacaoCard({ row, sinalPendencia, selectable, selected, onToggleSe
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen() } }}
       aria-label={`Abrir ${formatNumeroOC(row.numero_interno)}`}
       className={cn(
-        'relative cursor-pointer rounded-lg border border-slate-400 bg-card p-4 transition-[box-shadow,border-color,background-color] duration-200 ease-out hover:z-10 hover:border-primary/60 hover:bg-muted/30 hover:shadow-xl dark:border-slate-700 dark:hover:bg-[var(--elevated-dark)] dark:hover:shadow-[0_16px_40px_-8px_rgba(0,0,0,0.85)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+        'relative cursor-pointer overflow-hidden rounded-lg border border-slate-300 bg-card p-4 pl-5 transition-[box-shadow,border-color,background-color] duration-200 ease-out hover:z-10 hover:border-primary/60 hover:bg-muted/30 hover:shadow-xl dark:border-slate-700 dark:hover:bg-[var(--elevated-dark)] dark:hover:shadow-[0_16px_40px_-8px_rgba(0,0,0,0.85)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+        `card-status card-status-${row.status}`,
         selectable && selected && 'border-primary bg-primary/5',
         !selected && sinal === 'parceiro_respondeu' && 'border-emerald-400 ring-1 ring-emerald-200 dark:border-emerald-700 dark:ring-emerald-900/50',
         !selected && sinal === 'aguardando_parceiro' && 'border-red-400 ring-1 ring-red-200 dark:border-red-900/60 dark:ring-red-900/40',
@@ -878,8 +879,9 @@ function BulkActionsBar({
 }
 
 // "Pop" persistente de pendência no card — visível a qualquer um que olhe a
-// lista (não é o sino, que cada usuário apaga). 'parceiro_respondeu' é o
-// acionável (resposta sem tratamento); 'aguardando_parceiro' é informativo.
+// lista (não é o sino, que cada usuário apaga). Ambos os sinais pulsam (mesmo
+// padrão do portal, para não haver assimetria); a cor distingue o estado:
+// verde 'parceiro_respondeu' (acionável) e vermelho 'aguardando_parceiro'.
 function PendenciaPop({ sinal }: { sinal: PendenciaSinal }) {
   if (sinal === 'parceiro_respondeu') {
     return (
@@ -901,8 +903,12 @@ function PendenciaPop({ sinal }: { sinal: PendenciaSinal }) {
       className="inline-flex shrink-0 items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-800 dark:bg-red-950/60 dark:text-red-300"
       title="Pendência aberta nesta solicitação"
     >
+      <span className="relative flex h-2 w-2">
+        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75 motion-reduce:animate-none" />
+        <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
+      </span>
       <Undo2 className="h-3 w-3" />
-      Pendência
+      Aguardando parceiro
     </span>
   )
 }

@@ -26,6 +26,25 @@ export function usePendenciasAbertas() {
   })
 }
 
+/** Histórico completo de pendências de uma solicitação (abertas e resolvidas),
+ *  mais recente primeiro. A RLS já filtra por parceiro_id (sem trava de status),
+ *  então o parceiro enxerga o registro do que foi devolvido e como respondeu. */
+export function usePendenciasSolicitacao(solicitacaoId: string | undefined) {
+  return useQuery({
+    queryKey: ['pendencias-solicitacao', solicitacaoId],
+    enabled: !!solicitacaoId,
+    queryFn: async (): Promise<Pendencia[]> => {
+      const { data, error } = await supabase
+        .from('solicitacao_pendencias')
+        .select('*')
+        .eq('solicitacao_id', solicitacaoId as string)
+        .order('created_at', { ascending: false })
+      if (error) throw error
+      return (data ?? []) as Pendencia[]
+    },
+  })
+}
+
 /** Pendência aberta de uma solicitação específica (ou null). */
 export function usePendenciaAberta(solicitacaoId: string | undefined) {
   return useQuery({
@@ -62,6 +81,7 @@ export function useResolverPendencia() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['pendencias-abertas'] })
       qc.invalidateQueries({ queryKey: ['pendencia-aberta'] })
+      qc.invalidateQueries({ queryKey: ['pendencias-solicitacao'] })
       toast.success('Pendência resolvida. A equipe da LHG foi avisada.')
     },
     onError: (e: unknown) => toast.error(traduzirErroBanco(e)),
