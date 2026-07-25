@@ -115,6 +115,10 @@ export interface ListFilters {
   pamcard: PamcardFiltro
   atendenteId: string | null
   apenasAtrasadas?: boolean
+  // Intervalo explícito por created_at (ISO). Independente de `periodo` — se
+  // ambos vierem, os dois se aplicam (AND). Usado no filtro De/Até.
+  dataInicio?: string | null
+  dataFim?: string | null
   page: number
   pageSize: number
 }
@@ -247,6 +251,8 @@ export async function fetchSolicitacoesParaExport(
   }
   const since = periodoToISO(filters.periodo)
   if (since) query = query.gte('created_at', since)
+  if (filters.dataInicio) query = query.gte('created_at', filters.dataInicio)
+  if (filters.dataFim) query = query.lte('created_at', filters.dataFim)
 
   if (filters.search.trim()) {
     const t = filters.search.trim()
@@ -288,6 +294,8 @@ export function useSolicitacoesList(filters: ListFilters) {
       }
       const since = periodoToISO(filters.periodo)
       if (since) query = query.gte('created_at', since)
+      if (filters.dataInicio) query = query.gte('created_at', filters.dataInicio)
+      if (filters.dataFim) query = query.lte('created_at', filters.dataFim)
 
       if (filters.search.trim()) {
         const t = filters.search.trim()
@@ -345,6 +353,27 @@ export function usePamcardPendenteCount() {
       return count ?? 0
     },
     refetchInterval: 30_000,
+  })
+}
+
+/**
+ * Conta as solicitações com status 'recebida' (novas, ainda não iniciadas) para
+ * o indicador ao lado de "Solicitações" na sidebar. `head: true` traz só o
+ * count, sem as linhas. Recarrega a cada 30s e ao voltar o foco da janela.
+ */
+export function useRecebidasCount() {
+  return useQuery({
+    queryKey: ['recebidas-count'],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from('solicitacoes')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'recebida')
+      if (error) throw error
+      return count ?? 0
+    },
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
   })
 }
 

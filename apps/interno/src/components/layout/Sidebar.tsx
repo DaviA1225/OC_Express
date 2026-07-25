@@ -4,6 +4,7 @@ import {
   LayoutDashboard,
   Inbox,
   RotateCcw,
+  ClipboardCheck,
   User,
   Truck,
   Container,
@@ -32,7 +33,7 @@ import {
   canViewAtividade,
   canViewSeguranca,
 } from '@/features/auth/permissions'
-import { usePamcardPendenteCount } from '@/features/solicitacoes/useSolicitacoes'
+import { useRecebidasCount } from '@/features/solicitacoes/useSolicitacoes'
 
 interface NavItem {
   to: string
@@ -61,6 +62,7 @@ const operacional: NavItem[] = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/solicitacoes', label: 'Solicitações', icon: Inbox },
   { to: '/cargas-retorno', label: 'Cargas de Retorno', icon: RotateCcw },
+  { to: '/conferencia-viagem', label: 'Conferência de Viagem', icon: ClipboardCheck },
 ]
 
 const cadastros: NavItem[] = [
@@ -96,8 +98,8 @@ export function SidebarContent({ collapsed, onToggleCollapse, onNavigate, onClos
   const showProdutividade = canViewProdutividade(profile)
   const showAtividade = canViewAtividade(profile)
   const showSeguranca = canViewSeguranca(profile)
-  const pamcardPendente = usePamcardPendenteCount()
-  const pamcardPendenteCount = pamcardPendente.data ?? 0
+  const recebidas = useRecebidasCount()
+  const recebidasCount = recebidas.data ?? 0
 
   return (
     <aside
@@ -139,7 +141,7 @@ export function SidebarContent({ collapsed, onToggleCollapse, onNavigate, onClos
               item={item}
               collapsed={collapsed}
               onNavigate={onNavigate}
-              badgeCount={item.to === '/solicitacoes' ? pamcardPendenteCount : 0}
+              badgeCount={item.to === '/solicitacoes' ? recebidasCount : 0}
             />
           ))}
         </ul>
@@ -305,7 +307,7 @@ function NavListItem({
         }
         title={
           collapsed
-            ? item.label + (badgeCount > 0 ? ` (${badgeCount} Pamcard pendente)` : '')
+            ? item.label + (badgeCount > 0 ? ` (${badgeCount} recebida${badgeCount === 1 ? '' : 's'})` : '')
             : undefined
         }
       >
@@ -317,7 +319,7 @@ function NavListItem({
           ) : (
             <span
               className="ml-auto inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-semibold text-white"
-              title={`${badgeCount} solicitação(ões) com Pamcard pendente`}
+              title={`${badgeCount} solicitação(ões) com status Recebida`}
             >
               {badgeCount}
             </span>

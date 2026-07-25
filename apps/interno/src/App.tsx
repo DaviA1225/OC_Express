@@ -24,6 +24,7 @@ const SolicitacaoDetailPage = lazy(() =>
   import('@/pages/solicitacoes/SolicitacaoDetailPage').then((m) => ({ default: m.SolicitacaoDetailPage })),
 )
 const CargasRetornoPage = lazy(() => import('@/pages/cargas-retorno/CargasRetornoPage'))
+const ConferenciaViagemPage = lazy(() => import('@/pages/conferencia/ConferenciaViagemPage'))
 const AuditoriaPage = lazy(() => import('@/pages/auditoria/AuditoriaPage'))
 const SegurancaPage = lazy(() => import('@/pages/seguranca/SegurancaPage'))
 const RelatoriosPage = lazy(() => import('@/pages/relatorios/RelatoriosPage'))
@@ -55,6 +56,7 @@ export default function App() {
                 <Route path="/solicitacoes" element={<SolicitacoesListPage />} />
                 <Route path="/solicitacoes/:id" element={<SolicitacaoDetailPage />} />
                 <Route path="/cargas-retorno" element={<CargasRetornoPage />} />
+                <Route path="/conferencia-viagem" element={<ConferenciaViagemPage />} />
                 <Route path="/cadastros/motoristas" element={<MotoristasPage />} />
                 <Route path="/cadastros/veiculos" element={<VeiculosPage />} />
                 <Route path="/cadastros/carretas" element={<CarretasPage />} />
