@@ -25,6 +25,7 @@ export function usePortalRealtime() {
         () => {
           qc.invalidateQueries({ queryKey: ['pendencias-abertas'] })
           qc.invalidateQueries({ queryKey: ['pendencia-aberta'] })
+          qc.invalidateQueries({ queryKey: ['pendencias-solicitacao'] })
           qc.invalidateQueries({ queryKey: ['portal-solicitacoes'] })
         },
       )

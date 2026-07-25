@@ -400,8 +400,8 @@ export function SolicitacaoDetailPage() {
           {s.origem === 'parceiro' && (s.status === 'oc_gerada' || s.status === 'oc_enviada') && (
             <AvisarParceiroCard solicitacao={s} />
           )}
-          {s.origem === 'parceiro' && (pendencias.data?.length ?? 0) > 0 && (
-            <PendenciasCard pendencias={pendencias.data ?? []} />
+          {(pendencias.data?.length ?? 0) > 0 && (
+            <PendenciasCard pendencias={pendencias.data ?? []} isParceiro={isParceiro} />
           )}
           <HistoricoCard
             solicitacaoId={s.id}
@@ -1839,16 +1839,20 @@ function MarcarPendenciaForm({
 
 // Histórico de pendências da solicitação: o que foi devolvido, o status e a
 // resposta do parceiro quando resolvida.
-function PendenciasCard({ pendencias }: { pendencias: Pendencia[] }) {
+function PendenciasCard({ pendencias, isParceiro }: { pendencias: Pendencia[]; isParceiro: boolean }) {
   const marcarVista = useMarcarPendenciaVista()
   return (
     <section className="rounded-lg border bg-card">
       <header className="flex items-center justify-between border-b px-4 py-2">
-        <h2 className="text-[14px] font-medium text-foreground">Pendências com o parceiro</h2>
+        <h2 className="text-[14px] font-medium text-foreground">
+          {isParceiro ? 'Pendências com o parceiro' : 'Pendências internas'}
+        </h2>
       </header>
       <ul className="divide-y">
         {pendencias.map((p) => {
           const aberta = p.status === 'aberta'
+          // parceiro_id nulo = pendência interna (a própria equipe abre/resolve).
+          const dePendenciaParceiro = p.parceiro_id != null
           const respondidaNaoVista = !aberta && !p.vista_equipe_em
           return (
             <li
@@ -1868,7 +1872,7 @@ function PendenciasCard({ pendencias }: { pendencias: Pendencia[] }) {
                   )}
                 >
                   {aberta ? <Undo2 className="h-3 w-3" /> : <CheckCircle2 className="h-3 w-3" />}
-                  {aberta ? 'Aguardando parceiro' : 'Resolvida'}
+                  {aberta ? (dePendenciaParceiro ? 'Aguardando parceiro' : 'Pendência aberta') : 'Resolvida'}
                 </span>
                 <span className="text-[11px] text-muted-foreground">
                   {format(new Date(p.created_at), "dd/MM 'às' HH:mm", { locale: ptBR })}

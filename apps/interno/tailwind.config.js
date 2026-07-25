@@ -2,10 +2,11 @@
 export default {
   darkMode: ['class'],
   content: ['./index.html', './src/**/*.{ts,tsx}'],
-  // Classes .status-* são aplicadas dinamicamente (`status-${s}`) no filtro de
-  // solicitações, então o scanner do Tailwind não as enxerga e purgaria as variantes
-  // do modo claro (as do dark sobrevivem por causa da classe `dark`). Safelist garante
-  // que todas as cores de status estejam sempre no bundle, em claro e escuro.
+  // Classes .status-* e .card-status-* são aplicadas dinamicamente (`status-${s}`,
+  // `card-status-${row.status}`) no filtro e nos cards de solicitações, então o scanner
+  // do Tailwind não as enxerga e purgaria as variantes do modo claro (as do dark
+  // sobrevivem por causa da classe `dark`). Safelist garante que todas as cores de
+  // status estejam sempre no bundle, em claro e escuro.
   safelist: [
     'status-recebida',
     'status-em_cadastro',
@@ -14,6 +15,13 @@ export default {
     'status-oc_enviada',
     'status-finalizada',
     'status-cancelada',
+    'card-status-recebida',
+    'card-status-em_cadastro',
+    'card-status-instrucao_emitida',
+    'card-status-oc_gerada',
+    'card-status-oc_enviada',
+    'card-status-finalizada',
+    'card-status-cancelada',
   ],
   theme: {
     container: {

@@ -28,7 +28,7 @@ import {
   useDuplicarSolicitacao,
   type PortalSolicitacao,
 } from '@/features/solicitacoes/useSolicitacoes'
-import { usePendenciaAberta, useResolverPendencia } from '@/features/solicitacoes/usePendencias'
+import { usePendenciaAberta, usePendenciasSolicitacao, useResolverPendencia, type Pendencia } from '@/features/solicitacoes/usePendencias'
 import type { Tables, SolicitacaoStatus } from '@sislog/shared/types'
 
 function fmtDataHora(iso: string | null): string {
@@ -43,6 +43,7 @@ export default function SolicitacaoDetailPage() {
   const duplicar = useDuplicarSolicitacao()
   const baixarOC = useBaixarOC()
   const pendencia = usePendenciaAberta(id)
+  const pendenciasHist = usePendenciasSolicitacao(id)
   const [confirmOpen, setConfirmOpen] = React.useState(false)
   const [confirmDup, setConfirmDup] = React.useState(false)
 
@@ -211,6 +212,12 @@ export default function SolicitacaoDetailPage() {
         </section>
       )}
 
+      {(pendenciasHist.data?.length ?? 0) > 0 && (
+        <div className="mt-4">
+          <PendenciasHistoricoCard pendencias={pendenciasHist.data ?? []} />
+        </div>
+      )}
+
       <section className="mt-4 rounded-lg border bg-background p-5">
         <h2 className="text-[15px] font-semibold text-foreground">Dados da solicitação</h2>
         <dl className="mt-4 grid gap-x-6 gap-y-3.5 sm:grid-cols-2">
@@ -359,6 +366,59 @@ function PendenciaBanner({
           </div>
         </div>
       </div>
+    </section>
+  )
+}
+
+// Histórico de pendências desta solicitação, do ponto de vista do parceiro: o
+// que a LHG devolveu (motivo) e como o parceiro respondeu ao resolver. Somente
+// leitura — a ação de resolver fica no banner "Ação necessária" no topo.
+function PendenciasHistoricoCard({ pendencias }: { pendencias: Pendencia[] }) {
+  return (
+    <section className="rounded-lg border bg-background">
+      <header className="flex items-center gap-2 border-b px-5 py-3">
+        <Undo2 className="h-4 w-4 text-muted-foreground" />
+        <h2 className="text-[15px] font-semibold text-foreground">Histórico de pendências</h2>
+      </header>
+      <ul className="divide-y">
+        {pendencias.map((p) => {
+          const aberta = p.status === 'aberta'
+          return (
+            <li key={p.id} className="space-y-1.5 px-5 py-3">
+              <div className="flex items-center gap-2">
+                <span
+                  className={cn(
+                    'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium',
+                    aberta
+                      ? 'bg-orange-100 text-orange-800 dark:bg-orange-950/60 dark:text-orange-300'
+                      : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300',
+                  )}
+                >
+                  {aberta ? <Undo2 className="h-3 w-3" /> : <Check className="h-3 w-3" />}
+                  {aberta ? 'Aguardando você' : 'Resolvida'}
+                </span>
+                <span className="text-[11px] text-muted-foreground">
+                  Devolvida em {format(new Date(p.created_at), "dd/MM 'às' HH:mm", { locale: ptBR })}
+                </span>
+              </div>
+              <p className="text-[12px] text-foreground">
+                <span className="text-muted-foreground">Motivo (LHG): </span>{p.motivo}
+              </p>
+              {p.resposta_parceiro && (
+                <p className="rounded-md bg-muted/60 px-2.5 py-1.5 text-[12px] text-foreground">
+                  <span className="text-muted-foreground">Sua resposta: </span>
+                  {p.resposta_parceiro}
+                </p>
+              )}
+              {!aberta && p.resolvida_em && (
+                <p className="text-[11px] text-emerald-700 dark:text-emerald-400">
+                  Resolvida em {format(new Date(p.resolvida_em), "dd/MM 'às' HH:mm", { locale: ptBR })}
+                </p>
+              )}
+            </li>
+          )
+        })}
+      </ul>
     </section>
   )
 }

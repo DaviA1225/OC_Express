@@ -200,6 +200,39 @@ body.density-compact ul.divide-y > li {
   .dark .status-finalizada        { background-color: rgba(5, 150, 105, 0.28);   color: #a7f3d0; }
   .dark .status-cancelada         { background-color: rgba(239, 68, 68, 0.18);   color: #fca5a5; }
 
+  /* Faixa lateral esquerda por status — mesma leitura de cor dos badges/chips.
+     Implementada como pseudo-elemento para não competir com os utilitários de
+     borda (SLA, pendência, selecionado, hover), que continuam envolvendo o card
+     nos 4 lados como sinal de urgência. A cor vem de `--stripe-color`. */
+  .card-status::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 6px;
+    border-top-left-radius: inherit;
+    border-bottom-left-radius: inherit;
+    background-color: var(--stripe-color);
+    pointer-events: none;
+  }
+
+  .card-status-recebida          { --stripe-color: #94A3B8; } /* slate — estado neutro/novo */
+  .card-status-em_cadastro       { --stripe-color: #EA8A54; } /* laranja (Em emissão) */
+  .card-status-instrucao_emitida { --stripe-color: #E6B24A; } /* âmbar */
+  .card-status-oc_gerada         { --stripe-color: #CD853F; } /* marrom-areia — distinto do vermelho */
+  .card-status-oc_enviada        { --stripe-color: #34D399; } /* esmeralda */
+  .card-status-finalizada        { --stripe-color: #10B981; } /* verde */
+  .card-status-cancelada         { --stripe-color: #E5484D; } /* vermelho vivo */
+
+  .dark .card-status-recebida          { --stripe-color: #64748B; }
+  .dark .card-status-em_cadastro       { --stripe-color: #FF5100; }
+  .dark .card-status-instrucao_emitida { --stripe-color: #F59E0B; }
+  .dark .card-status-oc_gerada         { --stripe-color: #C44612; }
+  .dark .card-status-oc_enviada        { --stripe-color: #10B981; }
+  .dark .card-status-finalizada        { --stripe-color: #059669; }
+  .dark .card-status-cancelada         { --stripe-color: #EF4444; }
+
   .label-uppercase {
     @apply text-[10px] font-medium uppercase tracking-[0.5px] text-muted-foreground;
   }
