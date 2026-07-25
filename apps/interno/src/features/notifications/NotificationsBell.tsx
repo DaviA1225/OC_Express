@@ -95,7 +95,7 @@ export function NotificationsBell() {
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="relative rounded-md p-1.5 text-primary-foreground transition-colors hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+          className="relative rounded-md p-1.5 text-white transition-colors hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
           aria-label={total > 0 ? `${total} notificações` : 'Notificações'}
           title={total > 0 ? `${total} alerta${total === 1 ? '' : 's'} operacional${total === 1 ? '' : 'is'}` : 'Sem alertas'}
         >
