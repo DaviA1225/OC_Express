@@ -25,15 +25,15 @@
     --popover: 0 0% 100%;
     --popover-foreground: 220 20% 13%;
 
-    --primary: 19 100% 50%;              /* #FF5100 laranja LHG — acento */
-    --primary-hover: 21 79% 47%;         /* #D3641A laranja queimado */
-    /* Tinta ESCURA quente no fill de acento (mesma inversao do dark). Branco
-       sobre #FF5100 falha WCAG AA (3.27:1 — o laranja da marca e' luminoso demais
-       p/ texto branco); tinta escura passa (5.38:1 no botao, 4.52:1 no hover).
-       Vale p/ todo fill de acento (botao/avatar/checkbox/logo). O laranja-como-
-       TEXTO (links, chips, icones) e' outra categoria: icones passam como UI
-       (3:1) e o texto tem affordance redundante (barra/ring/sublinhado). */
-    --primary-foreground: 20 50% 10%;
+    --primary: 19 100% 40%;              /* #CC4100 laranja queimado — fill de acento */
+    --primary-hover: 19 100% 34%;        /* #AD3700 — queima mais no hover */
+    /* Fill de acento em laranja QUEIMADO (#CC4100, L40) com texto BRANCO. O
+       #FF5100 puro (L50) e' luminoso demais: dark-text passa AA mas fica pesado/
+       "muito forte", e white-text falha (3.27:1). Escurecer o fill p/ L40 resolve
+       os dois — white sobre #CC4100 = 4.86:1 (AA), e o laranja fica menos neon.
+       O #FF5100 da marca segue vivo no FOCO (--ring) e como TEXTO
+       (--primary-strong). Vale p/ todo fill de acento (botao/avatar/checkbox/logo). */
+    --primary-foreground: 0 0% 100%;
 
     --secondary: 220 16% 20%;            /* grafite escuro neutro */
     --secondary-foreground: 0 0% 100%;
