@@ -140,26 +140,37 @@ interface SearchAuxIds {
   parceiroVeiculoIds: string[]
   carretaIds: string[]
   parceiroCarretaIds: string[]
+  clienteIds: string[]
 }
 
 async function fetchSearchAuxIds(term: string): Promise<SearchAuxIds> {
   const like = `%${term.replace(/[%_]/g, '\\$&')}%`
-  const [mot, parcMot, veic, parcVeic, carr, parcCarr] = await Promise.all([
+  // CPF pode estar formatado (123.456.789-00) ou só dígitos; busca com o termo
+  // cru cobre "copiou o que viu na tela"; a variante só-dígitos cobre quem digita
+  // sem pontuação (o ilike casa se o CPF no banco também for sem pontuação).
+  const digits = term.replace(/\D/g, '')
+  const likeDigits = digits ? `%${digits}%` : like
+  const [motNome, motCpf, parcMotNome, parcMotCpf, veic, parcVeic, carr, parcCarr, cli] = await Promise.all([
     supabase.from('motoristas').select('id').ilike('nome_completo', like).limit(SEARCH_AUX_LIMIT),
+    supabase.from('motoristas').select('id').or(`cpf.ilike.${like},cpf.ilike.${likeDigits}`).limit(SEARCH_AUX_LIMIT),
     supabase.from('parceiro_motoristas').select('id').ilike('nome_completo', like).limit(SEARCH_AUX_LIMIT),
+    supabase.from('parceiro_motoristas').select('id').or(`cpf.ilike.${like},cpf.ilike.${likeDigits}`).limit(SEARCH_AUX_LIMIT),
     supabase.from('veiculos').select('id').ilike('placa', like).limit(SEARCH_AUX_LIMIT),
     supabase.from('parceiro_veiculos').select('id').ilike('placa', like).limit(SEARCH_AUX_LIMIT),
     supabase.from('carretas').select('id').ilike('placa', like).limit(SEARCH_AUX_LIMIT),
     supabase.from('parceiro_carretas').select('id').ilike('placa', like).limit(SEARCH_AUX_LIMIT),
+    supabase.from('clientes').select('id').ilike('razao_social', like).limit(SEARCH_AUX_LIMIT),
   ])
   const ids = (r: { data: { id: string }[] | null }) => (r.data ?? []).map((row) => row.id)
+  const uniq = (a: string[], b: string[]) => Array.from(new Set([...a, ...b]))
   return {
-    motoristaIds: ids(mot),
-    parceiroMotoristaIds: ids(parcMot),
+    motoristaIds: uniq(ids(motNome), ids(motCpf)),
+    parceiroMotoristaIds: uniq(ids(parcMotNome), ids(parcMotCpf)),
     veiculoIds: ids(veic),
     parceiroVeiculoIds: ids(parcVeic),
     carretaIds: ids(carr),
     parceiroCarretaIds: ids(parcCarr),
+    clienteIds: ids(cli),
   }
 }
 
@@ -167,7 +178,11 @@ function buildSearchOrClause(termRaw: string, aux: SearchAuxIds): string {
   const t = termRaw.replace(/[%_]/g, '\\$&')
   const parts: string[] = [`solicitante_nome.ilike.%${t}%`]
   const asNumber = Number(t.replace(/\D/g, ''))
-  if (Number.isFinite(asNumber) && asNumber > 0) {
+  // numero_interno é serial (int4). Só tratamos como número da OC se couber no
+  // int4 — senão um CPF/telefone (dígito-string longo) estoura o range e a
+  // query inteira falha com 400.
+  const INT4_MAX = 2147483647
+  if (Number.isFinite(asNumber) && asNumber > 0 && asNumber <= INT4_MAX) {
     parts.push(`numero_interno.eq.${asNumber}`)
   }
   const inList = (col: string, list: string[]) => {
@@ -177,8 +192,15 @@ function buildSearchOrClause(termRaw: string, aux: SearchAuxIds): string {
   inList('parceiro_motorista_id', aux.parceiroMotoristaIds)
   inList('veiculo_id', aux.veiculoIds)
   inList('parceiro_veiculo_id', aux.parceiroVeiculoIds)
+  // Placa de carreta pode estar em qualquer posição da composição (última,
+  // 1ª ou dolly) — todas referenciam a mesma tabela carretas/parceiro_carretas.
   inList('carreta_id', aux.carretaIds)
+  inList('primeira_carreta_id', aux.carretaIds)
+  inList('dolly_id', aux.carretaIds)
   inList('parceiro_carreta_id', aux.parceiroCarretaIds)
+  inList('parceiro_primeira_carreta_id', aux.parceiroCarretaIds)
+  inList('parceiro_dolly_id', aux.parceiroCarretaIds)
+  inList('cliente_id', aux.clienteIds)
   return parts.join(',')
 }
 
