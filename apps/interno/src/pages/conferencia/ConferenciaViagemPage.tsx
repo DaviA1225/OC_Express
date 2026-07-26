@@ -43,18 +43,57 @@ function fimDoDiaISO(d: string): string | null {
 
 const PAGE_SIZE = 50
 
+// Persiste os filtros da Conferência entre navegações (sair para outra página e
+// voltar), como a lista de Solicitações faz. Por aba (sessionStorage).
+const STORAGE_KEY = 'conferencia:filtros'
+
+interface FiltrosPersistidos {
+  search?: string
+  dataDe?: string
+  dataAte?: string
+  page?: number
+}
+
+function carregarFiltros(): FiltrosPersistidos {
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY)
+    return raw ? (JSON.parse(raw) as FiltrosPersistidos) : {}
+  } catch {
+    return {}
+  }
+}
+
 export function ConferenciaViagemPage() {
-  const [search, setSearch] = React.useState('')
-  const [dataDe, setDataDe] = React.useState('')
-  const [dataAte, setDataAte] = React.useState('')
-  const [page, setPage] = React.useState(1)
+  // Lê o storage uma única vez (montagem) para semear o estado inicial.
+  const inicial = React.useRef(carregarFiltros()).current
+  const [search, setSearch] = React.useState(inicial.search ?? '')
+  const [dataDe, setDataDe] = React.useState(inicial.dataDe ?? '')
+  const [dataAte, setDataAte] = React.useState(inicial.dataAte ?? '')
+  const [page, setPage] = React.useState(inicial.page ?? 1)
   const debouncedSearch = useDebounce(search, 300)
 
   const dataInicio = dataDe ? inicioDoDiaISO(dataDe) : null
   const dataFim = dataAte ? fimDoDiaISO(dataAte) : null
 
-  // Volta para a 1ª página sempre que um filtro muda.
-  React.useEffect(() => { setPage(1) }, [debouncedSearch, dataInicio, dataFim])
+  // Volta para a 1ª página quando um filtro muda — mas NÃO na montagem, para não
+  // sobrescrever a página restaurada do storage.
+  const primeiraRenderizacao = React.useRef(true)
+  React.useEffect(() => {
+    if (primeiraRenderizacao.current) {
+      primeiraRenderizacao.current = false
+      return
+    }
+    setPage(1)
+  }, [debouncedSearch, dataInicio, dataFim])
+
+  // Salva os filtros atuais a cada mudança.
+  React.useEffect(() => {
+    try {
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ search, dataDe, dataAte, page }))
+    } catch {
+      /* storage indisponível (ex.: modo privado) — ignora */
+    }
+  }, [search, dataDe, dataAte, page])
 
   const temFiltro = search.trim() !== '' || !!dataDe || !!dataAte
   const limparFiltros = () => { setSearch(''); setDataDe(''); setDataAte('') }

@@ -44,7 +44,10 @@ export function useGlobalSearch(query: string, enabled: boolean) {
       const tu = escapeIlike(unaccent(term))
       const ilikeU = `%${tu}%`
       const asNumber = Number(term.replace(/\D/g, ''))
-      const isNumber = Number.isFinite(asNumber) && asNumber > 0
+      // numero_interno é serial (int4). Um CPF/telefone (dígito-string longo)
+      // estoura o range e faz o .eq falhar com 400; só tratamos como número da
+      // OC se couber no int4.
+      const isNumber = Number.isFinite(asNumber) && asNumber > 0 && asNumber <= 2147483647
 
       const [solicNum, solicNome, clientes, motoristas, veiculos, carretas, materiais, subs] =
         await Promise.all([
