@@ -17,15 +17,26 @@ import {
 import { buildCsv, downloadCsv, type CsvColumn } from '@/lib/csv'
 import { formatNumeroOC } from '@/lib/utils'
 
-// Junta todas as placas da composição (cavalo + carretas + dolly), na ordem em
-// que aparecem fisicamente, ignorando as vazias.
-function placasDaViagem(row: SolicitacaoListRow): string[] {
-  return [
-    row.veiculo?.placa,
-    row.primeira_carreta?.placa,
-    row.dolly?.placa,
-    row.carreta?.placa,
-  ].filter((p): p is string => !!p)
+// Placeholder usado nas células vazias (mesma convenção do resto do sistema).
+const VAZIO = '—'
+
+// A composição é conferida peça a peça: cavalo, 1ª carreta, dolly e última
+// carreta. Cada posição tem coluna própria — quando a viagem não tem aquela
+// peça (carreta simples, sem dolly), a célula fica com o traço.
+function composicaoDaViagem(row: SolicitacaoListRow) {
+  return {
+    cavalo: row.veiculo?.placa ?? null,
+    primeiraCarreta: row.primeira_carreta?.placa ?? null,
+    dolly: row.dolly?.placa ?? null,
+    ultimaCarreta: row.carreta?.placa ?? null,
+  }
+}
+
+// Placa na tipografia padrão do sistema (Wanted Sans), só com números
+// tabulares para as colunas alinharem entre si.
+function Placa({ value }: { value: string | null }) {
+  if (!value) return <span className="text-muted-foreground/60">{VAZIO}</span>
+  return <span className="font-medium tabular-nums tracking-[0.3px] text-foreground">{value}</span>
 }
 
 // Converte o yyyy-mm-dd do <input type="date"> em limites de dia no fuso local
@@ -129,9 +140,13 @@ export function ConferenciaViagemPage() {
       const cols: CsvColumn<SolicitacaoListRow>[] = [
         { header: 'Número', accessor: (r) => formatNumeroOC(r.numero_interno) },
         { header: 'Data da solicitação', accessor: (r) => (r.created_at ? format(new Date(r.created_at), 'dd/MM/yyyy HH:mm', { locale: ptBR }) : '') },
+        { header: 'Subcontratada', accessor: (r) => r.subcontratada?.razao_social },
         { header: 'Motorista', accessor: (r) => r.motorista?.nome_completo },
         { header: 'CPF', accessor: (r) => r.motorista?.cpf },
-        { header: 'Placas', accessor: (r) => placasDaViagem(r).join(' / ') },
+        { header: 'Cavalo', accessor: (r) => composicaoDaViagem(r).cavalo ?? '-' },
+        { header: '1ª carreta', accessor: (r) => composicaoDaViagem(r).primeiraCarreta ?? '-' },
+        { header: 'Dolly', accessor: (r) => composicaoDaViagem(r).dolly ?? '-' },
+        { header: 'Última carreta', accessor: (r) => composicaoDaViagem(r).ultimaCarreta ?? '-' },
         { header: 'Cliente de destino', accessor: (r) => r.cliente?.razao_social },
         { header: 'Solicitante', accessor: (r) => r.solicitante_nome },
       ]
@@ -176,7 +191,7 @@ export function ConferenciaViagemPage() {
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Número, motorista ou placa"
+            placeholder="Número, motorista, CPF, placa ou cliente"
             className="pl-9"
           />
         </div>
@@ -245,42 +260,58 @@ export function ConferenciaViagemPage() {
 
       {!list.isLoading && !list.isError && rows.length > 0 && (
         <div className="overflow-x-auto rounded-lg border bg-card">
+          {/* Filete vertical entre todas as colunas (menos a última) — cada campo
+              da conferência fica isolado na sua própria célula. */}
           <table className="w-full border-collapse text-[13px] [&_td]:border-r [&_td]:border-border [&_td:last-child]:border-r-0 [&_th]:border-r [&_th]:border-border [&_th:last-child]:border-r-0">
-            <thead>
-              <tr className="border-b border-border bg-muted/50 text-left text-[10px] uppercase tracking-[0.5px] text-muted-foreground">
+            <thead className="text-[10px] uppercase tracking-[0.5px] text-muted-foreground">
+              <tr className="border-b border-border bg-muted/60 text-left">
                 <th className="px-3 py-2 font-medium">Número</th>
                 <th className="px-3 py-2 font-medium">Data</th>
+                <th className="px-3 py-2 font-medium">Subcontratada</th>
                 <th className="px-3 py-2 font-medium">Motorista</th>
                 <th className="px-3 py-2 font-medium">CPF</th>
-                <th className="px-3 py-2 font-medium">Placas</th>
+                <th className="px-3 py-2 font-medium">Cavalo</th>
+                <th className="px-3 py-2 font-medium">1ª carreta</th>
+                <th className="px-3 py-2 font-medium">Dolly</th>
+                <th className="px-3 py-2 font-medium">Última carreta</th>
                 <th className="px-3 py-2 font-medium">Cliente de destino</th>
                 <th className="px-3 py-2 font-medium">Solicitante</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((row) => {
-                const placas = placasDaViagem(row)
+                const comp = composicaoDaViagem(row)
                 return (
-                  <tr key={row.id} className="border-b border-border last:border-b-0 even:bg-muted/20">
+                  <tr
+                    key={row.id}
+                    className="border-b border-border transition-colors last:border-b-0 even:bg-muted/20 hover:bg-accent/60"
+                  >
                     <td className="whitespace-nowrap px-3 py-2 font-medium text-primary-strong">{formatNumeroOC(row.numero_interno)}</td>
                     <td className="whitespace-nowrap px-3 py-2 tabular-nums text-muted-foreground">
-                      {row.created_at ? format(new Date(row.created_at), 'dd/MM/yyyy HH:mm', { locale: ptBR }) : '—'}
+                      {row.created_at ? format(new Date(row.created_at), 'dd/MM/yyyy HH:mm', { locale: ptBR }) : VAZIO}
                     </td>
-                    <td className="px-3 py-2 text-foreground">{row.motorista?.nome_completo ?? '—'}</td>
-                    <td className="whitespace-nowrap px-3 py-2 tabular-nums text-muted-foreground">{row.motorista?.cpf ?? '—'}</td>
-                    <td className="px-3 py-2">
-                      {placas.length > 0 ? (
-                        <span className="inline-flex flex-wrap gap-1">
-                          {placas.map((p, i) => (
-                            <span key={`${p}-${i}`} className="rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium tabular-nums text-foreground">
-                              {p}
-                            </span>
-                          ))}
-                        </span>
-                      ) : '—'}
+                    <td
+                      className="max-w-[260px] truncate px-3 py-2 text-foreground"
+                      title={row.subcontratada?.razao_social ?? undefined}
+                    >
+                      {row.subcontratada?.razao_social ?? <span className="text-muted-foreground/60">{VAZIO}</span>}
                     </td>
-                    <td className="px-3 py-2 text-foreground">{row.cliente?.razao_social ?? '—'}</td>
-                    <td className="px-3 py-2 text-muted-foreground">{row.solicitante_nome ?? '—'}</td>
+                    <td className="px-3 py-2 text-foreground">{row.motorista?.nome_completo ?? VAZIO}</td>
+                    <td className="whitespace-nowrap px-3 py-2 tabular-nums text-muted-foreground">{row.motorista?.cpf ?? VAZIO}</td>
+                    <td className="whitespace-nowrap px-3 py-2">
+                      <Placa value={comp.cavalo} />
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2">
+                      <Placa value={comp.primeiraCarreta} />
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2">
+                      <Placa value={comp.dolly} />
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2">
+                      <Placa value={comp.ultimaCarreta} />
+                    </td>
+                    <td className="px-3 py-2 text-foreground">{row.cliente?.razao_social ?? VAZIO}</td>
+                    <td className="px-3 py-2 text-muted-foreground">{row.solicitante_nome ?? VAZIO}</td>
                   </tr>
                 )
               })}
