@@ -109,32 +109,49 @@ function descricaoBase(e: RawEvent): string {
   return 'Editou a solicitação'
 }
 
+/** `->>` devolve texto; `numero_interno` volta como string e precisa virar número. */
+function paraNumero(v: string | null): number | null {
+  if (v == null) return null
+  const n = Number(v)
+  return Number.isFinite(n) ? n : null
+}
+
 async function fetchEventos(desdeISO: string): Promise<RawEvent[]> {
   const all: RawEvent[] = []
   // Ordem DESC: a primeira linha vista de cada usuário já é a mais recente.
   for (let from = 0; ; from += PG_PAGE) {
+    // Extrai só os quatro campos usados, no SERVIDOR (`->>`). `dados_antes` e
+    // `dados_depois` são snapshots `to_jsonb()` da linha inteira da solicitação
+    // (~1,9 KB por linha de log) — trazer sete dias deles a cada 60s, para ler
+    // status e número, era o maior tráfego do painel.
     const { data, error } = await supabase
       .from('log_auditoria')
-      .select('usuario_id, acao, dados_antes, dados_depois, created_at')
+      .select(
+        'usuario_id, acao, created_at,' +
+          ' antesStatus:dados_antes->>status, depoisStatus:dados_depois->>status,' +
+          ' antesNumero:dados_antes->>numero_interno, depoisNumero:dados_depois->>numero_interno',
+      )
       .eq('tabela', 'solicitacoes')
       .gte('created_at', desdeISO)
       .order('created_at', { ascending: false })
       .range(from, from + PG_PAGE - 1)
     if (error) throw error
-    const page = (data ?? []) as Array<{
+    const page = (data ?? []) as unknown as Array<{
       usuario_id: string | null
       acao: string
-      dados_antes: { status?: string; numero_interno?: number } | null
-      dados_depois: { status?: string; numero_interno?: number } | null
       created_at: string
+      antesStatus: string | null
+      depoisStatus: string | null
+      antesNumero: string | null
+      depoisNumero: string | null
     }>
     for (const l of page) {
       all.push({
         usuario_id: l.usuario_id,
         acao: l.acao,
-        numero: l.dados_depois?.numero_interno ?? l.dados_antes?.numero_interno ?? null,
-        fromStatus: l.dados_antes?.status ?? null,
-        toStatus: l.dados_depois?.status ?? null,
+        numero: paraNumero(l.depoisNumero) ?? paraNumero(l.antesNumero),
+        fromStatus: l.antesStatus,
+        toStatus: l.depoisStatus,
         at: l.created_at,
       })
     }

@@ -220,32 +220,37 @@ export function useStatusTransitions(periodo: PeriodoRelatorio, solicitacaoIds: 
       for (let i = 0; i < solicitacaoIds.length; i += 200) {
         chunks.push(solicitacaoIds.slice(i, i + 200))
       }
-      const all: StatusTransition[] = []
       const PAGE = 1000
-      for (const ch of chunks) {
+
+      const carregarChunk = async (ch: string[]): Promise<StatusTransition[]> => {
+        const out: StatusTransition[] = []
         // Mesmo teto de ~1000 linhas do PostgREST: um chunk de 200 solicitações
         // pode ter muito mais de 1000 transições no log. Paginamos cada chunk.
         for (let from = 0; ; from += PAGE) {
+          // Só o `status` de cada snapshot, extraído no SERVIDOR (`->>`). Antes
+          // vinham `dados_antes` e `dados_depois` inteiros: são cópias
+          // `to_jsonb()` da linha completa da solicitação (~1,9 KB por linha de
+          // log), e todo esse payload trafegava para o navegador ler UM campo.
           const { data, error } = await supabase
             .from('log_auditoria')
-            .select('registro_id, dados_antes, dados_depois, created_at')
+            .select('registro_id, created_at, antes:dados_antes->>status, depois:dados_depois->>status')
             .eq('tabela', 'solicitacoes')
             .eq('acao', 'UPDATE')
             .in('registro_id', ch)
             .order('created_at', { ascending: true })
             .range(from, from + PAGE - 1)
           if (error) throw error
-          const batch = (data ?? []) as Array<{
+          const batch = (data ?? []) as unknown as Array<{
             registro_id: string
-            dados_antes: { status?: string } | null
-            dados_depois: { status?: string } | null
             created_at: string
+            antes: string | null
+            depois: string | null
           }>
           for (const l of batch) {
-            const prev = l.dados_antes?.status ?? null
-            const next = l.dados_depois?.status
+            const prev = l.antes ?? null
+            const next = l.depois
             if (!next || prev === next) continue
-            all.push({
+            out.push({
               registro_id: l.registro_id,
               from_status: prev,
               to_status: next,
@@ -254,8 +259,14 @@ export function useStatusTransitions(periodo: PeriodoRelatorio, solicitacaoIds: 
           }
           if (batch.length < PAGE) break
         }
+        return out
       }
-      return all
+
+      // Blocos em paralelo: são independentes entre si (cada um filtra por ids
+      // distintos) e antes rodavam em série, somando o tempo de ida e volta de
+      // dezenas de requisições num período longo.
+      const porChunk = await Promise.all(chunks.map(carregarChunk))
+      return porChunk.flat()
     },
   })
 }
