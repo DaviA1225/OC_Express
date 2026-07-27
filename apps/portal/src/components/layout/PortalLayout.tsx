@@ -126,7 +126,14 @@ export function PortalLayout() {
                 'relative flex h-11 items-center whitespace-nowrap px-3 text-[13px] font-medium transition-colors',
                 isActive
                   ? 'text-primary after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:rounded-full after:bg-primary after:shadow-[0_0_8px_0_rgba(96,152,255,0.55)] after:content-[""]'
-                  : 'text-muted-foreground hover:text-foreground',
+                  : cn(
+                      'text-muted-foreground hover:text-foreground',
+                      // Mesmo gesto do menu do interno, girado 90°: a barra de
+                      // acento do item ativo cresce a partir do centro sob o
+                      // ponteiro, antecipando o estado para onde o clique leva.
+                      'after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:origin-center after:scale-x-0 after:rounded-full after:bg-primary after:opacity-0 after:transition after:duration-200 after:ease-out after:content-[""]',
+                      'hover:after:scale-x-100 hover:after:opacity-100',
+                    ),
               )
             }
           >

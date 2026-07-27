@@ -671,7 +671,14 @@ function SolicitacaoCard({ row, sinalPendencia, selectable, selected, onToggleSe
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen() } }}
       aria-label={`Abrir ${formatNumeroOC(row.numero_interno)}`}
       className={cn(
-        'relative cursor-pointer overflow-hidden rounded-lg border border-slate-300 bg-card p-4 pl-5 transition-[box-shadow,border-color,background-color] duration-200 ease-out hover:z-10 hover:border-primary/60 hover:bg-muted/30 hover:shadow-xl dark:border-slate-700 dark:hover:bg-[var(--elevated-dark)] dark:hover:shadow-[0_16px_40px_-8px_rgba(0,0,0,0.85)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+        'relative cursor-pointer overflow-hidden rounded-lg border border-slate-300 bg-card p-4 pl-5 dark:border-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+        // O card cresce por inteiro sob o ponteiro. `scale` age no elemento
+        // todo, então texto, borda e faixa de status ampliam juntos, na mesma
+        // proporção — nada é redesenhado, é a caixa inteira que escala. O
+        // hover:z-10 mantém o card ampliado por cima dos vizinhos.
+        // Sem guarda `motion-reduce`: por decisão de produto o efeito roda
+        // mesmo para quem liga "reduzir movimento" no sistema.
+        'transition-transform duration-300 ease-out hover:z-10 hover:scale-[1.03]',
         `card-status card-status-${row.status}`,
         selectable && selected && 'border-primary bg-primary/5',
         !selected && sinal === 'parceiro_respondeu' && 'border-emerald-400 ring-1 ring-emerald-200 dark:border-emerald-700 dark:ring-emerald-900/50',
@@ -775,7 +782,9 @@ function SolicitacaoListaRow({ row, sinalPendencia, selectable, selected, onTogg
   return (
     <div
       className={cn(
-        'relative flex items-center gap-3 rounded-md px-3 py-2.5 transition-all duration-200 ease-out hover:-translate-y-0.5 hover:bg-muted/50 hover:shadow-sm motion-reduce:hover:translate-y-0 motion-reduce:hover:shadow-none',
+        // Sem reação ao ponteiro, como nos cards: nada de levantar, sombrear ou
+        // trocar o fundo.
+        'relative flex items-center gap-3 rounded-md px-3 py-2.5',
         selectable && selected && 'bg-primary/5',
       )}
     >
