@@ -299,10 +299,19 @@ function NavListItem({
         className={({ isActive }) =>
           cn(
             'group relative flex items-center gap-2 rounded-lg border py-2 text-[13px] font-medium transition-all duration-200 ease-out',
+            // O item avança um passo curto na direção da página ao receber o
+            // ponteiro — mesmo gesto no item ativo, para o menu inteiro reagir.
+            'hover:translate-x-1',
             collapsed ? 'justify-center px-0' : 'px-3',
             isActive
               ? 'border-border bg-accent text-accent-foreground before:absolute before:left-0 before:top-1/2 before:h-5 before:w-[3px] before:-translate-y-1/2 before:rounded-r-full before:bg-primary before:content-[""]'
-              : 'border-border bg-muted/40 text-foreground/80 hover:translate-x-0.5 hover:border-primary/40 hover:bg-accent hover:text-foreground motion-reduce:hover:translate-x-0',
+              : cn(
+                  'border-border bg-muted/40 text-foreground/80 hover:border-primary/40 hover:bg-accent hover:text-foreground',
+                  // A barra de acento do item ativo "cresce" a partir do centro
+                  // no hover — antecipa o estado para onde o clique leva.
+                  'before:absolute before:left-0 before:top-1/2 before:h-5 before:w-[3px] before:-translate-y-1/2 before:scale-y-0 before:rounded-r-full before:bg-primary before:opacity-0 before:transition before:duration-200 before:ease-out before:content-[""]',
+                  'hover:before:scale-y-100 hover:before:opacity-100',
+                ),
           )
         }
         title={
@@ -311,7 +320,7 @@ function NavListItem({
             : undefined
         }
       >
-        <Icon className="h-[18px] w-[18px] shrink-0" />
+        <Icon className="h-[18px] w-[18px] shrink-0 transition-transform duration-200 ease-out group-hover:scale-125" />
         {!collapsed && <span className="truncate">{item.label}</span>}
         {badgeCount > 0 && (
           collapsed ? (

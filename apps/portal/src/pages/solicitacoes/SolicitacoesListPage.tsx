@@ -241,7 +241,11 @@ function SolicitacaoCard({ view, temPendencia }: { view: SolicitacaoView; temPen
     <Link
       to={`/solicitacoes/${sol.id}`}
       className={cn(
-        'flex flex-col gap-3 rounded-lg border bg-background p-4 transition-colors hover:border-primary/40 hover:bg-accent/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+        'relative flex flex-col gap-3 rounded-lg border bg-background p-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+        // Mesmo hover dos cards do interno: o card cresce por inteiro — texto,
+        // borda e badges na mesma proporção — sem realce de borda ou de fundo.
+        // O hover:z-10 o mantém por cima dos vizinhos enquanto está ampliado.
+        'transition-transform duration-300 ease-out hover:z-10 hover:scale-[1.03]',
         temPendencia && 'border-red-400 ring-1 ring-red-200 dark:border-red-900/60 dark:ring-red-900/40',
       )}
     >
