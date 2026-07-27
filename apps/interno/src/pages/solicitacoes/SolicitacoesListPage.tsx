@@ -245,16 +245,12 @@ export function SolicitacoesListPage() {
   const exportCsv = async () => {
     setExporting(true)
     try {
-      const rows = await fetchSolicitacoesParaExport({
-        search: debouncedSearch,
-        statuses,
-        periodo,
-        materialId,
-        tipo,
-        origem,
-        pamcard,
-        atendenteId: null,
-      })
+      // Passa o MESMO objeto que alimenta a lista (a exportação ignora
+      // page/pageSize de propósito — o CSV leva tudo). Reescrever os filtros à
+      // mão aqui já fez o arquivo ignorar "Atrasadas": a tela mostrava 12
+      // registros e o CSV baixava todos. Reutilizando o objeto, todo filtro
+      // novo entra na exportação sem ninguém precisar lembrar disso.
+      const rows = await fetchSolicitacoesParaExport(filters)
       if (rows.length === 0) {
         toast.info('Nenhuma solicitação para exportar com os filtros atuais.')
         return
@@ -322,10 +318,19 @@ export function SolicitacoesListPage() {
     search.trim() !== '' || statuses.length > 0 || periodo !== 'todos' || !!materialId ||
     tipo !== 'todos' || origem !== 'todos' || pamcard !== 'todos' || apenasAtrasadas
 
-  const clearFilters = () => {
-    setSearch(''); setStatuses([]); setPeriodo('todos'); setMaterialId(null); setTipo('todos')
-    setOrigem('todos'); setPamcard('todos'); setApenasAtrasadas(false)
-  }
+  // UMA chamada só, de propósito. Antes eram oito setters em sequência
+  // (setSearch(''), setStatuses([])…) e o botão simplesmente NÃO limpava nada:
+  // o `setSearchParams` do React Router lê os params da última renderização, não
+  // de uma fila de atualizações, então as oito chamadas do mesmo handler partiam
+  // todas do MESMO estado e a última vencia — sobrando um "delete atrasadas"
+  // sozinho. Ao mexer aqui, mantenha tudo dentro de um único updateParams.
+  // `view` fica de fora: é preferência de exibição, não filtro.
+  const clearFilters = () =>
+    updateParams((n) => {
+      for (const p of ['search', 'status', 'periodo', 'material', 'tipo', 'origem', 'pamcard', 'atrasadas', 'page']) {
+        n.delete(p)
+      }
+    })
 
   const toggleStatus = (s: SolicitacaoStatus) => {
     setStatuses(statuses.includes(s) ? statuses.filter((x) => x !== s) : [...statuses, s])

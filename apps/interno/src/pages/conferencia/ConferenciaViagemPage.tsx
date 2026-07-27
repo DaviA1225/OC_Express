@@ -76,7 +76,12 @@ function carregarFiltros(): FiltrosPersistidos {
 
 export function ConferenciaViagemPage() {
   // Lê o storage uma única vez (montagem) para semear o estado inicial.
-  const inicial = React.useRef(carregarFiltros()).current
+  // `useState(fn)` e não `useRef(carregarFiltros())`: no useRef o argumento é
+  // avaliado a CADA render (o valor é descartado depois da montagem), o que
+  // fazia getItem+JSON.parse em toda renderização da página — e ler `.current`
+  // durante o render viola a regra react-hooks/refs. O initializer preguiçoso
+  // do useState roda só na montagem.
+  const [inicial] = React.useState(carregarFiltros)
   const [search, setSearch] = React.useState(inicial.search ?? '')
   const [dataDe, setDataDe] = React.useState(inicial.dataDe ?? '')
   const [dataAte, setDataAte] = React.useState(inicial.dataAte ?? '')

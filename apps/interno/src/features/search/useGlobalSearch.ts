@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { ilikeFilter, ilikePattern } from '@sislog/shared/postgrest'
 import { supabase } from '@/lib/supabase'
 
 export type SearchEntityType =
@@ -20,10 +21,6 @@ export interface SearchResultItem {
 
 const PER_TYPE_LIMIT = 5
 
-function escapeIlike(t: string): string {
-  return t.replace(/[%_]/g, '\\$&')
-}
-
 // Remove acentos do termo no cliente para casar com as colunas `*_unaccent`
 // (geradas via imm_unaccent no banco — migration 0024). Assim "jose" acha
 // "josé" e "graos" acha "grãos".
@@ -38,11 +35,14 @@ export function useGlobalSearch(query: string, enabled: boolean) {
     queryKey: ['global-search', term],
     staleTime: 30_000,
     queryFn: async (): Promise<SearchResultItem[]> => {
-      const t = escapeIlike(term)
-      const ilike = `%${t}%`
+      // Padrões para os métodos dedicados (`.ilike`), que mandam o valor como
+      // parâmetro próprio; para as cláusulas `.or(...)` vai `ilikeFilter`, que
+      // acrescenta as aspas que o parser do PostgREST exige em termos com
+      // vírgula ou parêntese.
+      const ilike = ilikePattern(term)
       // Termo sem acento para as colunas `*_unaccent` (migration 0024).
-      const tu = escapeIlike(unaccent(term))
-      const ilikeU = `%${tu}%`
+      const termoU = unaccent(term)
+      const ilikeU = ilikePattern(termoU)
       const asNumber = Number(term.replace(/\D/g, ''))
       // numero_interno é serial (int4). Um CPF/telefone (dígito-string longo)
       // estoura o range e faz o .eq falhar com 400; só tratamos como número da
@@ -74,7 +74,7 @@ export function useGlobalSearch(query: string, enabled: boolean) {
           supabase
             .from('motoristas')
             .select('id, nome_completo, cpf')
-            .or(`nome_completo_unaccent.ilike.${ilikeU},cpf.ilike.${ilike}`)
+            .or(`${ilikeFilter('nome_completo_unaccent', termoU)},${ilikeFilter('cpf', term)}`)
             .eq('ativo', true)
             .order('nome_completo', { ascending: true })
             .limit(PER_TYPE_LIMIT),
@@ -102,7 +102,7 @@ export function useGlobalSearch(query: string, enabled: boolean) {
           supabase
             .from('subcontratadas')
             .select('id, razao_social, documento')
-            .or(`razao_social_unaccent.ilike.${ilikeU},documento.ilike.${ilike}`)
+            .or(`${ilikeFilter('razao_social_unaccent', termoU)},${ilikeFilter('documento', term)}`)
             .eq('ativo', true)
             .order('razao_social', { ascending: true })
             .limit(PER_TYPE_LIMIT),

@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
+import { ilikeFilter, ilikePattern } from '@sislog/shared/postgrest'
 import { supabase } from '@/lib/supabase'
 import { traduzirErroBanco } from '@/features/crud/useCrudQueries'
 import { SLA_ALERT_HOURS, SLA_PENDING_STATUSES } from '@/features/solicitacoes/status'
@@ -114,7 +115,10 @@ export interface ListFilters {
   origem: SolicitacaoOrigem | 'todos'
   pamcard: PamcardFiltro
   atendenteId: string | null
-  apenasAtrasadas?: boolean
+  // Obrigatório de propósito: quando era opcional, a exportação para CSV
+  // simplesmente esquecia de passá-lo e baixava mais linhas do que a tela
+  // mostrava. Com o campo obrigatório o compilador cobra quem monta o filtro.
+  apenasAtrasadas: boolean
   // Intervalo explícito por created_at (ISO). Independente de `periodo` — se
   // ambos vierem, os dois se aplicam (AND). Usado no filtro De/Até.
   dataInicio?: string | null
@@ -144,17 +148,20 @@ interface SearchAuxIds {
 }
 
 async function fetchSearchAuxIds(term: string): Promise<SearchAuxIds> {
-  const like = `%${term.replace(/[%_]/g, '\\$&')}%`
+  // `.ilike(col, pattern)` manda o valor como parâmetro próprio: basta escapar
+  // os curingas. Já o `.or(...)` é string montada — ali vai `ilikeFilter`, que
+  // também põe as aspas exigidas pelo parser do PostgREST.
+  const like = ilikePattern(term)
   // CPF pode estar formatado (123.456.789-00) ou só dígitos; busca com o termo
   // cru cobre "copiou o que viu na tela"; a variante só-dígitos cobre quem digita
   // sem pontuação (o ilike casa se o CPF no banco também for sem pontuação).
   const digits = term.replace(/\D/g, '')
-  const likeDigits = digits ? `%${digits}%` : like
+  const cpfOr = `${ilikeFilter('cpf', term)},${ilikeFilter('cpf', digits || term)}`
   const [motNome, motCpf, parcMotNome, parcMotCpf, veic, parcVeic, carr, parcCarr, cli] = await Promise.all([
     supabase.from('motoristas').select('id').ilike('nome_completo', like).limit(SEARCH_AUX_LIMIT),
-    supabase.from('motoristas').select('id').or(`cpf.ilike.${like},cpf.ilike.${likeDigits}`).limit(SEARCH_AUX_LIMIT),
+    supabase.from('motoristas').select('id').or(cpfOr).limit(SEARCH_AUX_LIMIT),
     supabase.from('parceiro_motoristas').select('id').ilike('nome_completo', like).limit(SEARCH_AUX_LIMIT),
-    supabase.from('parceiro_motoristas').select('id').or(`cpf.ilike.${like},cpf.ilike.${likeDigits}`).limit(SEARCH_AUX_LIMIT),
+    supabase.from('parceiro_motoristas').select('id').or(cpfOr).limit(SEARCH_AUX_LIMIT),
     supabase.from('veiculos').select('id').ilike('placa', like).limit(SEARCH_AUX_LIMIT),
     supabase.from('parceiro_veiculos').select('id').ilike('placa', like).limit(SEARCH_AUX_LIMIT),
     supabase.from('carretas').select('id').ilike('placa', like).limit(SEARCH_AUX_LIMIT),
@@ -175,9 +182,8 @@ async function fetchSearchAuxIds(term: string): Promise<SearchAuxIds> {
 }
 
 function buildSearchOrClause(termRaw: string, aux: SearchAuxIds): string {
-  const t = termRaw.replace(/[%_]/g, '\\$&')
-  const parts: string[] = [`solicitante_nome.ilike.%${t}%`]
-  const asNumber = Number(t.replace(/\D/g, ''))
+  const parts: string[] = [ilikeFilter('solicitante_nome', termRaw)]
+  const asNumber = Number(termRaw.replace(/\D/g, ''))
   // numero_interno é serial (int4). Só tratamos como número da OC se couber no
   // int4 — senão um CPF/telefone (dígito-string longo) estoura o range e a
   // query inteira falha com 400.

@@ -8,6 +8,7 @@
     "./types": "./src/database.types.ts",
     "./validators": "./src/validators.ts",
     "./formatters": "./src/formatters.ts",
+    "./postgrest": "./src/postgrest.ts",
     "./supabase": "./src/supabase.ts"
   },
   "scripts": {
