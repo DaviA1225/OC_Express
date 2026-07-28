@@ -18,7 +18,7 @@ import { supabase } from '@/lib/supabase'
 import { useTransitStatus } from '@/features/solicitacoes/useSolicitacoes'
 import { traduzirErroBanco } from '@/features/crud/useCrudQueries'
 import { OCDocument, type OCData } from './OCDocument'
-import { OCS_PDF_BUCKET } from './ocPdf'
+import { OCS_PDF_BUCKET, ocPdfStoragePath } from './ocPdf'
 import { LOGO_DATA_URL } from './logo'
 import type { SolicitacaoListRow } from '@/features/solicitacoes/useSolicitacoes'
 import type { Tables } from '@/types/database.types'
@@ -169,7 +169,18 @@ export function GerarOCDialog({ open, onOpenChange, solicitacao, material, onSav
     }
   }, [])
 
-  const filename = `OC_${pad4(solicitacao.numero_interno)}_${yyyymmdd(new Date())}.pdf`
+  // Regerar reaproveita o MESMO caminho no bucket, quando já existe.
+  //
+  // O nome carrega a data, então uma OC regerada em outro dia ia para um
+  // arquivo novo (OC_0287_20260728.pdf) e o anterior ficava órfão no bucket
+  // para sempre — apesar de o diálogo prometer "irá sobrescrever o arquivo
+  // anterior", promessa que só valia se a regeração fosse no mesmo dia. Com o
+  // upsert no caminho já registrado, substituir passa a substituir de verdade.
+  //
+  // `ocPdfStoragePath` normaliza registros antigos, que guardavam a URL pública
+  // inteira em vez do path.
+  const filenameNovo = `OC_${pad4(solicitacao.numero_interno)}_${yyyymmdd(new Date())}.pdf`
+  const filename = solicitacao.pdf_url ? ocPdfStoragePath(solicitacao.pdf_url) : filenameNovo
 
   const doSave = async () => {
     if (!blob) return
@@ -256,7 +267,7 @@ export function GerarOCDialog({ open, onOpenChange, solicitacao, material, onSav
                 disabled={!blobUrl || building}
               >
                 {blobUrl ? (
-                  <a href={blobUrl} download={filename}>
+                  <a href={blobUrl} download={filenameNovo}>
                     <Download className="h-4 w-4" />
                     Baixar PDF
                   </a>

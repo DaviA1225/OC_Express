@@ -6,8 +6,12 @@ import { ProtectedRoute } from '@/components/shared/ProtectedRoute'
 import { PerfilRoute } from '@/components/shared/PerfilRoute'
 import { AppLayout } from '@/components/layout/AppLayout'
 import LoginPage from '@/pages/auth/LoginPage'
-import DashboardPage from '@/pages/dashboard/DashboardPage'
 
+// O Dashboard entra em lazy junto com as demais páginas. Importado direto, ele
+// arrastava o recharts (~107 kB gzip, chunk `charts`) para o modulepreload do
+// index.html — baixado até por quem estava só na tela de login. O LoginPage
+// segue estático de propósito: é a primeira tela de quem não tem sessão.
+const DashboardPage = lazy(() => import('@/pages/dashboard/DashboardPage'))
 const SubcontratadasPage = lazy(() => import('@/pages/cadastros/SubcontratadasPage'))
 const MotoristasPage = lazy(() => import('@/pages/cadastros/MotoristasPage'))
 const VeiculosPage = lazy(() => import('@/pages/cadastros/VeiculosPage'))

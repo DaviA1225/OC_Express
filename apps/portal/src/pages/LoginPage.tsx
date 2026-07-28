@@ -126,6 +126,11 @@ export default function LoginPage() {
                 Suas credenciais
               </h1>
 
+              {/* react-hooks/refs acusa `handleSubmit` porque o react-hook-form
+                  guarda o estado do formulário em refs internos. Aqui não há
+                  leitura de ref nossa no render: o retorno é um handler de
+                  evento, que só toca nos refs quando o submit dispara. */}
+              {/* eslint-disable-next-line react-hooks/refs */}
               <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-4" noValidate>
                 <div className="space-y-1.5">
                   <Label htmlFor="email">E-mail</Label>

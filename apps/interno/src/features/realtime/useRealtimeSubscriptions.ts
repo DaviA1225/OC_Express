@@ -21,9 +21,12 @@ export function useRealtimeSubscriptions(): RealtimeStatus {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'solicitacoes' }, () => {
         qc.invalidateQueries({ queryKey: ['solicitacoes'] })
         qc.invalidateQueries({ queryKey: ['solicitacao'] })
-        qc.invalidateQueries({ queryKey: ['dashboard-counts'] })
+        // `dashboard-estado-atual` alimenta os KPIs herói (pendentes/atrasadas).
+        // Aqui havia `dashboard-counts` e `dashboard-oldest-pending`, chaves de
+        // hooks que nao existem mais — invalidava-se o nada enquanto a chave
+        // viva nunca era invalidada.
+        qc.invalidateQueries({ queryKey: ['dashboard-estado-atual'] })
         qc.invalidateQueries({ queryKey: ['dashboard-status-breakdown'] })
-        qc.invalidateQueries({ queryKey: ['dashboard-oldest-pending'] })
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'cargas_retorno' }, () => {
         qc.invalidateQueries({ queryKey: ['cargas-retorno-options'] })

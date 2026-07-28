@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
+import { ilikeFilter } from '@sislog/shared/postgrest'
 import { supabase } from '@/lib/supabase'
 import type { Database, Tables, TablesInsert, TablesUpdate } from '@sislog/shared/types'
 
@@ -38,8 +39,8 @@ export function useParceiroCrudList<TName extends ParceiroCrudTable>(
         query = query.eq('ativo' as never, true as never)
       }
       if (params.search.trim()) {
-        const term = params.search.trim().replace(/[%_]/g, '\\$&')
-        const ors = params.searchColumns.map((c) => `${c}.ilike.%${term}%`).join(',')
+        const term = params.search.trim()
+        const ors = params.searchColumns.map((c) => ilikeFilter(c, term)).join(',')
         query = query.or(ors)
       }
 

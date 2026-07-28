@@ -153,26 +153,38 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, onCreated }: Props) 
   // cadastrar cliente novo. Ele escolhe um cliente já cadastrado.
   const podeCriarCliente = canEditClientes(profile)
 
+  // ATENÇÃO: este diálogo fica MONTADO o tempo todo — o NovaSolicitacaoProvider
+  // envolve o <Outlet/> do AppLayout para o atalho Ctrl+N funcionar em qualquer
+  // tela. Sem o `enabled: open`, estas sete buscas (cada uma varrendo a tabela
+  // inteira, paginando até esgotar) disparavam em TODA página do sistema, mesmo
+  // para quem nunca abre o diálogo. Agora só carregam quando ele abre, e o cache
+  // do react-query evita refazer nas aberturas seguintes.
   const motoristas = useCrudOptions<MotoristaOpt>({
     table: 'motoristas', selectColumns: 'id, nome_completo, cpf', orderBy: 'nome_completo',
+    enabled: open,
   })
   const veiculos = useCrudOptions<VeiculoOpt>({
     table: 'veiculos', selectColumns: 'id, placa, tipo, subcontratada_id', orderBy: 'placa',
+    enabled: open,
   })
   const carretas = useCrudOptions<CarretaOpt>({
     table: 'carretas', selectColumns: 'id, placa, tipo', orderBy: 'placa',
+    enabled: open,
   })
   const subcontratadas = useCrudOptions<SubcontratadaOpt>({
     table: 'subcontratadas', selectColumns: 'id, razao_social, documento', orderBy: 'razao_social',
+    enabled: open,
   })
   const clientes = useCrudOptions<ClienteOpt>({
     table: 'clientes', selectColumns: 'id, razao_social, cidade, uf', orderBy: 'razao_social',
     equals: { cliente_minerio: true },
+    enabled: open,
   })
   const materiais = useCrudOptions<MaterialOpt>({
     table: 'materiais', selectColumns: 'id, nome, filial, origem_padrao', orderBy: 'nome',
+    enabled: open,
   })
-  const cargasRetorno = useCargasRetorno()
+  const cargasRetorno = useCargasRetorno({ enabled: open })
 
   const {
     register,

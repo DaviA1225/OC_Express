@@ -29,11 +29,6 @@ export const STATUS_CLASSES: Record<SolicitacaoStatus, string> = {
   cancelada: 'bg-red-100 text-red-800',
 }
 
-export function nextStatus(current: SolicitacaoStatus): SolicitacaoStatus | null {
-  if (current === 'cancelada' || current === 'finalizada') return null
-  const i = STATUS_ORDER.indexOf(current)
-  return i >= 0 ? STATUS_ORDER[i + 1] ?? null : null
-}
 
 export function canCancel(current: SolicitacaoStatus): boolean {
   return current !== 'cancelada' && current !== 'finalizada'

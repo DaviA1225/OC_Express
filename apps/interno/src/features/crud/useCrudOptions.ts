@@ -6,6 +6,14 @@ interface OptionParams {
   selectColumns: string
   orderBy?: string
   equals?: Record<string, string | number | boolean | null>
+  /**
+   * Só busca quando `true` (padrão). Existe porque estas queries varrem a
+   * TABELA INTEIRA (paginando até esgotar) — carregá-las em formulário fechado
+   * custa caro à toa. Use `enabled: aberto` / `enabled: editando` em diálogo e
+   * card de edição. O cache do react-query segura o resultado por alguns
+   * minutos, então reabrir não refaz a busca.
+   */
+  enabled?: boolean
 }
 
 // Tamanho de página da busca de opções. Um teto fixo (ex.: 500) escondia
@@ -15,8 +23,9 @@ interface OptionParams {
 // esgotar para nunca mais cortar. O PAGE_SIZE fica no teto padrão do PostgREST.
 const OPTIONS_PAGE_SIZE = 1000
 
-export function useCrudOptions<T = Record<string, unknown>>({ table, selectColumns, orderBy = 'created_at', equals }: OptionParams) {
+export function useCrudOptions<T = Record<string, unknown>>({ table, selectColumns, orderBy = 'created_at', equals, enabled = true }: OptionParams) {
   return useQuery({
+    enabled,
     queryKey: ['crud-options', table, selectColumns, orderBy, equals],
     queryFn: async (): Promise<T[]> => {
       const all: T[] = []

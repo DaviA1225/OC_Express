@@ -110,25 +110,28 @@ async function fetchAuditEvents(solicitacaoIds: string[]): Promise<AuditEvent[]>
   for (const ch of chunk(solicitacaoIds, 150)) {
     let from = 0
     for (;;) {
+      // Só o `status`, extraído no SERVIDOR (`->>`): `dados_antes`/`dados_depois`
+      // carregam o snapshot da linha, e trazê-los inteiros para ler um campo era
+      // a maior parte do tráfego deste relatório.
       const { data, error } = await supabase
         .from('log_auditoria')
-        .select('registro_id, usuario_id, acao, dados_antes, dados_depois, created_at')
+        .select('registro_id, usuario_id, acao, created_at, antes:dados_antes->>status, depois:dados_depois->>status')
         .eq('tabela', 'solicitacoes')
         .in('registro_id', ch)
         .order('created_at', { ascending: true })
         .range(from, from + PG_PAGE - 1)
       if (error) throw error
-      const page = (data ?? []) as Array<{
+      const page = (data ?? []) as unknown as Array<{
         registro_id: string
         usuario_id: string | null
         acao: string
-        dados_antes: { status?: string } | null
-        dados_depois: { status?: string } | null
         created_at: string
+        antes: string | null
+        depois: string | null
       }>
       for (const l of page) {
-        const fromStatus = l.dados_antes?.status ?? null
-        const to = l.dados_depois?.status ?? null
+        const fromStatus = l.antes
+        const to = l.depois
         // INSERT: só interessa como "criação"; UPDATE: só se o status mudou.
         if (l.acao === 'UPDATE' && fromStatus === to) continue
         all.push({

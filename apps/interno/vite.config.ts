@@ -22,8 +22,25 @@ export default defineConfig({
       output: {
         codeSplitting: {
           groups: [
+            // PRIMEIRO grupo de propósito. São micro-utilitários (poucos kB no
+            // total) usados por VÁRIOS dos grupos abaixo. Sem um grupo próprio,
+            // cada um caía dentro do primeiro chunk pesado que o referenciasse —
+            // e aí todo mundo passava a importar daquele chunk.
+            //
+            // Era exatamente o que acontecia: o `clsx` foi parar dentro de
+            // `charts`, então `ui` (radix/lucide, no caminho crítico) importava
+            // UM símbolo de lá e arrastava os ~373 kB do recharts para o
+            // modulepreload do index.html — baixado até na tela de login. O
+            // `charts` puxava o `pdf` (1,4 MB) pelo mesmo mecanismo.
+            //
+            // Ao mexer nos grupos abaixo, confira o `index.html` gerado: chunk
+            // pesado não pode aparecer como modulepreload.
+            {
+              name: 'vendor-shared',
+              test: /node_modules\/(clsx|tailwind-merge|class-variance-authority|tslib|object-assign|react-is|use-sync-external-store|@swc\/helpers)\//,
+            },
             { name: 'react', test: /node_modules\/(react|react-dom|react-router|react-router-dom|scheduler)\// },
-            { name: 'pdf', test: /node_modules\/(@react-pdf|pdfkit|fontkit|restructure|brotli|tiny-inflate|@swc\/helpers)\// },
+            { name: 'pdf', test: /node_modules\/(@react-pdf|pdfkit|fontkit|restructure|brotli|tiny-inflate)\// },
             { name: 'charts', test: /node_modules\/(recharts|d3-.*|victory-vendor)\// },
             { name: 'supabase', test: /node_modules\/(@supabase|isows|websocket)\// },
             { name: 'ui', test: /node_modules\/(@radix-ui|cmdk|sonner|lucide-react)\// },

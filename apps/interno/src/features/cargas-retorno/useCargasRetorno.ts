@@ -9,9 +9,12 @@ export interface CargaRetornoRow {
   cliente: { razao_social: string; cidade: string | null; uf: string | null } | null
 }
 
-export function useCargasRetorno(opts: { onlyActive?: boolean } = {}) {
+export function useCargasRetorno(opts: { onlyActive?: boolean; enabled?: boolean } = {}) {
   const onlyActive = opts.onlyActive ?? true
   return useQuery({
+    // `enabled` pelo mesmo motivo do useCrudOptions: em formulário fechado esta
+    // busca não precisa acontecer.
+    enabled: opts.enabled ?? true,
     queryKey: ['cargas-retorno-options', { onlyActive }],
     queryFn: async () => {
       let q = supabase

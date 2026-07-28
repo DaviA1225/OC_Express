@@ -48,6 +48,16 @@ const ALLOWED_ORIGINS = [
     .filter(Boolean),
 ]
 
+// Perfis internos autorizados a mexer nos usuarios de um parceiro. Espelha o
+// guard da rota /cadastros/parceiros/:id/usuarios no app interno
+// (PerfilRoute allowed={['admin','gerente','supervisor']}) e o canEditParceiros.
+//
+// Antes bastava ser interno ATIVO: qualquer analista ou assistente podia, com o
+// proprio JWT, convidar ou EXCLUIR usuarios de QUALQUER parceiro chamando esta
+// funcao direto — a restricao existia so na tela. Autorizacao de front nao e
+// autorizacao.
+const PERFIS_INTERNOS_AUTORIZADOS = ['admin', 'gerente', 'supervisor']
+
 function corsHeaders(origin: string | null): Record<string, string> {
   const allow = origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0]
   return {
@@ -116,7 +126,7 @@ Deno.serve(async (req) => {
   const [{ data: interno }, { data: pu }] = await Promise.all([
     admin
       .from('perfis_usuarios')
-      .select('id, ativo')
+      .select('id, ativo, perfil')
       .eq('user_id', callerId)
       .eq('ativo', true)
       .maybeSingle(),
@@ -128,7 +138,7 @@ Deno.serve(async (req) => {
       .maybeSingle(),
   ])
 
-  const isInterno = !!interno
+  const isInterno = !!interno && PERFIS_INTERNOS_AUTORIZADOS.includes(interno.perfil)
   const isAdminParceiro = !!pu && pu.perfil === 'admin_parceiro'
 
   if (!isInterno && !isAdminParceiro) {

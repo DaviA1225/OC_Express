@@ -757,10 +757,13 @@ function MotoristaVeiculoCard({ solicitacao, editable, onSave, lockedHint }: Car
   const [subcontratada, setSubcontratada] = React.useState<string | null>(solicitacao.subcontratada_id)
   const [saving, setSaving] = React.useState(false)
 
-  const motoristas = useCrudOptions<MotoristaOpt>({ table: 'motoristas', selectColumns: 'id, nome_completo, cpf', orderBy: 'nome_completo' })
-  const veiculos = useCrudOptions<VeiculoOpt>({ table: 'veiculos', selectColumns: 'id, placa, subcontratada_id', orderBy: 'placa' })
-  const carretas = useCrudOptions<CarretaOpt>({ table: 'carretas', selectColumns: 'id, placa', orderBy: 'placa' })
-  const subcontratadas = useCrudOptions<SubcontratadaOpt>({ table: 'subcontratadas', selectColumns: 'id, razao_social, documento', orderBy: 'razao_social' })
+  // `enabled: editing` — em modo leitura o card mostra os dados vindos do JOIN
+  // da própria solicitação, não das listas. Sem a guarda, abrir uma OC só para
+  // conferir baixava motoristas, veículos, carretas e subcontratadas inteiros.
+  const motoristas = useCrudOptions<MotoristaOpt>({ table: 'motoristas', selectColumns: 'id, nome_completo, cpf', orderBy: 'nome_completo', enabled: editing })
+  const veiculos = useCrudOptions<VeiculoOpt>({ table: 'veiculos', selectColumns: 'id, placa, subcontratada_id', orderBy: 'placa', enabled: editing })
+  const carretas = useCrudOptions<CarretaOpt>({ table: 'carretas', selectColumns: 'id, placa', orderBy: 'placa', enabled: editing })
+  const subcontratadas = useCrudOptions<SubcontratadaOpt>({ table: 'subcontratadas', selectColumns: 'id, razao_social, documento', orderBy: 'razao_social', enabled: editing })
 
   const [lastTransporteSync, setLastTransporteSync] = React.useState({ solicitacao, editing })
   if (lastTransporteSync.solicitacao !== solicitacao || lastTransporteSync.editing !== editing) {
@@ -918,8 +921,10 @@ function DestinoMaterialCard({ solicitacao, editable, onSave }: CardProps) {
   )
   const [saving, setSaving] = React.useState(false)
 
-  const clientes = useCrudOptions<ClienteOpt>({ table: 'clientes', selectColumns: 'id, razao_social', orderBy: 'razao_social' })
-  const materiais = useCrudOptions<MaterialOpt>({ table: 'materiais', selectColumns: 'id, nome, filial, origem_padrao', orderBy: 'nome' })
+  // Idem: em leitura o card usa o JOIN da solicitação; as listas só servem aos
+  // seletores do modo de edição.
+  const clientes = useCrudOptions<ClienteOpt>({ table: 'clientes', selectColumns: 'id, razao_social', orderBy: 'razao_social', enabled: editing })
+  const materiais = useCrudOptions<MaterialOpt>({ table: 'materiais', selectColumns: 'id, nome, filial, origem_padrao', orderBy: 'nome', enabled: editing })
 
   const [lastDestinoSync, setLastDestinoSync] = React.useState({ solicitacao, editing })
   if (lastDestinoSync.solicitacao !== solicitacao || lastDestinoSync.editing !== editing) {
@@ -1104,7 +1109,11 @@ function DestinoMaterialCard({ solicitacao, editable, onSave }: CardProps) {
           )}
           <div className="flex justify-end gap-2">
             <Button variant="outline" size="sm" onClick={() => setEditing(false)} disabled={saving}>Cancelar</Button>
-            <Button size="sm" onClick={submit} disabled={saving || datasInvalidas}>
+            {/* Espera a lista de materiais: numa solicitação de parceiro sem
+                material, o submit resolve "MINÉRIO" a partir dela. Como a busca
+                só começa ao entrar em edição, salvar antes de carregar cairia no
+                erro "Material MINÉRIO não encontrado" sem ser verdade. */}
+            <Button size="sm" onClick={submit} disabled={saving || datasInvalidas || materiais.isLoading}>
               {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
               Salvar
             </Button>

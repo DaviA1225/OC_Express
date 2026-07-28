@@ -109,38 +109,94 @@ function descricaoBase(e: RawEvent): string {
   return 'Editou a solicitação'
 }
 
+/** `->>` devolve texto; `numero_interno` volta como string e precisa virar número. */
+function paraNumero(v: string | null): number | null {
+  if (v == null) return null
+  const n = Number(v)
+  return Number.isFinite(n) ? n : null
+}
+
+/** Resolve o número da OC de cada solicitação citada no log, em blocos (um
+ *  `.in()` com centenas de ids estoura a URL do PostgREST). */
+async function fetchNumerosPorSolicitacao(ids: string[]): Promise<Map<string, number>> {
+  const mapa = new Map<string, number>()
+  const BLOCO = 120
+  const blocos: string[][] = []
+  for (let i = 0; i < ids.length; i += BLOCO) blocos.push(ids.slice(i, i + BLOCO))
+  const respostas = await Promise.all(
+    blocos.map((b) => supabase.from('solicitacoes').select('id, numero_interno').in('id', b)),
+  )
+  for (const { data, error } of respostas) {
+    if (error) throw error
+    for (const r of (data ?? []) as { id: string; numero_interno: number }[]) {
+      mapa.set(r.id, r.numero_interno)
+    }
+  }
+  return mapa
+}
+
 async function fetchEventos(desdeISO: string): Promise<RawEvent[]> {
-  const all: RawEvent[] = []
+  interface LinhaLog {
+    registro_id: string | null
+    usuario_id: string | null
+    acao: string
+    created_at: string
+    antesStatus: string | null
+    depoisStatus: string | null
+    antesNumero: string | null
+    depoisNumero: string | null
+  }
+
+  const linhas: LinhaLog[] = []
   // Ordem DESC: a primeira linha vista de cada usuário já é a mais recente.
   for (let from = 0; ; from += PG_PAGE) {
+    // Extrai só os campos usados, no SERVIDOR (`->>`). `dados_antes` e
+    // `dados_depois` são snapshots `to_jsonb()` da linha da solicitação —
+    // trazer sete dias deles a cada 60s, para ler status e número, era o maior
+    // tráfego do painel.
     const { data, error } = await supabase
       .from('log_auditoria')
-      .select('usuario_id, acao, dados_antes, dados_depois, created_at')
+      .select(
+        'registro_id, usuario_id, acao, created_at,' +
+          ' antesStatus:dados_antes->>status, depoisStatus:dados_depois->>status,' +
+          ' antesNumero:dados_antes->>numero_interno, depoisNumero:dados_depois->>numero_interno',
+      )
       .eq('tabela', 'solicitacoes')
       .gte('created_at', desdeISO)
       .order('created_at', { ascending: false })
       .range(from, from + PG_PAGE - 1)
     if (error) throw error
-    const page = (data ?? []) as Array<{
-      usuario_id: string | null
-      acao: string
-      dados_antes: { status?: string; numero_interno?: number } | null
-      dados_depois: { status?: string; numero_interno?: number } | null
-      created_at: string
-    }>
-    for (const l of page) {
-      all.push({
-        usuario_id: l.usuario_id,
-        acao: l.acao,
-        numero: l.dados_depois?.numero_interno ?? l.dados_antes?.numero_interno ?? null,
-        fromStatus: l.dados_antes?.status ?? null,
-        toStatus: l.dados_depois?.status ?? null,
-        at: l.created_at,
-      })
-    }
+    const page = (data ?? []) as unknown as LinhaLog[]
+    linhas.push(...page)
     if (page.length < PG_PAGE) break
   }
-  return all
+
+  // A partir da migration 0049 o UPDATE grava só os campos ALTERADOS, e
+  // `numero_interno` nunca muda — então ele não vem mais no JSON dessas linhas
+  // (segue vindo em INSERT/DELETE, que guardam a linha inteira). Resolvemos o
+  // número na tabela viva, que é a fonte correta do dado de qualquer forma.
+  // Só busca o que faltou, então linhas antigas (formato completo) não geram
+  // consulta alguma.
+  const semNumero = Array.from(
+    new Set(
+      linhas
+        .filter((l) => l.registro_id && paraNumero(l.depoisNumero) == null && paraNumero(l.antesNumero) == null)
+        .map((l) => l.registro_id as string),
+    ),
+  )
+  const numeros = semNumero.length > 0 ? await fetchNumerosPorSolicitacao(semNumero) : new Map<string, number>()
+
+  return linhas.map((l) => ({
+    usuario_id: l.usuario_id,
+    acao: l.acao,
+    numero:
+      paraNumero(l.depoisNumero) ??
+      paraNumero(l.antesNumero) ??
+      (l.registro_id ? numeros.get(l.registro_id) ?? null : null),
+    fromStatus: l.antesStatus,
+    toStatus: l.depoisStatus,
+    at: l.created_at,
+  }))
 }
 
 /** Agregação pura (testável) a partir dos perfis + eventos do log. */

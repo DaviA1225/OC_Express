@@ -209,9 +209,20 @@ export interface StatusTransition {
  * Busca todas as transições de status das solicitações no período.
  * Reconstrói a linha do tempo a partir do log de auditoria + created_at.
  */
-export function useStatusTransitions(periodo: PeriodoRelatorio, solicitacaoIds: string[]) {
+/**
+ * `habilitado` existe porque a leitura de `log_auditoria` é restrita por RLS a
+ * admin/gerente/supervisor (0025). O perfil `analista` enxerga a página de
+ * Relatórios mas NÃO essa tabela — e a RLS não devolve erro, devolve zero
+ * linhas. Sem a guarda, o TMA aparecia vazio para ele como se não houvesse
+ * dados, o que é diferente de "você não tem acesso a isto".
+ */
+export function useStatusTransitions(
+  periodo: PeriodoRelatorio,
+  solicitacaoIds: string[],
+  habilitado = true,
+) {
   return useQuery({
-    enabled: solicitacaoIds.length > 0,
+    enabled: habilitado && solicitacaoIds.length > 0,
     queryKey: ['relatorio-transicoes', periodo.desde, periodo.ate, solicitacaoIds.length],
     staleTime: 60_000,
     queryFn: async (): Promise<StatusTransition[]> => {
@@ -220,32 +231,37 @@ export function useStatusTransitions(periodo: PeriodoRelatorio, solicitacaoIds: 
       for (let i = 0; i < solicitacaoIds.length; i += 200) {
         chunks.push(solicitacaoIds.slice(i, i + 200))
       }
-      const all: StatusTransition[] = []
       const PAGE = 1000
-      for (const ch of chunks) {
+
+      const carregarChunk = async (ch: string[]): Promise<StatusTransition[]> => {
+        const out: StatusTransition[] = []
         // Mesmo teto de ~1000 linhas do PostgREST: um chunk de 200 solicitações
         // pode ter muito mais de 1000 transições no log. Paginamos cada chunk.
         for (let from = 0; ; from += PAGE) {
+          // Só o `status` de cada snapshot, extraído no SERVIDOR (`->>`). Antes
+          // vinham `dados_antes` e `dados_depois` inteiros: são cópias
+          // `to_jsonb()` da linha completa da solicitação (~1,9 KB por linha de
+          // log), e todo esse payload trafegava para o navegador ler UM campo.
           const { data, error } = await supabase
             .from('log_auditoria')
-            .select('registro_id, dados_antes, dados_depois, created_at')
+            .select('registro_id, created_at, antes:dados_antes->>status, depois:dados_depois->>status')
             .eq('tabela', 'solicitacoes')
             .eq('acao', 'UPDATE')
             .in('registro_id', ch)
             .order('created_at', { ascending: true })
             .range(from, from + PAGE - 1)
           if (error) throw error
-          const batch = (data ?? []) as Array<{
+          const batch = (data ?? []) as unknown as Array<{
             registro_id: string
-            dados_antes: { status?: string } | null
-            dados_depois: { status?: string } | null
             created_at: string
+            antes: string | null
+            depois: string | null
           }>
           for (const l of batch) {
-            const prev = l.dados_antes?.status ?? null
-            const next = l.dados_depois?.status
+            const prev = l.antes ?? null
+            const next = l.depois
             if (!next || prev === next) continue
-            all.push({
+            out.push({
               registro_id: l.registro_id,
               from_status: prev,
               to_status: next,
@@ -254,8 +270,14 @@ export function useStatusTransitions(periodo: PeriodoRelatorio, solicitacaoIds: 
           }
           if (batch.length < PAGE) break
         }
+        return out
       }
-      return all
+
+      // Blocos em paralelo: são independentes entre si (cada um filtra por ids
+      // distintos) e antes rodavam em série, somando o tempo de ida e volta de
+      // dezenas de requisições num período longo.
+      const porChunk = await Promise.all(chunks.map(carregarChunk))
+      return porChunk.flat()
     },
   })
 }
@@ -488,16 +510,6 @@ export function topSubcontratadas(ds: RelatorioDataset, limit = 10): TopItem[] {
     (id) => ds.parceiroSubcontratadas.get(id)?.razao_social,
     limit,
   )
-}
-
-export interface TipoBreakdownItem { tipo: string; total: number }
-
-export function porTipo(rows: RelatorioRow[]): TipoBreakdownItem[] {
-  const counts = new Map<string, number>()
-  for (const r of rows) {
-    counts.set(r.tipo, (counts.get(r.tipo) ?? 0) + 1)
-  }
-  return Array.from(counts.entries()).map(([tipo, total]) => ({ tipo, total }))
 }
 
 export function porMaterial(ds: RelatorioDataset): TopItem[] {

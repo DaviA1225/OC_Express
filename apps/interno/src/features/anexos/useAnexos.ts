@@ -89,12 +89,24 @@ export function useDeleteAnexo() {
   const qc = useQueryClient()
   return useMutation<{ id: string; solicitacaoId: string }, unknown, { anexo: Anexo }>({
     mutationFn: async ({ anexo }) => {
+      // Linha primeiro, arquivo depois — de propósito.
+      //
+      // Na ordem inversa, uma falha no DELETE do banco (RLS, rede) deixava o
+      // arquivo já apagado e a linha apontando para o vazio: um anexo que
+      // aparece na lista e não abre. Nesta ordem, o pior caso é um arquivo órfão
+      // no bucket, que não quebra nada para o usuário. É a mesma lógica de
+      // compensação que o upload já usava ao contrário (sobe o arquivo, e se o
+      // INSERT falhar, remove o arquivo).
+      const { error } = await supabase.from('solicitacao_anexos').delete().eq('id', anexo.id)
+      if (error) throw error
       const { error: rmErr } = await supabase.storage
         .from(ANEXOS_BUCKET)
         .remove([anexo.storage_path])
-      if (rmErr) throw rmErr
-      const { error } = await supabase.from('solicitacao_anexos').delete().eq('id', anexo.id)
-      if (error) throw error
+      if (rmErr) {
+        // A linha já foi embora: para o usuário o anexo sumiu, que era a
+        // intenção. Não transformamos isto em erro — só registramos.
+        console.warn('[anexos] linha removida, arquivo permaneceu no bucket', anexo.storage_path, rmErr)
+      }
       return { id: anexo.id, solicitacaoId: anexo.solicitacao_id }
     },
     onSuccess: (res) => {
