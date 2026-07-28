@@ -209,9 +209,20 @@ export interface StatusTransition {
  * Busca todas as transições de status das solicitações no período.
  * Reconstrói a linha do tempo a partir do log de auditoria + created_at.
  */
-export function useStatusTransitions(periodo: PeriodoRelatorio, solicitacaoIds: string[]) {
+/**
+ * `habilitado` existe porque a leitura de `log_auditoria` é restrita por RLS a
+ * admin/gerente/supervisor (0025). O perfil `analista` enxerga a página de
+ * Relatórios mas NÃO essa tabela — e a RLS não devolve erro, devolve zero
+ * linhas. Sem a guarda, o TMA aparecia vazio para ele como se não houvesse
+ * dados, o que é diferente de "você não tem acesso a isto".
+ */
+export function useStatusTransitions(
+  periodo: PeriodoRelatorio,
+  solicitacaoIds: string[],
+  habilitado = true,
+) {
   return useQuery({
-    enabled: solicitacaoIds.length > 0,
+    enabled: habilitado && solicitacaoIds.length > 0,
     queryKey: ['relatorio-transicoes', periodo.desde, periodo.ate, solicitacaoIds.length],
     staleTime: 60_000,
     queryFn: async (): Promise<StatusTransition[]> => {
@@ -499,16 +510,6 @@ export function topSubcontratadas(ds: RelatorioDataset, limit = 10): TopItem[] {
     (id) => ds.parceiroSubcontratadas.get(id)?.razao_social,
     limit,
   )
-}
-
-export interface TipoBreakdownItem { tipo: string; total: number }
-
-export function porTipo(rows: RelatorioRow[]): TipoBreakdownItem[] {
-  const counts = new Map<string, number>()
-  for (const r of rows) {
-    counts.set(r.tipo, (counts.get(r.tipo) ?? 0) + 1)
-  }
-  return Array.from(counts.entries()).map(([tipo, total]) => ({ tipo, total }))
 }
 
 export function porMaterial(ds: RelatorioDataset): TopItem[] {

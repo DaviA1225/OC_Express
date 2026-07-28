@@ -92,13 +92,31 @@ export function useSolicitacoesPortal() {
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('portal_solicitacoes')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(500)
-      if (error) throw error
-      return (data ?? []) as PortalSolicitacao[]
+      // Pagina até esgotar, em vez de `.limit(500)`.
+      //
+      // A tela filtra tudo no CLIENTE (busca, status, período) sobre esta
+      // lista, então um teto não corta só o fim da rolagem: a solicitação
+      // cortada some também da BUSCA, sem aviso. E 500 não é folgado — um
+      // parceiro ativo passou de 375 solicitações em 30 dias, ou seja, o teto
+      // seria alcançado em algumas semanas. Mesmo problema que já mordeu as
+      // carretas no app interno.
+      //
+      // O volume é seguro: `portal_solicitacoes` expõe só IDs (decisão de
+      // segurança do Bloco 1), sem joins, então cada linha é pequena.
+      const PAGINA = 1000
+      const todas: PortalSolicitacao[] = []
+      for (let from = 0; ; from += PAGINA) {
+        const { data, error } = await supabase
+          .from('portal_solicitacoes')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .range(from, from + PAGINA - 1)
+        if (error) throw error
+        const pagina = (data ?? []) as PortalSolicitacao[]
+        todas.push(...pagina)
+        if (pagina.length < PAGINA) break
+      }
+      return todas
     },
   })
 }

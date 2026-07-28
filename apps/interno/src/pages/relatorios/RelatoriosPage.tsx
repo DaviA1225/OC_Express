@@ -18,6 +18,8 @@ import { ClipboardCheck, ClipboardList, Hourglass, Percent, Download, Loader2, A
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { toast } from 'sonner'
+import { useAuth } from '@/hooks/useAuth'
+import { canViewAuditoria } from '@/features/auth/permissions'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
@@ -110,7 +112,14 @@ export default function RelatoriosPage() {
   const ds = useRelatorioDataset(periodo)
 
   const solicitacaoIds = React.useMemo(() => (ds.data?.rows ?? []).map((r) => r.id), [ds.data])
-  const transitions = useStatusTransitions(periodo, solicitacaoIds)
+  // O TMA vem do log_auditoria, cuja leitura a RLS (0025) restringe a
+  // admin/gerente/supervisor. `analista` tem acesso a esta pagina mas nao a
+  // essa tabela, e a RLS nega devolvendo ZERO LINHAS, sem erro — entao sem
+  // esta guarda o painel aparecia vazio para ele, indistinguivel de "nao ha
+  // dados no periodo".
+  const { profile } = useAuth()
+  const podeVerTma = canViewAuditoria(profile)
+  const transitions = useStatusTransitions(periodo, solicitacaoIds, podeVerTma)
 
   // Dataset recortado pela origem selecionada — alimenta todos os agregados gerais.
   const dsFiltrado = React.useMemo(() => {
@@ -325,11 +334,15 @@ export default function RelatoriosPage() {
             title="TMA emissão → finalização"
             subtitle="Tempo de “Em emissão” até “Finalizada” nas solicitações de parceiro"
           >
-            <TmaEmissaoFinal
-              geral={tmaParceirosGeral}
-              porParceiro={tmaPorParceiro}
-              isLoading={ds.isLoading || transitions.isLoading}
-            />
+            {podeVerTma ? (
+              <TmaEmissaoFinal
+                geral={tmaParceirosGeral}
+                porParceiro={tmaPorParceiro}
+                isLoading={ds.isLoading || transitions.isLoading}
+              />
+            ) : (
+              <TmaSemAcesso />
+            )}
           </Card>
         </div>
       )}
@@ -338,7 +351,11 @@ export default function RelatoriosPage() {
         title="TMA por status"
         subtitle="Tempo médio até sair de cada etapa (intervalos concluídos)"
       >
-        <TmaChart entries={tmaEntries} isLoading={ds.isLoading || transitions.isLoading} />
+        {podeVerTma ? (
+          <TmaChart entries={tmaEntries} isLoading={ds.isLoading || transitions.isLoading} />
+        ) : (
+          <TmaSemAcesso />
+        )}
       </Card>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -699,6 +716,17 @@ function TmaEmissaoFinal({
 interface TmaChartProps {
   entries: TmaStatusEntry[]
   isLoading: boolean
+}
+
+// Estado explícito para quem não pode ler o log de auditoria (analista). Sem
+// isto o painel ficava vazio, indistinguível de "não há dados no período".
+function TmaSemAcesso() {
+  return (
+    <div className="flex h-[200px] items-center justify-center px-6 text-center text-[13px] text-muted-foreground">
+      O TMA é calculado a partir do log de auditoria, restrito aos perfis de
+      gestão. Os demais números desta página não dependem dele.
+    </div>
+  )
 }
 
 function TmaChart({ entries, isLoading }: TmaChartProps) {

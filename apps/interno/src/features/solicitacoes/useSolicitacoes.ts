@@ -364,27 +364,6 @@ export function useSolicitacao(id: string | null | undefined) {
 }
 
 /**
- * Conta solicitações com cartão Pamcard ainda pendente de providência.
- * Recarrega a cada 30s para alimentar o indicador da sidebar.
- */
-export function usePamcardPendenteCount() {
-  return useQuery({
-    queryKey: ['pamcard-pendente-count'],
-    queryFn: async () => {
-      const { count, error } = await supabase
-        .from('solicitacoes')
-        .select('id', { count: 'exact', head: true })
-        .eq('origem', 'parceiro')
-        .eq('pamcard_status', 'nao_tem_cartao')
-        .is('pamcard_providenciado_em', null)
-      if (error) throw error
-      return count ?? 0
-    },
-    refetchInterval: 30_000,
-  })
-}
-
-/**
  * Conta as solicitações com status 'recebida' (novas, ainda não iniciadas) para
  * o indicador ao lado de "Solicitações" na sidebar. `head: true` traz só o
  * count, sem as linhas. Recarrega a cada 30s e ao voltar o foco da janela.
@@ -507,9 +486,8 @@ export function useDuplicateSolicitacao() {
     },
     onSuccess: (created) => {
       qc.invalidateQueries({ queryKey: ['solicitacoes'] })
-      qc.invalidateQueries({ queryKey: ['dashboard-counts'] })
+      qc.invalidateQueries({ queryKey: ['dashboard-estado-atual'] })
       qc.invalidateQueries({ queryKey: ['dashboard-status-breakdown'] })
-      qc.invalidateQueries({ queryKey: ['dashboard-oldest-pending'] })
       toast.success(`Solicitação duplicada como #${String(created.numero_interno).padStart(4, '0')}`)
     },
     onError: (e: unknown) => toast.error(traduzirErroBanco(e)),
@@ -690,9 +668,8 @@ export function useBulkTransitStatus() {
       for (const id of vars.ids) {
         qc.invalidateQueries({ queryKey: ['solicitacao', id] })
       }
-      qc.invalidateQueries({ queryKey: ['dashboard-counts'] })
+      qc.invalidateQueries({ queryKey: ['dashboard-estado-atual'] })
       qc.invalidateQueries({ queryKey: ['dashboard-status-breakdown'] })
-      qc.invalidateQueries({ queryKey: ['dashboard-oldest-pending'] })
     },
   })
 }
@@ -747,9 +724,8 @@ export function useBulkDeleteSolicitacoes() {
     },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ['solicitacoes'] })
-      qc.invalidateQueries({ queryKey: ['dashboard-counts'] })
+      qc.invalidateQueries({ queryKey: ['dashboard-estado-atual'] })
       qc.invalidateQueries({ queryKey: ['dashboard-status-breakdown'] })
-      qc.invalidateQueries({ queryKey: ['dashboard-oldest-pending'] })
     },
   })
 }
