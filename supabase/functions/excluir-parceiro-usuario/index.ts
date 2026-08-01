@@ -7,16 +7,25 @@
 // Abordagem (decisão): NÃO deletar a linha em `auth.users`. Esse caminho
 // falharia por FK porque várias tabelas tem colunas `created_by` (e similares)
 // que apontam pra `auth.users.id` SEM `ON DELETE`. Em vez disso:
-//   1. Renomear `auth.users.email` para um placeholder único
-//      (`deleted-<uuid>@deleted.invalid`). Isso libera o e-mail ORIGINAL para
-//      ser reutilizado num próximo convite. A conta em `auth.users` continua
-//      existindo (sem nenhuma FK quebrada) mas com um e-mail "morto".
-//   2. Deletar a linha de `parceiro_usuarios` (o vínculo com o parceiro).
+//   1. Deletar a linha de `parceiro_usuarios` (o vínculo com o parceiro).
 //      A migration 0031 trocou `solicitacoes.parceiro_usuario_id` pra
 //      ON DELETE SET NULL — solicitações antigas ficam no histórico.
 //      `eventos_portal.parceiro_usuario_id` já era ON DELETE SET NULL (0021).
+//   2. Renomear `auth.users.email` para um placeholder único
+//      (`deleted-<uuid>@deleted.invalid`). Isso libera o e-mail ORIGINAL para
+//      ser reutilizado num próximo convite. A conta em `auth.users` continua
+//      existindo (sem nenhuma FK quebrada) mas com um e-mail "morto".
 //   3. Sem `parceiro_usuarios`, o gate de login do portal não acha vínculo
 //      e nega acesso mesmo que alguém saiba a senha — efetivamente "morta".
+//
+// A ORDEM importa: os dois passos batem em APIs diferentes, então não existe
+// transação cobrindo os dois. A primeira versão renomeava e depois deletava,
+// com rollback best-effort do rename se o delete falhasse — e o delete falhava
+// de verdade (o CHECK `solicitacoes_origem_integridade` proibia o SET NULL que
+// a própria 0031 dispara; corrigido na 0054). Deletar primeiro elimina o
+// rollback: se o passo 1 falha, nada foi tocado. Se o passo 2 falha, o vínculo
+// já caiu — o acesso, que é a parte de segurança, está revogado; sobra o e-mail
+// ocupado, que é inconveniência e vem descrito na resposta.
 //
 // Quem pode chamar:
 //   - interno (perfis_usuarios.ativo=true) — pode apagar de qualquer parceiro
@@ -166,8 +175,20 @@ Deno.serve(async (req) => {
     return json({ error: 'nao_pode_apagar_a_si_mesmo' }, 400)
   }
 
-  // Passo 1: renomeia o e-mail no auth.users para liberar o original.
-  // Placeholder usa o `parceiro_usuarios.id` (já deletado em seguida) + a TLD
+  // Passo 1: deleta a linha em parceiro_usuarios. FKs em solicitacoes/
+  // eventos_portal são ON DELETE SET NULL — histórico preservado. Vem primeiro
+  // porque é o passo que pode falhar por regra de banco; falhando aqui, nada
+  // foi mutado e não há rollback a fazer.
+  const { error: delErr } = await admin
+    .from('parceiro_usuarios')
+    .delete()
+    .eq('id', alvo.id)
+  if (delErr) {
+    return json({ error: 'falha_no_delete', detalhe: delErr.message }, 500)
+  }
+
+  // Passo 2: renomeia o e-mail no auth.users para liberar o original.
+  // Placeholder usa o `parceiro_usuarios.id` (já deletado acima) + a TLD
   // reservada `.invalid` (RFC 2606) para nunca colidir com domínio real.
   const placeholderEmail = `deleted-${alvo.id}@deleted.invalid`
   const { error: renameErr } = await admin.auth.admin.updateUserById(alvo.user_id, {
@@ -175,24 +196,14 @@ Deno.serve(async (req) => {
     email_confirm: true,
   })
   if (renameErr) {
-    return json({ error: 'falha_ao_liberar_email', detalhe: renameErr.message }, 500)
-  }
-
-  // Passo 2: deleta a linha em parceiro_usuarios. FKs em solicitacoes/
-  // eventos_portal são ON DELETE SET NULL — histórico preservado.
-  const { error: delErr } = await admin
-    .from('parceiro_usuarios')
-    .delete()
-    .eq('id', alvo.id)
-  if (delErr) {
-    // Tentativa de rollback do rename — best-effort. Se falhar também, o usuário
-    // fica num estado inconsistente (auth com placeholder, parceiro_usuarios
-    // intacto). Logamos no detalhe para investigação manual.
-    await admin.auth.admin.updateUserById(alvo.user_id, {
-      email: alvo.email,
-      email_confirm: true,
-    }).catch(() => {})
-    return json({ error: 'falha_no_delete', detalhe: delErr.message }, 500)
+    // O vínculo já caiu: o acesso ao portal está revogado (é o que importa) e a
+    // exclusão NÃO deve ser desfeita. O que sobrou é o e-mail ainda preso em
+    // auth.users, que só atrapalha se essa mesma pessoa for reconvidada.
+    return json({
+      error: 'falha_ao_liberar_email',
+      detalhe: renameErr.message,
+      vinculo_removido: true,
+    }, 500)
   }
 
   // Auditoria — best-effort. parceiro_id derivado pela função SECURITY DEFINER

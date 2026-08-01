@@ -149,10 +149,15 @@ export default function UsuariosPage() {
       return data
     },
     onSuccess: (data) => {
-      qc.invalidateQueries({ queryKey: ['parceiro-usuarios'] })
       toast.success(`Usuário ${data?.email ?? ''} excluído, e-mail liberado para reuso`)
     },
     onError: (e: Error) => toast.error(e.message),
+    // Recarrega a lista mesmo no erro: a Edge Function apaga o vínculo ANTES de
+    // liberar o e-mail, então `falha_ao_liberar_email` chega com a linha já
+    // removida no banco — sem isto ela continuaria na tela.
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ['parceiro-usuarios'] })
+    },
   })
 
   if (!isAdmin) {
@@ -591,7 +596,10 @@ function traduzirErroExclusao(code: string, detalhe?: string): string {
     case 'forbidden': return 'Você não tem permissão para excluir este usuário.'
     case 'usuario_nao_encontrado': return 'Usuário não encontrado.'
     case 'nao_pode_apagar_a_si_mesmo': return 'Você não pode excluir a sua própria conta.'
-    case 'falha_ao_liberar_email': return `Não foi possível liberar o e-mail${detalhe ? `: ${detalhe}` : ''}.`
+    // O vínculo já foi removido quando este erro chega — só o e-mail continua
+    // preso em auth.users, o que atrapalha apenas um reconvite dessa pessoa.
+    case 'falha_ao_liberar_email':
+      return `Usuário removido, mas o e-mail continua ocupado${detalhe ? `: ${detalhe}` : ''}.`
     case 'falha_no_delete': return `Não foi possível excluir${detalhe ? `: ${detalhe}` : ''}.`
     default: return detalhe || 'Erro ao excluir o usuário.'
   }
