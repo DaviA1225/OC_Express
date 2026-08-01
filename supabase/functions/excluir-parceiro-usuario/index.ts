@@ -36,6 +36,9 @@ const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 // CORS endurecido: substitui o curinga '*' por allowlist. Origens extras
 // podem ser adicionadas via secret ALLOWED_ORIGINS (separadas por virgula).
 const ALLOWED_ORIGINS = [
+  // Interno: 'sislog' e o alias vivo; 'oc-express' virou 308 -> sislog, mas fica
+  // na lista porque o projeto Vercel ainda responde por ele.
+  'https://sislog.vercel.app',
   'https://oc-express.vercel.app',
   'https://oc-sislog-portal.vercel.app',
   'http://localhost:5173',
