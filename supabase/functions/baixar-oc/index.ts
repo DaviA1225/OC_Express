@@ -29,6 +29,9 @@ const STATUS_OC_PRONTA = ['oc_gerada', 'oc_enviada', 'finalizada']
 // CORS endurecido: substitui o curinga '*' por allowlist. Origens extras
 // podem ser adicionadas via secret ALLOWED_ORIGINS (separadas por virgula).
 const ALLOWED_ORIGINS = [
+  // Interno: 'sislog' e o alias vivo; 'oc-express' virou 308 -> sislog, mas fica
+  // na lista porque o projeto Vercel ainda responde por ele.
+  'https://sislog.vercel.app',
   'https://oc-express.vercel.app',
   'https://oc-sislog-portal.vercel.app',
   'http://localhost:5173',
