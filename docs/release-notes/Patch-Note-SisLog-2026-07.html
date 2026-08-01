@@ -1,0 +1,483 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<title>SisLog — Notas de atualização · julho/2026</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/wanted-sans@1.0.3/fonts/webfonts/static/split/WantedSans.css" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Kanit:wght@500;600&display=swap" />
+<style>
+  @page { size: A4; margin: 16mm 15mm 14mm; }
+
+  :root {
+    --ink: #16181D;
+    --ink-soft: #4A5160;
+    --ink-faint: #7A8296;
+    --rule: #D8DCE3;
+    --rule-soft: #EBEEF2;
+    --accent: #CC4100;
+    --surface: #F6F7F9;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    font-family: "Wanted Sans", -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 9.6pt;
+    line-height: 1.5;
+    color: var(--ink);
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  h1, h2, h3 { font-family: Kanit, "Wanted Sans", sans-serif; margin: 0; letter-spacing: -0.01em; }
+
+  /* ---------- Cabeçalho ---------- */
+  .head { border-bottom: 2px solid var(--ink); padding-bottom: 10px; }
+  .head .kicker {
+    font-size: 7.6pt; letter-spacing: 1.4px; text-transform: uppercase;
+    color: var(--accent); font-weight: 600;
+  }
+  .head h1 { font-size: 23pt; font-weight: 600; line-height: 1.1; margin-top: 3px; }
+  .head .meta {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-top: 7px; font-size: 8.6pt; color: var(--ink-soft);
+  }
+  .head .meta strong { color: var(--ink); font-weight: 600; }
+
+  .intro {
+    margin: 15px 0 20px;
+    padding: 11px 13px;
+    background: var(--surface);
+    font-size: 9.4pt;
+    color: var(--ink-soft);
+  }
+  .intro strong { color: var(--ink); font-weight: 600; }
+
+  /* ---------- Seções ---------- */
+  .app { margin-top: 22px; }
+  .app > h2 {
+    font-size: 13.5pt; font-weight: 600;
+    padding-bottom: 5px; border-bottom: 1px solid var(--rule);
+    display: flex; align-items: baseline; gap: 9px;
+  }
+  .app > h2 .tag {
+    font-family: "Wanted Sans", sans-serif;
+    font-size: 7.4pt; letter-spacing: 1px; text-transform: uppercase;
+    font-weight: 600; color: #fff; background: var(--ink);
+    padding: 2.5px 7px; position: relative; top: -2px;
+  }
+  .app.portal > h2 .tag { background: #1E40AF; }
+
+  h3.grupo {
+    font-size: 8pt; letter-spacing: 1.2px; text-transform: uppercase;
+    color: var(--ink-faint); font-weight: 600;
+    margin: 16px 0 8px;
+  }
+
+  /* ---------- Itens ---------- */
+  ul.itens { list-style: none; margin: 0; padding: 0; }
+  ul.itens > li {
+    display: grid; grid-template-columns: 15px 1fr; gap: 9px;
+    padding: 7px 0; border-bottom: 1px solid var(--rule-soft);
+    break-inside: avoid;
+  }
+  ul.itens > li:last-child { border-bottom: 0; }
+  ul.itens > li .n {
+    font-size: 9pt; color: var(--ink-faint);
+    font-variant-numeric: tabular-nums; text-align: right;
+  }
+  ul.itens > li .t { font-weight: 600; display: block; margin-bottom: 1px; }
+  ul.itens > li .d { color: var(--ink-soft); display: block; }
+  ul.itens ul {
+    margin: 4px 0 0; padding-left: 15px; color: var(--ink-soft);
+  }
+  ul.itens ul li { padding: 1px 0; }
+
+  /* ---------- Onde encontrar ---------- */
+  .acoes { margin-top: 24px; break-inside: avoid; }
+  .acoes h2 { font-size: 12pt; font-weight: 600; margin-bottom: 9px; }
+  table.onde { width: 100%; border-collapse: collapse; font-size: 9.2pt; }
+  table.onde th {
+    text-align: left; font-size: 7.4pt; letter-spacing: 1px; text-transform: uppercase;
+    color: var(--ink-faint); font-weight: 600;
+    border-bottom: 1px solid var(--rule); padding: 0 10px 5px 0;
+  }
+  table.onde td { padding: 6px 10px 6px 0; border-bottom: 1px solid var(--rule-soft); vertical-align: top; }
+  table.onde td:first-child { font-weight: 600; white-space: nowrap; }
+  table.onde td:last-child { color: var(--ink-soft); }
+
+  /* ---------- Rodapé ---------- */
+  .foot {
+    margin-top: 26px; padding-top: 9px; border-top: 1px solid var(--rule);
+    font-size: 8.2pt; color: var(--ink-faint);
+    display: flex; justify-content: space-between; gap: 16px;
+    break-inside: avoid;
+  }
+</style>
+</head>
+<body>
+
+<header class="head">
+  <div class="kicker">LHG Logística · SisLog</div>
+  <h1>Notas de atualização</h1>
+  <div class="meta">
+    <span>Período: <strong>16 de julho a 1º de agosto de 2026</strong></span>
+    <span>Versão <strong>1.3.2</strong></span>
+  </div>
+</header>
+
+<p class="intro">
+  O SisLog ficou <strong>indisponível a partir de 16 de julho</strong>. Nesse
+  intervalo o sistema interno e o Portal de Parceiros receberam páginas novas, mudanças de
+  navegação e uma revisão de segurança. Este documento reúne tudo o que mudou, na ordem em que
+  você vai encontrar no dia a dia. No fim estão as <strong>correções posteriores</strong>, feitas
+  depois que o sistema já tinha voltado ao ar.
+</p>
+
+<!-- ============================ INTERNO ============================ -->
+<section class="app">
+  <h2><span class="tag">Interno</span> Sistema interno</h2>
+
+  <h3 class="grupo">Novidades</h3>
+  <ul class="itens">
+    <li>
+      <span class="n">1</span>
+      <span>
+        <span class="t">Conferência de Viagem, página nova</span>
+        <span class="d">
+          No menu, em Operacional. Reúne <strong>somente as viagens finalizadas</strong>, em tabela,
+          apenas para consulta: nada é editado por ali. Traz número, data, subcontratada, motorista,
+          CPF, cliente de destino e solicitante, com as placas separadas por posição
+          (<strong>cavalo, 1ª carreta, dolly e última carreta</strong>). Quando a composição não tem
+          aquela peça, a coluna fica com um traço.
+          <ul>
+            <li>Busca por número, motorista, CPF, placa ou cliente</li>
+            <li>Filtro de datas De/Até e paginação</li>
+            <li>Exportar CSV do que estiver filtrado</li>
+            <li>O último filtro fica guardado: ao sair e voltar, você retoma de onde parou</li>
+          </ul>
+        </span>
+      </span>
+    </li>
+    <li>
+      <span class="n">2</span>
+      <span>
+        <span class="t">Novo menu e cabeçalho</span>
+        <span class="d">
+          A barra lateral fixa deu lugar a um painel que abre pelo botão <strong>Menu</strong>, no
+          canto superior esquerdo. Com isso o conteúdo ocupa a largura inteira da tela e a busca
+          passou para o centro do cabeçalho.
+        </span>
+      </span>
+    </li>
+    <li>
+      <span class="n">3</span>
+      <span>
+        <span class="t">Tema escuro</span>
+        <span class="d">
+          Botão de sol/lua no cabeçalho. A escolha fica guardada no seu navegador e vale para as
+          próximas visitas.
+        </span>
+      </span>
+    </li>
+    <li>
+      <span class="n">4</span>
+      <span>
+        <span class="t">Verificação em duas etapas (2FA)</span>
+        <span class="d">
+          Disponível em <strong>Meu perfil</strong>, por enquanto <strong>opcional</strong>. Quem
+          ativar passa a informar, no login, um código de 6 dígitos gerado por aplicativo
+          autenticador. Quem não ativar continua entrando normalmente.
+        </span>
+      </span>
+    </li>
+    <li>
+      <span class="n">5</span>
+      <span>
+        <span class="t">Pendência interna</span>
+        <span class="d">
+          Antes só era possível abrir pendência em solicitação vinda do portal. Agora a equipe
+          também marca e resolve pendência em <strong>solicitação de origem interna</strong>, e cada
+          solicitação passa a ter um histórico das pendências abertas e resolvidas.
+        </span>
+      </span>
+    </li>
+  </ul>
+
+  <h3 class="grupo">Melhorias</h3>
+  <ul class="itens">
+    <li>
+      <span class="n">6</span>
+      <span>
+        <span class="t">Contador do menu passa a contar Recebidas</span>
+        <span class="d">
+          O número ao lado de <strong>Solicitações</strong> mostra quantas estão com status
+          <strong>Recebida</strong>, ou seja, esperando alguém pegar. Antes ele contava cartão
+          Pamcard pendente, o que não refletia a fila de trabalho.
+        </span>
+      </span>
+    </li>
+    <li>
+      <span class="n">7</span>
+      <span>
+        <span class="t">Busca mais abrangente</span>
+        <span class="d">
+          O campo de busca agora encontra também por <strong>CPF</strong> (com ou sem pontuação),
+          <strong>cliente de destino</strong> e placas de <strong>1ª carreta e dolly</strong>, além
+          de número, solicitante, motorista, cavalo e última carreta, que já funcionavam.
+        </span>
+      </span>
+    </li>
+    <li>
+      <span class="n">8</span>
+      <span>
+        <span class="t">Lista de solicitações mais fácil de ler</span>
+        <span class="d">
+          O status agora aparece como uma faixa colorida na lateral esquerda do card, em vez de
+          colorir a borda inteira. A cor de <strong>OC gerada</strong> passou de laranja para
+          marrom-areia, para não se confundir com o vermelho de atraso. A marca de pendência aberta
+          pisca e diz <strong>Aguardando parceiro</strong>, deixando claro de quem é a vez.
+        </span>
+      </span>
+    </li>
+    <li>
+      <span class="n">9</span>
+      <span>
+        <span class="t">Contraste e legibilidade</span>
+        <span class="d">
+          Cabeçalho e botões laranja foram reajustados para que o texto sobre eles fique legível,
+          nos temas claro e escuro.
+        </span>
+      </span>
+    </li>
+    <li>
+      <span class="n">10</span>
+      <span>
+        <span class="t">Resposta ao passar o mouse</span>
+        <span class="d">
+          Itens do menu e cards de solicitação agora reagem ao ponteiro, ajudando a saber onde o
+          clique vai cair.
+        </span>
+      </span>
+    </li>
+    <li>
+      <span class="n">11</span>
+      <span>
+        <span class="t">Revisão dos textos</span>
+        <span class="d">
+          Travessões trocados por vírgula nas mensagens do sistema e no PDF da Ordem de
+          Carregamento, deixando a leitura mais direta.
+        </span>
+      </span>
+    </li>
+  </ul>
+
+  <h3 class="grupo">Correções</h3>
+  <ul class="itens">
+    <li>
+      <span class="n">12</span>
+      <span>
+        <span class="t">Busca por CPF ou telefone derrubava a consulta</span>
+        <span class="d">
+          Digitar uma sequência longa de números fazia a busca falhar em vez de retornar resultado.
+          Corrigido na lista de solicitações e na busca global (Ctrl+K).
+        </span>
+      </span>
+    </li>
+    <li>
+      <span class="n">13</span>
+      <span>
+        <span class="t">Geração e pré-visualização da OC</span>
+        <span class="d">
+          As novas regras de segurança do navegador bloquearam, por dois dias durante a manutenção,
+          a geração e a pré-visualização do PDF da Ordem de Carregamento. Já corrigido e verificado
+          em produção.
+        </span>
+      </span>
+    </li>
+  </ul>
+</section>
+
+<!-- ============================ PORTAL ============================ -->
+<section class="app portal">
+  <h2><span class="tag">Portal</span> Portal de Parceiros</h2>
+
+  <h3 class="grupo">Novidades</h3>
+  <ul class="itens">
+    <li>
+      <span class="n">1</span>
+      <span>
+        <span class="t">Duplicar solicitação</span>
+        <span class="d">
+          Na tela de detalhe, cria uma solicitação nova repetindo os mesmos dados: motorista,
+          veículo, composição, cliente, Pamcard e observações. O material fica em branco, para a
+          equipe da LHG definir no processamento, e a nova solicitação começa como
+          <strong>Recebida</strong>.
+        </span>
+      </span>
+    </li>
+    <li>
+      <span class="n">2</span>
+      <span>
+        <span class="t">Histórico operacional</span>
+        <span class="d">
+          A tela de detalhe passa a mostrar as solicitações da sua empresa nos
+          <strong>últimos 30 dias</strong>, para dar contexto sem precisar voltar para a lista.
+        </span>
+      </span>
+    </li>
+    <li>
+      <span class="n">3</span>
+      <span>
+        <span class="t">Histórico de pendências</span>
+        <span class="d">
+          Card novo, acima dos dados da solicitação, com o <strong>motivo apontado pela LHG</strong>
+          e a <strong>resposta enviada</strong>, inclusive das pendências já resolvidas.
+        </span>
+      </span>
+    </li>
+    <li>
+      <span class="n">4</span>
+      <span>
+        <span class="t">Tema escuro</span>
+        <span class="d">
+          Botão de sol/lua no cabeçalho, com a preferência guardada no navegador.
+        </span>
+      </span>
+    </li>
+  </ul>
+
+  <h3 class="grupo">Melhorias</h3>
+  <ul class="itens">
+    <li>
+      <span class="n">5</span>
+      <span>
+        <span class="t">Sinal de pendência na lista</span>
+        <span class="d">
+          A solicitação que está aguardando resposta sua aparece destacada já na listagem, sem
+          precisar abrir uma a uma.
+        </span>
+      </span>
+    </li>
+    <li>
+      <span class="n">6</span>
+      <span>
+        <span class="t">Navegação e cards com resposta ao mouse</span>
+        <span class="d">
+          Os itens do menu superior e os cards de solicitação reagem ao ponteiro, no mesmo padrão
+          do sistema interno.
+        </span>
+      </span>
+    </li>
+  </ul>
+</section>
+
+<!-- ============================ SEGURANÇA ============================ -->
+<section class="app">
+  <h2><span class="tag">Ambos</span> Segurança</h2>
+  <ul class="itens">
+    <li>
+      <span class="n">1</span>
+      <span>
+        <span class="t">Proteção do navegador em modo bloqueio</span>
+        <span class="d">
+          A Política de Segurança de Conteúdo, que vinha rodando apenas em observação, passou a
+          <strong>bloquear de fato</strong> conteúdo de origem não autorizada nos dois sistemas.
+        </span>
+      </span>
+    </li>
+    <li>
+      <span class="n">2</span>
+      <span>
+        <span class="t">Revisão das permissões de gravação do portal</span>
+        <span class="d">
+          As regras que definem o que cada parceiro pode gravar foram endurecidas e submetidas a
+          teste de invasão: <strong>115 de 115 cenários aprovados</strong>. O isolamento entre
+          empresas permaneceu íntegro em todas as verificações, sem nenhum acesso de um parceiro a
+          dados de outro.
+        </span>
+      </span>
+    </li>
+    <li>
+      <span class="n">3</span>
+      <span>
+        <span class="t">Verificação em duas etapas no sistema interno</span>
+        <span class="d">
+          Disponível para os perfis internos, por adesão. Ver o item 4 da seção do sistema interno.
+        </span>
+      </span>
+    </li>
+  </ul>
+</section>
+
+<!-- ============================ DEPOIS DA MANUTENÇÃO ============================ -->
+<section class="app">
+  <h2><span class="tag">Interno</span> Correções posteriores</h2>
+
+  <p class="intro" style="margin-top:12px">
+    Duas falhas na tela <strong>Cadastros → Parceiros → Usuários</strong>, encontradas depois do
+    fim da manutenção e corrigidas em <strong>31 de julho e 1º de agosto</strong>. Nenhum dado foi
+    perdido: nos dois casos a operação era recusada por inteiro, sem gravar nada pela metade.
+  </p>
+
+  <ul class="itens">
+    <li>
+      <span class="n">14</span>
+      <span>
+        <span class="t">Adicionar e excluir usuário de parceiro não funcionavam</span>
+        <span class="d">
+          Os dois botões respondiam com uma mensagem técnica em vez de concluir a ação. O endereço
+          do sistema interno mudou, e o serviço que trata convites e exclusões ainda reconhecia
+          apenas o endereço antigo, recusando os pedidos vindos do novo. O restante da tela
+          continuava funcionando normalmente, o que fazia a falha parecer coisa de um botão só.
+          <ul>
+            <li>Convites que não chegaram nesse período precisam ser enviados de novo</li>
+            <li>Corrigido e verificado em produção</li>
+          </ul>
+        </span>
+      </span>
+    </li>
+    <li>
+      <span class="n">15</span>
+      <span>
+        <span class="t">Excluir usuário que já tinha feito solicitações</span>
+        <span class="d">
+          A exclusão era recusada sempre que a pessoa já havia criado alguma solicitação, e só
+          funcionava para quem nunca tinha usado o portal. Duas regras internas se contradiziam:
+          uma mandava preservar as solicitações antigas ao apagar o usuário, a outra proibia
+          exatamente esse resultado. Agora a exclusão conclui e
+          <strong>as solicitações continuam no histórico</strong>, com todo o resto do registro
+          intacto — parceiro, motorista, veículo, datas e número —, apenas sem o nome de quem
+          pediu, já que o cadastro deixou de existir.
+        </span>
+      </span>
+    </li>
+  </ul>
+</section>
+
+<!-- ============================ ONDE ENCONTRAR ============================ -->
+<section class="acoes">
+  <h2>Onde encontrar</h2>
+  <table class="onde">
+    <thead>
+      <tr><th>O quê</th><th>Onde</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Conferência de Viagem</td><td>Menu → Operacional → Conferência de Viagem</td></tr>
+      <tr><td>Abrir o menu</td><td>Botão <strong>Menu</strong>, canto superior esquerdo</td></tr>
+      <tr><td>Tema escuro</td><td>Ícone de sol/lua no cabeçalho (interno e portal)</td></tr>
+      <tr><td>Ativar 2FA</td><td>Seu nome → Meu perfil → Verificação em duas etapas</td></tr>
+      <tr><td>Duplicar solicitação</td><td>Portal → abrir a solicitação → Duplicar</td></tr>
+      <tr><td>Usuários de um parceiro</td><td>Menu → Cadastros → Parceiros → abrir o parceiro → Usuários</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<footer class="foot">
+  <span>LHG Logística · SisLog v1.3.2 · Documento gerado em 01/08/2026</span>
+  <span>Suporte: davi.silva@lhgmining.com.br · WhatsApp +55 67 99871-2180</span>
+</footer>
+
+</body>
+</html>
