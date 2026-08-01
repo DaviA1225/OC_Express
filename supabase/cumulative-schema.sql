@@ -1,5 +1,5 @@
 -- =====================================================================
--- OC Express / SisLog LHG — Schema cumulativo (migrations 0001 → 0047)
+-- OC Express / SisLog LHG — Schema cumulativo (migrations 0001 → 0054)
 -- =====================================================================
 --
 -- Este arquivo agrega TODAS as migrations num único script IDEMPOTENTE.
@@ -21,6 +21,18 @@
 -- vivo, rode SO o bloco isolado dela no SQL Editor do projeto REMOTO
 -- (https://supabase.com/dashboard/project/pwufbvneqfyyqnmfxzyw/sql) — nao dependa
 -- de replayar este arquivo inteiro.
+--
+-- Pelo mesmo motivo, o CHECK `solicitacoes_origem_integridade` aparece nos blocos
+-- da 0018 e da 0034 ja na forma FINAL da 0054 (sem exigir `parceiro_usuario_id`):
+-- a forma antiga proibia o ON DELETE SET NULL que a propria 0031 dispara, e um
+-- replay a reinstalaria, quebrando de novo a exclusao de usuario do parceiro.
+--
+-- ATENCAO — a secao da 0051 (RLS/InitPlan) e uma VARREDURA sobre `pg_policies`,
+-- ou seja, age sobre o estado vivo em vez de listar policies uma a uma. Ela tem
+-- que ficar DEPOIS de toda criacao de policy deste arquivo, senao as policies
+-- criadas adiante voltam avaliando os helpers por linha (regressao medida de
+-- 142 ms -> 8,2 s num COUNT de log_auditoria). Policy nova daqui em diante entra
+-- ANTES dessa secao.
 --
 -- Estrutura:
 --   1. Helpers (funcoes auxiliares)
@@ -697,6 +709,10 @@ ALTER TABLE solicitacoes
     OR material_id IS NOT NULL
   ) NOT VALID;
 
+-- `parceiro_usuario_id IS NOT NULL` NAO entra aqui, embora a 0018 original
+-- exigisse: ver a 0054 no fim do arquivo. A forma antiga proibia o ON DELETE
+-- SET NULL da 0031 e travava a exclusao de usuario do parceiro; a presenca no
+-- INSERT e garantida pelo trigger da 0047/0054.
 ALTER TABLE solicitacoes
   DROP CONSTRAINT IF EXISTS solicitacoes_origem_integridade;
 ALTER TABLE solicitacoes
@@ -704,7 +720,6 @@ ALTER TABLE solicitacoes
   CHECK (
     (origem = 'parceiro'
       AND parceiro_id IS NOT NULL
-      AND parceiro_usuario_id IS NOT NULL
       AND parceiro_motorista_id IS NOT NULL
       AND parceiro_veiculo_id IS NOT NULL
       AND motorista_id IS NULL
@@ -2047,6 +2062,9 @@ COMMENT ON COLUMN solicitacoes.parceiro_dolly_id IS
 -- Mantem a regra da 0018: solicitacao de parceiro usa apenas referencias
 -- parceiro_*; interna/e-mail nao usa nenhuma referencia parceiro_*. NOT VALID:
 -- nao varre linhas legadas (todas tem os novos campos NULL).
+--
+-- Assim como no bloco da 0018 acima, `parceiro_usuario_id IS NOT NULL` foi
+-- retirado do ramo do parceiro — forma final da 0054.
 
 ALTER TABLE solicitacoes
   DROP CONSTRAINT IF EXISTS solicitacoes_origem_integridade;
@@ -2055,7 +2073,6 @@ ALTER TABLE solicitacoes
   CHECK (
     (origem = 'parceiro'
       AND parceiro_id IS NOT NULL
-      AND parceiro_usuario_id IS NOT NULL
       AND parceiro_motorista_id IS NOT NULL
       AND parceiro_veiculo_id IS NOT NULL
       AND motorista_id IS NULL
@@ -2734,6 +2751,273 @@ DROP TRIGGER IF EXISTS trg_solicitacoes_sanitizar_externo ON solicitacoes;
 CREATE TRIGGER trg_solicitacoes_sanitizar_externo
   BEFORE INSERT ON solicitacoes
   FOR EACH ROW EXECUTE FUNCTION solicitacao_sanitizar_insert_externo();
+
+NOTIFY pgrst, 'reload schema';
+
+
+-- =====================================================================
+-- 0048 — Indice de log_auditoria por registro auditado
+-- =====================================================================
+-- `log_auditoria` era 80 MB em ~44 mil linhas contra ~10 MB de todo o resto do
+-- banco. Nenhum indice cobria `registro_id`, entao a reconstrucao da linha do
+-- tempo de status nos Relatorios varria a tabela inteira a cada bloco de ids.
+
+CREATE INDEX IF NOT EXISTS idx_log_auditoria_registro_created
+  ON log_auditoria(registro_id, created_at DESC);
+
+COMMENT ON INDEX idx_log_auditoria_registro_created IS
+  'Historico por registro auditado. Sustenta o registro_id IN (...) + ORDER BY '
+  'created_at dos Relatorios (reconstrucao de transicoes de status) e a leitura '
+  'de historico de um registro. Migration 0048.';
+
+
+-- =====================================================================
+-- 0049 + 0050 — UPDATE grava so os campos alterados
+-- =====================================================================
+-- O audit_trigger da secao 2 gravava `to_jsonb(OLD)` e `to_jsonb(NEW)` inteiros
+-- a cada UPDATE — duas copias da linha por alteracao de um campo. Era o que
+-- fazia log_auditoria responder sozinha por ~90% do banco.
+--
+-- A 0049 fez o delta inline no trigger; a 0050 extraiu para a funcao pura
+-- `audit_jsonb_delta` (testavel por RPC, para falha aparecer na resposta em vez
+-- de virar fallback silencioso). So a forma final da 0050 esta aqui: replayar a
+-- versao intermediaria da 0049 nao mudaria o estado final.
+
+CREATE OR REPLACE FUNCTION audit_jsonb_delta(p_old jsonb, p_new jsonb)
+RETURNS TABLE (antes jsonb, depois jsonb)
+LANGUAGE sql
+IMMUTABLE
+SET search_path = public, pg_temp
+AS $$
+  SELECT
+    COALESCE(jsonb_object_agg(e.key, p_old -> e.key), '{}'::jsonb),
+    COALESCE(jsonb_object_agg(e.key, e.value), '{}'::jsonb)
+  FROM jsonb_each(p_new) AS e
+  WHERE e.value IS DISTINCT FROM (p_old -> e.key);
+$$;
+
+COMMENT ON FUNCTION audit_jsonb_delta(jsonb, jsonb) IS
+  'Reduz um par (antes, depois) as chaves que mudaram. Pura e testavel por RPC: '
+  'existe separada do trigger justamente para que falhas aparecam na resposta em '
+  'vez de virarem fallback silencioso (migration 0050).';
+
+CREATE OR REPLACE FUNCTION audit_trigger()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_user   uuid;
+  v_old    jsonb;
+  v_new    jsonb;
+  v_antes  jsonb;
+  v_depois jsonb;
+BEGIN
+  BEGIN
+    v_user := auth.uid();
+  EXCEPTION WHEN OTHERS THEN
+    v_user := NULL;
+  END;
+  IF (TG_OP = 'INSERT') THEN
+    INSERT INTO log_auditoria (usuario_id, acao, tabela, registro_id, dados_depois)
+    VALUES (v_user, 'INSERT', TG_TABLE_NAME, NEW.id, to_jsonb(NEW));
+    RETURN NEW;
+  ELSIF (TG_OP = 'UPDATE') THEN
+    v_old := to_jsonb(OLD);
+    v_new := to_jsonb(NEW);
+    BEGIN
+      SELECT d.antes, d.depois INTO v_antes, v_depois
+        FROM audit_jsonb_delta(v_old, v_new) AS d;
+    EXCEPTION WHEN OTHERS THEN
+      v_antes  := v_old;
+      v_depois := v_new;
+    END;
+    INSERT INTO log_auditoria (usuario_id, acao, tabela, registro_id, dados_antes, dados_depois)
+    VALUES (v_user, 'UPDATE', TG_TABLE_NAME, NEW.id, v_antes, v_depois);
+    RETURN NEW;
+  ELSIF (TG_OP = 'DELETE') THEN
+    INSERT INTO log_auditoria (usuario_id, acao, tabela, registro_id, dados_antes)
+    VALUES (v_user, 'DELETE', TG_TABLE_NAME, OLD.id, to_jsonb(OLD));
+    RETURN OLD;
+  END IF;
+  RETURN NULL;
+END;
+$$;
+
+COMMENT ON FUNCTION audit_trigger() IS
+  'Trilha de auditoria. INSERT/DELETE guardam a linha completa; UPDATE guarda '
+  'apenas as chaves alteradas, nos dois lados (migrations 0049/0050). '
+  'SECURITY DEFINER com search_path fixo (0042).';
+
+
+-- =====================================================================
+-- 0054 — CHECK de origem aceita autor apagado
+-- =====================================================================
+-- Os blocos da 0018 e da 0034, la em cima, ja saem na forma final (sem exigir
+-- `parceiro_usuario_id`). Este bloco repete o resultado para quem for aplicar so
+-- a parte nova num remoto vivo, e traz o trigger da 0047 com a checagem de
+-- PRESENCA que substituiu a garantia perdida no CHECK.
+--
+-- Motivo: a 0031 trocou solicitacoes.parceiro_usuario_id para ON DELETE SET NULL
+-- (preservar o historico ao apagar o usuario) e o CHECK proibia exatamente esse
+-- estado. Excluir usuario do parceiro so funcionava para quem nunca criou
+-- solicitacao.
+
+ALTER TABLE solicitacoes
+  DROP CONSTRAINT IF EXISTS solicitacoes_origem_integridade;
+ALTER TABLE solicitacoes
+  ADD CONSTRAINT solicitacoes_origem_integridade
+  CHECK (
+    (origem = 'parceiro'
+      AND parceiro_id IS NOT NULL
+      AND parceiro_motorista_id IS NOT NULL
+      AND parceiro_veiculo_id IS NOT NULL
+      AND motorista_id IS NULL
+      AND veiculo_id IS NULL
+      AND carreta_id IS NULL
+      AND primeira_carreta_id IS NULL
+      AND dolly_id IS NULL
+      AND subcontratada_id IS NULL)
+    OR
+    (origem <> 'parceiro'
+      AND parceiro_id IS NULL
+      AND parceiro_usuario_id IS NULL
+      AND parceiro_motorista_id IS NULL
+      AND parceiro_veiculo_id IS NULL
+      AND parceiro_carreta_id IS NULL
+      AND parceiro_primeira_carreta_id IS NULL
+      AND parceiro_dolly_id IS NULL
+      AND parceiro_subcontratada_id IS NULL)
+  ) NOT VALID;
+
+COMMENT ON CONSTRAINT solicitacoes_origem_integridade ON solicitacoes IS
+  'Solicitacao de parceiro usa apenas referencias parceiro_*; interna/e-mail nao '
+  'usa nenhuma. parceiro_usuario_id NULO em linha de parceiro significa AUTOR '
+  'APAGADO (ON DELETE SET NULL da 0031); a presenca no INSERT e exigida pelo '
+  'trigger solicitacao_sanitizar_insert_externo (0047/0054).';
+
+CREATE OR REPLACE FUNCTION solicitacao_sanitizar_insert_externo()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  -- Presenca do autor: era garantida pelo CHECK de origem ate a 0054.
+  IF NEW.origem = 'parceiro' AND NEW.parceiro_usuario_id IS NULL THEN
+    RAISE EXCEPTION 'Solicitacao de parceiro exige parceiro_usuario_id.'
+      USING ERRCODE = '23514';
+  END IF;
+
+  IF is_interno() THEN
+    RETURN NEW;
+  END IF;
+
+  NEW.status                    := 'recebida';
+  NEW.atendente_id              := NULL;
+  NEW.documentado_por           := NULL;
+  NEW.documentado_em            := NULL;
+  NEW.pdf_url                   := NULL;
+  NEW.enviada_em                := NULL;
+  NEW.finalizada_em             := NULL;
+  NEW.numero_instrucao          := NULL;
+  NEW.cte_emitido               := false;
+  NEW.mdfe_emitido              := false;
+  NEW.vale_pedagio              := false;
+  NEW.created_by                := auth.uid();
+  NEW.pamcard_providenciado_em  := NULL;
+  NEW.pamcard_providenciado_por := NULL;
+  NEW.observacoes_internas      := NULL;
+  NEW.external_msg_id           := NULL;
+
+  IF NEW.parceiro_usuario_id IS NOT NULL THEN
+    IF NOT EXISTS (
+      SELECT 1 FROM parceiro_usuarios
+      WHERE id = NEW.parceiro_usuario_id
+        AND parceiro_id = NEW.parceiro_id
+    ) THEN
+      RAISE EXCEPTION 'Usuario informado nao pertence a este parceiro.'
+        USING ERRCODE = '42501';
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+COMMENT ON FUNCTION solicitacao_sanitizar_insert_externo() IS
+  'Zera as colunas de dominio interno (status, atendente, pdf, flags, datas) em '
+  'INSERTs feitos por quem nao e interno, e valida presenca e posse de '
+  'parceiro_usuario_id (migrations 0047 e 0054).';
+
+DROP TRIGGER IF EXISTS trg_solicitacoes_sanitizar_externo ON solicitacoes;
+CREATE TRIGGER trg_solicitacoes_sanitizar_externo
+  BEFORE INSERT ON solicitacoes
+  FOR EACH ROW EXECUTE FUNCTION solicitacao_sanitizar_insert_externo();
+
+
+-- =====================================================================
+-- 0051 (+0052/0053) — RLS: helpers avaliados UMA vez por query
+-- =====================================================================
+-- PRECISA SER O ULTIMO BLOCO QUE TOCA POLICY. Nao e uma lista de policies: e uma
+-- varredura sobre `pg_policies`, o estado vivo. Toda policy criada ACIMA e
+-- reescrita aqui; toda policy criada ABAIXO ficaria de fora.
+--
+-- Por que existe: `is_interno()`, `meu_perfil_interno()`, `is_admin_parceiro()`,
+-- `get_current_parceiro_id()` e `auth.uid()` chamadas direto no USING/WITH CHECK
+-- sao avaliadas POR LINHA candidata, mesmo sendo STABLE. Dentro de um subselect
+-- viram InitPlan — uma avaliacao por query. Medido em 2026-07-27: COUNT em
+-- log_auditoria (44 mil linhas) caiu de 8,2 s para 142 ms, e perfis_usuarios
+-- tinha acumulado 305 milhoes de seq scans numa tabela de 28 linhas.
+--
+-- Nenhuma condicao de acesso e adicionada, removida ou alterada: `(SELECT f())`
+-- devolve o mesmo que `f()`. So a forma de avaliar muda.
+--
+-- Diferencas em relacao a migration 0051 original, ja incorporando 0052 e 0053:
+--   * a tabela `rls_initplan_report` nao entra (era conferencia pos-deploy e a
+--     0053 a removeu);
+--   * a lista de policies e materializada ANTES do laco. A 0051 varreu o
+--     catalogo alterando dentro do mesmo laco, e o cursor preguicoso devolveu
+--     cada policy duas vezes (sem dano — a reescrita e determinística — mas
+--     inflou a contagem de 79 para 158).
+--
+-- Idempotente: o lookbehind `(?<!SELECT )` impede re-encapsular o que ja esta
+-- encapsulado, entao reexecutar nao gera `(SELECT (SELECT f()))`.
+
+DO $do$
+DECLARE
+  r            record;
+  v_novo_qual  text;
+  v_novo_check text;
+  v_sql        text;
+  -- `\m` = inicio de palavra: evita casar o sufixo de um nome maior.
+  c_padrao     text := '(?<!SELECT )\m(is_interno|meu_perfil_interno|is_admin_parceiro|get_current_parceiro_id|auth\.uid)\(\)';
+BEGIN
+  FOR r IN
+    SELECT * FROM (
+      SELECT schemaname, tablename, policyname, qual, with_check
+        FROM pg_policies
+       WHERE schemaname = 'public'
+       ORDER BY tablename, policyname
+    ) s
+  LOOP
+    v_novo_qual  := regexp_replace(r.qual,       c_padrao, '(SELECT \1())', 'g');
+    v_novo_check := regexp_replace(r.with_check, c_padrao, '(SELECT \1())', 'g');
+
+    CONTINUE WHEN v_novo_qual IS NOT DISTINCT FROM r.qual
+              AND v_novo_check IS NOT DISTINCT FROM r.with_check;
+
+    v_sql := format('ALTER POLICY %I ON %I.%I', r.policyname, r.schemaname, r.tablename);
+    IF v_novo_qual IS NOT NULL THEN
+      v_sql := v_sql || format(' USING (%s)', v_novo_qual);
+    END IF;
+    IF v_novo_check IS NOT NULL THEN
+      v_sql := v_sql || format(' WITH CHECK (%s)', v_novo_check);
+    END IF;
+
+    EXECUTE v_sql;
+  END LOOP;
+END
+$do$;
 
 NOTIFY pgrst, 'reload schema';
 
