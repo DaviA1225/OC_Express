@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
+import { registrarAcesso } from '@/lib/acesso'
 import { traduzirErroBanco } from '@/features/cadastros/useParceiroCrud'
 import type { Tables } from '@sislog/shared/types'
 
@@ -104,6 +105,16 @@ export function useDeleteAnexo() {
       if (rmErr) throw rmErr
       const { error } = await supabase.from('solicitacao_anexos').delete().eq('id', anexo.id)
       if (error) throw error
+
+      // O DELETE acima disparou a trigger da 0060, que abre uma pendência de
+      // remoção no storage. Aqui o portal já apagou o arquivo ANTES da linha
+      // (ordem inversa à do app interno), então a pendência nasce resolvida —
+      // damos baixa na hora para ela não aparecer como órfã na varredura.
+      const baixa = { p_path: anexo.storage_path, p_erro: null } as never
+      void supabase.rpc('marcar_storage_removido', baixa).then(({ error: baixaErr }) => {
+        if (baixaErr) console.warn('[anexos] baixa da fila de remocao falhou', baixaErr.message)
+      })
+
       return { id: anexo.id, solicitacaoId: anexo.solicitacao_id }
     },
     onSuccess: (res) => {
@@ -119,5 +130,11 @@ export async function getAnexoSignedUrl(storagePath: string, expiresInSec = 3600
     .from(ANEXOS_BUCKET)
     .createSignedUrl(storagePath, expiresInSec)
   if (error) throw error
+
+  // Registro de acesso (LGPD art. 37). No portal a `registrar_acesso` grava
+  // origem='portal', derivada no servidor — dá para separar o que a equipe
+  // interna abriu do que o parceiro abriu.
+  registrarAcesso('abrir_anexo', storagePath, { expira_em_seg: expiresInSec })
+
   return data.signedUrl
 }

@@ -1,6 +1,6 @@
 import { format } from 'date-fns'
 import type { SolicitacaoListRow } from '@/features/solicitacoes/useSolicitacoes'
-import { formatNumeroOC } from '@/lib/utils'
+import { formatNumeroOC, maskCpf } from '@/lib/utils'
 
 const COUNTRY_BR = '55'
 
@@ -47,7 +47,14 @@ export function formatOCWhatsAppMessage(s: SolicitacaoListRow, pdfUrl?: string |
   linhas.push('')
 
   if (s.motorista?.nome_completo) {
-    const cpf = s.motorista.cpf ? `, CPF ${s.motorista.cpf}` : ''
+    // CPF mascarado de propósito (auditoria LGPD 08/2026). A mensagem sai por
+    // WhatsApp — canal fora do controle da empresa e trivialmente encaminhável.
+    // Os seis dígitos centrais bastam para o conferente casar a pessoa com o
+    // documento em mãos; o CPF completo permanece no PDF da OC, que só abre por
+    // link assinado. maskCpf devolve '' se o dado não for um CPF completo, e
+    // nesse caso o campo é omitido em vez de cair no valor cru.
+    const cpfMascarado = maskCpf(s.motorista.cpf)
+    const cpf = cpfMascarado ? `, CPF ${cpfMascarado}` : ''
     linhas.push(`Motorista: ${s.motorista.nome_completo}${cpf}`)
   }
   if (s.veiculo?.placa) linhas.push(`Cavalo: ${s.veiculo.placa}`)
