@@ -1,0 +1,49 @@
+name: Cumulative schema
+
+# Valida supabase/cumulative-schema.sql — que até 2026-08-09 nada verificava.
+#
+# Por que é um workflow separado do db-migrate.yml: aquele é filtrado por
+# `supabase/migrations/**` e, na main, APLICA migrations no remoto. Esta
+# checagem precisa disparar também quando só o cumulative muda, e não deve
+# arrastar junto o job que escreve no banco. Separar mantém os gatilhos
+# honestos: um workflow que lê arquivo e um que altera produção não têm por que
+# compartilhar condição de disparo.
+#
+# Não usa secret nem rede: é análise estática do repositório. Roda em segundos.
+#
+# O que ele pega (detalhe do porquê em scripts/valida-cumulative-schema.mjs):
+#   1. aspas-dólar ímpares            3. objeto de migration ausente
+#   2. cabeçalho defasado             4. policy depois da varredura da 0051
+#
+# O que ele NÃO pega: erro de SQL que só o Postgres acusaria. Não há banco
+# descartável neste CI. Para prova de execução, replayar num projeto Supabase
+# de rascunho continua sendo o único caminho.
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/cumulative-schema.sql'
+      - 'supabase/migrations/**'
+      - 'scripts/valida-cumulative-schema.mjs'
+      - '.github/workflows/schema-check.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/cumulative-schema.sql'
+      - 'supabase/migrations/**'
+      - 'scripts/valida-cumulative-schema.mjs'
+      - '.github/workflows/schema-check.yml'
+
+jobs:
+  validar:
+    name: Validar cumulative-schema
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      # Sem `npm ci` de propósito: o script usa só builtins do Node. Instalar
+      # as dependências do monorepo aqui seria ~1 min para não usar nada delas.
+      - name: Validar
+        run: node scripts/valida-cumulative-schema.mjs
