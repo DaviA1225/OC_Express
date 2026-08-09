@@ -17,6 +17,7 @@
     "lint": "npm run lint --workspace @sislog/interno",
     "typecheck:agente": "npm run typecheck --workspace @sislog/agente-whatsapp",
     "pentest:rls": "node scripts/pentest-rls.mjs",
+    "schema:check": "node scripts/valida-cumulative-schema.mjs",
     "db:status": "npx supabase migration list --linked",
     "db:push": "npx supabase db push",
     "db:push:dry": "npx supabase db push --dry-run"
