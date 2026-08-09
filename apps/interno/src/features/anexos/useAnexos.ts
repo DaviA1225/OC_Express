@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
+import { registrarAcesso } from '@/lib/acesso'
 import { traduzirErroBanco } from '@/features/crud/useCrudQueries'
 import type { Tables } from '@/types/database.types'
 
@@ -102,6 +103,17 @@ export function useDeleteAnexo() {
       const { error: rmErr } = await supabase.storage
         .from(ANEXOS_BUCKET)
         .remove([anexo.storage_path])
+
+      // O DELETE acima disparou a trigger da 0060, que abriu uma pendência de
+      // remoção no storage. Aqui damos baixa nela — ou gravamos o motivo da
+      // falha. Antes, um `console.warn` era todo o registro de que um arquivo
+      // com dado pessoal tinha ficado órfão no bucket; agora a dívida fica
+      // numa tabela que dá para consultar.
+      const baixa = { p_path: anexo.storage_path, p_erro: rmErr?.message ?? null } as never
+      void supabase.rpc('marcar_storage_removido', baixa).then(({ error }) => {
+        if (error) console.warn('[anexos] baixa da fila de remocao falhou', error.message)
+      })
+
       if (rmErr) {
         // A linha já foi embora: para o usuário o anexo sumiu, que era a
         // intenção. Não transformamos isto em erro — só registramos.
@@ -122,5 +134,11 @@ export async function getAnexoSignedUrl(storagePath: string, expiresInSec = 3600
     .from(ANEXOS_BUCKET)
     .createSignedUrl(storagePath, expiresInSec)
   if (error) throw error
+
+  // Registro de acesso (LGPD art. 37). Anexo é o canal por onde entra o dado
+  // pessoal menos controlado do sistema — CRLV, CNH, prints de conversa —, e
+  // até aqui abrir um não deixava rastro nenhum.
+  registrarAcesso('abrir_anexo', storagePath, { expira_em_seg: expiresInSec })
+
   return data.signedUrl
 }

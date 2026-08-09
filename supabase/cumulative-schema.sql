@@ -1,5 +1,5 @@
 -- =====================================================================
--- OC Express / SisLog LHG — Schema cumulativo (migrations 0001 → 0055)
+-- OC Express / SisLog LHG — Schema cumulativo (migrations 0001 → 0060)
 -- =====================================================================
 --
 -- Este arquivo agrega TODAS as migrations num único script IDEMPOTENTE.
@@ -2956,6 +2956,365 @@ DROP TRIGGER IF EXISTS trg_solicitacoes_sanitizar_externo ON solicitacoes;
 CREATE TRIGGER trg_solicitacoes_sanitizar_externo
   BEFORE INSERT ON solicitacoes
   FOR EACH ROW EXECUTE FUNCTION solicitacao_sanitizar_insert_externo();
+
+
+-- =====================================================================
+-- 0056-0060 — Conformidade LGPD (auditoria de 2026-08-09)
+-- =====================================================================
+-- Bloco colocado AQUI, e nao no fim do arquivo, de proposito: a 0059 e a 0060
+-- criam policy, e toda policy precisa nascer ANTES da varredura da 0051 logo
+-- abaixo — senao ela fica avaliando meu_perfil_interno() por linha.
+--
+-- O "porque" de cada decisao esta nos arquivos de migration; aqui fica so o
+-- DDL necessario para reconstruir o banco.
+
+-- ---------- 0059 — log_acesso (registro de LEITURA de dado pessoal) ----------
+CREATE TABLE IF NOT EXISTS log_acesso (
+  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  usuario_id uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  acao       text NOT NULL CHECK (acao IN ('export_csv', 'download_oc_pdf', 'abrir_anexo')),
+  recurso    text,
+  detalhe    jsonb,
+  ip         text,
+  user_agent text,
+  origem     text NOT NULL DEFAULT 'interno' CHECK (origem IN ('interno', 'portal')),
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_log_acesso_created_at ON log_acesso (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_log_acesso_usuario    ON log_acesso (usuario_id);
+CREATE INDEX IF NOT EXISTS idx_log_acesso_acao       ON log_acesso (acao);
+
+ALTER TABLE log_acesso ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS log_acesso_select ON log_acesso;
+CREATE POLICY log_acesso_select ON log_acesso
+  FOR SELECT TO authenticated
+  USING (meu_perfil_interno() IN ('admin', 'gerente', 'supervisor'));
+
+CREATE OR REPLACE FUNCTION registrar_acesso(
+  p_acao text, p_recurso text DEFAULT NULL, p_detalhe jsonb DEFAULT NULL
+) RETURNS uuid
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE
+  v_user uuid := auth.uid(); v_headers json; v_ip text; v_ua text;
+  v_origem text; v_detalhe jsonb; v_id uuid;
+BEGIN
+  IF v_user IS NULL THEN RETURN NULL; END IF;
+  IF p_acao NOT IN ('export_csv', 'download_oc_pdf', 'abrir_anexo') THEN RETURN NULL; END IF;
+  BEGIN v_headers := current_setting('request.headers', true)::json;
+  EXCEPTION WHEN OTHERS THEN v_headers := NULL; END;
+  IF v_headers IS NOT NULL THEN
+    v_ip := NULLIF(btrim(split_part(v_headers ->> 'x-forwarded-for', ',', 1)), '');
+    v_ua := left(v_headers ->> 'user-agent', 500);
+  END IF;
+  v_origem := CASE WHEN is_interno() THEN 'interno' ELSE 'portal' END;
+  v_detalhe := p_detalhe;
+  IF v_detalhe IS NOT NULL AND length(v_detalhe::text) > 1024 THEN
+    v_detalhe := jsonb_build_object('truncado', true);
+  END IF;
+  INSERT INTO log_acesso (usuario_id, acao, recurso, detalhe, ip, user_agent, origem)
+  VALUES (v_user, p_acao, left(p_recurso, 120), v_detalhe, v_ip, v_ua, v_origem)
+  RETURNING id INTO v_id;
+  RETURN v_id;
+END; $$;
+REVOKE ALL ON FUNCTION registrar_acesso(text, text, jsonb) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION registrar_acesso(text, text, jsonb) TO authenticated;
+
+-- ---------- 0060 — fila de remocao no storage (anexos orfaos) ----------
+CREATE TABLE IF NOT EXISTS storage_remocao_pendente (
+  id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  bucket         text NOT NULL,
+  path           text NOT NULL,
+  motivo         text NOT NULL,
+  solicitacao_id uuid,
+  created_at     timestamptz NOT NULL DEFAULT now(),
+  removido_em    timestamptz,
+  erro           text
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_storage_remocao_pendente_aberta
+  ON storage_remocao_pendente (bucket, path) WHERE removido_em IS NULL;
+CREATE INDEX IF NOT EXISTS idx_storage_remocao_pendente_abertas
+  ON storage_remocao_pendente (created_at) WHERE removido_em IS NULL;
+
+CREATE OR REPLACE FUNCTION enfileirar_remocao_anexo()
+RETURNS TRIGGER
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+BEGIN
+  INSERT INTO storage_remocao_pendente (bucket, path, motivo, solicitacao_id)
+  VALUES ('solicitacoes-anexos', OLD.storage_path, TG_OP, OLD.solicitacao_id)
+  ON CONFLICT DO NOTHING;
+  RETURN OLD;
+EXCEPTION WHEN OTHERS THEN
+  RETURN OLD;  -- limpeza nunca aborta a exclusao que o usuario pediu
+END; $$;
+
+DROP TRIGGER IF EXISTS trg_anexo_enfileira_remocao ON solicitacao_anexos;
+CREATE TRIGGER trg_anexo_enfileira_remocao
+  AFTER DELETE ON solicitacao_anexos
+  FOR EACH ROW EXECUTE FUNCTION enfileirar_remocao_anexo();
+
+ALTER TABLE storage_remocao_pendente ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS storage_remocao_pendente_select ON storage_remocao_pendente;
+CREATE POLICY storage_remocao_pendente_select ON storage_remocao_pendente
+  FOR SELECT TO authenticated
+  USING (meu_perfil_interno() IN ('admin', 'gerente', 'supervisor'));
+
+CREATE OR REPLACE FUNCTION marcar_storage_removido(p_path text, p_erro text DEFAULT NULL)
+RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+BEGIN
+  IF auth.uid() IS NULL OR p_path IS NULL THEN RETURN; END IF;
+  IF p_erro IS NULL THEN
+    UPDATE storage_remocao_pendente SET removido_em = now(), erro = NULL
+     WHERE path = p_path AND removido_em IS NULL;
+  ELSE
+    UPDATE storage_remocao_pendente SET erro = left(p_erro, 500)
+     WHERE path = p_path AND removido_em IS NULL;
+  END IF;
+END; $$;
+REVOKE ALL ON FUNCTION marcar_storage_removido(text, text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION marcar_storage_removido(text, text) TO authenticated;
+
+-- ---------- 0056 (+0059) — politica de retencao ----------
+-- Prazos: log_auditoria 5 anos; eventos_portal e log_acesso 1 ano.
+-- p_dry_run = true por padrao. Nao esta agendada: rodar pelo SQL Editor.
+CREATE OR REPLACE FUNCTION purgar_dados_antigos(
+  p_dry_run boolean DEFAULT true,
+  p_dias_auditoria int DEFAULT 1826,
+  p_dias_eventos int DEFAULT 365
+)
+RETURNS TABLE (tabela text, corte timestamptz, linhas_alvo bigint, apagadas boolean)
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE
+  v_corte_aud timestamptz := now() - make_interval(days => p_dias_auditoria);
+  v_corte_evt timestamptz := now() - make_interval(days => p_dias_eventos);
+  v_n bigint;
+BEGIN
+  IF p_dias_auditoria < 180 OR p_dias_eventos < 180 THEN
+    RAISE EXCEPTION 'retencao curta demais (auditoria=% dias, eventos=% dias). Minimo 180.',
+      p_dias_auditoria, p_dias_eventos;
+  END IF;
+
+  SELECT count(*) INTO v_n FROM log_auditoria WHERE created_at < v_corte_aud;
+  IF NOT p_dry_run AND v_n > 0 THEN DELETE FROM log_auditoria WHERE created_at < v_corte_aud; END IF;
+  tabela := 'log_auditoria'; corte := v_corte_aud; linhas_alvo := v_n;
+  apagadas := (NOT p_dry_run AND v_n > 0); RETURN NEXT;
+
+  SELECT count(*) INTO v_n FROM eventos_portal WHERE created_at < v_corte_evt;
+  IF NOT p_dry_run AND v_n > 0 THEN DELETE FROM eventos_portal WHERE created_at < v_corte_evt; END IF;
+  tabela := 'eventos_portal'; corte := v_corte_evt; linhas_alvo := v_n;
+  apagadas := (NOT p_dry_run AND v_n > 0); RETURN NEXT;
+
+  SELECT count(*) INTO v_n FROM log_acesso WHERE created_at < v_corte_evt;
+  IF NOT p_dry_run AND v_n > 0 THEN DELETE FROM log_acesso WHERE created_at < v_corte_evt; END IF;
+  tabela := 'log_acesso'; corte := v_corte_evt; linhas_alvo := v_n;
+  apagadas := (NOT p_dry_run AND v_n > 0); RETURN NEXT;
+END; $$;
+REVOKE ALL ON FUNCTION purgar_dados_antigos(boolean, int, int) FROM PUBLIC;
+REVOKE ALL ON FUNCTION purgar_dados_antigos(boolean, int, int) FROM anon, authenticated;
+
+-- ---------- 0057 — direitos do titular ----------
+CREATE OR REPLACE FUNCTION audit_scrub_pii(p jsonb)
+RETURNS jsonb LANGUAGE sql IMMUTABLE SET search_path = public, pg_temp AS $$
+  SELECT CASE WHEN p IS NULL THEN NULL ELSE COALESCE(
+    (SELECT jsonb_object_agg(e.key,
+              CASE WHEN e.key IN ('nome_completo','nome_completo_unaccent','cpf',
+                                  'telefone','observacoes','solicitante_nome',
+                                  'solicitante_nome_unaccent','solicitante_telefone')
+                   AND e.value <> 'null'::jsonb
+                   THEN '"[ANONIMIZADO]"'::jsonb ELSE e.value END)
+       FROM jsonb_each(p) AS e), p) END;
+$$;
+
+CREATE OR REPLACE FUNCTION exportar_dados_titular(p_cpf text)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE
+  v_digitos text := regexp_replace(COALESCE(p_cpf, ''), '\D', '', 'g');
+  v_ids_int uuid[]; v_ids_par uuid[]; v_out jsonb;
+BEGIN
+  IF meu_perfil_interno() IS DISTINCT FROM 'admin'
+     AND meu_perfil_interno() IS DISTINCT FROM 'gerente' THEN
+    RAISE EXCEPTION 'forbidden: exportar_dados_titular exige perfil admin ou gerente';
+  END IF;
+  IF length(v_digitos) <> 11 THEN
+    RAISE EXCEPTION 'cpf invalido: informe os 11 digitos (recebido: % digitos)', length(v_digitos);
+  END IF;
+
+  SELECT array_agg(id) INTO v_ids_int FROM motoristas
+   WHERE regexp_replace(cpf, '\D', '', 'g') = v_digitos;
+  SELECT array_agg(id) INTO v_ids_par FROM parceiro_motoristas
+   WHERE regexp_replace(cpf, '\D', '', 'g') = v_digitos;
+  v_ids_int := COALESCE(v_ids_int, ARRAY[]::uuid[]);
+  v_ids_par := COALESCE(v_ids_par, ARRAY[]::uuid[]);
+
+  SELECT jsonb_build_object(
+    'gerado_em', now(), 'gerado_por', auth.uid(), 'cpf_consultado', p_cpf,
+    'encontrado', (array_length(v_ids_int,1) IS NOT NULL OR array_length(v_ids_par,1) IS NOT NULL),
+    'cadastro_frota_interna', COALESCE(
+      (SELECT jsonb_agg(to_jsonb(m)) FROM motoristas m WHERE m.id = ANY(v_ids_int)), '[]'::jsonb),
+    'cadastro_frota_parceiro', COALESCE(
+      (SELECT jsonb_agg(to_jsonb(pm) || jsonb_build_object('parceiro', p.razao_social))
+         FROM parceiro_motoristas pm JOIN parceiros p ON p.id = pm.parceiro_id
+        WHERE pm.id = ANY(v_ids_par)), '[]'::jsonb),
+    'solicitacoes', COALESCE(
+      (SELECT jsonb_agg(jsonb_build_object('id', s.id, 'numero_interno', s.numero_interno,
+                'tipo', s.tipo, 'status', s.status, 'origem', s.origem,
+                'created_at', s.created_at, 'finalizada_em', s.finalizada_em))
+         FROM solicitacoes s
+        WHERE s.motorista_id = ANY(v_ids_int) OR s.parceiro_motorista_id = ANY(v_ids_par)), '[]'::jsonb),
+    'anexos', COALESCE(
+      (SELECT jsonb_agg(jsonb_build_object('filename', a.filename, 'storage_path', a.storage_path,
+                'mime_type', a.mime_type, 'created_at', a.created_at))
+         FROM solicitacao_anexos a JOIN solicitacoes s ON s.id = a.solicitacao_id
+        WHERE s.motorista_id = ANY(v_ids_int) OR s.parceiro_motorista_id = ANY(v_ids_par)), '[]'::jsonb),
+    'auditoria_do_cadastro', COALESCE(
+      (SELECT jsonb_agg(jsonb_build_object('acao', l.acao, 'tabela', l.tabela,
+                'registro_id', l.registro_id, 'quando', l.created_at,
+                'por', COALESCE(pu.nome_completo, l.usuario_id::text)))
+         FROM log_auditoria l LEFT JOIN perfis_usuarios pu ON pu.user_id = l.usuario_id
+        WHERE (l.tabela = 'motoristas' AND l.registro_id = ANY(v_ids_int))
+           OR (l.tabela = 'parceiro_motoristas' AND l.registro_id = ANY(v_ids_par))), '[]'::jsonb)
+  ) INTO v_out;
+  RETURN v_out;
+END; $$;
+REVOKE ALL ON FUNCTION exportar_dados_titular(text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION exportar_dados_titular(text) TO authenticated;
+
+CREATE OR REPLACE FUNCTION anonimizar_titular(p_cpf text, p_confirmar boolean DEFAULT false)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE
+  v_digitos text := regexp_replace(COALESCE(p_cpf, ''), '\D', '', 'g');
+  v_ids_int uuid[]; v_ids_par uuid[]; v_abertas bigint; v_scrub_aud bigint := 0;
+  v_marcador constant text := '[ANONIMIZADO]';
+BEGIN
+  IF meu_perfil_interno() IS DISTINCT FROM 'admin' THEN
+    RAISE EXCEPTION 'forbidden: anonimizar_titular exige perfil admin';
+  END IF;
+  IF length(v_digitos) <> 11 THEN
+    RAISE EXCEPTION 'cpf invalido: informe os 11 digitos (recebido: % digitos)', length(v_digitos);
+  END IF;
+
+  SELECT array_agg(id) INTO v_ids_int FROM motoristas
+   WHERE regexp_replace(cpf, '\D', '', 'g') = v_digitos;
+  SELECT array_agg(id) INTO v_ids_par FROM parceiro_motoristas
+   WHERE regexp_replace(cpf, '\D', '', 'g') = v_digitos;
+  v_ids_int := COALESCE(v_ids_int, ARRAY[]::uuid[]);
+  v_ids_par := COALESCE(v_ids_par, ARRAY[]::uuid[]);
+
+  IF array_length(v_ids_int,1) IS NULL AND array_length(v_ids_par,1) IS NULL THEN
+    RETURN jsonb_build_object('encontrado', false, 'cpf_consultado', p_cpf);
+  END IF;
+
+  SELECT count(*) INTO v_abertas FROM solicitacoes s
+   WHERE (s.motorista_id = ANY(v_ids_int) OR s.parceiro_motorista_id = ANY(v_ids_par))
+     AND s.status NOT IN ('finalizada', 'cancelada');
+  IF v_abertas > 0 THEN
+    RAISE EXCEPTION 'titular tem % solicitacao(oes) em andamento — finalize ou cancele antes de anonimizar', v_abertas;
+  END IF;
+
+  IF NOT p_confirmar THEN
+    RETURN jsonb_build_object('simulacao', true, 'encontrado', true, 'cpf_consultado', p_cpf,
+      'cadastros_frota_interna', COALESCE(array_length(v_ids_int,1), 0),
+      'cadastros_frota_parceiro', COALESCE(array_length(v_ids_par,1), 0),
+      'solicitacoes_preservadas', (SELECT count(*) FROM solicitacoes s
+         WHERE s.motorista_id = ANY(v_ids_int) OR s.parceiro_motorista_id = ANY(v_ids_par)),
+      'linhas_de_auditoria_a_limpar', (SELECT count(*) FROM log_auditoria l
+         WHERE (l.tabela = 'motoristas' AND l.registro_id = ANY(v_ids_int))
+            OR (l.tabela = 'parceiro_motoristas' AND l.registro_id = ANY(v_ids_par))),
+      'aviso', 'nada foi alterado. Repita com p_confirmar => true para aplicar.');
+  END IF;
+
+  UPDATE motoristas SET nome_completo = v_marcador,
+         cpf = 'ANON-' || left(replace(id::text, '-', ''), 12),
+         telefone = NULL, observacoes = NULL, ativo = false
+   WHERE id = ANY(v_ids_int);
+  UPDATE parceiro_motoristas SET nome_completo = v_marcador,
+         cpf = 'ANON-' || left(replace(id::text, '-', ''), 12),
+         telefone = NULL, observacoes = NULL, ativo = false
+   WHERE id = ANY(v_ids_par);
+
+  -- DEPOIS dos UPDATEs de proposito: eles disparam o audit_trigger, que grava
+  -- o nome e o CPF antigos. Limpar antes reintroduziria o dado em silencio.
+  WITH alvo AS (
+    UPDATE log_auditoria l SET dados_antes = audit_scrub_pii(l.dados_antes),
+                               dados_depois = audit_scrub_pii(l.dados_depois)
+     WHERE (l.tabela = 'motoristas' AND l.registro_id = ANY(v_ids_int))
+        OR (l.tabela = 'parceiro_motoristas' AND l.registro_id = ANY(v_ids_par))
+    RETURNING 1)
+  SELECT count(*) INTO v_scrub_aud FROM alvo;
+
+  RETURN jsonb_build_object('simulacao', false, 'encontrado', true,
+    'anonimizado_em', now(), 'anonimizado_por', auth.uid(),
+    'cadastros_frota_interna', COALESCE(array_length(v_ids_int,1), 0),
+    'cadastros_frota_parceiro', COALESCE(array_length(v_ids_par,1), 0),
+    'linhas_de_auditoria_limpas', v_scrub_aud,
+    'ids_preservados', to_jsonb(v_ids_int || v_ids_par));
+END; $$;
+REVOKE ALL ON FUNCTION anonimizar_titular(text, boolean) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION anonimizar_titular(text, boolean) TO authenticated;
+
+-- ---------- 0058 — registrar_evento_portal: IP/UA do header + rate limit ----------
+-- Substitui a versao da 0021/0023/0031/0043 acima. IP e user-agent passam a
+-- vir dos headers (o cliente nao forja) e ha teto de metadata e rate limit.
+CREATE INDEX IF NOT EXISTS idx_eventos_portal_ip_created
+  ON eventos_portal (ip, created_at DESC) WHERE tipo_evento = 'portal_login_falha';
+
+CREATE OR REPLACE FUNCTION registrar_evento_portal(p_tipo_evento text, p_payload jsonb DEFAULT NULL)
+RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE
+  v_user_id uuid := auth.uid(); v_pu parceiro_usuarios%ROWTYPE;
+  v_parceiro_id uuid; v_parceiro_usuario_id uuid; v_email_tentado text;
+  v_solicitacao_id uuid; v_ip text; v_user_agent text; v_metadata jsonb;
+  v_headers json; v_recentes int; v_id uuid;
+BEGIN
+  IF p_tipo_evento NOT IN ('portal_login','portal_login_falha','portal_logout',
+    'portal_solicitacao_criada','portal_solicitacao_editada',
+    'portal_solicitacao_cancelada','portal_senha_alterada',
+    'portal_usuario_convidado','portal_usuario_excluido') THEN
+    RAISE EXCEPTION 'tipo_evento invalido: %', p_tipo_evento;
+  END IF;
+
+  BEGIN v_headers := current_setting('request.headers', true)::json;
+  EXCEPTION WHEN OTHERS THEN v_headers := NULL; END;
+  IF v_headers IS NOT NULL THEN
+    v_ip := NULLIF(btrim(split_part(v_headers ->> 'x-forwarded-for', ',', 1)), '');
+    v_user_agent := v_headers ->> 'user-agent';
+  END IF;
+  v_user_agent := left(COALESCE(v_user_agent, p_payload ->> 'user_agent'), 500);
+
+  IF p_tipo_evento = 'portal_login_falha' AND v_ip IS NOT NULL THEN
+    SELECT count(*) INTO v_recentes FROM eventos_portal
+     WHERE tipo_evento = 'portal_login_falha' AND ip = v_ip
+       AND created_at > now() - interval '5 minutes';
+    IF v_recentes >= 20 THEN RETURN NULL; END IF;  -- silencioso de proposito
+  END IF;
+
+  IF p_tipo_evento = 'portal_login_falha' THEN
+    v_email_tentado := left(p_payload ->> 'email_tentado', 320);
+  ELSE
+    IF v_user_id IS NULL THEN RETURN NULL; END IF;
+    SELECT * INTO v_pu FROM parceiro_usuarios
+      WHERE user_id = v_user_id AND ativo = true LIMIT 1;
+    IF NOT FOUND THEN RETURN NULL; END IF;
+    v_parceiro_id := v_pu.parceiro_id; v_parceiro_usuario_id := v_pu.id;
+  END IF;
+
+  v_solicitacao_id := NULLIF(p_payload ->> 'solicitacao_id', '')::uuid;
+  v_metadata := COALESCE(p_payload, '{}'::jsonb)
+                - ARRAY['email_tentado','ip','user_agent','solicitacao_id'];
+  IF v_metadata = '{}'::jsonb THEN v_metadata := NULL;
+  ELSIF length(v_metadata::text) > 2048 THEN
+    v_metadata := jsonb_build_object('truncado', true, 'motivo', 'metadata acima de 2KB',
+                                     'bytes_originais', length(v_metadata::text));
+  END IF;
+
+  INSERT INTO eventos_portal (tipo_evento, user_id, parceiro_id, parceiro_usuario_id,
+    email_tentado, solicitacao_id, ip, user_agent, metadata)
+  VALUES (p_tipo_evento, v_user_id, v_parceiro_id, v_parceiro_usuario_id,
+    v_email_tentado, v_solicitacao_id, v_ip, v_user_agent, v_metadata)
+  RETURNING id INTO v_id;
+  RETURN v_id;
+END; $$;
+GRANT EXECUTE ON FUNCTION registrar_evento_portal(text, jsonb) TO anon, authenticated;
 
 
 -- =====================================================================

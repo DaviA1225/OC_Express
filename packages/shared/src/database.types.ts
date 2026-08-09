@@ -772,6 +772,28 @@ export interface Database {
         Args: { p_id: string }
         Returns: string
       }
+      // 0059 — registro de acesso a dado pessoal (LGPD art. 37). Chamada
+      // fire-and-forget por `lib/acesso.ts` nos dois apps.
+      registrar_acesso: {
+        Args: { p_acao: string; p_recurso?: string | null; p_detalhe?: Json | null }
+        Returns: string | null
+      }
+      // 0060 — baixa na fila de remoção do storage, após o app apagar (ou
+      // falhar ao apagar) o arquivo do anexo.
+      marcar_storage_removido: {
+        Args: { p_path: string; p_erro?: string | null }
+        Returns: undefined
+      }
+      // 0057 — direitos do titular. Sem UI ainda: chamadas pelo SQL Editor.
+      // Tipadas aqui para quando a tela existir e para documentar a assinatura.
+      exportar_dados_titular: {
+        Args: { p_cpf: string }
+        Returns: Json
+      }
+      anonimizar_titular: {
+        Args: { p_cpf: string; p_confirmar?: boolean }
+        Returns: Json
+      }
     }
     Enums: Record<string, never>
   }

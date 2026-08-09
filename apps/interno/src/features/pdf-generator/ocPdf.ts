@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase'
+import { registrarAcesso } from '@/lib/acesso'
 
 export const OCS_PDF_BUCKET = 'ocs-pdf'
 
@@ -49,5 +50,12 @@ export async function getOcPdfSignedUrl(
     .from(OCS_PDF_BUCKET)
     .createSignedUrl(path, expiresInSec)
   if (error) throw error
+
+  // Registro de acesso (LGPD art. 37). O evento é a EMISSÃO do link, não a
+  // abertura do PDF: a partir daqui existe uma URL que abre nome e CPF do
+  // motorista sem login, e é isso que precisa ficar rastreado. `expira_em_seg`
+  // distingue o link interno de 1h do link de 5 dias que vai para o WhatsApp.
+  registrarAcesso('download_oc_pdf', path, { expira_em_seg: expiresInSec })
+
   return data.signedUrl
 }
