@@ -99,21 +99,38 @@ export function useDeleteAnexo() {
   const qc = useQueryClient()
   return useMutation<{ id: string; solicitacaoId: string }, unknown, { anexo: Anexo }>({
     mutationFn: async ({ anexo }) => {
-      const { error: rmErr } = await supabase.storage
-        .from(ANEXOS_BUCKET)
-        .remove([anexo.storage_path])
-      if (rmErr) throw rmErr
+      // Linha primeiro, arquivo depois — mesma ordem do app interno.
+      //
+      // O portal fazia o inverso (arquivo, depois linha). Nessa ordem, uma
+      // falha no DELETE do banco — RLS, rede — deixava o arquivo já apagado e
+      // a linha apontando para o vazio: um anexo que aparece na lista e não
+      // abre. É exatamente o defeito que o app interno já tinha corrigido, e
+      // o portal seguia com a versão antiga.
+      //
+      // Nesta ordem o pior caso é um arquivo órfão no bucket, que não quebra
+      // nada para o usuário — e que desde a migration 0060 deixa de ser
+      // silencioso: a trigger abre uma pendência em storage_remocao_pendente e
+      // a baixa abaixo só fecha o que foi de fato removido.
       const { error } = await supabase.from('solicitacao_anexos').delete().eq('id', anexo.id)
       if (error) throw error
 
-      // O DELETE acima disparou a trigger da 0060, que abre uma pendência de
-      // remoção no storage. Aqui o portal já apagou o arquivo ANTES da linha
-      // (ordem inversa à do app interno), então a pendência nasce resolvida —
-      // damos baixa na hora para ela não aparecer como órfã na varredura.
-      const baixa = { p_path: anexo.storage_path, p_erro: null } as never
+      const { error: rmErr } = await supabase.storage
+        .from(ANEXOS_BUCKET)
+        .remove([anexo.storage_path])
+
+      // Baixa na fila aberta pela trigger: fecha se removeu, guarda o motivo
+      // se falhou. Passar `rmErr?.message` em vez de null é o que faz a
+      // pendência continuar aberta e aparecer na varredura de órfãos.
+      const baixa = { p_path: anexo.storage_path, p_erro: rmErr?.message ?? null } as never
       void supabase.rpc('marcar_storage_removido', baixa).then(({ error: baixaErr }) => {
         if (baixaErr) console.warn('[anexos] baixa da fila de remocao falhou', baixaErr.message)
       })
+
+      if (rmErr) {
+        // A linha já foi embora: para o usuário o anexo sumiu, que era a
+        // intenção. Não vira erro — o registro fica na fila da 0060.
+        console.warn('[anexos] linha removida, arquivo permaneceu no bucket', anexo.storage_path, rmErr)
+      }
 
       return { id: anexo.id, solicitacaoId: anexo.solicitacao_id }
     },
