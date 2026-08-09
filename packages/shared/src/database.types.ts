@@ -80,8 +80,6 @@ export interface Database {
           razao_social_unaccent: string
           documento: string | null
           tipo_pessoa: 'PF' | 'PJ' | null
-          contato_nome: string | null
-          contato_telefone: string | null
           ativo: boolean
           created_at: string
           updated_at: string
@@ -92,8 +90,6 @@ export interface Database {
           razao_social: string
           documento?: string | null
           tipo_pessoa?: 'PF' | 'PJ' | null
-          contato_nome?: string | null
-          contato_telefone?: string | null
           ativo?: boolean
           created_at?: string
           updated_at?: string
@@ -107,10 +103,7 @@ export interface Database {
           nome_completo: string
           nome_completo_unaccent: string
           cpf: string
-          rg: string | null
-          antt: string | null
           telefone: string | null
-          subcontratada_id: string | null
           observacoes: string | null
           ativo: boolean
           created_at: string
@@ -121,10 +114,7 @@ export interface Database {
           id?: string
           nome_completo: string
           cpf: string
-          rg?: string | null
-          antt?: string | null
           telefone?: string | null
-          subcontratada_id?: string | null
           observacoes?: string | null
           ativo?: boolean
           created_at?: string
@@ -566,10 +556,9 @@ export interface Database {
           razao_social: string
           documento: string | null
           tipo_pessoa: 'PF' | 'PJ' | null
-          // Colunas dormentes (Fase 8.4): mantidas no banco para nao perder
-          // dado, mas sem UI no portal apos o alinhamento com o interno.
-          contato_nome: string | null
-          contato_telefone: string | null
+          // contato_nome/contato_telefone foram dropadas pela 0055: eram
+          // "colunas dormentes" desde a Fase 8.4 e as 427 linhas estavam todas
+          // nulas — dado pessoal guardado sem finalidade (LGPD art. 6, III).
           ativo: boolean
           created_at: string
           updated_at: string
@@ -581,8 +570,6 @@ export interface Database {
           razao_social: string
           documento?: string | null
           tipo_pessoa?: 'PF' | 'PJ' | null
-          contato_nome?: string | null
-          contato_telefone?: string | null
           ativo?: boolean
           created_at?: string
           updated_at?: string
@@ -596,8 +583,6 @@ export interface Database {
           parceiro_id: string
           nome_completo: string
           cpf: string
-          rg: string | null
-          antt: string | null
           telefone: string | null
           subcontratada_parceiro_id: string | null
           observacoes: string | null
@@ -611,8 +596,6 @@ export interface Database {
           parceiro_id: string
           nome_completo: string
           cpf: string
-          rg?: string | null
-          antt?: string | null
           telefone?: string | null
           subcontratada_parceiro_id?: string | null
           observacoes?: string | null

@@ -1,5 +1,5 @@
 -- =====================================================================
--- OC Express / SisLog LHG — Schema cumulativo (migrations 0001 → 0054)
+-- OC Express / SisLog LHG — Schema cumulativo (migrations 0001 → 0055)
 -- =====================================================================
 --
 -- Este arquivo agrega TODAS as migrations num único script IDEMPOTENTE.
@@ -115,7 +115,10 @@ CREATE TABLE IF NOT EXISTS motoristas (
   created_by uuid REFERENCES auth.users(id)
 );
 CREATE INDEX IF NOT EXISTS idx_motoristas_cpf ON motoristas(cpf);
-CREATE INDEX IF NOT EXISTS idx_motoristas_subcontratada ON motoristas(subcontratada_id);
+-- idx_motoristas_subcontratada removido: a coluna `motoristas.subcontratada_id`
+-- foi dropada pela 0055 (minimizacao LGPD) e este CREATE INDEX passaria a
+-- falhar num replay com "column does not exist", derrubando a transacao inteira.
+-- Os indices equivalentes de veiculos/carretas/solicitacoes continuam validos.
 DROP TRIGGER IF EXISTS trg_motoristas_updated ON motoristas;
 CREATE TRIGGER trg_motoristas_updated BEFORE UPDATE ON motoristas
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
@@ -3018,6 +3021,40 @@ BEGIN
   END LOOP;
 END
 $do$;
+
+NOTIFY pgrst, 'reload schema';
+
+
+-- =====================================================================
+-- 0055 — Minimizacao LGPD: colunas de dado pessoal sem uso
+-- =====================================================================
+-- Nove colunas com dado pessoal que nenhum formulario, tela, relatorio, PDF,
+-- exportacao ou policy usava (auditoria LGPD de 09/08/2026). Contagem no
+-- remoto antes do drop: so `motoristas.rg`/`.antt` tinham 1 linha preenchida,
+-- e era o motorista ficticio do seed 0002 — nenhum dado real foi perdido.
+--
+-- Este bloco fica DEPOIS dos CREATE TABLE que ainda declaram essas colunas, e
+-- os dois caminhos convergem: em banco novo o CREATE cria e este DROP remove;
+-- em banco vivo o CREATE IF NOT EXISTS e no-op e o DROP IF EXISTS tambem, se
+-- ja tiver rodado. Nao toca em policy, entao pode ficar depois da varredura da
+-- 0051 sem reintroduzir a regressao de InitPlan.
+
+ALTER TABLE motoristas
+  DROP COLUMN IF EXISTS rg,
+  DROP COLUMN IF EXISTS antt,
+  DROP COLUMN IF EXISTS subcontratada_id;
+
+ALTER TABLE parceiro_motoristas
+  DROP COLUMN IF EXISTS rg,
+  DROP COLUMN IF EXISTS antt;
+
+ALTER TABLE subcontratadas
+  DROP COLUMN IF EXISTS contato_nome,
+  DROP COLUMN IF EXISTS contato_telefone;
+
+ALTER TABLE parceiro_subcontratadas
+  DROP COLUMN IF EXISTS contato_nome,
+  DROP COLUMN IF EXISTS contato_telefone;
 
 NOTIFY pgrst, 'reload schema';
 

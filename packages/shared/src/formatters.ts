@@ -10,6 +10,27 @@ export function formatCpf(value: string): string {
     .replace(/(\d{3})(\d{1,2})$/, '$1-$2')
 }
 
+/**
+ * Mascara um CPF para sair do sistema por canal não controlado (mensagem de
+ * WhatsApp, e-mail), no padrão da Receita Federal: preserva os seis dígitos
+ * centrais e oculta os três primeiros e os dois verificadores.
+ *
+ *   '333.666.999-57' -> '***.666.999-**'
+ *
+ * Minimização (LGPD art. 6º, III): o trecho central basta para o conferente
+ * casar a pessoa com o documento em mãos, sem trafegar o identificador civil
+ * completo. O CPF inteiro continua no PDF da OC, que exige link assinado.
+ *
+ * Devolve '' quando o valor não é um CPF completo — o chamador deve omitir o
+ * campo nesse caso, nunca cair de volta no valor cru.
+ */
+export function maskCpf(value: string | null | undefined): string {
+  if (!value) return ''
+  const digits = value.replace(/\D/g, '')
+  if (digits.length !== 11) return ''
+  return `***.${digits.slice(3, 6)}.${digits.slice(6, 9)}-**`
+}
+
 export function formatCnpj(value: string): string {
   const digits = value.replace(/\D/g, '').slice(0, 14)
   return digits
