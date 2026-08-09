@@ -8,8 +8,18 @@
 -- precedido de DROP IF EXISTS, e renomes/migracoes ficam em DO blocks
 -- com checagem em information_schema.
 --
--- Quando criar uma migration nova em supabase/migrations/, refletir aqui
--- (no fim, antes da secao "Operacional / vinculos de usuario").
+-- Quando criar uma migration nova em supabase/migrations/, refletir aqui.
+-- ONDE colar depende do que a migration faz:
+--
+--   • Cria ou troca POLICY  -> ANTES da secao da 0051 (RLS/InitPlan). Ela e
+--     uma varredura sobre o estado vivo: policy colada depois dela fica de
+--     fora e volta a avaliar os helpers por linha. Foi o caso da 0059/0060.
+--   • So DDL, sem policy    -> no fim, antes da secao "Operacional /
+--     vinculos de usuario". Foi o caso da 0055.
+--
+-- As duas regras ja se contradisseram uma vez: o texto antigo mandava sempre
+-- colar no fim, o que teria posto as policies da 0059/0060 depois da varredura.
+-- Na duvida, ANTES da 0051 e sempre seguro — nada la embaixo depende de ordem.
 --
 -- ATENCAO — replay num remoto JA POPULADO: varios CHECK IN(...) sao re-adicionados
 -- em blocos de migrations antigas. Se um bloco usar a lista ANTIGA de valores, o
