@@ -1,0 +1,451 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<title>SisLog — Notas de atualização · agosto/2026</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/wanted-sans@1.0.3/fonts/webfonts/static/split/WantedSans.css" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Kanit:wght@500;600&display=swap" />
+<style>
+  @page { size: A4; margin: 16mm 15mm 14mm; }
+
+  :root {
+    --ink: #16181D;
+    --ink-soft: #4A5160;
+    --ink-faint: #7A8296;
+    --rule: #D8DCE3;
+    --rule-soft: #EBEEF2;
+    --accent: #CC4100;
+    --surface: #F6F7F9;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    font-family: "Wanted Sans", -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 9.6pt;
+    line-height: 1.5;
+    color: var(--ink);
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  h1, h2, h3 { font-family: Kanit, "Wanted Sans", sans-serif; margin: 0; letter-spacing: -0.01em; }
+
+  /* ---------- Cabeçalho ---------- */
+  .head { border-bottom: 2px solid var(--ink); padding-bottom: 10px; }
+  .head .kicker {
+    font-size: 7.6pt; letter-spacing: 1.4px; text-transform: uppercase;
+    color: var(--accent); font-weight: 600;
+  }
+  .head h1 { font-size: 23pt; font-weight: 600; line-height: 1.1; margin-top: 3px; }
+  .head .meta {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-top: 7px; font-size: 8.6pt; color: var(--ink-soft);
+  }
+  .head .meta strong { color: var(--ink); font-weight: 600; }
+
+  .intro {
+    margin: 15px 0 20px;
+    padding: 11px 13px;
+    background: var(--surface);
+    font-size: 9.4pt;
+    color: var(--ink-soft);
+  }
+  .intro strong { color: var(--ink); font-weight: 600; }
+
+  /* Destaque para a mudança que aparece na tela sem aviso. Mesmo bloco do
+     .intro: a diferença vem da chamada em acento, que é como o acento já é
+     usado neste documento (o kicker do cabeçalho), e não de uma barra lateral
+     colorida. */
+  .atencao {
+    margin: 15px 0 20px;
+    padding: 11px 13px;
+    background: var(--surface);
+    font-size: 9.4pt;
+    color: var(--ink-soft);
+  }
+  .atencao strong { color: var(--ink); font-weight: 600; }
+  .atencao .chamada {
+    color: var(--accent); font-weight: 600;
+    text-transform: uppercase; letter-spacing: 1px; font-size: 7.6pt;
+    display: block; margin-bottom: 3px;
+  }
+
+  /* ---------- Seções ---------- */
+  .app { margin-top: 22px; }
+  .app > h2 {
+    font-size: 13.5pt; font-weight: 600;
+    padding-bottom: 5px; border-bottom: 1px solid var(--rule);
+    display: flex; align-items: baseline; gap: 9px;
+  }
+  .app > h2 .tag {
+    font-family: "Wanted Sans", sans-serif;
+    font-size: 7.4pt; letter-spacing: 1px; text-transform: uppercase;
+    font-weight: 600; color: #fff; background: var(--ink);
+    padding: 2.5px 7px; position: relative; top: -2px;
+  }
+  .app.portal > h2 .tag { background: #1E40AF; }
+
+  h3.grupo {
+    font-size: 8pt; letter-spacing: 1.2px; text-transform: uppercase;
+    color: var(--ink-faint); font-weight: 600;
+    margin: 16px 0 8px;
+  }
+
+  /* ---------- Itens ---------- */
+  ul.itens { list-style: none; margin: 0; padding: 0; }
+  ul.itens > li {
+    display: grid; grid-template-columns: 15px 1fr; gap: 9px;
+    padding: 7px 0; border-bottom: 1px solid var(--rule-soft);
+    break-inside: avoid;
+  }
+  ul.itens > li:last-child { border-bottom: 0; }
+  ul.itens > li .n {
+    font-size: 9pt; color: var(--ink-faint);
+    font-variant-numeric: tabular-nums; text-align: right;
+  }
+  ul.itens > li .t { font-weight: 600; display: block; margin-bottom: 1px; }
+  ul.itens > li .d { color: var(--ink-soft); display: block; }
+  ul.itens ul {
+    margin: 4px 0 0; padding-left: 15px; color: var(--ink-soft);
+  }
+  ul.itens ul li { padding: 1px 0; }
+
+  /* Exemplo curto de antes/depois, dentro de um item. */
+  .amostra {
+    margin: 6px 0 2px; padding: 7px 9px; background: var(--surface);
+    font-size: 9pt; line-height: 1.55;
+  }
+  .amostra span { display: block; }
+  .amostra .rot {
+    font-size: 7.4pt; letter-spacing: 1px; text-transform: uppercase;
+    color: var(--ink-faint); font-weight: 600;
+  }
+
+  /* ---------- Onde encontrar ---------- */
+  .acoes { margin-top: 24px; break-inside: avoid; }
+  .acoes h2 { font-size: 12pt; font-weight: 600; margin-bottom: 9px; }
+  table.onde { width: 100%; border-collapse: collapse; font-size: 9.2pt; }
+  table.onde th {
+    text-align: left; font-size: 7.4pt; letter-spacing: 1px; text-transform: uppercase;
+    color: var(--ink-faint); font-weight: 600;
+    border-bottom: 1px solid var(--rule); padding: 0 10px 5px 0;
+  }
+  table.onde td { padding: 6px 10px 6px 0; border-bottom: 1px solid var(--rule-soft); vertical-align: top; }
+  table.onde td:first-child { font-weight: 600; white-space: nowrap; }
+  table.onde td:last-child { color: var(--ink-soft); }
+
+  /* ---------- Rodapé ---------- */
+  .foot {
+    margin-top: 26px; padding-top: 9px; border-top: 1px solid var(--rule);
+    font-size: 8.2pt; color: var(--ink-faint);
+    display: flex; justify-content: space-between; gap: 16px;
+    break-inside: avoid;
+  }
+</style>
+</head>
+<body>
+
+<header class="head">
+  <div class="kicker">LHG Logística · SisLog</div>
+  <h1>Notas de atualização</h1>
+  <div class="meta">
+    <span>Período: <strong>1º a 9 de agosto de 2026</strong></span>
+    <span>Versão <strong>1.4.0</strong></span>
+  </div>
+</header>
+
+<p class="intro">
+  Esta atualização é sobre <strong>proteção de dado pessoal</strong>. O SisLog passou por uma
+  revisão completa de privacidade: mapeamos todo dado de pessoa que o sistema guarda, retiramos o
+  que era guardado sem uso, reduzimos por onde o CPF circula e criamos o que faltava para atender
+  um pedido de motorista que queira ver ou apagar os próprios dados. <strong>Nenhuma tela mudou de
+  lugar</strong> e nenhum dado da operação foi perdido. As duas mudanças que você percebe no dia a
+  dia estão logo abaixo.
+</p>
+
+<p class="atencao">
+  <span class="chamada">Leia antes de usar</span>
+  O CPF do motorista agora sai <strong>parcialmente escondido</strong> na mensagem de WhatsApp, e o
+  link do PDF passou a valer <strong>5 dias</strong> em vez de 7. Não é defeito, é mudança
+  proposital. Os itens 1 e 2 explicam o porquê e o que fazer quando um link vencer.
+</p>
+
+<!-- ============================ O QUE VOCÊ VÊ ============================ -->
+<section class="app">
+  <h2><span class="tag">Interno</span> O que muda na sua tela</h2>
+
+  <ul class="itens">
+    <li>
+      <span class="n">1</span>
+      <span>
+        <span class="t">CPF parcialmente escondido na mensagem de WhatsApp</span>
+        <span class="d">
+          Ao enviar a Ordem de Carregamento, a mensagem passa a mostrar apenas o miolo do CPF.
+          <div class="amostra">
+            <span class="rot">Antes</span>
+            <span>Motorista: João Pereira da Silva, CPF 111.444.777-35</span>
+            <span class="rot" style="margin-top:5px">Agora</span>
+            <span>Motorista: João Pereira da Silva, CPF ***.444.777-**</span>
+          </div>
+          Os seis dígitos do meio bastam para o conferente casar a pessoa com o documento na mão.
+          <strong>O CPF completo continua no PDF da OC</strong>, que é o documento oficial do
+          carregamento. Ele só não trafega mais inteiro numa mensagem que pode ser encaminhada
+          para qualquer pessoa.
+        </span>
+      </span>
+    </li>
+    <li>
+      <span class="n">2</span>
+      <span>
+        <span class="t">O link do PDF agora vale 5 dias</span>
+        <span class="d">
+          Era 7 dias. O prazo cobre com folga o motorista que leva de 1 a 4 dias entre receber a
+          mensagem e chegar para carregar.
+          <ul>
+            <li><strong>Se o link vencer</strong>, abra a solicitação e envie pelo WhatsApp de novo: um link novo é gerado na hora</li>
+            <li>Nada muda para quem abre a OC pelo próprio sistema</li>
+          </ul>
+        </span>
+      </span>
+    </li>
+    <li>
+      <span class="n">3</span>
+      <span>
+        <span class="t">Exportações e anexos passam a ficar registrados</span>
+        <span class="d">
+          Três ações agora deixam registro de <strong>quem fez e quando</strong>: exportar CSV
+          (qualquer tela), gerar o link do PDF de uma OC e abrir um anexo. É o mesmo tipo de
+          registro que já existia para quem cria, edita e apaga cadastro. A diferença é que agora
+          vale também para <strong>consulta</strong>, que é por onde dado pessoal costuma sair em
+          volume.
+          <ul>
+            <li>Não muda nada no seu fluxo: continue exportando normalmente</li>
+            <li>O registro guarda a ação e a quantidade de linhas, nunca o conteúdo exportado</li>
+          </ul>
+        </span>
+      </span>
+    </li>
+  </ul>
+</section>
+
+<!-- ============================ PEDIDO DE TITULAR ============================ -->
+<section class="app">
+  <h2><span class="tag">Interno</span> Pedido de motorista sobre os próprios dados</h2>
+
+  <p class="intro" style="margin-top:12px">
+    A lei dá ao motorista o direito de pedir para <strong>ver</strong>, <strong>corrigir</strong> ou
+    <strong>apagar</strong> os dados que a empresa guarda sobre ele. Ver e corrigir o sistema já
+    fazia; apagar, não. Agora os três caminhos existem.
+  </p>
+
+  <ul class="itens">
+    <li>
+      <span class="n">4</span>
+      <span>
+        <span class="t">Ver todos os dados de uma pessoa</span>
+        <span class="d">
+          A partir do CPF, o sistema reúne num só lugar o cadastro, as solicitações em que a pessoa
+          aparece, os anexos ligados a elas e o histórico de alterações do cadastro.
+          <strong>Peça ao administrador</strong>: ainda não há tela para isso, e a consulta é feita
+          nos bastidores e entregue como arquivo.
+        </span>
+      </span>
+    </li>
+    <li>
+      <span class="n">5</span>
+      <span>
+        <span class="t">Corrigir</span>
+        <span class="d">
+          Pelas telas de cadastro de sempre. Nada mudou.
+        </span>
+      </span>
+    </li>
+    <li>
+      <span class="n">6</span>
+      <span>
+        <span class="t">Apagar os dados de uma pessoa</span>
+        <span class="d">
+          Nome, CPF, telefone e observações são substituídos por uma marca de anonimizado, e o
+          cadastro é desativado. <strong>As Ordens de Carregamento antigas continuam no
+          histórico</strong>: número, cliente, datas, placas e material seguem lá, apenas sem
+          identificar a pessoa. É assim de propósito: a empresa é obrigada a guardar o histórico
+          fiscal do transporte, e apagar a linha levaria a OC junto.
+          <ul>
+            <li>Só o administrador executa, e o sistema mostra antes o que será alterado</li>
+            <li><strong>Não funciona com viagem em andamento</strong>: finalize ou cancele as solicitações abertas da pessoa antes de pedir</li>
+          </ul>
+        </span>
+      </span>
+    </li>
+  </ul>
+</section>
+
+<!-- ============================ PORTAL ============================ -->
+<section class="app portal">
+  <h2><span class="tag">Portal</span> Portal de Parceiros</h2>
+
+  <ul class="itens">
+    <li>
+      <span class="n">1</span>
+      <span>
+        <span class="t">Exportação da frota também fica registrada</span>
+        <span class="d">
+          Exportar o CSV de motoristas passa a deixar registro de quem fez e quando, do mesmo jeito
+          que no sistema interno. O conteúdo exportado não é guardado.
+        </span>
+      </span>
+    </li>
+    <li>
+      <span class="n">2</span>
+      <span>
+        <span class="t">Excluir anexo ficou mais seguro</span>
+        <span class="d">
+          A ordem interna da exclusão foi corrigida. Antes, se algo falhasse no meio, o anexo podia
+          continuar aparecendo na lista sem abrir. Agora o pior caso não afeta quem usa: para você,
+          o anexo some, que era a intenção.
+        </span>
+      </span>
+    </li>
+    <li>
+      <span class="n">3</span>
+      <span>
+        <span class="t">Registro de tentativa de acesso mais confiável</span>
+        <span class="d">
+          O painel de segurança mostra as tentativas de entrada no portal. A origem dessas
+          tentativas passou a ser identificada <strong>pelo próprio servidor</strong>, e não mais
+          informada por quem tenta entrar, o que impedia confiar no registro. Também passou a haver
+          limite de tentativas seguidas a partir de uma mesma origem.
+        </span>
+      </span>
+    </li>
+  </ul>
+</section>
+
+<!-- ============================ BASTIDORES ============================ -->
+<section class="app">
+  <h2><span class="tag">Ambos</span> Nos bastidores</h2>
+
+  <p class="intro" style="margin-top:12px">
+    Mudanças sem efeito visível na tela, registradas aqui porque afetam o que a empresa guarda.
+  </p>
+
+  <ul class="itens">
+    <li>
+      <span class="n">1</span>
+      <span>
+        <span class="t">Campos que eram guardados sem nunca serem usados</span>
+        <span class="d">
+          Nove campos de dado pessoal existiam no banco sem aparecer em nenhuma tela, relatório,
+          PDF ou exportação, entre eles o <strong>RG do motorista</strong>. Guardar documento de
+          identidade que ninguém usa é exatamente o que a lei proíbe. Todos foram removidos.
+          <ul>
+            <li>Nenhum dado real foi perdido: oito dos nove estavam completamente vazios</li>
+            <li>O único preenchido era um cadastro fictício de teste, também removido</li>
+          </ul>
+        </span>
+      </span>
+    </li>
+    <li>
+      <span class="n">2</span>
+      <span>
+        <span class="t">Prazo para guardar registros</span>
+        <span class="d">
+          Até agora o sistema guardava histórico para sempre, sem prazo definido. Foram
+          estabelecidos: <strong>5 anos</strong> para o histórico de alterações, acompanhando a
+          guarda fiscal do transporte, e <strong>1 ano</strong> para os registros de acesso e de
+          login. Nada será apagado tão cedo: o registro mais antigo do sistema é de abril de 2026.
+        </span>
+      </span>
+    </li>
+    <li>
+      <span class="n">3</span>
+      <span>
+        <span class="t">Arquivos de anexo excluídos</span>
+        <span class="d">
+          Quando um anexo era removido, havia situações em que o arquivo continuava guardado sem
+          nada apontando para ele. Agora toda remoção fica controlada, e o que porventura sobrar
+          aparece numa lista para ser limpo.
+        </span>
+      </span>
+    </li>
+    <li>
+      <span class="n">4</span>
+      <span>
+        <span class="t">Verificações confirmadas</span>
+        <span class="d">
+          A revisão também conferiu pontos que já estavam corretos e não precisaram de mudança:
+          <strong>nenhuma senha é guardada de forma legível</strong>, os arquivos de OC e de anexo
+          já estavam fechados a acesso externo e o sistema <strong>não guarda dado de saúde,
+          biometria, religião, opinião política nem dado de menor de idade</strong>.
+        </span>
+      </span>
+    </li>
+    <li>
+      <span class="n">5</span>
+      <span>
+        <span class="t">Documento de conformidade</span>
+        <span class="d">
+          Foi criado o <strong>COMPLIANCE.md</strong>, que registra todo dado pessoal tratado, os
+          prazos acima, como atender um pedido de motorista e as medidas de segurança em vigor. É o
+          documento a apresentar caso a empresa seja questionada sobre proteção de dados.
+        </span>
+      </span>
+    </li>
+  </ul>
+</section>
+
+<!-- ============================ A CAMINHO ============================ -->
+<section class="app">
+  <h2><span class="tag">Ambos</span> A caminho</h2>
+  <ul class="itens">
+    <li>
+      <span class="n">1</span>
+      <span>
+        <span class="t">Verificação em duas etapas passa a ser obrigatória</span>
+        <span class="d">
+          Hoje o 2FA é opcional (ver julho/2026, item 4). No <strong>começo de setembro</strong> ele
+          passa a ser exigido de todos os perfis internos: quem ainda não ativou verá uma tela
+          pedindo a ativação no primeiro login. <strong>A equipe será avisada antes.</strong>
+          Se quiser adiantar, ative agora em Meu perfil.
+        </span>
+      </span>
+    </li>
+    <li>
+      <span class="n">2</span>
+      <span>
+        <span class="t">Telas para o que hoje é feito nos bastidores</span>
+        <span class="d">
+          Consulta e exclusão de dados de uma pessoa, além da lista de registros de acesso, ainda
+          dependem do administrador. As telas estão previstas.
+        </span>
+      </span>
+    </li>
+  </ul>
+</section>
+
+<!-- ============================ ONDE ENCONTRAR ============================ -->
+<section class="acoes">
+  <h2>Onde encontrar</h2>
+  <table class="onde">
+    <thead>
+      <tr><th>O quê</th><th>Onde</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Enviar OC por WhatsApp</td><td>Abrir a solicitação → Enviar pelo WhatsApp (link novo é gerado a cada envio)</td></tr>
+      <tr><td>CPF completo do motorista</td><td>No PDF da OC e na tela de detalhe da solicitação</td></tr>
+      <tr><td>Ativar 2FA antes de virar obrigatório</td><td>Seu nome → Meu perfil → Verificação em duas etapas</td></tr>
+      <tr><td>Pedido de motorista sobre os dados dele</td><td>Falar com o administrador do sistema</td></tr>
+      <tr><td>Documento de conformidade</td><td>COMPLIANCE.md, na raiz do projeto</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<footer class="foot">
+  <span>LHG Logística · SisLog v1.4.0 · Documento gerado em 09/08/2026</span>
+  <span>Suporte: davi.silva@lhgmining.com.br · WhatsApp +55 67 99871-2180</span>
+</footer>
+
+</body>
+</html>
