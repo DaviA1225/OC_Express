@@ -1,5 +1,5 @@
 -- =====================================================================
--- OC Express / SisLog LHG — Schema cumulativo (migrations 0001 → 0060)
+-- OC Express / SisLog LHG — Schema cumulativo (migrations 0001 → 0066)
 -- =====================================================================
 --
 -- Este arquivo agrega TODAS as migrations num único script IDEMPOTENTE.
@@ -1176,9 +1176,10 @@ CREATE TRIGGER trg_solicitacoes_rate_limit_diario
 
 ALTER TABLE eventos_portal DROP CONSTRAINT IF EXISTS eventos_portal_tipo_evento_check;
 -- Lista FINAL (inclui 'portal_solicitacao_editada' e 'portal_usuario_excluido',
--- migrations 0031/0043) mesmo neste bloco antigo (0023): re-adicionar a lista
--- curta num remoto ja populado aborta (23514) porque ja existem linhas desses
--- tipos, dando rollback de TODA a transacao do SQL Editor. Superset = replay seguro.
+-- migrations 0031/0043, e os tres de agendamento da 0061) mesmo neste bloco
+-- antigo (0023): re-adicionar a lista curta num remoto ja populado aborta
+-- (23514) porque ja existem linhas desses tipos, dando rollback de TODA a
+-- transacao do SQL Editor. Superset = replay seguro.
 ALTER TABLE eventos_portal ADD CONSTRAINT eventos_portal_tipo_evento_check
   CHECK (tipo_evento IN (
     'portal_login',
@@ -1189,7 +1190,10 @@ ALTER TABLE eventos_portal ADD CONSTRAINT eventos_portal_tipo_evento_check
     'portal_solicitacao_cancelada',
     'portal_senha_alterada',
     'portal_usuario_convidado',
-    'portal_usuario_excluido'
+    'portal_usuario_excluido',
+    'portal_agendamento_solicitado',
+    'portal_agendamento_cancelado',
+    'portal_agendamento_reagendado'
   ));
 
 -- ============================================================
@@ -1831,7 +1835,10 @@ ALTER TABLE eventos_portal ADD CONSTRAINT eventos_portal_tipo_evento_check
     'portal_solicitacao_cancelada',
     'portal_senha_alterada',
     'portal_usuario_convidado',
-    'portal_usuario_excluido'
+    'portal_usuario_excluido',
+    'portal_agendamento_solicitado',
+    'portal_agendamento_cancelado',
+    'portal_agendamento_reagendado'
   ));
 
 -- ============================================================
@@ -3328,6 +3335,649 @@ GRANT EXECUTE ON FUNCTION registrar_evento_portal(text, jsonb) TO anon, authenti
 
 
 -- =====================================================================
+-- 0061 — Modulo de Agendamentos (docs/SPEC-AGENDAMENTOS.md)
+-- =====================================================================
+-- Digitaliza a solicitacao de agendamento de descarga em terminal. Fica ANTES
+-- da varredura da 0051 porque cria policies (agendamentos, terminal_janelas e
+-- storage.objects).
+--
+-- Decisoes que o schema materializa: agendamento e sempre filho de uma
+-- solicitacao; a NF nasce no carregamento, logo o pedido so vale depois que a
+-- carga sai; data desejada e preferencia, nao exigencia; reagendar cria linha
+-- nova ('substituido' na anterior); o que exige agendamento e atributo do
+-- CLIENTE, nao da rota.
+
+-- ---------- clientes: quem exige agendamento ----------
+ALTER TABLE clientes
+  ADD COLUMN IF NOT EXISTS requer_agendamento boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS terminal_nome text,
+  ADD COLUMN IF NOT EXISTS antecedencia_minima_horas integer,
+  ADD COLUMN IF NOT EXISTS observacoes_agendamento text;
+
+-- ---------- terminal_janelas: grade de slots ----------
+-- Dois padroes de grade, nao um: 08..16 de 1 h com 4 vagas (TCI, Arcelor,
+-- Metalsider) e 06/13/19 de 6 h com 10 vagas (A.B/CSN). Uma linha por slot —
+-- janela_inicio/janela_fim nao representariam os dois.
+CREATE TABLE IF NOT EXISTS terminal_janelas (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  cliente_id uuid NOT NULL REFERENCES clientes(id) ON DELETE CASCADE,
+  hora time NOT NULL,
+  duracao_minutos integer NOT NULL DEFAULT 60,
+  capacidade integer,
+  ativo boolean NOT NULL DEFAULT true,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  created_by uuid REFERENCES auth.users(id),
+  UNIQUE (cliente_id, hora)
+);
+CREATE INDEX IF NOT EXISTS idx_terminal_janelas_cliente
+  ON terminal_janelas(cliente_id) WHERE ativo = true;
+
+DROP TRIGGER IF EXISTS trg_terminal_janelas_updated ON terminal_janelas;
+CREATE TRIGGER trg_terminal_janelas_updated BEFORE UPDATE ON terminal_janelas
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+DROP TRIGGER IF EXISTS aud_terminal_janelas ON terminal_janelas;
+CREATE TRIGGER aud_terminal_janelas AFTER INSERT OR UPDATE OR DELETE ON terminal_janelas
+  FOR EACH ROW EXECUTE FUNCTION audit_trigger();
+
+-- ---------- agendamentos ----------
+CREATE TABLE IF NOT EXISTS agendamentos (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  numero_interno serial UNIQUE NOT NULL,
+  solicitacao_id uuid NOT NULL REFERENCES solicitacoes(id) ON DELETE CASCADE,
+  parceiro_id uuid REFERENCES parceiros(id) ON DELETE CASCADE,
+  parceiro_usuario_id uuid REFERENCES parceiro_usuarios(id) ON DELETE SET NULL,
+  status text NOT NULL DEFAULT 'solicitado',
+  data_preferida date NOT NULL,
+  hora_preferida time,
+  observacoes text,
+  nota_fiscal text,
+  nota_fiscal_origem text,
+  data_agendada date,
+  hora_agendada time,
+  hora_fora_da_grade boolean NOT NULL DEFAULT false,
+  comprovante_path text,
+  nf_pdf_path text,
+  contrato_frete_path text,   -- 0064
+  substitui_agendamento_id uuid REFERENCES agendamentos(id) ON DELETE SET NULL,
+  motivo_reagendamento text,
+  assumido_por uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  assumido_em timestamptz,
+  agendado_por uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  agendado_em timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  created_by uuid REFERENCES auth.users(id) ON DELETE SET NULL
+);
+
+-- 0064 — coluna do contrato de frete. Precisa de ALTER e nao so do CREATE TABLE
+-- acima: num banco que ja tem `agendamentos` (parou na 0061), o CREATE TABLE IF
+-- NOT EXISTS e no-op e a coluna nunca chegaria — e o CHECK abaixo, que a
+-- referencia, quebraria com "column does not exist".
+ALTER TABLE agendamentos
+  ADD COLUMN IF NOT EXISTS contrato_frete_path text;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'agendamentos_status_check') THEN
+    ALTER TABLE agendamentos ADD CONSTRAINT agendamentos_status_check
+      CHECK (status IN ('solicitado','em_andamento','agendado','substituido','cancelado'));
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'agendamentos_nf_origem_check') THEN
+    ALTER TABLE agendamentos ADD CONSTRAINT agendamentos_nf_origem_check
+      CHECK (nota_fiscal_origem IS NULL OR nota_fiscal_origem IN ('automatica','manual'));
+  END IF;
+END $$;
+
+-- `agendado_completo` na forma FINAL da 0064 (com o contrato de frete), e SEM
+-- guarda de "se nao existir": um banco parado na 0061 ja tem a constraint na
+-- forma antiga, e a guarda faria o replay puxar para o lado errado — deixaria a
+-- versao de tres campos no lugar, achando que estava tudo certo. DROP + ADD
+-- converge de qualquer estado.
+--
+-- NOT VALID pelo mesmo motivo da migration: existem agendamentos concluidos
+-- ANTES desta regra, e um replay nao pode abortar por causa deles. A regra vale
+-- para toda linha inserida ou atualizada daqui em diante; para fechar a divida,
+-- anexe o contrato nas linhas herdadas e rode
+-- `ALTER TABLE agendamentos VALIDATE CONSTRAINT agendamentos_agendado_completo`.
+ALTER TABLE agendamentos DROP CONSTRAINT IF EXISTS agendamentos_agendado_completo;
+ALTER TABLE agendamentos ADD CONSTRAINT agendamentos_agendado_completo
+  CHECK (status <> 'agendado'
+         OR (data_agendada IS NOT NULL AND hora_agendada IS NOT NULL
+             AND comprovante_path IS NOT NULL
+             AND contrato_frete_path IS NOT NULL)) NOT VALID;
+
+-- Um agendamento vivo por solicitacao: e este indice que obriga o
+-- reagendamento a passar pela RPC (substitui + insere na mesma transacao).
+CREATE UNIQUE INDEX IF NOT EXISTS uq_agendamento_ativo_por_solicitacao
+  ON agendamentos(solicitacao_id)
+  WHERE status IN ('solicitado','em_andamento','agendado');
+CREATE INDEX IF NOT EXISTS idx_agendamentos_status ON agendamentos(status);
+CREATE INDEX IF NOT EXISTS idx_agendamentos_parceiro ON agendamentos(parceiro_id);
+CREATE INDEX IF NOT EXISTS idx_agendamentos_solicitacao ON agendamentos(solicitacao_id);
+CREATE INDEX IF NOT EXISTS idx_agendamentos_fila
+  ON agendamentos(created_at) WHERE status IN ('solicitado','em_andamento');
+CREATE INDEX IF NOT EXISTS idx_agendamentos_data_agendada
+  ON agendamentos(data_agendada, hora_agendada) WHERE status = 'agendado';
+
+CREATE OR REPLACE FUNCTION agendamento_preencher_insert()
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE
+  v_cliente_requer boolean;
+BEGIN
+  SELECT s.parceiro_id, c.requer_agendamento
+    INTO NEW.parceiro_id, v_cliente_requer
+    FROM solicitacoes s
+    LEFT JOIN clientes c ON c.id = s.cliente_id
+   WHERE s.id = NEW.solicitacao_id;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Solicitacao nao encontrada.' USING ERRCODE = '23503';
+  END IF;
+  IF v_cliente_requer IS NOT TRUE THEN
+    RAISE EXCEPTION 'Esta rota nao exige agendamento.' USING ERRCODE = '23514';
+  END IF;
+  IF NEW.parceiro_usuario_id IS NULL THEN
+    SELECT pu.id INTO NEW.parceiro_usuario_id FROM parceiro_usuarios pu
+     WHERE pu.user_id = auth.uid() AND pu.ativo = true LIMIT 1;
+  END IF;
+  NEW.created_by := auth.uid();
+  NEW.status := 'solicitado';
+  NEW.assumido_por := NULL; NEW.assumido_em := NULL;
+  NEW.agendado_por := NULL; NEW.agendado_em := NULL;
+  NEW.data_agendada := NULL; NEW.hora_agendada := NULL;
+  NEW.hora_fora_da_grade := false; NEW.comprovante_path := NULL;
+  RETURN NEW;
+END; $$;
+
+CREATE OR REPLACE FUNCTION agendamento_transicao()
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE v_ok boolean; v_slots integer;
+BEGIN
+  IF NEW.status IS DISTINCT FROM OLD.status THEN
+    v_ok := CASE OLD.status
+      WHEN 'solicitado'   THEN NEW.status IN ('em_andamento','cancelado')
+      WHEN 'em_andamento' THEN NEW.status IN ('agendado','solicitado','cancelado')
+      WHEN 'agendado'     THEN NEW.status IN ('substituido','cancelado')
+      ELSE false
+    END;
+    IF NOT v_ok THEN
+      RAISE EXCEPTION 'Transicao invalida de % para %.', OLD.status, NEW.status
+        USING ERRCODE = '23514';
+    END IF;
+  END IF;
+  IF NEW.status = 'em_andamento' AND OLD.status <> 'em_andamento' THEN
+    NEW.assumido_por := COALESCE(auth.uid(), NEW.assumido_por);
+    NEW.assumido_em := now();
+  END IF;
+  IF NEW.status = 'solicitado' AND OLD.status = 'em_andamento' THEN
+    NEW.assumido_por := NULL; NEW.assumido_em := NULL;
+  END IF;
+  IF NEW.status = 'agendado' AND OLD.status <> 'agendado' THEN
+    NEW.agendado_por := COALESCE(auth.uid(), NEW.agendado_por);
+    NEW.agendado_em := now();
+    SELECT count(*) INTO v_slots FROM terminal_janelas tj
+      JOIN solicitacoes s ON s.cliente_id = tj.cliente_id
+     WHERE s.id = NEW.solicitacao_id AND tj.ativo = true;
+    IF v_slots = 0 THEN
+      NEW.hora_fora_da_grade := false;
+    ELSE
+      NEW.hora_fora_da_grade := NOT EXISTS (
+        SELECT 1 FROM terminal_janelas tj
+          JOIN solicitacoes s ON s.cliente_id = tj.cliente_id
+         WHERE s.id = NEW.solicitacao_id AND tj.ativo = true AND tj.hora = NEW.hora_agendada);
+    END IF;
+  END IF;
+  RETURN NEW;
+END; $$;
+
+DROP TRIGGER IF EXISTS trg_agendamento_preencher ON agendamentos;
+CREATE TRIGGER trg_agendamento_preencher BEFORE INSERT ON agendamentos
+  FOR EACH ROW EXECUTE FUNCTION agendamento_preencher_insert();
+DROP TRIGGER IF EXISTS trg_agendamento_transicao ON agendamentos;
+CREATE TRIGGER trg_agendamento_transicao BEFORE UPDATE ON agendamentos
+  FOR EACH ROW EXECUTE FUNCTION agendamento_transicao();
+DROP TRIGGER IF EXISTS trg_agendamentos_updated ON agendamentos;
+CREATE TRIGGER trg_agendamentos_updated BEFORE UPDATE ON agendamentos
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+DROP TRIGGER IF EXISTS aud_agendamentos ON agendamentos;
+CREATE TRIGGER aud_agendamentos AFTER INSERT OR UPDATE OR DELETE ON agendamentos
+  FOR EACH ROW EXECUTE FUNCTION audit_trigger();
+
+-- ---------- RLS ----------
+-- Parceiro le (o SELECT tambem e o que habilita o Realtime dele) e escreve
+-- so pelas RPCs, como na 0044.
+ALTER TABLE agendamentos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE terminal_janelas ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS agendamentos_interno_all ON agendamentos;
+DROP POLICY IF EXISTS agendamentos_parceiro_select ON agendamentos;
+CREATE POLICY agendamentos_interno_all ON agendamentos FOR ALL TO authenticated
+  USING ((SELECT is_interno())) WITH CHECK ((SELECT is_interno()));
+CREATE POLICY agendamentos_parceiro_select ON agendamentos FOR SELECT TO authenticated
+  USING (parceiro_id = (SELECT get_current_parceiro_id()));
+
+DROP POLICY IF EXISTS terminal_janelas_interno_all ON terminal_janelas;
+DROP POLICY IF EXISTS terminal_janelas_leitura ON terminal_janelas;
+CREATE POLICY terminal_janelas_interno_all ON terminal_janelas FOR ALL TO authenticated
+  USING ((SELECT is_interno())) WITH CHECK ((SELECT is_interno()));
+CREATE POLICY terminal_janelas_leitura ON terminal_janelas FOR SELECT TO authenticated
+  USING (ativo = true);
+
+-- ---------- Storage: bucket privado agendamentos-docs ----------
+-- Diferente de `ocs-pdf`, o parceiro LE os proprios comprovantes: e o que ele
+-- precisa receber de volta. Escrita so da equipe.
+DO $$
+BEGIN
+  INSERT INTO storage.buckets (id, name, public)
+  VALUES ('agendamentos-docs', 'agendamentos-docs', false)
+  ON CONFLICT (id) DO NOTHING;
+EXCEPTION WHEN insufficient_privilege THEN
+  RAISE NOTICE 'Sem privilegio para criar o bucket agendamentos-docs via SQL. Crie-o PRIVADO pelo Dashboard.';
+END $$;
+
+CREATE OR REPLACE FUNCTION storage_agendamento_pertence_ao_parceiro_logado(p_name text)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public, pg_temp AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM agendamentos
+     WHERE id::text = split_part(p_name, '/', 1)
+       AND parceiro_id IS NOT NULL
+       AND parceiro_id = get_current_parceiro_id());
+$$;
+
+DROP POLICY IF EXISTS "agendamentos_docs_select" ON storage.objects;
+DROP POLICY IF EXISTS "agendamentos_docs_insert" ON storage.objects;
+DROP POLICY IF EXISTS "agendamentos_docs_update" ON storage.objects;
+DROP POLICY IF EXISTS "agendamentos_docs_delete" ON storage.objects;
+CREATE POLICY "agendamentos_docs_select" ON storage.objects FOR SELECT TO authenticated
+  USING (bucket_id = 'agendamentos-docs'
+         AND ((SELECT is_interno()) OR storage_agendamento_pertence_ao_parceiro_logado(name)));
+CREATE POLICY "agendamentos_docs_insert" ON storage.objects FOR INSERT TO authenticated
+  WITH CHECK (bucket_id = 'agendamentos-docs' AND (SELECT is_interno()));
+CREATE POLICY "agendamentos_docs_update" ON storage.objects FOR UPDATE TO authenticated
+  USING (bucket_id = 'agendamentos-docs' AND (SELECT is_interno()));
+CREATE POLICY "agendamentos_docs_delete" ON storage.objects FOR DELETE TO authenticated
+  USING (bucket_id = 'agendamentos-docs' AND (SELECT is_interno()));
+
+-- ---------- clientes_publicos ganha as colunas de agendamento (0061 + 0062) ----------
+-- O portal precisa saber se o destino exige agendamento e qual a antecedencia;
+-- o parceiro nao tem SELECT em `clientes` e esta view e a via para isso.
+--
+-- Forma FINAL ja com a 0062: entram os tres campos ESTRUTURADOS e fica de fora
+-- `observacoes_agendamento`, que e texto livre da equipe. A view responde a
+-- role `anon` (a anon key viaja no bundle do front), entao prosa da operacao
+-- nao pode passar por aqui — mesma razao pela qual `agendamentos` guarda um
+-- booleano em vez de "observacoes internas".
+--
+-- DROP + CREATE, e nao CREATE OR REPLACE: replace nao remove coluna, e um banco
+-- parado na 0061 (com quatro colunas) faria o replay abortar. Nada depende
+-- desta view, entao o DROP e seguro. O SELECT do `anon` volta pelos default
+-- privileges do schema public, como antes.
+DROP VIEW IF EXISTS clientes_publicos;
+CREATE VIEW clientes_publicos
+WITH (security_invoker = false) AS
+SELECT id, razao_social, cidade, uf,
+       requer_agendamento, terminal_nome, antecedencia_minima_horas
+FROM clientes
+WHERE ativo = true
+  AND cliente_minerio = true;
+GRANT SELECT ON clientes_publicos TO authenticated;
+
+-- ---------- RPCs ----------
+-- Ocupacao da propria LHG por slot: referencia parcial, nunca disponibilidade.
+-- A vaga real vive no sistema do terminal e outras transportadoras tambem
+-- ocupam slots. DEFINER porque o parceiro so enxerga os proprios agendamentos.
+CREATE OR REPLACE FUNCTION agendamentos_ocupacao_slot(p_cliente_id uuid, p_data date)
+RETURNS TABLE (hora time, duracao_minutos integer, capacidade integer, ocupados integer)
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
+  SELECT tj.hora, tj.duracao_minutos, tj.capacidade,
+         (SELECT count(*)::integer FROM agendamentos a
+            JOIN solicitacoes s ON s.id = a.solicitacao_id
+           WHERE a.status = 'agendado' AND a.data_agendada = p_data
+             AND a.hora_agendada = tj.hora AND s.cliente_id = p_cliente_id) AS ocupados
+    FROM terminal_janelas tj
+   WHERE tj.cliente_id = p_cliente_id AND tj.ativo = true
+   ORDER BY tj.hora;
+$$;
+
+-- Grade padrao por id do cliente — o casamento por razao_social e fragil (a
+-- base tem 'A. B. OPERADORA DE TERMINAIS L' e ' Estoque-A. B. OPERADORA DE TE').
+CREATE OR REPLACE FUNCTION terminal_aplicar_grade_padrao(p_cliente_id uuid, p_modelo text)
+RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path = public, pg_temp AS $$
+DECLARE v_inseridos integer := 0;
+BEGIN
+  IF p_modelo = 'horaria' THEN
+    INSERT INTO terminal_janelas (cliente_id, hora, duracao_minutos, capacidade, created_by)
+    SELECT p_cliente_id, g.h::time, 60, 4, auth.uid()
+      FROM generate_series(timestamp '2000-01-01 08:00', timestamp '2000-01-01 16:00',
+                           interval '1 hour') AS g(h)
+    ON CONFLICT (cliente_id, hora) DO NOTHING;
+  ELSIF p_modelo = 'janela_longa' THEN
+    INSERT INTO terminal_janelas (cliente_id, hora, duracao_minutos, capacidade, created_by)
+    SELECT p_cliente_id, g.h, 360, 10, auth.uid()
+      FROM (VALUES ('06:00'::time), ('13:00'::time), ('19:00'::time)) AS g(h)
+    ON CONFLICT (cliente_id, hora) DO NOTHING;
+  ELSE
+    RAISE EXCEPTION 'Modelo de grade invalido: % (use horaria ou janela_longa).', p_modelo
+      USING ERRCODE = '22023';
+  END IF;
+  GET DIAGNOSTICS v_inseridos = ROW_COUNT;
+  RETURN v_inseridos;
+END; $$;
+
+-- Nucleo do reagendamento, sem GRANT: so as duas RPCs abaixo o chamam, depois
+-- de autorizar. DEFINER sem checagem de permissao nao pode ir a authenticated.
+CREATE OR REPLACE FUNCTION agendamento_reagendar_core(
+  p_agendamento_id uuid, p_motivo text, p_nova_data date, p_nova_hora time)
+RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE v_antigo agendamentos%ROWTYPE; v_novo uuid;
+BEGIN
+  SELECT * INTO v_antigo FROM agendamentos WHERE id = p_agendamento_id FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Agendamento nao encontrado.' USING ERRCODE = 'PT404';
+  END IF;
+  IF v_antigo.status <> 'agendado' THEN
+    RAISE EXCEPTION 'So um agendamento ja confirmado pode ser reagendado.' USING ERRCODE = 'PT409';
+  END IF;
+  IF p_nova_data IS NULL THEN
+    RAISE EXCEPTION 'Informe a nova data desejada.' USING ERRCODE = '22004';
+  END IF;
+  UPDATE agendamentos
+     SET status = 'substituido',
+         motivo_reagendamento = COALESCE(NULLIF(btrim(p_motivo), ''), motivo_reagendamento)
+   WHERE id = p_agendamento_id;
+  INSERT INTO agendamentos (solicitacao_id, data_preferida, hora_preferida, observacoes,
+                            nota_fiscal, nota_fiscal_origem,
+                            substitui_agendamento_id, motivo_reagendamento)
+  VALUES (v_antigo.solicitacao_id, p_nova_data, p_nova_hora, v_antigo.observacoes,
+          v_antigo.nota_fiscal, v_antigo.nota_fiscal_origem,
+          p_agendamento_id, NULLIF(btrim(p_motivo), ''))
+  RETURNING id INTO v_novo;
+  RETURN v_novo;
+END; $$;
+REVOKE ALL ON FUNCTION agendamento_reagendar_core(uuid, text, date, time) FROM public, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION portal_solicitar_agendamento(
+  p_solicitacao_id uuid, p_data_preferida date, p_hora_preferida time, p_observacoes text)
+RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE
+  v_parceiro uuid := get_current_parceiro_id();
+  v_status text; v_cliente uuid; v_requer boolean; v_antecedencia integer;
+  v_min_data date; v_slots integer; v_id uuid;
+BEGIN
+  IF v_parceiro IS NULL THEN
+    RAISE EXCEPTION 'Sessao de parceiro nao identificada.' USING ERRCODE = '42501';
+  END IF;
+  SELECT s.status, s.cliente_id, c.requer_agendamento, c.antecedencia_minima_horas
+    INTO v_status, v_cliente, v_requer, v_antecedencia
+    FROM solicitacoes s LEFT JOIN clientes c ON c.id = s.cliente_id
+   WHERE s.id = p_solicitacao_id AND s.origem = 'parceiro' AND s.parceiro_id = v_parceiro;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Solicitacao nao encontrada.' USING ERRCODE = 'PT404';
+  END IF;
+  IF v_requer IS NOT TRUE THEN
+    RAISE EXCEPTION 'Esta rota nao exige agendamento.' USING ERRCODE = 'PT409';
+  END IF;
+  -- A NF nasce no carregamento: antes da OC enviada o pedido chega cedo demais.
+  IF v_status NOT IN ('oc_enviada','finalizada') THEN
+    RAISE EXCEPTION 'O agendamento so pode ser pedido depois que a carga sai (OC enviada).'
+      USING ERRCODE = 'PT409';
+  END IF;
+  IF p_data_preferida IS NULL THEN
+    RAISE EXCEPTION 'Informe a data desejada.' USING ERRCODE = '22004';
+  END IF;
+  -- Fuso explicito: o servidor roda em UTC e o front calcula a data minima no
+  -- relogio local. Sem isto, das 21h em diante o SisLog recusaria uma data que
+  -- a propria tela acabou de oferecer (mesmo motivo do dia-calendario da 0022).
+  v_min_data := ((now() AT TIME ZONE 'America/Sao_Paulo')
+                 + make_interval(hours => COALESCE(v_antecedencia, 0)))::date;
+  IF p_data_preferida < v_min_data THEN
+    RAISE EXCEPTION 'Este terminal exige % h de antecedencia.', COALESCE(v_antecedencia, 0)
+      USING ERRCODE = 'PT422';
+  END IF;
+  IF p_hora_preferida IS NOT NULL THEN
+    SELECT count(*) INTO v_slots FROM terminal_janelas
+     WHERE cliente_id = v_cliente AND ativo = true;
+    IF v_slots > 0 AND NOT EXISTS (
+      SELECT 1 FROM terminal_janelas
+       WHERE cliente_id = v_cliente AND ativo = true AND hora = p_hora_preferida) THEN
+      RAISE EXCEPTION 'Horario indisponivel na grade deste terminal.' USING ERRCODE = 'PT422';
+    END IF;
+  END IF;
+  IF EXISTS (SELECT 1 FROM agendamentos
+              WHERE solicitacao_id = p_solicitacao_id
+                AND status IN ('solicitado','em_andamento','agendado')) THEN
+    RAISE EXCEPTION 'Ja existe um agendamento em aberto para esta solicitacao.'
+      USING ERRCODE = 'PT409';
+  END IF;
+  INSERT INTO agendamentos (solicitacao_id, data_preferida, hora_preferida, observacoes)
+  VALUES (p_solicitacao_id, p_data_preferida, p_hora_preferida, NULLIF(btrim(p_observacoes), ''))
+  RETURNING id INTO v_id;
+  RETURN v_id;
+END; $$;
+
+-- Forma FINAL da 0065: cancela em QUALQUER estado vivo (solicitado,
+-- em_andamento, agendado). A 0061 travava em 'solicitado' com o argumento de
+-- que depois disso a equipe ja podia ter agendado no terminal — argumento
+-- invertido: manter de pe um pedido que o parceiro abandonou e que faz o
+-- SisLog mentir, com a equipe tocando uma janela que ninguem vai usar.
+-- Continua sem DELETE: a linha vira 'cancelado' e fica no historico (2.4).
+CREATE OR REPLACE FUNCTION portal_cancelar_agendamento(p_id uuid)
+RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE v_parceiro uuid := get_current_parceiro_id();
+BEGIN
+  IF v_parceiro IS NULL THEN
+    RAISE EXCEPTION 'Sessao de parceiro nao identificada.' USING ERRCODE = '42501';
+  END IF;
+  UPDATE agendamentos SET status = 'cancelado'
+   WHERE id = p_id AND parceiro_id = v_parceiro
+     AND status IN ('solicitado', 'em_andamento', 'agendado');
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Este agendamento ja foi cancelado ou substituido.'
+      USING ERRCODE = 'PT409';
+  END IF;
+  RETURN p_id;
+END; $$;
+
+CREATE OR REPLACE FUNCTION portal_reagendar_agendamento(
+  p_id uuid, p_motivo text, p_nova_data date, p_nova_hora time)
+RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE v_parceiro uuid := get_current_parceiro_id();
+BEGIN
+  IF v_parceiro IS NULL THEN
+    RAISE EXCEPTION 'Sessao de parceiro nao identificada.' USING ERRCODE = '42501';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM agendamentos
+                  WHERE id = p_id AND parceiro_id = v_parceiro AND status = 'agendado') THEN
+    RAISE EXCEPTION 'Agendamento nao encontrado ou nao reagendavel.' USING ERRCODE = 'PT409';
+  END IF;
+  RETURN agendamento_reagendar_core(p_id, p_motivo, p_nova_data, p_nova_hora);
+END; $$;
+
+CREATE OR REPLACE FUNCTION agendamento_reagendar(
+  p_agendamento_id uuid, p_motivo text, p_nova_data date, p_nova_hora time)
+RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+BEGIN
+  IF NOT is_interno() THEN
+    RAISE EXCEPTION 'Apenas a equipe interna pode reagendar por aqui.' USING ERRCODE = '42501';
+  END IF;
+  RETURN agendamento_reagendar_core(p_agendamento_id, p_motivo, p_nova_data, p_nova_hora);
+END; $$;
+
+-- Trava de concorrencia: numa equipe de 15 pessoas, sem isto duas agendam a
+-- mesma nota. Item parado ha mais de 2 h volta a ser assumivel.
+CREATE OR REPLACE FUNCTION agendamento_assumir(p_id uuid)
+RETURNS uuid LANGUAGE plpgsql SECURITY INVOKER SET search_path = public, pg_temp AS $$
+BEGIN
+  UPDATE agendamentos
+     SET status = 'em_andamento', assumido_por = auth.uid(), assumido_em = now()
+   WHERE id = p_id
+     AND (status = 'solicitado'
+       OR (status = 'em_andamento' AND assumido_em < now() - interval '2 hours')
+       OR (status = 'em_andamento' AND assumido_por = auth.uid()));
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Este agendamento ja esta com outra pessoa.' USING ERRCODE = 'PT409';
+  END IF;
+  RETURN p_id;
+END; $$;
+
+REVOKE ALL ON FUNCTION agendamentos_ocupacao_slot(uuid, date) FROM public, anon;
+REVOKE ALL ON FUNCTION terminal_aplicar_grade_padrao(uuid, text) FROM public, anon;
+REVOKE ALL ON FUNCTION portal_solicitar_agendamento(uuid, date, time, text) FROM public, anon;
+REVOKE ALL ON FUNCTION portal_cancelar_agendamento(uuid) FROM public, anon;
+REVOKE ALL ON FUNCTION portal_reagendar_agendamento(uuid, text, date, time) FROM public, anon;
+REVOKE ALL ON FUNCTION agendamento_reagendar(uuid, text, date, time) FROM public, anon;
+REVOKE ALL ON FUNCTION agendamento_assumir(uuid) FROM public, anon;
+GRANT EXECUTE ON FUNCTION agendamentos_ocupacao_slot(uuid, date) TO authenticated;
+GRANT EXECUTE ON FUNCTION terminal_aplicar_grade_padrao(uuid, text) TO authenticated;
+GRANT EXECUTE ON FUNCTION portal_solicitar_agendamento(uuid, date, time, text) TO authenticated;
+GRANT EXECUTE ON FUNCTION portal_cancelar_agendamento(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION portal_reagendar_agendamento(uuid, text, date, time) TO authenticated;
+GRANT EXECUTE ON FUNCTION agendamento_reagendar(uuid, text, date, time) TO authenticated;
+GRANT EXECUTE ON FUNCTION agendamento_assumir(uuid) TO authenticated;
+
+-- ---------- Eventos do portal ----------
+-- O CHECK ja esta na forma final (superset) nos blocos da 0023 e da 0031 mais
+-- acima; aqui so a funcao, que precisa vir DEPOIS da versao da 0058 para que a
+-- ultima definicao seja a que aceita os tres tipos novos. Mesmo corpo da 0058
+-- (IP/UA dos headers, teto de metadata, rate limit no login falho).
+CREATE OR REPLACE FUNCTION registrar_evento_portal(p_tipo_evento text, p_payload jsonb DEFAULT NULL)
+RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE
+  v_user_id uuid := auth.uid(); v_pu parceiro_usuarios%ROWTYPE;
+  v_parceiro_id uuid; v_parceiro_usuario_id uuid; v_email_tentado text;
+  v_solicitacao_id uuid; v_ip text; v_user_agent text; v_metadata jsonb;
+  v_headers json; v_recentes int; v_id uuid;
+BEGIN
+  IF p_tipo_evento NOT IN ('portal_login','portal_login_falha','portal_logout',
+    'portal_solicitacao_criada','portal_solicitacao_editada',
+    'portal_solicitacao_cancelada','portal_senha_alterada',
+    'portal_usuario_convidado','portal_usuario_excluido',
+    'portal_agendamento_solicitado','portal_agendamento_cancelado',
+    'portal_agendamento_reagendado') THEN
+    RAISE EXCEPTION 'tipo_evento invalido: %', p_tipo_evento;
+  END IF;
+
+  BEGIN v_headers := current_setting('request.headers', true)::json;
+  EXCEPTION WHEN OTHERS THEN v_headers := NULL; END;
+  IF v_headers IS NOT NULL THEN
+    v_ip := NULLIF(btrim(split_part(v_headers ->> 'x-forwarded-for', ',', 1)), '');
+    v_user_agent := v_headers ->> 'user-agent';
+  END IF;
+  v_user_agent := left(COALESCE(v_user_agent, p_payload ->> 'user_agent'), 500);
+
+  IF p_tipo_evento = 'portal_login_falha' AND v_ip IS NOT NULL THEN
+    SELECT count(*) INTO v_recentes FROM eventos_portal
+     WHERE tipo_evento = 'portal_login_falha' AND ip = v_ip
+       AND created_at > now() - interval '5 minutes';
+    IF v_recentes >= 20 THEN RETURN NULL; END IF;  -- silencioso de proposito
+  END IF;
+
+  IF p_tipo_evento = 'portal_login_falha' THEN
+    v_email_tentado := left(p_payload ->> 'email_tentado', 320);
+  ELSE
+    IF v_user_id IS NULL THEN RETURN NULL; END IF;
+    SELECT * INTO v_pu FROM parceiro_usuarios
+      WHERE user_id = v_user_id AND ativo = true LIMIT 1;
+    IF NOT FOUND THEN RETURN NULL; END IF;
+    v_parceiro_id := v_pu.parceiro_id; v_parceiro_usuario_id := v_pu.id;
+  END IF;
+
+  v_solicitacao_id := NULLIF(p_payload ->> 'solicitacao_id', '')::uuid;
+  v_metadata := COALESCE(p_payload, '{}'::jsonb)
+                - ARRAY['email_tentado','ip','user_agent','solicitacao_id'];
+  IF v_metadata = '{}'::jsonb THEN v_metadata := NULL;
+  ELSIF length(v_metadata::text) > 2048 THEN
+    v_metadata := jsonb_build_object('truncado', true, 'motivo', 'metadata acima de 2KB',
+                                     'bytes_originais', length(v_metadata::text));
+  END IF;
+
+  INSERT INTO eventos_portal (tipo_evento, user_id, parceiro_id, parceiro_usuario_id,
+    email_tentado, solicitacao_id, ip, user_agent, metadata)
+  VALUES (p_tipo_evento, v_user_id, v_parceiro_id, v_parceiro_usuario_id,
+    v_email_tentado, v_solicitacao_id, v_ip, v_user_agent, v_metadata)
+  RETURNING id INTO v_id;
+  RETURN v_id;
+END; $$;
+GRANT EXECUTE ON FUNCTION registrar_evento_portal(text, jsonb) TO anon, authenticated;
+
+-- ---------- Registro de acesso a dado pessoal (LGPD art. 37) ----------
+-- Duas leituras novas deste modulo: o comprovante/PDF da NF (nome, CPF, placas)
+-- e o CPF do painel de trabalho, que aparece mascarado e so e revelado ao
+-- copiar. Vem DEPOIS da versao da 0059 para que a ultima definicao valha.
+ALTER TABLE log_acesso DROP CONSTRAINT IF EXISTS log_acesso_acao_check;
+ALTER TABLE log_acesso ADD CONSTRAINT log_acesso_acao_check
+  CHECK (acao IN ('export_csv', 'download_oc_pdf', 'abrir_anexo',
+                  'abrir_documento_agendamento', 'copiar_cpf'));
+
+CREATE OR REPLACE FUNCTION registrar_acesso(
+  p_acao text, p_recurso text DEFAULT NULL, p_detalhe jsonb DEFAULT NULL)
+RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE
+  v_user uuid := auth.uid(); v_headers json; v_ip text; v_ua text;
+  v_origem text; v_detalhe jsonb; v_id uuid;
+BEGIN
+  IF v_user IS NULL THEN RETURN NULL; END IF;
+  IF p_acao NOT IN ('export_csv', 'download_oc_pdf', 'abrir_anexo',
+                    'abrir_documento_agendamento', 'copiar_cpf') THEN
+    RETURN NULL;  -- entrada invalida nao derruba o fluxo do usuario
+  END IF;
+  BEGIN v_headers := current_setting('request.headers', true)::json;
+  EXCEPTION WHEN OTHERS THEN v_headers := NULL; END;
+  IF v_headers IS NOT NULL THEN
+    v_ip := NULLIF(btrim(split_part(v_headers ->> 'x-forwarded-for', ',', 1)), '');
+    v_ua := left(v_headers ->> 'user-agent', 500);
+  END IF;
+  v_origem := CASE WHEN is_interno() THEN 'interno' ELSE 'portal' END;
+  v_detalhe := p_detalhe;
+  IF v_detalhe IS NOT NULL AND length(v_detalhe::text) > 1024 THEN
+    v_detalhe := jsonb_build_object('truncado', true);
+  END IF;
+  INSERT INTO log_acesso (usuario_id, acao, recurso, detalhe, ip, user_agent, origem)
+  VALUES (v_user, p_acao, left(p_recurso, 120), v_detalhe, v_ip, v_ua, v_origem)
+  RETURNING id INTO v_id;
+  RETURN v_id;
+END; $$;
+REVOKE ALL ON FUNCTION registrar_acesso(text, text, jsonb) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION registrar_acesso(text, text, jsonb) TO authenticated;
+
+-- ---------- Realtime ----------
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables
+                  WHERE pubname = 'supabase_realtime' AND tablename = 'agendamentos') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE agendamentos;
+  END IF;
+END $$;
+
+-- ---------- Seed da grade ----------
+-- So para clientes JA marcados com requer_agendamento. Em base limpa nao faz
+-- nada — marcar o cliente e decisao da equipe, na tela, onde se escolhe o
+-- registro certo por id em vez de adivinhar por texto.
+INSERT INTO terminal_janelas (cliente_id, hora, duracao_minutos, capacidade)
+SELECT c.id, g.h::time, 60, 4
+  FROM clientes c
+  CROSS JOIN generate_series(timestamp '2000-01-01 08:00', timestamp '2000-01-01 16:00',
+                             interval '1 hour') AS g(h)
+ WHERE c.requer_agendamento = true
+   AND (upper(c.razao_social) LIKE '%TCI%'
+     OR upper(c.razao_social) LIKE '%ARCELOR%'
+     OR upper(c.razao_social) LIKE '%METALSIDER%')
+ON CONFLICT (cliente_id, hora) DO NOTHING;
+
+INSERT INTO terminal_janelas (cliente_id, hora, duracao_minutos, capacidade)
+SELECT c.id, g.h, 360, 10
+  FROM clientes c
+  CROSS JOIN (VALUES ('06:00'::time), ('13:00'::time), ('19:00'::time)) AS g(h)
+ WHERE c.requer_agendamento = true
+   AND (upper(c.razao_social) LIKE '%A. B.%'
+     OR upper(c.razao_social) LIKE '%OPERADORA DE TERMINAIS%')
+ON CONFLICT (cliente_id, hora) DO NOTHING;
+
+NOTIFY pgrst, 'reload schema';
+
+
+-- =====================================================================
 -- 0051 (+0052/0053) — RLS: helpers avaliados UMA vez por query
 -- =====================================================================
 -- PRECISA SER O ULTIMO BLOCO QUE TOCA POLICY. Nao e uma lista de policies: e uma
@@ -3424,6 +4074,83 @@ ALTER TABLE subcontratadas
 ALTER TABLE parceiro_subcontratadas
   DROP COLUMN IF EXISTS contato_nome,
   DROP COLUMN IF EXISTS contato_telefone;
+
+NOTIFY pgrst, 'reload schema';
+
+
+-- =====================================================================
+-- 0063 + 0066 — Terminais ligados: TCI, A.B/CSN e MRS Sao Bento
+-- =====================================================================
+-- Configuracao operacional, nao schema: marca os dois primeiros clientes que
+-- exigem agendamento e cria a grade de cada um. Por ID — a conferencia no
+-- remoto mostrou que a A.B esta gravada como 'A.B OPERADORA DE TERMINAIS' (sem
+-- espaco depois do 'A.'), que o LIKE '%A. B.%' da 0061 nao alcanca.
+--
+-- ArcelorMittal (cb4d3528-...) e Metalsider (fc9eba1a-...) seguem desligados;
+-- ligar cada um e um toggle na tela de Clientes.
+--
+-- Nao destrutivo: `terminal_nome` so e preenchido se estiver vazio, e as
+-- janelas usam ON CONFLICT DO NOTHING — replay nao desfaz ajuste da equipe.
+
+UPDATE clientes
+   SET requer_agendamento = true,
+       terminal_nome = COALESCE(NULLIF(btrim(terminal_nome), ''), 'TCI Itutinga')
+ WHERE id = '99dbb554-5340-4b78-9e36-6eb7228d0835';
+
+UPDATE clientes
+   SET requer_agendamento = true,
+       terminal_nome = COALESCE(NULLIF(btrim(terminal_nome), ''), 'A.B / CSN Pindamonhangaba')
+ WHERE id = '652eb27d-c040-470a-8a96-314ae7011b59';
+
+INSERT INTO terminal_janelas (cliente_id, hora, duracao_minutos, capacidade)
+SELECT '99dbb554-5340-4b78-9e36-6eb7228d0835', g.h::time, 60, 4
+  FROM generate_series(timestamp '2000-01-01 08:00',
+                       timestamp '2000-01-01 16:00',
+                       interval '1 hour') AS g(h)
+ON CONFLICT (cliente_id, hora) DO NOTHING;
+
+INSERT INTO terminal_janelas (cliente_id, hora, duracao_minutos, capacidade)
+SELECT '652eb27d-c040-470a-8a96-314ae7011b59', g.h, 360, 10
+  FROM (VALUES ('06:00'::time), ('13:00'::time), ('19:00'::time)) AS g(h)
+ON CONFLICT (cliente_id, hora) DO NOTHING;
+
+-- ---------- 0066 — MRS Estacao Sao Bento (Mogi das Cruzes) ----------
+-- Primeiro terminal a mostrar que "segue o padrao do TCI" era o FORMATO (slots
+-- discretos), nao os numeros: 07:00-17:30 em janelas de 30 min com 3 vagas, o
+-- que da 66/dia contra 36 do TCI e 30 da A.B. Janela de meia hora rende o dobro
+-- de slots — a diferenca e real, nao erro de cadastro.
+--
+-- Ultimo slot em 17:30 porque "das 7 as 18" foi lido como horario de
+-- funcionamento: a ultima janela inteira termina 18:00.
+UPDATE clientes
+   SET requer_agendamento = true,
+       terminal_nome = COALESCE(NULLIF(btrim(terminal_nome), ''),
+                                'MRS São Bento — Mogi das Cruzes')
+ WHERE id = '0281905e-646a-431f-abf1-80d7d7e757e1';
+
+INSERT INTO terminal_janelas (cliente_id, hora, duracao_minutos, capacidade)
+SELECT '0281905e-646a-431f-abf1-80d7d7e757e1', g.h::time, 30, 3
+  FROM generate_series(timestamp '2000-01-01 07:00',
+                       timestamp '2000-01-01 17:30',
+                       interval '30 minutes') AS g(h)
+ON CONFLICT (cliente_id, hora) DO NOTHING;
+
+-- Aviso, nao erro: a equipe vai ajustar capacidade quando confirmar os numeros
+-- com cada terminal, e este arquivo roda em UMA transacao — abortar por
+-- divergencia legitima derrubaria o replay inteiro.
+DO $$
+DECLARE
+  v_tci integer;
+  v_ab  integer;
+BEGIN
+  SELECT COALESCE(sum(capacidade), 0) INTO v_tci FROM terminal_janelas
+   WHERE cliente_id = '99dbb554-5340-4b78-9e36-6eb7228d0835' AND ativo;
+  SELECT COALESCE(sum(capacidade), 0) INTO v_ab  FROM terminal_janelas
+   WHERE cliente_id = '652eb27d-c040-470a-8a96-314ae7011b59' AND ativo;
+  IF v_tci <> 36 OR v_ab <> 30 THEN
+    RAISE WARNING 'Grade fora do padrao da SPEC: TCI=% (padrao 36), A.B=% (padrao 30).', v_tci, v_ab;
+  END IF;
+END $$;
 
 NOTIFY pgrst, 'reload schema';
 

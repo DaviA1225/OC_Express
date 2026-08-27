@@ -27,6 +27,7 @@ pendentes e estão listados no fim.
 | IP, user-agent, recurso acessado | `log_acesso` | Automático na exportação/abertura | Registro de acesso (art. 37) |
 | Cópia de linhas alteradas | `log_auditoria` | Automático por trigger | Trilha de quem criou/alterou/apagou |
 | Documentos anexados | bucket `solicitacoes-anexos` | Upload na solicitação | CRLV, comprovantes, prints |
+| Comprovante do terminal e PDF da NF | bucket `agendamentos-docs` | Conclusão do agendamento (0061) | Prova da janela confirmada; devolvido ao parceiro |
 
 **O sistema NÃO trata** dado sensível do art. 11 (saúde, biometria, religião,
 opinião política, filiação sindical, origem racial) nem dado de criança e
@@ -53,6 +54,7 @@ Decidido em 2026-08-09. Implementado em `supabase/migrations/0056` e `0059`.
 | `eventos_portal` | **1 ano** | Log de acesso. O Marco Civil (art. 15) exige 6 meses; 1 ano dá margem para investigar incidente descoberto tarde. |
 | `log_acesso` | **1 ano** | Mesma natureza da `eventos_portal`. |
 | Cadastros e solicitações | **sem prazo automático** | São a operação em si. Saem por pedido do titular (seção 3) ou por decisão de negócio. |
+| `agendamentos` + bucket `agendamentos-docs` | **acompanha a solicitação** | O comprovante do terminal é prova de que a descarga foi agendada; segue a mesma guarda fiscal do transporte (proposta: 5 anos). Nenhuma categoria nova de dado — nome, CPF e placas já estavam mapeados —, mas **aumenta o volume de documentos armazenados**. |
 
 **Como aplicar** (não está agendado — exclusão de trilha não roda sozinha):
 
@@ -124,10 +126,12 @@ da migration 0057.
 - **Escrita:** `log_auditoria`, por trigger em ~20 tabelas, desde a 0001.
   Registra autor, ação, tabela, registro e horário. Em UPDATE guarda só os
   campos que mudaram (0049).
-- **Leitura:** `log_acesso`, desde a 0059. Registra as três operações em que
-  dado pessoal sai do sistema: exportação de CSV, emissão do link do PDF da OC
-  e abertura de anexo. IP, user-agent e origem (interno/portal) vêm dos headers
-  no servidor — o cliente não os informa.
+- **Leitura:** `log_acesso`, desde a 0059. Registra as operações em que dado
+  pessoal sai do sistema: exportação de CSV, emissão do link do PDF da OC,
+  abertura de anexo e — desde a 0061 — abertura do comprovante/PDF da NF do
+  agendamento e a **revelação do CPF** no painel de agendamento (ele aparece
+  mascarado na tela e só sai por inteiro ao copiar). IP, user-agent e origem
+  (interno/portal) vêm dos headers no servidor — o cliente não os informa.
 - **Segurança do portal:** `eventos_portal`, desde a 0021. Login, falha de
   login, logout, troca de senha.
 

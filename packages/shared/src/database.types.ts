@@ -1,5 +1,5 @@
 // Tipos do banco SisLog (espelha as migrations em supabase/migrations,
-// até 0021 — eventos_portal + função registrar_evento_portal).
+// até 0061 — módulo de agendamentos).
 // Para regenerar a partir do banco real, instale Docker Desktop e rode:
 //   npx supabase gen types typescript --db-url "<DB_URL>" --schema public
 
@@ -36,6 +36,18 @@ export type ParceiroPerfil = 'admin_parceiro' | 'operador_parceiro'
 
 export type SolicitacaoPendenciaStatus = 'aberta' | 'resolvida'
 
+// 0061 — agendamento de descarga em terminal.
+// 'substituido' e 'cancelado' sao terminais; reagendar nunca sobrescreve, cria
+// uma linha nova apontando para a anterior.
+export type AgendamentoStatus =
+  | 'solicitado'
+  | 'em_andamento'
+  | 'agendado'
+  | 'substituido'
+  | 'cancelado'
+
+export type NotaFiscalOrigem = 'automatica' | 'manual'
+
 export type TipoEventoPortal =
   | 'portal_login'
   | 'portal_login_falha'
@@ -46,6 +58,9 @@ export type TipoEventoPortal =
   | 'portal_senha_alterada'
   | 'portal_usuario_convidado'
   | 'portal_usuario_excluido'
+  | 'portal_agendamento_solicitado'
+  | 'portal_agendamento_cancelado'
+  | 'portal_agendamento_reagendado'
 
 export interface Database {
   public: {
@@ -194,6 +209,12 @@ export interface Database {
           aceita_graneleiro: boolean
           cliente_minerio: boolean
           cliente_retorno: boolean
+          // 0061 — agendamento de descarga (SPEC-AGENDAMENTOS 2.5: e atributo
+          // do cliente, nao da rota).
+          requer_agendamento: boolean
+          terminal_nome: string | null
+          antecedencia_minima_horas: number | null
+          observacoes_agendamento: string | null
           observacoes: string | null
           ativo: boolean
           created_at: string
@@ -217,6 +238,10 @@ export interface Database {
           aceita_graneleiro?: boolean
           cliente_minerio?: boolean
           cliente_retorno?: boolean
+          requer_agendamento?: boolean
+          terminal_nome?: string | null
+          antecedencia_minima_horas?: number | null
+          observacoes_agendamento?: string | null
           observacoes?: string | null
           ativo?: boolean
           created_at?: string
@@ -440,6 +465,96 @@ export interface Database {
           vista_equipe_em?: string | null
         }
         Update: Partial<Database['public']['Tables']['solicitacao_pendencias']['Insert']>
+      }
+      // 0061 — grade de slots de cada terminal. Uma linha por horário: os dois
+      // padrões (9 slots de 1h × 3 janelas de 6h) não cabem em janela_inicio/fim.
+      terminal_janelas: {
+        Row: {
+          id: string
+          cliente_id: string
+          hora: string
+          duracao_minutos: number
+          capacidade: number | null
+          ativo: boolean
+          created_at: string
+          updated_at: string
+          created_by: string | null
+        }
+        Insert: {
+          id?: string
+          cliente_id: string
+          hora: string
+          duracao_minutos?: number
+          capacidade?: number | null
+          ativo?: boolean
+          created_at?: string
+          updated_at?: string
+          created_by?: string | null
+        }
+        Update: Partial<Database['public']['Tables']['terminal_janelas']['Insert']>
+      }
+      agendamentos: {
+        Row: {
+          id: string
+          numero_interno: number
+          solicitacao_id: string
+          // Denormalizado pelo trigger a partir da solicitação — é a chave do
+          // RLS do parceiro. NULL em agendamento de solicitação interna.
+          parceiro_id: string | null
+          parceiro_usuario_id: string | null
+          status: AgendamentoStatus
+          data_preferida: string
+          hora_preferida: string | null
+          observacoes: string | null
+          nota_fiscal: string | null
+          nota_fiscal_origem: NotaFiscalOrigem | null
+          data_agendada: string | null
+          hora_agendada: string | null
+          // Calculado no servidor ao concluir: a hora confirmada não existe na
+          // grade ativa do terminal. Aviso, não bloqueio.
+          hora_fora_da_grade: boolean
+          comprovante_path: string | null
+          nf_pdf_path: string | null
+          // 0064 — sai antes do comprovante e volta ao parceiro junto com ele.
+          contrato_frete_path: string | null
+          substitui_agendamento_id: string | null
+          motivo_reagendamento: string | null
+          assumido_por: string | null
+          assumido_em: string | null
+          agendado_por: string | null
+          agendado_em: string | null
+          created_at: string
+          updated_at: string
+          created_by: string | null
+        }
+        // status, parceiro_id, created_by e os carimbos são preenchidos por
+        // trigger (0061) — o cliente só envia o pedido.
+        Insert: {
+          id?: string
+          solicitacao_id: string
+          data_preferida: string
+          hora_preferida?: string | null
+          observacoes?: string | null
+          nota_fiscal?: string | null
+          nota_fiscal_origem?: NotaFiscalOrigem | null
+          parceiro_usuario_id?: string | null
+          substitui_agendamento_id?: string | null
+          motivo_reagendamento?: string | null
+        }
+        Update: {
+          status?: AgendamentoStatus
+          data_preferida?: string
+          hora_preferida?: string | null
+          observacoes?: string | null
+          nota_fiscal?: string | null
+          nota_fiscal_origem?: NotaFiscalOrigem | null
+          data_agendada?: string | null
+          hora_agendada?: string | null
+          comprovante_path?: string | null
+          nf_pdf_path?: string | null
+          contrato_frete_path?: string | null
+          motivo_reagendamento?: string | null
+        }
       }
       eventos_portal: {
         Row: {
@@ -712,6 +827,13 @@ export interface Database {
           razao_social: string | null
           cidade: string | null
           uf: string | null
+          // 0061 — o portal decide por estas colunas se oferece o pedido de
+          // agendamento e qual antecedência exigir no seletor de data.
+          // `observacoes_agendamento` NÃO entra (0062): é texto livre da equipe
+          // e a view responde ao `anon`.
+          requer_agendamento: boolean | null
+          terminal_nome: string | null
+          antecedencia_minima_horas: number | null
         }
       }
       portal_solicitacoes: {
@@ -783,6 +905,65 @@ export interface Database {
       marcar_storage_removido: {
         Args: { p_path: string; p_erro?: string | null }
         Returns: undefined
+      }
+      // 0061 — agendamentos. O parceiro escreve só por RPC (não tem SELECT em
+      // `solicitacoes`, então UPDATE direto afetaria zero linhas em silêncio).
+      portal_solicitar_agendamento: {
+        Args: {
+          p_solicitacao_id: string
+          p_data_preferida: string
+          p_hora_preferida: string | null
+          p_observacoes: string | null
+        }
+        Returns: string
+      }
+      portal_cancelar_agendamento: {
+        Args: { p_id: string }
+        Returns: string
+      }
+      portal_reagendar_agendamento: {
+        Args: {
+          p_id: string
+          p_motivo: string | null
+          p_nova_data: string
+          p_nova_hora: string | null
+        }
+        Returns: string
+      }
+      agendamento_reagendar: {
+        Args: {
+          p_agendamento_id: string
+          p_motivo: string | null
+          p_nova_data: string
+          p_nova_hora: string | null
+        }
+        Returns: string
+      }
+      // Trava de concorrência: resolve a corrida numa única instrução. Quem
+      // chegar depois recebe PT409.
+      agendamento_assumir: {
+        Args: { p_id: string }
+        Returns: string
+      }
+      // Referência PARCIAL: conta só os veículos da própria LHG no slot. A vaga
+      // real vive no sistema do terminal (SPEC-AGENDAMENTOS 3.1.2).
+      agendamentos_ocupacao_slot: {
+        Args: { p_cliente_id: string; p_data: string }
+        Returns: {
+          hora: string
+          duracao_minutos: number
+          capacidade: number | null
+          ocupados: number
+        }[]
+      }
+      // Não é mais chamada pela tela: o cadastro passou a gerar a grade a partir
+      // da faixa informada pelo terminal (início/fim/duração/vagas), porque cada
+      // terminal novo trouxe números próprios — a MRS foi descrita como "padrão
+      // do TCI" e veio com 30 min e 3 vagas. Fica no banco por documentar os
+      // dois presets que os seeds das 0061/0063 usam.
+      terminal_aplicar_grade_padrao: {
+        Args: { p_cliente_id: string; p_modelo: 'horaria' | 'janela_longa' }
+        Returns: number
       }
       // 0057 — direitos do titular. Sem UI ainda: chamadas pelo SQL Editor.
       // Tipadas aqui para quando a tela existir e para documentar a assinatura.

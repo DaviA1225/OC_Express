@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import {
   ResponsiveContainer,
   LineChart,
@@ -37,24 +37,22 @@ import {
   topClientes,
   topMotoristas,
   topSubcontratadas,
-  periodoFromPreset,
+  periodoDeIntervalo,
+  intervaloPadrao,
   previousPeriod,
-  type PeriodoPreset,
   type PeriodoRelatorio,
   type TopItem,
 } from '@/features/relatorios/useRelatorios'
+import { IntervaloDatas } from '@/features/relatorios/IntervaloDatas'
+import { useIntervaloPersistido } from '@/features/relatorios/useIntervaloPersistido'
 import { useEstadoAtual, useStatusBreakdown, type StatusBreakdownItem } from '@/features/dashboard/useDashboard'
 import { STATUS_LABELS } from '@/features/solicitacoes/status'
 import { cn } from '@/lib/utils'
 import type { SolicitacaoStatus } from '@/types/database.types'
 
-const PRESETS: { value: PeriodoPreset; label: string }[] = [
-  { value: 'hoje', label: 'Hoje' },
-  { value: '7d', label: '7 dias' },
-  { value: '30d', label: '30 dias' },
-  { value: 'mes', label: 'Mês' },
-]
-const VALID_PRESETS = PRESETS.map((p) => p.value) as string[]
+// Intervalo inicial: só o dia de hoje, o mesmo recorte que o preset padrão
+// anterior mostrava. "Limpar" volta para cá.
+const INTERVALO_PADRAO = intervaloPadrao(1)
 
 const STATUS_HEX: Record<SolicitacaoStatus, string> = {
   recebida: '#94a3b8',
@@ -70,12 +68,11 @@ const CHART_PRIMARY = '#FF5100'  // laranja LHG
 const CHART_SECONDARY = '#10b981'// emerald (mantido como sinal universal de "concluído")
 
 export default function DashboardPage() {
-  const [params, setParams] = useSearchParams()
-  const presetRaw = params.get('p')
-  const preset: PeriodoPreset = VALID_PRESETS.includes(presetRaw ?? '')
-    ? (presetRaw as PeriodoPreset)
-    : 'hoje'
-  const periodo = React.useMemo<PeriodoRelatorio>(() => periodoFromPreset(preset), [preset])
+  const { de, ate, setIntervalo, limpar, noPadrao } = useIntervaloPersistido(
+    'dashboard',
+    INTERVALO_PADRAO,
+  )
+  const periodo = React.useMemo<PeriodoRelatorio>(() => periodoDeIntervalo(de, ate), [de, ate])
   const periodoAnterior = React.useMemo(() => previousPeriod(periodo), [periodo])
 
   const ds = useRelatorioDataset(periodo)
@@ -83,17 +80,6 @@ export default function DashboardPage() {
   const estado = useEstadoAtual()
   const breakdown = useStatusBreakdown()
 
-  const setPreset = (p: PeriodoPreset) => {
-    setParams(
-      (prev) => {
-        const next = new URLSearchParams(prev)
-        if (p === 'hoje') next.delete('p')
-        else next.set('p', p)
-        return next
-      },
-      { replace: true },
-    )
-  }
 
   const kpis = ds.data ? calcKPIs(ds.data.rows) : null
   const kpisAnt = dsAnterior.data ? calcKPIs(dsAnterior.data.rows) : null
@@ -112,13 +98,16 @@ export default function DashboardPage() {
           <h1 className="text-[22px] font-semibold tracking-tight text-foreground">
             Visão geral
           </h1>
-          <p className="text-[12px] text-muted-foreground">
-            {periodo.label} ·{' '}
-            {format(new Date(periodo.desde), 'dd MMM', { locale: ptBR })} a{' '}
-            {format(addDays(new Date(periodo.ate), -1), 'dd MMM yyyy', { locale: ptBR })}
-          </p>
+          <p className="text-[12px] text-muted-foreground">{periodo.label}</p>
         </div>
-        <PeriodoTabs value={preset} onChange={setPreset} />
+        <IntervaloDatas
+          idPrefix="dash"
+          de={de}
+          ate={ate}
+          onChange={setIntervalo}
+          mostrarLimpar={!noPadrao}
+          onLimpar={limpar}
+        />
       </div>
 
       {/* Estado operacional — "agora" (herói da operação) */}
@@ -231,12 +220,6 @@ export default function DashboardPage() {
   )
 }
 
-function addDays(d: Date, days: number): Date {
-  const r = new Date(d)
-  r.setDate(r.getDate() + days)
-  return r
-}
-
 function VerRelatoriosLink() {
   return (
     <Link
@@ -249,29 +232,6 @@ function VerRelatoriosLink() {
   )
 }
 
-function PeriodoTabs({ value, onChange }: { value: PeriodoPreset; onChange: (v: PeriodoPreset) => void }) {
-  return (
-    <div className="inline-flex rounded-lg border bg-card p-1" role="tablist">
-      {PRESETS.map((p) => (
-        <button
-          key={p.value}
-          type="button"
-          role="tab"
-          aria-selected={value === p.value}
-          onClick={() => onChange(p.value)}
-          className={cn(
-            'rounded-md px-3 py-1 text-[12px] font-medium transition-colors',
-            value === p.value
-              ? 'bg-primary text-primary-foreground shadow-sm'
-              : 'text-foreground/70 hover:bg-muted hover:text-foreground',
-          )}
-        >
-          {p.label}
-        </button>
-      ))}
-    </div>
-  )
-}
 
 interface KpiCardProps {
   label: string

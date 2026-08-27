@@ -536,41 +536,67 @@ function entriesToTopItems<T>(
   return arr.slice(0, limit)
 }
 
-// ── Períodos pré-configurados ──────────────────────────────────────────────
+// ── Períodos ───────────────────────────────────────────────────────────────
+// O Dashboard e os dois Relatórios pedem intervalo livre (De/Até), como a
+// Conferência de Viagem. Os presets ('hoje', '7d', 'mes'…) foram removidos com
+// as abas que os usavam — preset responde "quanto tempo atrás", e a pergunta da
+// operação é "o que aconteceu entre estas duas datas".
 
-export type PeriodoPreset = 'hoje' | '7d' | 'mes' | 'mes_anterior' | '30d' | '90d'
+/** `yyyy-mm-dd` de uma data local, no formato que o `<input type="date">` usa. */
+export function paraInputDate(d: Date): string {
+  const mes = String(d.getMonth() + 1).padStart(2, '0')
+  const dia = String(d.getDate()).padStart(2, '0')
+  return `${d.getFullYear()}-${mes}-${dia}`
+}
 
-export function periodoFromPreset(preset: PeriodoPreset): PeriodoRelatorio {
-  const now = new Date()
-  if (preset === 'hoje') {
-    const desde = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-    const ate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
-    return { desde: desde.toISOString(), ate: ate.toISOString(), label: 'Hoje' }
+/** Intervalo inicial das telas: os últimos N dias terminando hoje. */
+export function intervaloPadrao(dias: number): { de: string; ate: string } {
+  const hoje = new Date()
+  const de = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - (dias - 1))
+  return { de: paraInputDate(de), ate: paraInputDate(hoje) }
+}
+
+/**
+ * Converte o par de `<input type="date">` no período do relatório.
+ *
+ * `PeriodoRelatorio.ate` é EXCLUSIVO — as consultas usam `.lt('created_at', ate)`.
+ * Por isso o dia escolhido em "Até" entra somando UM dia: sem isso, pedir "até
+ * 27/08" deixaria o dia 27 inteiro de fora, e o relatório mostraria menos do que
+ * a pessoa pediu sem dizer por quê.
+ *
+ * Intervalo invertido vira um único dia em vez de intervalo negativo (que
+ * devolveria zero linhas em silêncio). Os inputs já se limitam por `min`/`max`,
+ * então isso só cobre valor digitado à mão.
+ */
+export function periodoDeIntervalo(de: string, ate: string): PeriodoRelatorio {
+  const [y1, m1, d1] = de.split('-').map(Number)
+  const [y2, m2, d2] = ate.split('-').map(Number)
+  const desde = new Date(y1, m1 - 1, d1)
+  let fimExclusivo = new Date(y2, m2 - 1, d2 + 1)
+  if (fimExclusivo.getTime() <= desde.getTime()) {
+    fimExclusivo = new Date(y1, m1 - 1, d1 + 1)
   }
-  if (preset === '7d') {
-    const ate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
-    const desde = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6)
-    return { desde: desde.toISOString(), ate: ate.toISOString(), label: 'Últimos 7 dias' }
+  const ultimoDia = new Date(fimExclusivo.getTime() - 1)
+  const fmt = (d: Date) =>
+    `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`
+  const mesmoDia = fmt(desde) === fmt(ultimoDia)
+  return {
+    desde: desde.toISOString(),
+    ate: fimExclusivo.toISOString(),
+    // Um dia só não vira "27/08 a 27/08": os cards usam este rótulo como
+    // subtítulo, e repetir a data ali é ruído.
+    label: mesmoDia ? fmt(desde) : `${fmt(desde)} a ${fmt(ultimoDia)}`,
   }
-  if (preset === 'mes') {
-    const desde = new Date(now.getFullYear(), now.getMonth(), 1)
-    const ate = new Date(now.getFullYear(), now.getMonth() + 1, 1)
-    return { desde: desde.toISOString(), ate: ate.toISOString(), label: 'Mês corrente' }
-  }
-  if (preset === 'mes_anterior') {
-    const desde = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-    const ate = new Date(now.getFullYear(), now.getMonth(), 1)
-    return { desde: desde.toISOString(), ate: ate.toISOString(), label: 'Mês anterior' }
-  }
-  if (preset === '30d') {
-    const ate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
-    const desde = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29)
-    return { desde: desde.toISOString(), ate: ate.toISOString(), label: 'Últimos 30 dias' }
-  }
-  // 90d
-  const ate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
-  const desde = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 89)
-  return { desde: desde.toISOString(), ate: ate.toISOString(), label: 'Últimos 90 dias' }
+}
+
+/** Dias corridos do intervalo, para a tela avisar quando ele fica muito longo. */
+export function diasDoIntervalo(de: string, ate: string): number {
+  const [y1, m1, d1] = de.split('-').map(Number)
+  const [y2, m2, d2] = ate.split('-').map(Number)
+  if (!y1 || !y2) return 0
+  const ini = new Date(y1, m1 - 1, d1).getTime()
+  const fim = new Date(y2, m2 - 1, d2).getTime()
+  return Math.max(0, Math.round((fim - ini) / 86_400_000) + 1)
 }
 
 /** Retorna o mesmo intervalo do período anterior (mesma duração, deslocado pra trás). */

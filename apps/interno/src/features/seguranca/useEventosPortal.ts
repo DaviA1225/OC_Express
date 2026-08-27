@@ -45,6 +45,9 @@ export const TIPO_EVENTO_LABELS: Record<TipoEventoPortal, string> = {
   portal_senha_alterada: 'Senha alterada',
   portal_usuario_convidado: 'Usuário convidado',
   portal_usuario_excluido: 'Usuário excluído',
+  portal_agendamento_solicitado: 'Agendamento pedido',
+  portal_agendamento_cancelado: 'Agendamento cancelado',
+  portal_agendamento_reagendado: 'Reagendamento pedido',
 }
 
 export const TIPOS_EVENTO: TipoEventoPortal[] = [
@@ -57,6 +60,9 @@ export const TIPOS_EVENTO: TipoEventoPortal[] = [
   'portal_senha_alterada',
   'portal_usuario_convidado',
   'portal_usuario_excluido',
+  'portal_agendamento_solicitado',
+  'portal_agendamento_cancelado',
+  'portal_agendamento_reagendado',
 ]
 
 export function useEventosPortal(filters: EventosPortalFilters) {

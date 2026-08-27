@@ -1,7 +1,5 @@
 import * as React from 'react'
-import { useSearchParams, Link } from 'react-router-dom'
-import { format } from 'date-fns'
-import { ptBR } from 'date-fns/locale'
+import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
 import {
   ClipboardList,
@@ -16,10 +14,12 @@ import {
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
-  periodoFromPreset,
-  type PeriodoPreset,
+  periodoDeIntervalo,
+  intervaloPadrao,
   type PeriodoRelatorio,
 } from '@/features/relatorios/useRelatorios'
+import { IntervaloDatas } from '@/features/relatorios/IntervaloDatas'
+import { useIntervaloPersistido } from '@/features/relatorios/useIntervaloPersistido'
 import {
   useRelatorioInterno,
   formatHoras,
@@ -30,35 +30,18 @@ import type { SolicitacaoStatus } from '@/types/database.types'
 import { buildCsv, downloadCsv, type CsvColumn } from '@/lib/csv'
 import { cn } from '@/lib/utils'
 
-const PRESETS: { value: PeriodoPreset; label: string }[] = [
-  { value: 'mes', label: 'Mês corrente' },
-  { value: 'mes_anterior', label: 'Mês anterior' },
-  { value: '30d', label: 'Últimos 30 dias' },
-  { value: '90d', label: 'Últimos 90 dias' },
-]
-const VALID_PRESETS = PRESETS.map((p) => p.value)
+// Mesmo intervalo inicial da tela de Relatórios: últimos 30 dias.
+const INTERVALO_PADRAO = intervaloPadrao(30)
 
 // A partir deste tempo aberto, a solicitação parada vira alerta vermelho.
 const PARADA_ALERTA_HORAS = 24
 
 export default function RelatoriosInternosPage() {
-  const [params, setParams] = useSearchParams()
-  const presetRaw = params.get('p')
-  const preset: PeriodoPreset = (VALID_PRESETS as string[]).includes(presetRaw ?? '')
-    ? (presetRaw as PeriodoPreset)
-    : 'mes'
-  const periodo = React.useMemo<PeriodoRelatorio>(() => periodoFromPreset(preset), [preset])
-  const setPreset = (p: PeriodoPreset) => {
-    setParams(
-      (prev) => {
-        const next = new URLSearchParams(prev)
-        if (p === 'mes') next.delete('p')
-        else next.set('p', p)
-        return next
-      },
-      { replace: true },
-    )
-  }
+  const { de, ate, setIntervalo, limpar, noPadrao } = useIntervaloPersistido(
+    'relatorios-internos',
+    INTERVALO_PADRAO,
+  )
+  const periodo = React.useMemo<PeriodoRelatorio>(() => periodoDeIntervalo(de, ate), [de, ate])
 
   const q = useRelatorioInterno(periodo)
   const data = q.data
@@ -86,7 +69,7 @@ export default function RelatoriosInternosPage() {
       const csv = buildCsv(usuarios, cols)
       const ts = new Date()
       const stamp = `${ts.getFullYear()}${String(ts.getMonth() + 1).padStart(2, '0')}${String(ts.getDate()).padStart(2, '0')}_${String(ts.getHours()).padStart(2, '0')}${String(ts.getMinutes()).padStart(2, '0')}`
-      downloadCsv(`relatorio_interno_${preset}_${stamp}.csv`, csv)
+      downloadCsv(`relatorio_interno_${de}_a_${ate}_${stamp}.csv`, csv)
       toast.success('Relatório exportado')
     } catch (err) {
       toast.error('Falha ao exportar')
@@ -104,14 +87,18 @@ export default function RelatoriosInternosPage() {
         <div>
           <h1 className="text-[22px] font-semibold tracking-tight text-foreground">Relatórios Internos</h1>
           <p className="text-[12px] text-muted-foreground">
-            Produtividade da equipe · {periodo.label} ·{' '}
-            {format(new Date(periodo.desde), 'dd/MM/yyyy', { locale: ptBR })}
-            {' a '}
-            {format(addDays(new Date(periodo.ate), -1), 'dd/MM/yyyy', { locale: ptBR })}
+            Produtividade da equipe · {periodo.label}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <PeriodoTabs value={preset} onChange={setPreset} />
+          <IntervaloDatas
+            idPrefix="rel-int"
+            de={de}
+            ate={ate}
+            onChange={setIntervalo}
+            mostrarLimpar={!noPadrao}
+            onLimpar={limpar}
+          />
           <Button
             type="button"
             variant="outline"
@@ -156,36 +143,6 @@ export default function RelatoriosInternosPage() {
       >
         <ParadasList abertas={abertas} isLoading={q.isLoading} />
       </Card>
-    </div>
-  )
-}
-
-function addDays(d: Date, days: number): Date {
-  const r = new Date(d)
-  r.setDate(r.getDate() + days)
-  return r
-}
-
-function PeriodoTabs({ value, onChange }: { value: PeriodoPreset; onChange: (v: PeriodoPreset) => void }) {
-  return (
-    <div className="inline-flex rounded-lg border bg-card p-1" role="tablist">
-      {PRESETS.map((p) => (
-        <button
-          key={p.value}
-          type="button"
-          role="tab"
-          aria-selected={value === p.value}
-          onClick={() => onChange(p.value)}
-          className={cn(
-            'rounded-md px-2.5 py-1 text-[12px] font-medium transition-colors',
-            value === p.value
-              ? 'bg-primary text-primary-foreground'
-              : 'text-foreground/70 hover:bg-muted hover:text-foreground',
-          )}
-        >
-          {p.label}
-        </button>
-      ))}
     </div>
   )
 }

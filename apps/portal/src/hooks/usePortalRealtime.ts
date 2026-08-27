@@ -29,6 +29,17 @@ export function usePortalRealtime() {
           qc.invalidateQueries({ queryKey: ['portal-solicitacoes'] })
         },
       )
+      // Agendamentos (0061): o parceiro TEM policy de SELECT na tabela, então o
+      // realtime entrega as mudanças dos agendamentos dele — o card vira
+      // "Agendado" com o comprovante no momento em que a equipe conclui.
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'agendamentos' },
+        () => {
+          qc.invalidateQueries({ queryKey: ['agendamentos-solicitacao'] })
+          qc.invalidateQueries({ queryKey: ['agendamento-slots'] })
+        },
+      )
       .subscribe()
 
     return () => {

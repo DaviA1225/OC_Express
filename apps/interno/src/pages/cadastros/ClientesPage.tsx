@@ -3,9 +3,10 @@ import { useSearchParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Loader2, MapPin, Search as SearchIcon, Map as MapIcon, List as ListIcon } from 'lucide-react'
+import { Loader2, MapPin, Search as SearchIcon, Map as MapIcon, List as ListIcon, CalendarClock } from 'lucide-react'
 import { CrudListPage, useCrudListState, type ColumnDef } from '@/components/shared/CrudListPage'
 import { ClientesMapa } from './ClientesMapa'
+import { TerminalAgendamentoDialog } from './TerminalAgendamentoDialog'
 import { useClientesMapaMinerio } from '@/features/clientes/useClientesMapa'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { useCrudList, useActiveCount, useUpsertRow, useToggleActive, useDeleteRow, useBulkToggleActive, useBulkDeleteRows } from '@/features/crud/useCrudQueries'
@@ -139,6 +140,23 @@ function StatusBadge({ liberado }: { liberado: boolean }) {
   )
 }
 
+/** Coluna de agendamento: só quem exige aparece marcado. O rótulo mostra o
+ *  terminal como a equipe o chama, porque é por ele que a fila é agrupada. */
+function AgendamentoCell({ row }: { row: Row }) {
+  if (!row.requer_agendamento) {
+    return <span className="text-[12px] text-muted-foreground">—</span>
+  }
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-[11px] font-medium leading-tight cat-clay">
+      <CalendarClock className="h-3 w-3" />
+      {row.terminal_nome?.trim() || 'Exige agendamento'}
+      {row.antecedencia_minima_horas != null && (
+        <span className="tabular-nums opacity-80">· {row.antecedencia_minima_horas}h</span>
+      )}
+    </span>
+  )
+}
+
 function MapaCell({ row }: { row: Row }) {
   if (row.latitude == null || row.longitude == null) {
     return <span className="text-[12px] text-muted-foreground">—</span>
@@ -234,8 +252,10 @@ export default function ClientesPage() {
   const [confirmRow, setConfirmRow] = React.useState<Row | null>(null)
   const [deleteRow, setDeleteRow] = React.useState<Row | null>(null)
   const [opRow, setOpRow] = React.useState<Row | null>(null)
+  const [terminalRow, setTerminalRow] = React.useState<Row | null>(null)
 
   const openOpDialog = (row: Row) => { if (canEdit) setOpRow(row) }
+  const openTerminalDialog = (row: Row) => { if (canEdit) setTerminalRow(row) }
 
   const columns: ColumnDef<Row>[] = [
     { header: 'Razão Social', accessor: (r) => r.razao_social },
@@ -270,6 +290,22 @@ export default function ClientesPage() {
           </button>
         ) : (
           <StatusBadge liberado={r.liberado} />
+        ),
+    },
+    {
+      header: 'Agendamento',
+      accessor: (r) =>
+        canEdit ? (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); openTerminalDialog(r) }}
+            className="rounded-sm p-1 text-left hover:bg-muted"
+            title="Configurar agendamento e grade de horários"
+          >
+            <AgendamentoCell row={r} />
+          </button>
+        ) : (
+          <div className="p-1"><AgendamentoCell row={r} /></div>
         ),
     },
     {
@@ -399,6 +435,16 @@ export default function ClientesPage() {
             },
           })
           setOpRow(null)
+        }}
+      />
+
+      <TerminalAgendamentoDialog
+        row={terminalRow}
+        onOpenChange={(o) => !o && setTerminalRow(null)}
+        onSubmit={async (values) => {
+          if (!terminalRow) return
+          await upsert.mutateAsync({ id: terminalRow.id, values })
+          setTerminalRow(null)
         }}
       />
 

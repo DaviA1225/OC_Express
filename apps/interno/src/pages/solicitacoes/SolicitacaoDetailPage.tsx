@@ -36,6 +36,7 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { AnexosCard } from '@/features/anexos/AnexosCard'
 import { HistoricoCard } from '@/features/solicitacoes/HistoricoCard'
+import { AgendamentoCard } from '@/features/agendamentos/AgendamentoCard'
 import { usePendencias, useDevolverParceiro, useMarcarPendenciaVista, useMarcarPendencia, useResolverPendenciaInterna, type Pendencia } from '@/features/solicitacoes/usePendencias'
 const GerarOCDialog = React.lazy(() =>
   import('@/features/pdf-generator/GerarOCDialog').then((m) => ({ default: m.GerarOCDialog })),
@@ -403,6 +404,7 @@ export function SolicitacaoDetailPage() {
           {(pendencias.data?.length ?? 0) > 0 && (
             <PendenciasCard pendencias={pendencias.data ?? []} isParceiro={isParceiro} />
           )}
+          <AgendamentoCard solicitacaoId={s.id} clienteId={s.cliente_id} status={s.status} />
           <HistoricoCard
             solicitacaoId={s.id}
             motoristaId={s.motorista_id}
