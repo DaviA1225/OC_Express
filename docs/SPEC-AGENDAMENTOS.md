@@ -562,15 +562,26 @@ os dados para colar — mesma lógica do fluxo da OC.
 **Bloco "Dados para o terminal"** — cada campo com botão de copiar:
 
 ```
-Placa cavalo    SIK6H90         [copiar]
-Placa carreta   XYZ9W87         [copiar]
-Nota fiscal     6/254215        [copiar]
-Motorista       João Pereira    [copiar]
-CPF             ***             [copiar]
-Peso            36,78 t         [copiar]
+Placa cavalo    SIK6H90            [copiar]
+Placa carreta   XYZ9W87            [copiar]
+Nota fiscal     6/254215           [copiar]
+Motorista       João Pereira       [copiar]
+Telefone        (31) 99999-9999    [copiar]
+CPF             •••.•••.789-••     [copiar]
+Peso            36,78 t            [copiar]
 ```
 
 Isso elimina a transcrição manual, que é onde nascem erro de placa e de nota.
+
+O **telefone** entrou porque o TCI Itutinga o exige no agendamento. Fica visível
+para todos os terminais: é um campo a mais numa paleta de cópia, e quem não
+precisa apenas não copia. Requisito específico de um terminal tem lugar próprio
+— o campo **Observações do terminal** no cadastro do cliente, que o painel
+exibe como "Regra do terminal".
+
+Ele aparece **sem máscara**, ao contrário do CPF. O telefone já é exibido aberto
+na solicitação e no envio por WhatsApp; escondê-lo só aqui seria inconsistente
+sem proteger nada. O CPF continua mascarado e registrado ao copiar (seção 8).
 
 **Bloco "Confirmação":**
 

@@ -22,7 +22,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { cn } from '@/lib/utils'
+import { cn, formatTelefone } from '@/lib/utils'
 import { registrarAcesso } from '@/lib/acesso'
 import { GradeSlots } from '@/features/agendamentos/GradeSlots'
 import { useOcupacaoSlots } from '@/features/agendamentos/useTerminais'
@@ -193,6 +193,13 @@ function Conteudo({ row, onOpenChange }: { row: AgendamentoRow; onOpenChange: (o
             {dados.placaDolly && <LinhaCopiavel rotulo="Dolly" valor={dados.placaDolly} />}
             <LinhaCopiavel rotulo="Nota fiscal" valor={notaFiscal || null} />
             <LinhaCopiavel rotulo="Motorista" valor={dados.motoristaNome} />
+            {/* Sem máscara, diferente do CPF: o telefone já aparece aberto na
+                solicitação e no envio por WhatsApp — escondê-lo só aqui seria
+                inconsistente sem proteger nada. */}
+            <LinhaCopiavel
+              rotulo="Telefone"
+              valor={dados.motoristaTelefone ? formatTelefone(dados.motoristaTelefone) : null}
+            />
             <LinhaCopiavel
               rotulo="CPF"
               valor={formatarCpf(dados.motoristaCpf)}

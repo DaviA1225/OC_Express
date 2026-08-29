@@ -90,6 +90,9 @@ const SELECT_COM_JOINS = `
 export interface DadosVeiculo {
   motoristaNome: string | null
   motoristaCpf: string | null
+  /** O TCI Itutinga exige o telefone do motorista no agendamento. Já vinha na
+   *  consulta; só não estava exposto no bloco de cópia. */
+  motoristaTelefone: string | null
   placaCavalo: string | null
   placaCarreta: string | null
   placaPrimeiraCarreta: string | null
@@ -101,6 +104,7 @@ export function dadosDoVeiculo(row: AgendamentoRow): DadosVeiculo {
   return {
     motoristaNome: s?.motorista?.nome_completo ?? s?.parceiro_motorista?.nome_completo ?? null,
     motoristaCpf: s?.motorista?.cpf ?? s?.parceiro_motorista?.cpf ?? null,
+    motoristaTelefone: s?.motorista?.telefone ?? s?.parceiro_motorista?.telefone ?? null,
     placaCavalo: s?.veiculo?.placa ?? s?.parceiro_veiculo?.placa ?? null,
     placaCarreta: s?.carreta?.placa ?? s?.parceiro_carreta?.placa ?? null,
     placaPrimeiraCarreta: s?.primeira_carreta?.placa ?? s?.parceiro_primeira_carreta?.placa ?? null,
