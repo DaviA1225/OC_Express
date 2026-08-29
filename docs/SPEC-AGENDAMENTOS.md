@@ -433,7 +433,21 @@ visível apenas quando:
 |---|---|
 | Data desejada | date, mínimo = hoje + `antecedencia_minima_horas` |
 | Horário | grade de slots de `terminal_janelas` + opção "qualquer horário" |
+| Número da nota fiscal | text, **opcional** (0068) |
 | Observações | textarea, opcional |
+
+O **número da nota** é opcional de propósito. Quem está com a nota na mão
+primeiro é o parceiro — a foto dela era o que ele mandava por WhatsApp —, e
+recebê-la junto com o pedido encurta a busca da equipe no Corporate. Mas nem
+sempre ele a tem na hora de pedir, e exigir o número travaria o pedido por um
+dado que a equipe consegue obter sozinha.
+
+Grava em `agendamentos.nota_fiscal` com `nota_fiscal_origem = 'manual'` — não há
+coluna nova; é o mesmo campo do preenchimento automático de Embarques. Por isso
+o selo de NF no painel interno tem **três** estados, e não dois: *localizada*
+(veio de Embarques), *informada pelo parceiro* e *buscar no Corporate*. Sem o
+estado do meio, um agendamento que já chegou com a nota mostraria "buscar no
+Corporate" ao lado do próprio número.
 
 A grade mostra os slots reais do terminal escolhido — nove botões para o TCI,
 três para a A.B. O parceiro toca no horário; não digita.

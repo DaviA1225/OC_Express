@@ -227,10 +227,19 @@ function Conteudo({ row, onOpenChange }: { row: AgendamentoRow; onOpenChange: (o
             <Label htmlFor="nota_fiscal" className="text-[11px] uppercase tracking-[0.5px] text-muted-foreground">
               Nota fiscal
             </Label>
+            {/* Três estados, não dois: o parceiro agora pode informar o número
+                ao pedir (0068). Sem esta distinção, um agendamento que já veio
+                com a nota mostraria "Buscar no Corporate" ao lado do número —
+                mandando procurar o que já está na tela. */}
             {nfLocalizada ? (
               <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-800">
                 <CheckCircle2 className="h-3 w-3" />
                 NF localizada
+              </span>
+            ) : row.nota_fiscal ? (
+              <span className="inline-flex items-center gap-1 rounded-full cat-steel px-2 py-0.5 text-[11px] font-medium">
+                <CheckCircle2 className="h-3 w-3" />
+                Informada pelo parceiro
               </span>
             ) : (
               <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800">

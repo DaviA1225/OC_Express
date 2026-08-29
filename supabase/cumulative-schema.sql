@@ -1,5 +1,5 @@
 -- =====================================================================
--- OC Express / SisLog LHG — Schema cumulativo (migrations 0001 → 0067)
+-- OC Express / SisLog LHG — Schema cumulativo (migrations 0001 → 0068)
 -- =====================================================================
 --
 -- Este arquivo agrega TODAS as migrations num único script IDEMPOTENTE.
@@ -3697,13 +3697,18 @@ BEGIN
 END; $$;
 REVOKE ALL ON FUNCTION agendamento_reagendar_core(uuid, text, date, time) FROM public, anon, authenticated;
 
+-- Forma FINAL da 0068 (com `p_nota_fiscal`). O DROP da assinatura de 4
+-- argumentos e obrigatorio: lista de argumentos diferente cria SOBRECARGA, nao
+-- substitui, e sobrariam duas versoes para o PostgREST escolher.
+DROP FUNCTION IF EXISTS portal_solicitar_agendamento(uuid, date, time, text);
 CREATE OR REPLACE FUNCTION portal_solicitar_agendamento(
-  p_solicitacao_id uuid, p_data_preferida date, p_hora_preferida time, p_observacoes text)
+  p_solicitacao_id uuid, p_data_preferida date, p_hora_preferida time, p_observacoes text,
+  p_nota_fiscal text DEFAULT NULL)
 RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 DECLARE
   v_parceiro uuid := get_current_parceiro_id();
   v_status text; v_cliente uuid; v_requer boolean; v_antecedencia integer;
-  v_min_data date; v_slots integer; v_id uuid;
+  v_min_data date; v_slots integer; v_nota text; v_id uuid;
 BEGIN
   IF v_parceiro IS NULL THEN
     RAISE EXCEPTION 'Sessao de parceiro nao identificada.' USING ERRCODE = '42501';
@@ -3750,8 +3755,12 @@ BEGIN
     RAISE EXCEPTION 'Ja existe um agendamento em aberto para esta solicitacao.'
       USING ERRCODE = 'PT409';
   END IF;
-  INSERT INTO agendamentos (solicitacao_id, data_preferida, hora_preferida, observacoes)
-  VALUES (p_solicitacao_id, p_data_preferida, p_hora_preferida, NULLIF(btrim(p_observacoes), ''))
+  -- Teto de tamanho: numero de nota nao passa disso, e o campo e livre.
+  v_nota := NULLIF(left(btrim(p_nota_fiscal), 40), '');
+  INSERT INTO agendamentos (solicitacao_id, data_preferida, hora_preferida, observacoes,
+                            nota_fiscal, nota_fiscal_origem)
+  VALUES (p_solicitacao_id, p_data_preferida, p_hora_preferida, NULLIF(btrim(p_observacoes), ''),
+          v_nota, CASE WHEN v_nota IS NULL THEN NULL ELSE 'manual' END)
   RETURNING id INTO v_id;
   RETURN v_id;
 END; $$;
@@ -3823,14 +3832,14 @@ END; $$;
 
 REVOKE ALL ON FUNCTION agendamentos_ocupacao_slot(uuid, date) FROM public, anon;
 REVOKE ALL ON FUNCTION terminal_aplicar_grade_padrao(uuid, text) FROM public, anon;
-REVOKE ALL ON FUNCTION portal_solicitar_agendamento(uuid, date, time, text) FROM public, anon;
+REVOKE ALL ON FUNCTION portal_solicitar_agendamento(uuid, date, time, text, text) FROM public, anon;
 REVOKE ALL ON FUNCTION portal_cancelar_agendamento(uuid) FROM public, anon;
 REVOKE ALL ON FUNCTION portal_reagendar_agendamento(uuid, text, date, time) FROM public, anon;
 REVOKE ALL ON FUNCTION agendamento_reagendar(uuid, text, date, time) FROM public, anon;
 REVOKE ALL ON FUNCTION agendamento_assumir(uuid) FROM public, anon;
 GRANT EXECUTE ON FUNCTION agendamentos_ocupacao_slot(uuid, date) TO authenticated;
 GRANT EXECUTE ON FUNCTION terminal_aplicar_grade_padrao(uuid, text) TO authenticated;
-GRANT EXECUTE ON FUNCTION portal_solicitar_agendamento(uuid, date, time, text) TO authenticated;
+GRANT EXECUTE ON FUNCTION portal_solicitar_agendamento(uuid, date, time, text, text) TO authenticated;
 GRANT EXECUTE ON FUNCTION portal_cancelar_agendamento(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION portal_reagendar_agendamento(uuid, text, date, time) TO authenticated;
 GRANT EXECUTE ON FUNCTION agendamento_reagendar(uuid, text, date, time) TO authenticated;

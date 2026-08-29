@@ -164,6 +164,12 @@ export function AgendamentoCard({ solicitacaoId, status, cliente }: Props) {
                   </p>
                 )}
 
+                {a.nota_fiscal && (
+                  <p className="mt-1.5 text-[12px] text-muted-foreground">
+                    <span className="font-medium text-foreground">Nota fiscal: </span>
+                    <span className="tabular-nums">{a.nota_fiscal}</span>
+                  </p>
+                )}
                 {a.observacoes && (
                   <p className="mt-1.5 text-[12px] text-muted-foreground">{a.observacoes}</p>
                 )}
@@ -343,6 +349,7 @@ function Formulario({
   const [data, setData] = React.useState(minimo)
   const [hora, setHora] = React.useState<string | null>(reagendarDe?.hora_preferida ?? null)
   const [observacoes, setObservacoes] = React.useState('')
+  const [notaFiscal, setNotaFiscal] = React.useState('')
   const [motivo, setMotivo] = React.useState('')
 
   const slots = useSlotsDoTerminal(cliente?.id ?? null, data || null)
@@ -399,6 +406,24 @@ function Formulario({
 
         {!reagendarDe && (
           <div className="space-y-1.5">
+            <Label htmlFor="nota_fiscal_pedido">Número da nota fiscal</Label>
+            <Input
+              id="nota_fiscal_pedido"
+              value={notaFiscal}
+              onChange={(e) => setNotaFiscal(e.target.value)}
+              placeholder="Ex.: 6/254215"
+              maxLength={40}
+              className="w-[220px]"
+            />
+            <p className="text-[12px] text-muted-foreground">
+              Opcional. Se você já tem a nota em mãos, informar o número aqui poupa a equipe
+              de procurá-la no Corporate.
+            </p>
+          </div>
+        )}
+
+        {!reagendarDe && (
+          <div className="space-y-1.5">
             <Label htmlFor="observacoes_agendamento">Observações</Label>
             <Textarea
               id="observacoes_agendamento"
@@ -439,6 +464,7 @@ function Formulario({
                   dataPreferida: data,
                   horaPreferida: hora,
                   observacoes: observacoes.trim() || null,
+                  notaFiscal: notaFiscal.trim() || null,
                 })
               }
               onOpenChange(false)

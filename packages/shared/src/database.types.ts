@@ -914,6 +914,9 @@ export interface Database {
           p_data_preferida: string
           p_hora_preferida: string | null
           p_observacoes: string | null
+          // 0068 — opcional: o parceiro informa o número da nota para encurtar a
+          // busca da equipe no Corporate.
+          p_nota_fiscal?: string | null
         }
         Returns: string
       }

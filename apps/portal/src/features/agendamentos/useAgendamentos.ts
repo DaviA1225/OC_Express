@@ -102,12 +102,15 @@ export function useSolicitarAgendamento() {
       dataPreferida: string
       horaPreferida: string | null
       observacoes: string | null
+      /** Opcional (0068): encurta a busca da nota no Corporate pela equipe. */
+      notaFiscal: string | null
     }) => {
       const { data, error } = await supabase.rpc('portal_solicitar_agendamento', {
         p_solicitacao_id: input.solicitacaoId,
         p_data_preferida: input.dataPreferida,
         p_hora_preferida: input.horaPreferida,
         p_observacoes: input.observacoes,
+        p_nota_fiscal: input.notaFiscal,
       } as never)
       if (error) throw error
       return data as string
