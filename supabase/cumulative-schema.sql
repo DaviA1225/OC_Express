@@ -1,5 +1,5 @@
 -- =====================================================================
--- OC Express / SisLog LHG — Schema cumulativo (migrations 0001 → 0066)
+-- OC Express / SisLog LHG — Schema cumulativo (migrations 0001 → 0067)
 -- =====================================================================
 --
 -- Este arquivo agrega TODAS as migrations num único script IDEMPOTENTE.
@@ -4079,7 +4079,7 @@ NOTIFY pgrst, 'reload schema';
 
 
 -- =====================================================================
--- 0063 + 0066 — Terminais ligados: TCI, A.B/CSN e MRS Sao Bento
+-- 0063 + 0066 + 0067 — Terminais: TCI, A.B/CSN e MRS Sao Bento (+ regra do TCI)
 -- =====================================================================
 -- Configuracao operacional, nao schema: marca os dois primeiros clientes que
 -- exigem agendamento e cria a grade de cada um. Por ID — a conferencia no
@@ -4134,6 +4134,21 @@ SELECT '0281905e-646a-431f-abf1-80d7d7e757e1', g.h::time, 30, 3
                        timestamp '2000-01-01 17:30',
                        interval '30 minutes') AS g(h)
 ON CONFLICT (cliente_id, hora) DO NOTHING;
+
+-- ---------- 0067 — Regra do TCI: exige telefone do motorista ----------
+-- `observacoes_agendamento` e o que o painel mostra como "Regra do terminal",
+-- e e onde exigencia especifica de um terminal vive — em vez de virar coluna
+-- nova a cada pedido. Acrescenta em linha nova se a equipe ja escreveu algo, e
+-- nao mexe se telefone ja estiver mencionado (reexecutar nao duplica).
+UPDATE clientes
+   SET observacoes_agendamento = CASE
+         WHEN observacoes_agendamento IS NULL OR btrim(observacoes_agendamento) = ''
+           THEN 'Exige o telefone do motorista no agendamento.'
+         WHEN observacoes_agendamento ILIKE '%telefone%'
+           THEN observacoes_agendamento
+         ELSE btrim(observacoes_agendamento) || E'\nExige o telefone do motorista no agendamento.'
+       END
+ WHERE id = '99dbb554-5340-4b78-9e36-6eb7228d0835';
 
 -- Aviso, nao erro: a equipe vai ajustar capacidade quando confirmar os numeros
 -- com cada terminal, e este arquivo roda em UMA transacao — abortar por
