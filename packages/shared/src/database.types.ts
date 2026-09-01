@@ -579,6 +579,20 @@ export interface Database {
           motivo_reagendamento?: string | null
         }
       }
+      // 0070 — aceite do Termo de Uso e Confidencialidade. Escrita só pela RPC
+      // `registrar_aceite_termos`; o app lê a própria linha para saber se ainda
+      // precisa mostrar o modal.
+      termos_aceite: {
+        Row: {
+          id: string
+          user_id: string
+          versao: string
+          origem: 'interno' | 'portal'
+          aceito_em: string
+        }
+        Insert: Record<string, never>
+        Update: Record<string, never>
+      }
       eventos_portal: {
         Row: {
           id: string
@@ -944,6 +958,12 @@ export interface Database {
           // veículo (o banco recusa o pedido sem ele). Opcional nos demais.
           p_tipo_veiculo?: TipoVeiculo | null
         }
+        Returns: string
+      }
+      // 0070 — registra o aceite do termo pelo usuário logado. `origem` é
+      // derivada no servidor, não vem do payload.
+      registrar_aceite_termos: {
+        Args: { p_versao: string }
         Returns: string
       }
       portal_cancelar_agendamento: {

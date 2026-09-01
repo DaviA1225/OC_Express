@@ -13,6 +13,7 @@ import { TurnstileWidget, type TurnstileHandle } from '@/components/TurnstileWid
 import { useAuth } from '@/hooks/useAuth'
 import { emailLembrado, esquecerEmail, lembrarEmail } from '@sislog/shared/cookies'
 import { lerMotivoSaida, limparMotivoSaida } from '@sislog/shared/sessao'
+import { SISLOG_VERSAO } from '@sislog/shared/versao'
 
 // Chave pública do Turnstile. Quando ausente, o captcha fica desligado e o login
 // segue como antes — o gate real é habilitado no Dashboard do Supabase.
@@ -26,7 +27,6 @@ const loginSchema = z.object({
 type LoginValues = z.infer<typeof loginSchema>
 type Step = 'welcome' | 'credentials'
 
-const APP_VERSION = 'v1.3.1'
 // Mostra o ambiente quando não for produção (homologação/dev), para a operação
 // nunca confundir em qual base está agindo. Em produção fica oculto.
 const ENV_LABEL: string | null =
@@ -276,7 +276,7 @@ export default function LoginPage() {
             Acesso restrito a usuários autorizados · sessões registradas
           </p>
           <p className="text-[11px] text-muted-foreground/70">
-            LHG Logística · SisLog {APP_VERSION} ·{' '}
+            LHG Logística · SisLog v{SISLOG_VERSAO} ·{' '}
             <button
               type="button"
               onClick={() =>

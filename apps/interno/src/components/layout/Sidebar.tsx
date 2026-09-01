@@ -1,5 +1,6 @@
 import * as React from 'react'
 import { NavLink } from 'react-router-dom'
+import { SISLOG_VERSAO } from '@sislog/shared/versao'
 import {
   LayoutDashboard,
   Inbox,
@@ -43,7 +44,6 @@ interface NavItem {
   icon: React.ComponentType<{ className?: string }>
 }
 
-const APP_VERSION = 'v1.3.1'
 
 const PERFIL_LABELS: Record<string, string> = {
   admin: 'Administrador',
@@ -231,7 +231,7 @@ export function SidebarContent({ collapsed, onToggleCollapse, onNavigate, onClos
       <div className="p-2">
         {!collapsed && (
           <p className="px-2 pb-1.5 text-[10px] tabular-nums text-muted-foreground">
-            SisLog {APP_VERSION}
+            SisLog v{SISLOG_VERSAO}
           </p>
         )}
         <div

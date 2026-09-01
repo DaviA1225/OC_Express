@@ -26,6 +26,7 @@ pendentes e estão listados no fim.
 | IP, user-agent, e-mail tentado | `eventos_portal` | Automático no login do portal | Segurança: detectar acesso indevido |
 | IP, user-agent, recurso acessado | `log_acesso` | Automático na exportação/abertura | Registro de acesso (art. 37) |
 | Cópia de linhas alteradas | `log_auditoria` | Automático por trigger | Trilha de quem criou/alterou/apagou |
+| Usuário, versão e data do aceite | `termos_aceite` | Aceite do termo no primeiro acesso (0070) | Prova de que quem maneja dado pessoal foi instruído (art. 46/50) |
 | Documentos anexados | bucket `solicitacoes-anexos` | Upload na solicitação | CRLV, comprovantes, prints |
 | Comprovante do terminal e PDF da NF | bucket `agendamentos-docs` | Conclusão do agendamento (0061) | Prova da janela confirmada; devolvido ao parceiro |
 
@@ -53,6 +54,7 @@ Decidido em 2026-08-09. Implementado em `supabase/migrations/0056` e `0059`.
 | `log_auditoria` | **5 anos** | Acompanha a guarda fiscal do transporte (CT-e / MDF-e). É o prazo com obrigação legal concreta por trás. |
 | `eventos_portal` | **1 ano** | Log de acesso. O Marco Civil (art. 15) exige 6 meses; 1 ano dá margem para investigar incidente descoberto tarde. |
 | `log_acesso` | **1 ano** | Mesma natureza da `eventos_portal`. |
+| `termos_aceite` | **enquanto a conta existir** | `ON DELETE CASCADE`: o aceite regula um acesso que deixou de existir. Guardá-lo depois seria reter dado de quem saiu sem finalidade. |
 | Cadastros e solicitações | **sem prazo automático** | São a operação em si. Saem por pedido do titular (seção 3) ou por decisão de negócio. |
 | `agendamentos` + bucket `agendamentos-docs` | **acompanha a solicitação** | O comprovante do terminal é prova de que a descarga foi agendada; segue a mesma guarda fiscal do transporte (proposta: 5 anos). Nenhuma categoria nova de dado — nome, CPF e placas já estavam mapeados —, mas **aumenta o volume de documentos armazenados**. |
 
@@ -149,6 +151,28 @@ Nenhuma das três é gravável direto: toda escrita passa por função
 - Buckets `ocs-pdf` e `solicitacoes-anexos` **privados**; acesso só por URL
   assinada com validade curta.
 - CAPTCHA (Turnstile) e rate limit no login; CSP enforced nos dois apps.
+- **Termo de Uso e Confidencialidade aceito no primeiro acesso**, nos dois apps,
+  registrado em `termos_aceite` (migration 0070) com usuário, versão e data. O
+  texto vive em `packages/shared/src/termos.ts` — em código, e não em tabela
+  editável, para que a versão aceita seja recuperável no git. Mudou o texto,
+  sobe `TERMOS_VERSAO` e o aceite é pedido de novo.
+  **Não é consentimento do art. 8**: o titular dos dados é o motorista, e a base
+  legal é a execução do contrato de transporte (art. 7, V e II). O aceite prova
+  instrução ao operador e serve de aviso de privacidade sobre os dados do
+  próprio usuário.
+- **Sessão por tempo de atividade: 50 minutos sem interação encerram o acesso**,
+  nos dois apps, com aviso 2 minutos antes. O logout automático chama
+  `signOut()`, que revoga o refresh token no servidor — a estação que ficou
+  aberta na sala de operação deixa de ser um acesso válido. O padrão anterior
+  era sessão perpétua (o Supabase renova o token sozinho, indefinidamente).
+- O "lembrar" da tela de login guarda **apenas o e-mail**, em cookie
+  `SameSite=Lax` + `Secure`, por escolha explícita do usuário na caixa
+  *"Lembrar meu e-mail neste computador"*. **Senha e token de sessão nunca são
+  gravados em cookie** — guardar a senha anularia o limite de inatividade e
+  entregaria a credencial a qualquer XSS. O preenchimento da senha fica com o
+  gerenciador do navegador (`autocomplete="current-password"`).
+- MFA/TOTP disponível — **hoje opt-in**. A obrigatoriedade está prevista para
+  o começo de setembro de 2026.
 - O link do PDF da OC vale **5 dias**: o motorista não tem conta no sistema e
   leva de 1 a 4 dias para chegar ao carregamento. Não encurtar sem falar com a
   operação. O CPF vai mascarado na mensagem de WhatsApp e completo apenas
@@ -161,7 +185,7 @@ Nenhuma das três é gravável direto: toda escrita passa por função
 | # | Pendência | Natureza |
 |---|---|---|
 | 1 | **Contrato de operador (art. 39)** com as transportadoras parceiras | Jurídica |
-| 2 | **Aviso de privacidade** aos motoristas e usuários do portal | Jurídica |
+| 2 | **Aviso de privacidade aos motoristas** (o dos usuários passou a ser dado no termo da 0070; o motorista continua sem, e não tem conta no sistema) | Jurídica |
 | 3 | Definir formalmente **controlador × operador** em cada relação | Jurídica |
 | 4 | Política de senha no Supabase Dashboard (mínimo 10 + letras e dígitos) | Técnica |
 | 5 | MFA obrigatório para perfis internos | Técnica |

@@ -11,7 +11,9 @@
     "./postgrest": "./src/postgrest.ts",
     "./supabase": "./src/supabase.ts",
     "./sessao": "./src/sessao.ts",
-    "./cookies": "./src/cookies.ts"
+    "./cookies": "./src/cookies.ts",
+    "./termos": "./src/termos.ts",
+    "./versao": "./src/versao.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

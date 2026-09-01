@@ -1,5 +1,5 @@
 -- =====================================================================
--- OC Express / SisLog LHG — Schema cumulativo (migrations 0001 → 0069)
+-- OC Express / SisLog LHG — Schema cumulativo (migrations 0001 → 0070)
 -- =====================================================================
 --
 -- Este arquivo agrega TODAS as migrations num único script IDEMPOTENTE.
@@ -4057,6 +4057,86 @@ SELECT c.id, g.h, 360, 10
      OR upper(c.razao_social) LIKE '%OPERADORA DE TERMINAIS%')
    AND NOT EXISTS (SELECT 1 FROM terminal_janelas tj WHERE tj.cliente_id = c.id)
 ON CONFLICT (cliente_id, hora, tipo_veiculo) DO NOTHING;
+
+NOTIFY pgrst, 'reload schema';
+
+
+-- =====================================================================
+-- 0070 — Aceite do Termo de Uso e Confidencialidade (LGPD)
+-- =====================================================================
+-- Fica ANTES da varredura da 0051 porque cria policy.
+--
+-- NAO e consentimento do art. 8: o titular dos dados guardados aqui e o
+-- MOTORISTA, e a base legal e a execucao do contrato de transporte (art. 7, V e
+-- II). Esta tabela registra que quem MANEJA o dado foi instruido e assumiu o
+-- dever de confidencialidade — art. 46/50. Texto e versao vivem em
+-- `packages/shared/src/termos.ts`.
+--
+-- Uma linha por usuario POR VERSAO; sem UPDATE/DELETE (aceite e fato datado).
+-- Sem ip/user_agent de proposito: a linha vive enquanto a conta viver, e para
+-- provar aceite bastam quem, qual versao e quando (minimizacao, art. 6, III).
+
+CREATE TABLE IF NOT EXISTS termos_aceite (
+  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id    uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  versao     text NOT NULL,
+  origem     text NOT NULL CHECK (origem IN ('interno', 'portal')),
+  aceito_em  timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (user_id, versao)
+);
+CREATE INDEX IF NOT EXISTS idx_termos_aceite_user ON termos_aceite (user_id);
+
+ALTER TABLE termos_aceite ENABLE ROW LEVEL SECURITY;
+
+-- SELECT: a propria linha (o app precisa saber se ja aceitou) e os perfis que
+-- ja enxergam a auditoria. Sem policy de escrita: so a RPC abaixo escreve.
+DROP POLICY IF EXISTS termos_aceite_select ON termos_aceite;
+CREATE POLICY termos_aceite_select ON termos_aceite
+  FOR SELECT TO authenticated
+  USING (
+    user_id = (SELECT auth.uid())
+    OR (SELECT meu_perfil_interno()) IN ('admin', 'gerente', 'supervisor')
+  );
+
+-- `origem` vem de is_interno() no servidor, nunca do payload (mesmo padrao de
+-- registrar_acesso, 0059). Levanta excecao em vez de engolir erro: o app so
+-- libera a tela depois de gravar, senao o modal voltaria a cada carregamento.
+CREATE OR REPLACE FUNCTION registrar_aceite_termos(p_versao text)
+RETURNS uuid
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_user   uuid := auth.uid();
+  v_versao text := NULLIF(btrim(left(p_versao, 40)), '');
+  v_origem text;
+  v_id     uuid;
+BEGIN
+  IF v_user IS NULL THEN
+    RAISE EXCEPTION 'Sessao nao identificada.' USING ERRCODE = '42501';
+  END IF;
+  IF v_versao IS NULL THEN
+    RAISE EXCEPTION 'Versao do termo nao informada.' USING ERRCODE = '22004';
+  END IF;
+
+  v_origem := CASE WHEN is_interno() THEN 'interno' ELSE 'portal' END;
+
+  INSERT INTO termos_aceite (user_id, versao, origem)
+  VALUES (v_user, v_versao, v_origem)
+  ON CONFLICT (user_id, versao) DO NOTHING
+  RETURNING id INTO v_id;
+
+  IF v_id IS NULL THEN
+    SELECT id INTO v_id FROM termos_aceite
+     WHERE user_id = v_user AND versao = v_versao;
+  END IF;
+
+  RETURN v_id;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION registrar_aceite_termos(text) FROM public, anon;
+GRANT EXECUTE ON FUNCTION registrar_aceite_termos(text) TO authenticated;
 
 NOTIFY pgrst, 'reload schema';
 
