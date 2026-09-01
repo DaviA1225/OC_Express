@@ -1,5 +1,5 @@
 -- =====================================================================
--- OC Express / SisLog LHG — Schema cumulativo (migrations 0001 → 0070)
+-- OC Express / SisLog LHG — Schema cumulativo (migrations 0001 → 0071)
 -- =====================================================================
 --
 -- Este arquivo agrega TODAS as migrations num único script IDEMPOTENTE.
@@ -3468,17 +3468,41 @@ END $$;
 -- versao de tres campos no lugar, achando que estava tudo certo. DROP + ADD
 -- converge de qualquer estado.
 --
--- NOT VALID pelo mesmo motivo da migration: existem agendamentos concluidos
--- ANTES desta regra, e um replay nao pode abortar por causa deles. A regra vale
--- para toda linha inserida ou atualizada daqui em diante; para fechar a divida,
--- anexe o contrato nas linhas herdadas e rode
--- `ALTER TABLE agendamentos VALIDATE CONSTRAINT agendamentos_agendado_completo`.
+-- NOT VALID pelo mesmo motivo da migration: pode existir agendamento concluido
+-- ANTES desta regra, e um replay nao pode abortar por causa dele. A regra vale
+-- para toda linha inserida ou atualizada daqui em diante.
 ALTER TABLE agendamentos DROP CONSTRAINT IF EXISTS agendamentos_agendado_completo;
 ALTER TABLE agendamentos ADD CONSTRAINT agendamentos_agendado_completo
   CHECK (status <> 'agendado'
          OR (data_agendada IS NOT NULL AND hora_agendada IS NOT NULL
              AND comprovante_path IS NOT NULL
              AND contrato_frete_path IS NOT NULL)) NOT VALID;
+
+-- 0071 — e, logo em seguida, valida o CHECK se a base permitir. O DROP + ADD
+-- acima devolve a constraint ao estado NOT VALID a cada replay, entao a
+-- validacao precisa vir depois dele, e nao numa secao la no fim.
+--
+-- AVISA e sai quando encontra linha violando, em vez de abortar: este arquivo
+-- roda em UMA transacao, e derrubar o replay inteiro por causa de um dado
+-- herdado e exatamente o que a 0064 evitou ao escolher NOT VALID.
+DO $$
+DECLARE
+  v_violando integer;
+BEGIN
+  SELECT count(*) INTO v_violando
+    FROM agendamentos
+   WHERE status = 'agendado'
+     AND (data_agendada IS NULL OR hora_agendada IS NULL
+       OR comprovante_path IS NULL OR contrato_frete_path IS NULL);
+
+  IF v_violando > 0 THEN
+    RAISE WARNING
+      'CHECK agendamentos_agendado_completo segue NOT VALID: % agendamento(s) concluido(s) sem documento. Anexe pelo botao Documentos e replaye.',
+      v_violando;
+  ELSE
+    ALTER TABLE agendamentos VALIDATE CONSTRAINT agendamentos_agendado_completo;
+  END IF;
+END $$;
 
 -- Um agendamento vivo por solicitacao: e este indice que obriga o
 -- reagendamento a passar pela RPC (substitui + insere na mesma transacao).
