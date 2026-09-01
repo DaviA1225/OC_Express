@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { useAuth } from '@/hooks/useAuth'
-import { termosDeUso } from '@sislog/shared/termos'
+import { TERMOS_VERSAO, termosDeUso } from '@sislog/shared/termos'
 import { SISLOG_VERSAO } from '@sislog/shared/versao'
 import { useAceiteDeTermos, useAceitarTermos } from './useTermos'
 
@@ -106,7 +106,13 @@ export function TermosDialog() {
         </DialogBody>
 
         <DialogFooter>
-          <span className="text-[11px] text-muted-foreground/80">SisLog v{SISLOG_VERSAO}</span>
+          {/* As duas versões, porque são coisas diferentes: a do SisLog muda a
+              cada release; a do termo, só quando o texto muda — e é ELA que
+              fica gravada no aceite. Quem for conferir uma linha de
+              `termos_aceite` precisa achar na tela o número que está lá. */}
+          <span className="text-[11px] text-muted-foreground/80">
+            SisLog v{SISLOG_VERSAO} · termo {TERMOS_VERSAO}
+          </span>
           <div className="flex items-center gap-2">
             <Button
               type="button"
