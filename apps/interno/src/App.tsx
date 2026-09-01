@@ -5,6 +5,7 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import { ProtectedRoute } from '@/components/shared/ProtectedRoute'
 import { PerfilRoute } from '@/components/shared/PerfilRoute'
 import { AppLayout } from '@/components/layout/AppLayout'
+import { VigiaDeSessao } from '@/features/auth/VigiaDeSessao'
 import LoginPage from '@/pages/auth/LoginPage'
 
 // O Dashboard entra em lazy junto com as demais páginas. Importado direto, ele
@@ -50,6 +51,9 @@ export default function App() {
   return (
     <AuthProvider>
       <TooltipProvider delayDuration={200}>
+        {/* Fora do <Routes>: a contagem de inatividade não pode reiniciar a
+            cada navegação. */}
+        <VigiaDeSessao />
         <Suspense fallback={<PageFallback />}>
           <Routes>
             <Route path="/login" element={<LoginPage />} />

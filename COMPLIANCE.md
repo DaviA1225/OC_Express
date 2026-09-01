@@ -149,8 +149,6 @@ Nenhuma das três é gravável direto: toda escrita passa por função
 - Buckets `ocs-pdf` e `solicitacoes-anexos` **privados**; acesso só por URL
   assinada com validade curta.
 - CAPTCHA (Turnstile) e rate limit no login; CSP enforced nos dois apps.
-- MFA/TOTP disponível — **hoje opt-in**. A obrigatoriedade está prevista para
-  o começo de setembro de 2026.
 - O link do PDF da OC vale **5 dias**: o motorista não tem conta no sistema e
   leva de 1 a 4 dias para chegar ao carregamento. Não encurtar sem falar com a
   operação. O CPF vai mascarado na mensagem de WhatsApp e completo apenas
@@ -169,6 +167,7 @@ Nenhuma das três é gravável direto: toda escrita passa por função
 | 5 | MFA obrigatório para perfis internos | Técnica |
 | 6 | Tela para `log_acesso` e para a fila de órfãos do storage | Técnica |
 | 7 | Tela para os pedidos de titular (hoje só SQL Editor) | Técnica |
+| 8 | **Expiração de sessão no servidor** (Auth → Sessions no Dashboard): o limite de 50 min hoje é aplicado pelo cliente | Técnica |
 
 As pendências 1 a 3 são as que um pedido da ANPD cobraria primeiro, e nenhuma
 delas se resolve em código.

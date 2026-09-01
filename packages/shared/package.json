@@ -9,7 +9,9 @@
     "./validators": "./src/validators.ts",
     "./formatters": "./src/formatters.ts",
     "./postgrest": "./src/postgrest.ts",
-    "./supabase": "./src/supabase.ts"
+    "./supabase": "./src/supabase.ts",
+    "./sessao": "./src/sessao.ts",
+    "./cookies": "./src/cookies.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"
