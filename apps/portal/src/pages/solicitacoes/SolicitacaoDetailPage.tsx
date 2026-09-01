@@ -13,6 +13,7 @@ import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { StatusBadge } from '@/components/solicitacoes/StatusBadge'
 import { AnexosCard } from '@/features/anexos/AnexosCard'
 import { HistoricoCard } from '@/features/solicitacoes/HistoricoCard'
+import { AgendamentoCard } from '@/features/agendamentos/AgendamentoCard'
 import { cn } from '@/lib/utils'
 import { formatNumeroOC, formatarPamcardParaExibicao } from '@/lib/utils'
 import { podeCancelar, podeEditar } from '@/features/solicitacoes/status'
@@ -217,6 +218,14 @@ export default function SolicitacaoDetailPage() {
           <PendenciasHistoricoCard pendencias={pendenciasHist.data ?? []} />
         </div>
       )}
+
+      <div className="mt-4">
+        <AgendamentoCard
+          solicitacaoId={sol.id as string}
+          status={sol.status as SolicitacaoStatus}
+          cliente={cliente}
+        />
+      </div>
 
       <section className="mt-4 rounded-lg border bg-background p-5">
         <h2 className="text-[15px] font-semibold text-foreground">Dados da solicitação</h2>

@@ -3,13 +3,17 @@ import { useNavigate, Navigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { ArrowLeft, ArrowRight, Eye, EyeOff, Loader2 } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Clock, Eye, EyeOff, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Checkbox } from '@/components/ui/checkbox'
 import { TurnstileWidget, type TurnstileHandle } from '@/components/TurnstileWidget'
 import { useAuth } from '@/hooks/useAuth'
+import { emailLembrado, esquecerEmail, lembrarEmail } from '@sislog/shared/cookies'
+import { lerMotivoSaida, limparMotivoSaida } from '@sislog/shared/sessao'
+import { SISLOG_VERSAO } from '@sislog/shared/versao'
 
 // Chave pública do Turnstile. Quando ausente, o captcha fica desligado e o login
 // segue como antes — o gate real é habilitado no Dashboard do Supabase.
@@ -23,7 +27,6 @@ const loginSchema = z.object({
 type LoginValues = z.infer<typeof loginSchema>
 type Step = 'welcome' | 'credentials'
 
-const APP_VERSION = 'v1.3.1'
 // Mostra o ambiente quando não for produção (homologação/dev), para a operação
 // nunca confundir em qual base está agindo. Em produção fica oculto.
 const ENV_LABEL: string | null =
@@ -33,7 +36,19 @@ const ENV_LABEL: string | null =
 export default function LoginPage() {
   const { signIn, session, loading } = useAuth()
   const navigate = useNavigate()
-  const [step, setStep] = React.useState<Step>('welcome')
+
+  // Cookie de conveniência (só o e-mail — a senha nunca sai daqui; ver
+  // `@sislog/shared/cookies`). Lido uma vez: quem já entrou neste computador
+  // pula a tela de boas-vindas e cai direto no campo de senha.
+  const [emailSalvo] = React.useState(() => emailLembrado())
+  const [lembrar, setLembrar] = React.useState(!!emailSalvo)
+
+  // Por que a sessão caiu. Leitura pura no inicializador: apagar aqui seria
+  // efeito colateral num caminho que o StrictMode roda duas vezes. Quem apaga é
+  // o login bem-sucedido, mais abaixo.
+  const [saiuPorInatividade] = React.useState(() => lerMotivoSaida() === 'inatividade')
+
+  const [step, setStep] = React.useState<Step>(emailSalvo ? 'credentials' : 'welcome')
   const [showPassword, setShowPassword] = React.useState(false)
   const [capsOn, setCapsOn] = React.useState(false)
   const [submitting, setSubmitting] = React.useState(false)
@@ -47,7 +62,7 @@ export default function LoginPage() {
     formState: { errors },
   } = useForm<LoginValues>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { email: '', password: '' },
+    defaultValues: { email: emailSalvo ?? '', password: '' },
   })
 
   if (!loading && session) {
@@ -69,6 +84,11 @@ export default function LoginPage() {
       toast.error(error)
       return
     }
+    // Só depois do login dar certo: guardar um e-mail que nem existe deixaria a
+    // próxima visita com um campo preenchido errado.
+    if (lembrar) lembrarEmail(values.email)
+    else esquecerEmail()
+    limparMotivoSaida()
     navigate('/dashboard', { replace: true })
   }
 
@@ -103,6 +123,16 @@ export default function LoginPage() {
               SisLog
             </span>
           </div>
+          {saiuPorInatividade && (
+            <div className="mb-5 flex items-start gap-2 rounded-[3px] border border-amber-300 bg-amber-50 px-3 py-2 text-[12px] leading-relaxed text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
+              <Clock className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <span>
+                Entre novamente para continuar. Por inatividade, o acesso é encerrado para
+                proteger os dados do sistema.
+              </span>
+            </div>
+          )}
+
           {step === 'welcome' ? (
             <div
               key="welcome"
@@ -206,6 +236,18 @@ export default function LoginPage() {
                   )}
                 </div>
 
+                <div className="flex items-start gap-2">
+                  <Checkbox
+                    id="lembrar_email"
+                    checked={lembrar}
+                    onCheckedChange={(v) => setLembrar(v === true)}
+                    className="mt-0.5"
+                  />
+                  <Label htmlFor="lembrar_email" className="text-[12px] font-normal leading-relaxed text-muted-foreground">
+                    Lembrar meu e-mail neste computador
+                  </Label>
+                </div>
+
                 {captchaEnabled && (
                   <TurnstileWidget
                     ref={turnstileRef}
@@ -234,7 +276,7 @@ export default function LoginPage() {
             Acesso restrito a usuários autorizados · sessões registradas
           </p>
           <p className="text-[11px] text-muted-foreground/70">
-            LHG Logística · SisLog {APP_VERSION} ·{' '}
+            LHG Logística · SisLog v{SISLOG_VERSAO} ·{' '}
             <button
               type="button"
               onClick={() =>

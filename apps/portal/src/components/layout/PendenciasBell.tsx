@@ -1,18 +1,22 @@
 import * as React from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Bell, Undo2 } from 'lucide-react'
+import { Bell, Undo2, CalendarCheck } from 'lucide-react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { usePendenciasAbertas } from '@/features/solicitacoes/usePendencias'
 import { useSolicitacoesPortal } from '@/features/solicitacoes/useSolicitacoes'
+import { useAgendamentosRecentes } from '@/features/agendamentos/useAgendamentos'
+import { dataCompleta, horaCurta } from '@/features/agendamentos/agendamento'
 import { formatNumeroOC } from '@/lib/utils'
 
-/** Sino do portal: mostra as pendências abertas que a equipe da LHG devolveu
- *  ao parceiro para resolução. Clicar abre a solicitação correspondente. */
+/** Sino do portal: o que precisa da atenção do parceiro. Duas origens —
+ *  pendências que a LHG devolveu (estado aberto) e agendamentos confirmados nas
+ *  últimas 24h, que trazem comprovante novo para baixar. */
 export function PendenciasBell() {
   const navigate = useNavigate()
   const [open, setOpen] = React.useState(false)
   const { data: pendencias } = usePendenciasAbertas()
   const { data: solicitacoes } = useSolicitacoesPortal()
+  const { data: agendamentos } = useAgendamentosRecentes()
 
   const numeroPorSolicitacao = React.useMemo(() => {
     const m = new Map<string, number>()
@@ -23,7 +27,8 @@ export function PendenciasBell() {
   }, [solicitacoes])
 
   const itens = pendencias ?? []
-  const total = itens.length
+  const agendados = agendamentos ?? []
+  const total = itens.length + agendados.length
 
   const handleSelect = (solicitacaoId: string) => {
     setOpen(false)
@@ -36,8 +41,8 @@ export function PendenciasBell() {
         <button
           type="button"
           className="relative rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          aria-label={total > 0 ? `${total} pendência${total === 1 ? '' : 's'}` : 'Pendências'}
-          title={total > 0 ? `${total} pendência${total === 1 ? '' : 's'} aguardando você` : 'Sem pendências'}
+          aria-label={total > 0 ? `${total} aviso${total === 1 ? '' : 's'}` : 'Avisos'}
+          title={total > 0 ? `${total} aviso${total === 1 ? '' : 's'} para você` : 'Nenhum aviso'}
         >
           <Bell className="h-5 w-5" />
           {total > 0 && (
@@ -49,9 +54,9 @@ export function PendenciasBell() {
       </PopoverTrigger>
       <PopoverContent align="end" className="w-[340px] p-0">
         <header className="border-b px-3 py-2">
-          <p className="text-[13px] font-medium text-foreground">Pendências</p>
+          <p className="text-[13px] font-medium text-foreground">Avisos</p>
           <p className="text-[10px] text-muted-foreground">
-            Solicitações que precisam da sua ação
+            O que precisa da sua ação e o que ficou pronto
           </p>
         </header>
         <div className="max-h-[400px] overflow-y-auto">
@@ -62,6 +67,31 @@ export function PendenciasBell() {
             </div>
           ) : (
             <ul className="divide-y">
+              {agendados.map((a) => {
+                const numero = numeroPorSolicitacao.get(a.solicitacao_id)
+                return (
+                  <li key={a.id}>
+                    <button
+                      type="button"
+                      onClick={() => handleSelect(a.solicitacao_id)}
+                      className="flex w-full items-start gap-3 px-3 py-2.5 text-left hover:bg-muted/60"
+                    >
+                      <CalendarCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+                      <div className="min-w-0 flex-1">
+                        {numero != null && (
+                          <span className="text-[12px] font-medium tabular-nums text-primary">
+                            {formatNumeroOC(numero)}
+                          </span>
+                        )}
+                        <p className="text-[12px] text-foreground">
+                          Descarga agendada para {dataCompleta(a.data_agendada)} às{' '}
+                          {horaCurta(a.hora_agendada)} — comprovante disponível.
+                        </p>
+                      </div>
+                    </button>
+                  </li>
+                )
+              })}
               {itens.map((p) => {
                 const numero = numeroPorSolicitacao.get(p.solicitacao_id)
                 return (

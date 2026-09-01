@@ -5,6 +5,8 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import { ProtectedRoute } from '@/components/shared/ProtectedRoute'
 import { PerfilRoute } from '@/components/shared/PerfilRoute'
 import { AppLayout } from '@/components/layout/AppLayout'
+import { VigiaDeSessao } from '@/features/auth/VigiaDeSessao'
+import { TermosDialog } from '@/features/termos/TermosDialog'
 import LoginPage from '@/pages/auth/LoginPage'
 
 // O Dashboard entra em lazy junto com as demais páginas. Importado direto, ele
@@ -27,6 +29,7 @@ const SolicitacoesListPage = lazy(() =>
 const SolicitacaoDetailPage = lazy(() =>
   import('@/pages/solicitacoes/SolicitacaoDetailPage').then((m) => ({ default: m.SolicitacaoDetailPage })),
 )
+const AgendamentosPage = lazy(() => import('@/pages/agendamentos/AgendamentosPage'))
 const CargasRetornoPage = lazy(() => import('@/pages/cargas-retorno/CargasRetornoPage'))
 const ConferenciaViagemPage = lazy(() => import('@/pages/conferencia/ConferenciaViagemPage'))
 const AuditoriaPage = lazy(() => import('@/pages/auditoria/AuditoriaPage'))
@@ -49,6 +52,10 @@ export default function App() {
   return (
     <AuthProvider>
       <TooltipProvider delayDuration={200}>
+        {/* Fora do <Routes>: a contagem de inatividade não pode reiniciar a
+            cada navegação. */}
+        <VigiaDeSessao />
+        <TermosDialog />
         <Suspense fallback={<PageFallback />}>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
@@ -59,6 +66,7 @@ export default function App() {
                 <Route path="/dashboard" element={<DashboardPage />} />
                 <Route path="/solicitacoes" element={<SolicitacoesListPage />} />
                 <Route path="/solicitacoes/:id" element={<SolicitacaoDetailPage />} />
+                <Route path="/agendamentos" element={<AgendamentosPage />} />
                 <Route path="/cargas-retorno" element={<CargasRetornoPage />} />
                 <Route path="/conferencia-viagem" element={<ConferenciaViagemPage />} />
                 <Route path="/cadastros/motoristas" element={<MotoristasPage />} />

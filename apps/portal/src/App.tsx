@@ -4,6 +4,8 @@ import { AuthProvider } from '@/hooks/useAuth'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { PortalLayout } from '@/components/layout/PortalLayout'
 import { PortalLoader } from '@/components/PortalLoader'
+import { VigiaDeSessao } from '@/features/auth/VigiaDeSessao'
+import { TermosDialog } from '@/features/termos/TermosDialog'
 import LoginPage from '@/pages/LoginPage'
 
 const SolicitacoesPage = lazy(() => import('@/pages/solicitacoes/SolicitacoesListPage'))
@@ -22,6 +24,10 @@ const AceitarConvitePage = lazy(() => import('@/pages/AceitarConvitePage'))
 export function App() {
   return (
     <AuthProvider>
+      {/* Fora do <Routes>: a contagem de inatividade não pode reiniciar a cada
+          navegação. */}
+      <VigiaDeSessao />
+      <TermosDialog />
       <Suspense fallback={<PortalLoader />}>
         <Routes>
           <Route path="/" element={<LoginPage />} />

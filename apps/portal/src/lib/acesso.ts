@@ -13,7 +13,13 @@
 
 import { supabase } from '@/lib/supabase'
 
-export type AcaoAcesso = 'export_csv' | 'download_oc_pdf' | 'abrir_anexo'
+export type AcaoAcesso =
+  | 'export_csv'
+  | 'download_oc_pdf'
+  | 'abrir_anexo'
+  // 0061 — comprovante do agendamento baixado pelo parceiro.
+  | 'abrir_documento_agendamento'
+  | 'copiar_cpf'
 
 export function registrarAcesso(
   acao: AcaoAcesso,

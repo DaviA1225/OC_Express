@@ -37,6 +37,12 @@ export function useRealtimeSubscriptions(): RealtimeStatus {
         qc.invalidateQueries({ queryKey: ['pendencias'] })
         qc.invalidateQueries({ queryKey: ['notifications'] })
       })
+      // Agendamentos (0061): a fila é compartilhada por 15 pessoas e a trava de
+      // "quem assumiu" só serve se o card mudar na tela dos outros na hora.
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'agendamentos' }, () => {
+        qc.invalidateQueries({ queryKey: ['agendamentos'] })
+        qc.invalidateQueries({ queryKey: ['notifications'] })
+      })
       .subscribe((s) => {
         if (s === 'SUBSCRIBED') setStatus('live')
         else if (s === 'CHANNEL_ERROR' || s === 'TIMED_OUT' || s === 'CLOSED') setStatus('error')

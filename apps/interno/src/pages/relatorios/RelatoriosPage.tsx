@@ -39,8 +39,8 @@ import {
   tmaEmissaoFinalizacao,
   tmaEmissaoFinalizacaoPorParceiro,
   parseDayKey,
-  periodoFromPreset,
-  type PeriodoPreset,
+  periodoDeIntervalo,
+  intervaloPadrao,
   type PeriodoRelatorio,
   type OrigemFiltro,
   type TopItem,
@@ -49,19 +49,16 @@ import {
   type ParceiroTma,
   type TmaResumo,
 } from '@/features/relatorios/useRelatorios'
+import { IntervaloDatas } from '@/features/relatorios/IntervaloDatas'
+import { useIntervaloPersistido } from '@/features/relatorios/useIntervaloPersistido'
 import { formatHoras } from '@/features/relatorios/useRelatoriosInternos'
 import { STATUS_LABELS } from '@/features/solicitacoes/status'
 import { buildCsv, downloadCsv, type CsvColumn } from '@/lib/csv'
 import { cn } from '@/lib/utils'
 
-const PRESETS: { value: PeriodoPreset; label: string }[] = [
-  { value: 'mes', label: 'Mês corrente' },
-  { value: 'mes_anterior', label: 'Mês anterior' },
-  { value: '30d', label: 'Últimos 30 dias' },
-  { value: '90d', label: 'Últimos 90 dias' },
-]
-
-const VALID_PRESETS = PRESETS.map((p) => p.value)
+// Intervalo inicial: os últimos 30 dias, recorte equivalente ao preset padrão
+// anterior ("Mês corrente"). "Limpar" volta para cá.
+const INTERVALO_PADRAO = intervaloPadrao(30)
 
 const ORIGENS: { value: OrigemFiltro; label: string }[] = [
   { value: 'todas', label: 'Todas' },
@@ -69,6 +66,7 @@ const ORIGENS: { value: OrigemFiltro; label: string }[] = [
   { value: 'parceiro', label: 'Parceiros' },
 ]
 const VALID_ORIGENS = ORIGENS.map((o) => o.value)
+const CHAVE_ORIGEM = 'relatorios:origem'
 
 // Paleta de séries harmonizada à LHG — laranja de marca + tons industriais foscos
 // (aço, ocre, oliva, violeta-grafite, terracota, grafite), em vez dos brights genéricos.
@@ -76,33 +74,36 @@ const MATERIAL_COLORS = ['#FF5100', '#4E6986', '#9A6A3B', '#5E7A52', '#6E6594', 
 
 export default function RelatoriosPage() {
   const [params, setParams] = useSearchParams()
-  const presetRaw = params.get('p')
-  const preset: PeriodoPreset = (VALID_PRESETS as string[]).includes(presetRaw ?? '')
-    ? (presetRaw as PeriodoPreset)
-    : 'mes'
-  const periodo = React.useMemo<PeriodoRelatorio>(() => periodoFromPreset(preset), [preset])
-  const setPreset = (p: PeriodoPreset) => {
-    setParams(
-      (prev) => {
-        const next = new URLSearchParams(prev)
-        if (p === 'mes') next.delete('p')
-        else next.set('p', p)
-        return next
-      },
-      { replace: true },
-    )
-  }
+  const { de, ate, setIntervalo, limpar, noPadrao } = useIntervaloPersistido(
+    'relatorios',
+    INTERVALO_PADRAO,
+  )
+  const periodo = React.useMemo<PeriodoRelatorio>(() => periodoDeIntervalo(de, ate), [de, ate])
 
-  const origemRaw = params.get('o')
-  const origem: OrigemFiltro = (VALID_ORIGENS as string[]).includes(origemRaw ?? '')
-    ? (origemRaw as OrigemFiltro)
-    : 'todas'
+  // Origem persiste pelo mesmo motivo do intervalo: sair da página e voltar não
+  // deveria desfazer o recorte. URL preenchida vence (link compartilhado).
+  const [origem, setOrigemEstado] = React.useState<OrigemFiltro>(() => {
+    const daUrl = params.get('o')
+    if ((VALID_ORIGENS as string[]).includes(daUrl ?? '')) return daUrl as OrigemFiltro
+    try {
+      const salvo = sessionStorage.getItem(CHAVE_ORIGEM)
+      if ((VALID_ORIGENS as string[]).includes(salvo ?? '')) return salvo as OrigemFiltro
+    } catch {
+      /* storage indisponível — cai no padrão */
+    }
+    return 'todas'
+  })
   const setOrigem = (o: OrigemFiltro) => {
+    setOrigemEstado(o)
+    try {
+      sessionStorage.setItem(CHAVE_ORIGEM, o)
+    } catch {
+      /* storage indisponível — o filtro só não persiste */
+    }
     setParams(
       (prev) => {
         const next = new URLSearchParams(prev)
-        if (o === 'todas') next.delete('o')
-        else next.set('o', o)
+        next.set('o', o)
         return next
       },
       { replace: true },
@@ -235,7 +236,9 @@ export default function RelatoriosPage() {
       const csv = buildCsv(linhas, cols)
       const ts = new Date()
       const stamp = `${ts.getFullYear()}${String(ts.getMonth() + 1).padStart(2, '0')}${String(ts.getDate()).padStart(2, '0')}_${String(ts.getHours()).padStart(2, '0')}${String(ts.getMinutes()).padStart(2, '0')}`
-      downloadCsv(`relatorio_${preset}_${stamp}.csv`, csv)
+      // O nome do arquivo carrega o intervalo exportado: com data livre, "mes"
+      // ou "30d" não diriam mais a que recorte o CSV se refere.
+      downloadCsv(`relatorio_${de}_a_${ate}_${stamp}.csv`, csv)
       toast.success('Relatório exportado')
     } catch (err) {
       toast.error('Falha ao exportar')
@@ -250,17 +253,20 @@ export default function RelatoriosPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-[22px] font-semibold tracking-tight text-foreground">Relatórios</h1>
-          <p className="text-[12px] text-muted-foreground">
-            {periodo.label} · {format(new Date(periodo.desde), "dd/MM/yyyy", { locale: ptBR })}
-            {' a '}
-            {format(addDays(new Date(periodo.ate), -1), "dd/MM/yyyy", { locale: ptBR })}
-          </p>
+          <p className="text-[12px] text-muted-foreground">{periodo.label}</p>
           <div className="mt-2">
             <OrigemTabs value={origem} onChange={setOrigem} />
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <PeriodoTabs value={preset} onChange={setPreset} />
+          <IntervaloDatas
+            idPrefix="rel"
+            de={de}
+            ate={ate}
+            onChange={setIntervalo}
+            mostrarLimpar={!noPadrao}
+            onLimpar={limpar}
+          />
           <Button
             type="button"
             variant="outline"
@@ -381,36 +387,6 @@ export default function RelatoriosPage() {
       </Card>
       </>
       )}
-    </div>
-  )
-}
-
-function addDays(d: Date, days: number): Date {
-  const r = new Date(d)
-  r.setDate(r.getDate() + days)
-  return r
-}
-
-function PeriodoTabs({ value, onChange }: { value: PeriodoPreset; onChange: (v: PeriodoPreset) => void }) {
-  return (
-    <div className="inline-flex rounded-lg border bg-card p-1" role="tablist">
-      {PRESETS.map((p) => (
-        <button
-          key={p.value}
-          type="button"
-          role="tab"
-          aria-selected={value === p.value}
-          onClick={() => onChange(p.value)}
-          className={cn(
-            'rounded-md px-2.5 py-1 text-[12px] font-medium transition-colors',
-            value === p.value
-              ? 'bg-primary text-primary-foreground'
-              : 'text-foreground/70 hover:bg-muted hover:text-foreground',
-          )}
-        >
-          {p.label}
-        </button>
-      ))}
     </div>
   )
 }

@@ -1,8 +1,10 @@
 import * as React from 'react'
 import { NavLink } from 'react-router-dom'
+import { SISLOG_VERSAO } from '@sislog/shared/versao'
 import {
   LayoutDashboard,
   Inbox,
+  CalendarClock,
   RotateCcw,
   ClipboardCheck,
   User,
@@ -34,6 +36,7 @@ import {
   canViewSeguranca,
 } from '@/features/auth/permissions'
 import { useRecebidasCount } from '@/features/solicitacoes/useSolicitacoes'
+import { useAgendamentosPendentesCount } from '@/features/agendamentos/useAgendamentos'
 
 interface NavItem {
   to: string
@@ -41,7 +44,6 @@ interface NavItem {
   icon: React.ComponentType<{ className?: string }>
 }
 
-const APP_VERSION = 'v1.3.1'
 
 const PERFIL_LABELS: Record<string, string> = {
   admin: 'Administrador',
@@ -61,6 +63,7 @@ function iniciais(nome: string): string {
 const operacional: NavItem[] = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/solicitacoes', label: 'Solicitações', icon: Inbox },
+  { to: '/agendamentos', label: 'Agendamentos', icon: CalendarClock },
   { to: '/cargas-retorno', label: 'Cargas de Retorno', icon: RotateCcw },
   { to: '/conferencia-viagem', label: 'Conferência de Viagem', icon: ClipboardCheck },
 ]
@@ -100,6 +103,21 @@ export function SidebarContent({ collapsed, onToggleCollapse, onNavigate, onClos
   const showSeguranca = canViewSeguranca(profile)
   const recebidas = useRecebidasCount()
   const recebidasCount = recebidas.data ?? 0
+  const agendamentos = useAgendamentosPendentesCount()
+  const agendamentosCount = agendamentos.data ?? 0
+
+  // Contadores por rota: o badge é sempre "o que está esperando a equipe" —
+  // solicitações recebidas e agendamentos ainda não concluídos.
+  const badges: Record<string, { count: number; title: string }> = {
+    '/solicitacoes': {
+      count: recebidasCount,
+      title: `${recebidasCount} solicitação(ões) com status Recebida`,
+    },
+    '/agendamentos': {
+      count: agendamentosCount,
+      title: `${agendamentosCount} agendamento(s) na fila`,
+    },
+  }
 
   return (
     <aside
@@ -141,7 +159,8 @@ export function SidebarContent({ collapsed, onToggleCollapse, onNavigate, onClos
               item={item}
               collapsed={collapsed}
               onNavigate={onNavigate}
-              badgeCount={item.to === '/solicitacoes' ? recebidasCount : 0}
+              badgeCount={badges[item.to]?.count ?? 0}
+              badgeTitle={badges[item.to]?.title}
             />
           ))}
         </ul>
@@ -212,7 +231,7 @@ export function SidebarContent({ collapsed, onToggleCollapse, onNavigate, onClos
       <div className="p-2">
         {!collapsed && (
           <p className="px-2 pb-1.5 text-[10px] tabular-nums text-muted-foreground">
-            SisLog {APP_VERSION}
+            SisLog v{SISLOG_VERSAO}
           </p>
         )}
         <div
@@ -284,11 +303,13 @@ function NavListItem({
   collapsed,
   onNavigate,
   badgeCount = 0,
+  badgeTitle,
 }: {
   item: NavItem
   collapsed: boolean
   onNavigate?: () => void
   badgeCount?: number
+  badgeTitle?: string
 }) {
   const Icon = item.icon
   return (
@@ -314,11 +335,7 @@ function NavListItem({
                 ),
           )
         }
-        title={
-          collapsed
-            ? item.label + (badgeCount > 0 ? ` (${badgeCount} recebida${badgeCount === 1 ? '' : 's'})` : '')
-            : undefined
-        }
+        title={collapsed ? [item.label, badgeCount > 0 ? badgeTitle : null].filter(Boolean).join(' — ') : undefined}
       >
         <Icon className="h-[18px] w-[18px] shrink-0 transition-transform duration-200 ease-out group-hover:scale-125" />
         {!collapsed && <span className="truncate">{item.label}</span>}
@@ -328,7 +345,7 @@ function NavListItem({
           ) : (
             <span
               className="ml-auto inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-semibold text-white"
-              title={`${badgeCount} solicitação(ões) com status Recebida`}
+              title={badgeTitle}
             >
               {badgeCount}
             </span>

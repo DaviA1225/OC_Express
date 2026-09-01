@@ -13,7 +13,14 @@
 
 import { supabase } from '@/lib/supabase'
 
-export type AcaoAcesso = 'export_csv' | 'download_oc_pdf' | 'abrir_anexo'
+export type AcaoAcesso =
+  | 'export_csv'
+  | 'download_oc_pdf'
+  | 'abrir_anexo'
+  // 0061 — comprovante do terminal / PDF da NF, e o CPF que o painel de
+  // agendamento só revela na hora de copiar.
+  | 'abrir_documento_agendamento'
+  | 'copiar_cpf'
 
 export function registrarAcesso(
   acao: AcaoAcesso,
