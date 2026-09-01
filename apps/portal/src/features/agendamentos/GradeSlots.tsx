@@ -1,23 +1,33 @@
 import { cn } from '@/lib/utils'
 import { horaCurta } from './agendamento'
 import type { SlotOcupacao } from './useAgendamentos'
+import type { TipoVeiculo } from '@sislog/shared/types'
 
 interface Props {
   slots: SlotOcupacao[]
   /** `HH:MM:SS`, como o banco devolve. `null` = qualquer horário. */
   value: string | null
   onChange: (hora: string | null) => void
+  /** Tipo de veículo escolhido. Filtra a grade: numa A.B, caçamba e graneleiro
+   *  descarregam em horários diferentes. `null` = terminal de grade única. */
+  tipo?: TipoVeiculo | null
   isLoading?: boolean
 }
 
 /**
  * Grade de horários do terminal: você toca no horário, não digita. Só aparecem
- * os horários que o terminal realmente atende — nove no TCI, três na A.B.
+ * os horários que o terminal realmente atende — e, onde a grade é separada por
+ * tipo de veículo, só os do tipo escolhido.
  *
  * A contagem embaixo de cada botão é honesta de propósito: são os veículos da
  * LHG já agendados ali, não a vaga do terminal, que o SisLog não enxerga.
  */
-export function GradeSlots({ slots, value, onChange, isLoading = false }: Props) {
+export function GradeSlots({ slots: todos, value, onChange, tipo = null, isLoading = false }: Props) {
+  // Slot 'todos' vale para qualquer veículo; o tipado, só para o seu. Filtrar
+  // aqui e não na consulta mantém uma única ida ao banco por data — é a mesma
+  // lista que diz à tela quais tipos o terminal atende.
+  const slots = todos.filter((s) => s.tipo_veiculo === 'todos' || s.tipo_veiculo === tipo)
+
   if (isLoading) {
     return <p className="py-2 text-[12px] text-muted-foreground">Carregando horários…</p>
   }
@@ -37,7 +47,7 @@ export function GradeSlots({ slots, value, onChange, isLoading = false }: Props)
         <SlotButton selecionado={value === null} onClick={() => onChange(null)} titulo="Qualquer" />
         {slots.map((s) => (
           <SlotButton
-            key={s.hora}
+            key={`${s.hora}-${s.tipo_veiculo}`}
             selecionado={value === s.hora}
             onClick={() => onChange(s.hora)}
             titulo={horaCurta(s.hora)}

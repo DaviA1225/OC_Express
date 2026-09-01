@@ -37,6 +37,7 @@ import {
 import {
   AGENDAMENTO_STATUS_CLASSES,
   AGENDAMENTO_STATUS_LABELS,
+  TIPO_VEICULO_LABELS,
   assumidoExpirado,
   calcularEspera,
   dataCompleta,
@@ -44,8 +45,11 @@ import {
   duracaoLegivel,
   horaCurta,
   numeroAgendamento,
+  separaPorTipo,
+  tipoVeiculoLabel,
+  tiposDaGrade,
 } from '@/features/agendamentos/agendamento'
-import type { AgendamentoStatus } from '@/types/database.types'
+import type { AgendamentoStatus, TipoVeiculoSlot } from '@/types/database.types'
 
 type Aba = 'fila' | 'agendados' | 'historico'
 
@@ -285,19 +289,35 @@ export default function AgendamentosPage() {
   )
 }
 
-function CabecalhoGrupo({ grupo, grade }: { grupo: Grupo; grade: { hora: string; duracao_minutos: number; capacidade: number | null }[] }) {
+function CabecalhoGrupo({
+  grupo,
+  grade,
+}: {
+  grupo: Grupo
+  grade: {
+    hora: string
+    tipo_veiculo: TipoVeiculoSlot
+    duracao_minutos: number
+    capacidade: number | null
+  }[]
+}) {
   const primeiro = grupo.itens[0]
   const cliente = primeiro?.solicitacao?.cliente
   const antecedencia = cliente?.antecedencia_minima_horas
 
+  // Terminal que separa a grade por tipo de veículo tem uma faixa por tipo. Um
+  // resumo só ("01:00–22:00") daria a entender que qualquer veículo descarrega
+  // em qualquer um desses horários, que é justamente o que não vale na A.B.
   const resumoGrade = React.useMemo(() => {
     if (grade.length === 0) return 'Sem grade cadastrada'
-    const primeiroSlot = grade[0]
-    const ultimo = grade[grade.length - 1]
-    const cap = primeiroSlot.capacidade
-    const janela = `${horaCurta(primeiroSlot.hora)}–${horaCurta(ultimo.hora)}`
-    const porSlot = cap != null ? ` · ${cap} por ${duracaoLegivel(primeiroSlot.duracao_minutos)}` : ''
-    return `${janela}${porSlot}`
+    if (separaPorTipo(grade)) {
+      return tiposDaGrade(grade)
+        .map((t) => `${TIPO_VEICULO_LABELS[t]} ${faixa(grade.filter((g) => g.tipo_veiculo === t))}`)
+        .join(' · ')
+    }
+    const cap = grade[0].capacidade
+    const porSlot = cap != null ? ` · ${cap} por ${duracaoLegivel(grade[0].duracao_minutos)}` : ''
+    return `${faixa(grade)}${porSlot}`
   }, [grade])
 
   return (
@@ -314,6 +334,12 @@ function CabecalhoGrupo({ grupo, grade }: { grupo: Grupo; grade: { hora: string;
       )}
     </div>
   )
+}
+
+/** `01:00–22:00` — os extremos da grade, que já vem ordenada por hora. */
+function faixa(slots: { hora: string }[]): string {
+  if (slots.length === 0) return '—'
+  return `${horaCurta(slots[0].hora)}–${horaCurta(slots[slots.length - 1].hora)}`
 }
 
 function CardAgendamento({
@@ -406,6 +432,11 @@ function CardAgendamento({
           rotulo="Pediu"
           valor={`${dataCurta(item.data_preferida)}${item.hora_preferida ? ` · ${horaCurta(item.hora_preferida)}` : ' · qualquer'}`}
         />
+        {/* Só nos terminais que separam a grade por tipo: nos demais seria uma
+            coluna vazia em todo card da fila. */}
+        {tipoVeiculoLabel(item.tipo_veiculo) && (
+          <Campo rotulo="Veículo" valor={tipoVeiculoLabel(item.tipo_veiculo)} />
+        )}
       </dl>
 
       {item.status === 'agendado' && (

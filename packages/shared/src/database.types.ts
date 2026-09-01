@@ -48,6 +48,18 @@ export type AgendamentoStatus =
 
 export type NotaFiscalOrigem = 'automatica' | 'manual'
 
+// 0069 — o horário de descarga depende do tipo do veículo em terminal que
+// separa a grade (A.B/CSN). Mesmo vocabulário de `clientes.aceita_cacamba` /
+// `aceita_graneleiro` (0005).
+export type TipoVeiculo = 'cacamba' | 'graneleiro'
+
+// Na grade do terminal existe um terceiro valor: 'todos', o slot que atende
+// qualquer veículo. É o que os terminais de grade única (TCI, MRS) usam, e é
+// 'todos' em vez de NULL porque duas linhas NULL não colidiriam na UNIQUE
+// (cliente_id, hora, tipo_veiculo) — a grade aceitaria o mesmo horário duas
+// vezes.
+export type TipoVeiculoSlot = TipoVeiculo | 'todos'
+
 export type TipoEventoPortal =
   | 'portal_login'
   | 'portal_login_falha'
@@ -473,6 +485,10 @@ export interface Database {
           id: string
           cliente_id: string
           hora: string
+          // 0069 — 'todos' no terminal de grade única. A UNIQUE é
+          // (cliente_id, hora, tipo_veiculo): 13:00 existe duas vezes na A.B,
+          // uma por tipo.
+          tipo_veiculo: TipoVeiculoSlot
           duracao_minutos: number
           capacidade: number | null
           ativo: boolean
@@ -484,6 +500,7 @@ export interface Database {
           id?: string
           cliente_id: string
           hora: string
+          tipo_veiculo?: TipoVeiculoSlot
           duracao_minutos?: number
           capacidade?: number | null
           ativo?: boolean
@@ -508,6 +525,10 @@ export interface Database {
           observacoes: string | null
           nota_fiscal: string | null
           nota_fiscal_origem: NotaFiscalOrigem | null
+          // 0069 — informado no pedido quando o terminal separa a grade por
+          // tipo. NULL = terminal de grade única, ou pedido registrado pela
+          // equipe a partir de um WhatsApp.
+          tipo_veiculo: TipoVeiculo | null
           data_agendada: string | null
           hora_agendada: string | null
           // Calculado no servidor ao concluir: a hora confirmada não existe na
@@ -537,6 +558,7 @@ export interface Database {
           observacoes?: string | null
           nota_fiscal?: string | null
           nota_fiscal_origem?: NotaFiscalOrigem | null
+          tipo_veiculo?: TipoVeiculo | null
           parceiro_usuario_id?: string | null
           substitui_agendamento_id?: string | null
           motivo_reagendamento?: string | null
@@ -548,6 +570,7 @@ export interface Database {
           observacoes?: string | null
           nota_fiscal?: string | null
           nota_fiscal_origem?: NotaFiscalOrigem | null
+          tipo_veiculo?: TipoVeiculo | null
           data_agendada?: string | null
           hora_agendada?: string | null
           comprovante_path?: string | null
@@ -917,6 +940,9 @@ export interface Database {
           // 0068 — opcional: o parceiro informa o número da nota para encurtar a
           // busca da equipe no Corporate.
           p_nota_fiscal?: string | null
+          // 0069 — obrigatório quando o terminal separa a grade por tipo de
+          // veículo (o banco recusa o pedido sem ele). Opcional nos demais.
+          p_tipo_veiculo?: TipoVeiculo | null
         }
         Returns: string
       }
@@ -952,8 +978,12 @@ export interface Database {
       // real vive no sistema do terminal (SPEC-AGENDAMENTOS 3.1.2).
       agendamentos_ocupacao_slot: {
         Args: { p_cliente_id: string; p_data: string }
+        // Devolve a grade INTEIRA, com o tipo de cada slot (0069): é assim que
+        // a tela descobre, numa consulta só, se o terminal separa por tipo e
+        // quais tipos ele atende. O filtro por tipo é feito na tela.
         Returns: {
           hora: string
+          tipo_veiculo: TipoVeiculoSlot
           duracao_minutos: number
           capacidade: number | null
           ocupados: number

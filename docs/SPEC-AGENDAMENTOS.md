@@ -104,7 +104,8 @@ não é horário livre. Cada terminal tem sua própria grade.
 | TCI Itutinga | 08, 09, 10, 11, 12, 13, 14, 15, 16 | 1 h | 4 | 36 |
 | ArcelorMittal Juiz de Fora | mesmo padrão do TCI | 1 h | 4 | 36 |
 | Metalsider Betim | mesmo padrão do TCI | 1 h | 4 | 36 |
-| A.B / CSN Pindamonhangaba | 06, 13, 19 | 6 h | 10 | 30 |
+| A.B / CSN Pindamonhangaba — **caçamba** | 01, 07, 13, 19, 22 | 6 h (3 h nas duas últimas) | 10 | 50 |
+| A.B / CSN Pindamonhangaba — **graneleiro** | 06, 13 | 7 h / 6 h | 10 | 20 |
 | MRS São Bento, Mogi das Cruzes | 07:00 a 17:30, de 30 em 30 min | 30 min | 3 | 66 |
 
 **"Mesmo padrão" quer dizer formato, não números.** A MRS (0066) foi descrita
@@ -121,6 +122,33 @@ o que aquele terminal informou — não entre terminais.
 O modelo de dados aguenta a variação sem mudança: uma linha por slot já
 comportava 9 slots de 1 h e 3 de 6 h; 22 de 30 min entram igual.
 
+**Um terminal pode ter mais de uma grade: uma por tipo de veículo (0069).** Na
+A.B/CSN o horário de descarga depende do veículo — caçamba às 01, 07, 13, 19 e
+22; graneleiro só às 06 e às 13. Não são preferências: é o que o terminal
+atende. Por isso `terminal_janelas` ganhou `tipo_veiculo`
+(`todos` | `cacamba` | `graneleiro`) e a UNIQUE passou a ser
+`(cliente_id, hora, tipo_veiculo)` — **13:00 existe duas vezes na A.B**, uma por
+tipo, o que a restrição antiga proibia.
+
+`'todos'` em vez de `NULL` é deliberado: duas linhas `NULL` não colidem numa
+UNIQUE, e a grade voltaria a aceitar o mesmo horário duplicado. `'todos'` é
+também o DEFAULT, então terminal de grade única (TCI, MRS) não muda em nada e a
+tela nem pergunta o tipo.
+
+**A grade é que diz se a pergunta existe.** Não há campo em `clientes` para
+"separa por tipo": basta um slot tipado na grade do terminal para o portal
+passar a pedir o tipo antes de oferecer horário, e para o painel interno filtrar
+a grade pelo tipo do pedido. Ligar isso num terminal novo é cadastro, não
+migration.
+
+O vocabulário (`cacamba`, `graneleiro`) é o mesmo de `clientes.aceita_cacamba` /
+`aceita_graneleiro`, da 0005 — a operação já fala assim.
+
+**Basculante é caçamba**, o mesmo veículo com outro nome: parte da operação e
+dos terminais usa uma palavra, parte usa a outra. São **dois** tipos, não três —
+se aparecer "basculante" num pedido por WhatsApp ou numa conversa com o
+terminal, é `cacamba`.
+
 **Gerador de grade (Cadastros → Clientes → Agendamento).** Preset fixo não
 escalava: cada terminal novo trouxe números próprios e virava uma migration. A
 tela agora pede a faixa como o terminal a descreve — *das 7 às 18, janelas de 30
@@ -134,8 +162,10 @@ tela mostra uma **prévia ao vivo** do que vai criar — quantidade, primeiro e
 Gerar por cima de uma grade existente completa as lacunas e não derruba ajuste
 manual (`ON CONFLICT DO NOTHING`).
 
-Grade irregular continua sendo caso de cadastro linha a linha: a A.B (06, 13 e
-19) não sai de nenhuma faixa uniforme, e são três horários.
+Grade irregular continua sendo caso de cadastro linha a linha: a A.B não sai de
+nenhuma faixa uniforme (01, 07, 13, 19 e 22 para caçamba; 06 e 13 para
+graneleiro). O gerador tem um campo de tipo, então dá para gerar cada grade
+separadamente — mas nesses horários avulsos, linha a linha é mais rápido.
 
 Duas grades muito diferentes (9 slots de 1h contra 3 janelas de 6h) descartam
 `janela_inicio`/`janela_fim` como modelo: duas colunas não representam isso.
@@ -145,13 +175,15 @@ CREATE TABLE IF NOT EXISTS terminal_janelas (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   cliente_id uuid NOT NULL REFERENCES clientes(id) ON DELETE CASCADE,
   hora time NOT NULL,
+  -- 0069 — 'todos' | 'cacamba' | 'graneleiro'
+  tipo_veiculo text NOT NULL DEFAULT 'todos',
   duracao_minutos integer NOT NULL DEFAULT 60,
   capacidade integer,
   ativo boolean NOT NULL DEFAULT true,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   created_by uuid REFERENCES auth.users(id),
-  UNIQUE (cliente_id, hora)
+  UNIQUE (cliente_id, hora, tipo_veiculo)   -- 0069: era (cliente_id, hora)
 );
 
 CREATE INDEX IF NOT EXISTS idx_terminal_janelas_cliente
@@ -176,15 +208,19 @@ SELECT c.id, g.h::time, 60, 4
      OR upper(c.razao_social) LIKE '%METALSIDER%')
 ON CONFLICT (cliente_id, hora) DO NOTHING;
 
--- Janela longa: A.B / CSN — 06:00, 13:00 e 19:00, 6h, 10 vagas
-INSERT INTO terminal_janelas (cliente_id, hora, duracao_minutos, capacidade)
-SELECT c.id, g.h, 360, 10
-  FROM clientes c
-  CROSS JOIN (VALUES ('06:00'::time), ('13:00'::time), ('19:00'::time)) AS g(h)
- WHERE c.requer_agendamento = true
-   AND (upper(c.razao_social) LIKE '%A. B.%'
-     OR upper(c.razao_social) LIKE '%OPERADORA DE TERMINAIS%')
-ON CONFLICT (cliente_id, hora) DO NOTHING;
+-- A.B / CSN — duas grades, uma por tipo de veículo (0069)
+INSERT INTO terminal_janelas (cliente_id, hora, tipo_veiculo, duracao_minutos, capacidade)
+SELECT '652eb27d-c040-470a-8a96-314ae7011b59', g.hora, g.tipo, g.duracao, 10
+  FROM (VALUES
+          ('01:00'::time, 'cacamba',    360),
+          ('07:00'::time, 'cacamba',    360),
+          ('13:00'::time, 'cacamba',    360),
+          ('19:00'::time, 'cacamba',    180),
+          ('22:00'::time, 'cacamba',    180),
+          ('06:00'::time, 'graneleiro', 420),
+          ('13:00'::time, 'graneleiro', 360)
+       ) AS g(hora, tipo, duracao)
+ON CONFLICT (cliente_id, hora, tipo_veiculo) DO NOTHING;
 ```
 
 **Atenção:** o casamento por `razao_social` é frágil — a base tem grafias
@@ -432,9 +468,30 @@ visível apenas quando:
 | Campo | Tipo |
 |---|---|
 | Data desejada | date, mínimo = hoje + `antecedencia_minima_horas` |
+| Tipo de veículo | *Caçamba / Basculante* ou *Graneleiro* — **só quando a grade é separada por tipo** (0069) |
 | Horário | grade de slots de `terminal_janelas` + opção "qualquer horário" |
 | Número da nota fiscal | text, **opcional** (0068) |
 | Observações | textarea, opcional |
+
+**O tipo vem antes do horário, e não é opcional onde existe.** Na A.B/CSN os
+horários da caçamba e do graneleiro são outros: oferecer a grade inteira antes
+de saber o veículo seria oferecer horário que o terminal recusa. Enquanto o tipo
+não é escolhido, o bloco de horário mostra *"Escolha o tipo de veículo para ver
+os horários deste terminal"* e o botão de enviar fica desabilitado. A RPC repete
+a regra (PT422): tela não é validação.
+
+Trocar o tipo limpa o horário já escolhido — ele pertencia à grade do outro
+veículo.
+
+O botão do portal diz **"Caçamba / Basculante"**, com os dois nomes: quem chama
+de basculante precisa se reconhecer na opção, e errar o tipo aqui manda o
+caminhão para a grade errada do terminal. Só o botão de escolha carrega os dois
+nomes — depois de escolhido, o card e o painel interno mostram "Caçamba", que é
+o termo que vai para o sistema do terminal.
+
+No **reagendamento** o tipo aparece como leitura, não como escolha: reagendar
+troca a janela, não o veículo, e a RPC copia o tipo do agendamento anterior.
+Veículo de outro tipo é pedido novo.
 
 O **número da nota** é opcional de propósito. Quem está com a nota na mão
 primeiro é o parceiro — a foto dela era o que ele mandava por WhatsApp —, e
@@ -450,7 +507,8 @@ estado do meio, um agendamento que já chegou com a nota mostraria "buscar no
 Corporate" ao lado do próprio número.
 
 A grade mostra os slots reais do terminal escolhido — nove botões para o TCI,
-três para a A.B. O parceiro toca no horário; não digita.
+cinco para a caçamba da A.B, dois para o graneleiro. O parceiro toca no horário;
+não digita.
 
 Nota fixa abaixo dos campos, não uma caixa de seleção:
 
@@ -576,14 +634,18 @@ os dados para colar — mesma lógica do fluxo da OC.
 **Bloco "Dados para o terminal"** — cada campo com botão de copiar:
 
 ```
-Placa cavalo    SIK6H90            [copiar]
-Placa carreta   XYZ9W87            [copiar]
-Nota fiscal     6/254215           [copiar]
-Motorista       João Pereira       [copiar]
-Telefone        (31) 99999-9999    [copiar]
-CPF             •••.•••.789-••     [copiar]
-Peso            36,78 t            [copiar]
+Placa cavalo      SIK6H90            [copiar]
+Placa carreta     XYZ9W87            [copiar]
+Tipo de veículo   Caçamba            [copiar]
+Nota fiscal       6/254215           [copiar]
+Motorista         João Pereira       [copiar]
+Telefone          (31) 99999-9999    [copiar]
+CPF               •••.•••.789-••     [copiar]
+Peso              36,78 t            [copiar]
 ```
+
+O **tipo de veículo** só aparece quando o pedido o informou — nos terminais de
+grade única seria uma linha vazia em todo agendamento.
 
 Isso elimina a transcrição manual, que é onde nascem erro de placa e de nota.
 
@@ -621,10 +683,19 @@ O campo de hora é a **mesma grade de slots** do portal, com o horário pedido p
 parceiro pré-selecionado. Um clique confirma; outro clique escolhe o slot que o
 terminal tinha de fato.
 
+A grade segue o **tipo do pedido**: um pedido de caçamba na A.B mostra 01, 07,
+13, 19 e 22 — não os horários do graneleiro. Pedido **sem tipo** (registrado
+pela equipe a partir de um WhatsApp, onde exigir o tipo deixaria o pedido fora
+da fila) mostra a grade inteira, com o tipo etiquetado embaixo de cada horário:
+sem isso os dois 13:00 da A.B ficariam indistinguíveis.
+
 Horário fora da grade exige um campo livre, liberado por um link discreto
 ("outro horário"). Gera **aviso, não bloqueio** — exceções acontecem e o
 comprovante do terminal é a prova final. O aviso fica registrado nas observações
 internas.
+
+"Fora da grade" também é por tipo (0069): caçamba confirmada às 06:00 na A.B
+está fora da grade **dela**, ainda que 06:00 exista para graneleiro.
 
 **Reabrir um agendamento já concluído** (botão "Documentos", na fila e no card
 da solicitação) abre o mesmo painel em modo somente-documentos: data, hora e
@@ -836,6 +907,28 @@ O CHECK entrou como `NOT VALID`: já havia agendamento concluído antes da regra
 e as alternativas eram inventar um caminho de arquivo ou apagar dado de
 produção. A dívida se fecha com `VALIDATE CONSTRAINT` depois de anexar o
 contrato nas linhas herdadas.
+
+**9. A grade não era uma por terminal, e sim uma por tipo de veículo (0069).**
+A 0.1 assumia uma grade por cliente. A A.B/CSN tem duas: caçamba às 01, 07, 13,
+19 e 22; graneleiro às 06 e às 13. O modelo aguentou — uma linha por slot já
+era o certo —, mas a UNIQUE `(cliente_id, hora)` teve de sair: ela proibia os
+dois 13:00.
+
+Três consequências que valem registro:
+
+- **`'todos'` e não `NULL`** para "serve qualquer veículo". `NULL` não colide em
+  UNIQUE, então a grade voltaria a aceitar horário duplicado — e o `upsert` do
+  gerador (PostgREST) precisa de uma UNIQUE simples como árbitro, que índice
+  parcial ou por expressão não fornece.
+- **O tipo é pergunta obrigatória no portal, opcional no interno.** No portal a
+  grade só faz sentido depois dele. No interno, quem registra um pedido vindo
+  por WhatsApp nem sempre sabe o tipo, e travar por isso deixaria o pedido fora
+  da fila; sem tipo, o painel mostra a grade inteira etiquetada.
+- **A conferência de sanidade da A.B mudou de 30 para 70 veículos/dia** (5 slots
+  de caçamba + 2 de graneleiro, 10 vagas cada). A capacidade por slot foi
+  herdada da 0063 e **ainda não foi confirmada com o terminal** — é a mesma
+  questão 3, agora também para a A.B. O número é referência da LHG; a vaga real
+  vive no sistema do terminal.
 
 ---
 

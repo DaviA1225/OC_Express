@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { registrarAcesso } from '@/lib/acesso'
 import { registrarEvento } from '@/lib/eventos'
 import { traduzirErroBanco } from '@/features/cadastros/useParceiroCrud'
-import type { Tables } from '@sislog/shared/types'
+import type { Tables, TipoVeiculo, TipoVeiculoSlot } from '@sislog/shared/types'
 
 export const AGENDAMENTOS_BUCKET = 'agendamentos-docs'
 
@@ -12,6 +12,9 @@ export type Agendamento = Tables<'agendamentos'>
 
 export interface SlotOcupacao {
   hora: string
+  /** 'todos' no terminal de grade única. Na A.B/CSN cada horário pertence a um
+   *  tipo de veículo, e 13:00 aparece duas vezes — uma por tipo. */
+  tipo_veiculo: TipoVeiculoSlot
   duracao_minutos: number
   capacidade: number | null
   /** Veículos da própria LHG já agendados no horário. Não é disponibilidade:
@@ -104,6 +107,9 @@ export function useSolicitarAgendamento() {
       observacoes: string | null
       /** Opcional (0068): encurta a busca da nota no Corporate pela equipe. */
       notaFiscal: string | null
+      /** Obrigatório (0069) quando o terminal separa a grade por tipo: é o tipo
+       *  que decide quais horários existem. O banco recusa o pedido sem ele. */
+      tipoVeiculo: TipoVeiculo | null
     }) => {
       const { data, error } = await supabase.rpc('portal_solicitar_agendamento', {
         p_solicitacao_id: input.solicitacaoId,
@@ -111,6 +117,7 @@ export function useSolicitarAgendamento() {
         p_hora_preferida: input.horaPreferida,
         p_observacoes: input.observacoes,
         p_nota_fiscal: input.notaFiscal,
+        p_tipo_veiculo: input.tipoVeiculo,
       } as never)
       if (error) throw error
       return data as string

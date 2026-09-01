@@ -1,12 +1,17 @@
 import { cn } from '@/lib/utils'
-import { horaCurta } from './agendamento'
+import { horaCurta, TIPO_VEICULO_LABELS } from './agendamento'
 import type { SlotOcupacao } from './useTerminais'
+import type { TipoVeiculo } from '@/types/database.types'
 
 interface Props {
   slots: SlotOcupacao[]
   /** `HH:MM:SS`, como o Postgres devolve. `null` = qualquer horário. */
   value: string | null
   onChange: (hora: string | null) => void
+  /** Tipo de veículo do pedido. Filtra a grade onde o terminal separa horários
+   *  por tipo (A.B/CSN). `null` mostra a grade inteira, com o tipo etiquetado
+   *  em cada botão — é o caso do pedido que veio sem tipo informado. */
+  tipo?: TipoVeiculo | null
   /** Oferece o botão "qualquer horário" (pedido do parceiro, não confirmação). */
   permitirQualquer?: boolean
   /** Mostra a contagem da própria LHG no slot. Nunca é disponibilidade. */
@@ -16,19 +21,27 @@ interface Props {
 }
 
 /**
- * Grade de slots do terminal: nove botões para o TCI, três para a A.B. Quem
- * escolhe toca no horário — não digita. Horário que não existe na grade não
- * aparece, e é assim que pedidos impossíveis (07:30 no TCI) somem na origem.
+ * Grade de slots do terminal: nove botões para o TCI, cinco para a caçamba da
+ * A.B. Quem escolhe toca no horário — não digita. Horário que não existe na
+ * grade não aparece, e é assim que pedidos impossíveis (07:30 no TCI, ou 19:00
+ * de graneleiro na A.B) somem na origem.
  */
 export function GradeSlots({
-  slots,
+  slots: todos,
   value,
   onChange,
+  tipo = null,
   permitirQualquer = false,
   mostrarOcupacao = false,
   isLoading = false,
   disabled = false,
 }: Props) {
+  // Sem tipo definido a grade aparece inteira: o pedido registrado pela equipe
+  // pode não ter tipo, e esconder metade dos horários seria pior do que
+  // mostrá-los etiquetados.
+  const slots = tipo == null ? todos : todos.filter((s) => s.tipo_veiculo === 'todos' || s.tipo_veiculo === tipo)
+  const etiquetar = tipo == null && todos.some((s) => s.tipo_veiculo !== 'todos')
+
   if (isLoading) {
     return <p className="py-2 text-[12px] text-muted-foreground">Carregando horários…</p>
   }
@@ -55,18 +68,12 @@ export function GradeSlots({
         )}
         {slots.map((s) => (
           <SlotButton
-            key={s.hora}
+            key={`${s.hora}-${s.tipo_veiculo}`}
             selecionado={value === s.hora}
             onClick={() => onChange(s.hora)}
             disabled={disabled}
             titulo={horaCurta(s.hora)}
-            rodape={
-              mostrarOcupacao
-                ? s.capacidade != null
-                  ? `${s.ocupados}/${s.capacidade}`
-                  : String(s.ocupados)
-                : undefined
-            }
+            rodape={rodapeDoSlot(s, { mostrarOcupacao, etiquetar })}
             cheio={mostrarOcupacao && s.capacidade != null && s.ocupados >= s.capacidade}
           />
         ))}
@@ -81,6 +88,21 @@ export function GradeSlots({
       )}
     </div>
   )
+}
+
+/** Linha de baixo do botão: a ocupação da LHG e, quando a grade inteira está à
+ *  vista, de que tipo de veículo é aquele horário — sem isso os dois 13:00 da
+ *  A.B ficariam indistinguíveis. */
+function rodapeDoSlot(
+  s: SlotOcupacao,
+  { mostrarOcupacao, etiquetar }: { mostrarOcupacao: boolean; etiquetar: boolean },
+): string | undefined {
+  const partes: string[] = []
+  if (etiquetar && s.tipo_veiculo !== 'todos') partes.push(TIPO_VEICULO_LABELS[s.tipo_veiculo])
+  if (mostrarOcupacao) {
+    partes.push(s.capacidade != null ? `${s.ocupados}/${s.capacidade}` : String(s.ocupados))
+  }
+  return partes.length > 0 ? partes.join(' · ') : undefined
 }
 
 function SlotButton({

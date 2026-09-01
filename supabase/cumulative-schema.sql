@@ -1,5 +1,5 @@
 -- =====================================================================
--- OC Express / SisLog LHG — Schema cumulativo (migrations 0001 → 0068)
+-- OC Express / SisLog LHG — Schema cumulativo (migrations 0001 → 0069)
 -- =====================================================================
 --
 -- Este arquivo agrega TODAS as migrations num único script IDEMPOTENTE.
@@ -3362,16 +3362,39 @@ CREATE TABLE IF NOT EXISTS terminal_janelas (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   cliente_id uuid NOT NULL REFERENCES clientes(id) ON DELETE CASCADE,
   hora time NOT NULL,
+  tipo_veiculo text NOT NULL DEFAULT 'todos',   -- 0069
   duracao_minutos integer NOT NULL DEFAULT 60,
   capacidade integer,
   ativo boolean NOT NULL DEFAULT true,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
-  created_by uuid REFERENCES auth.users(id),
-  UNIQUE (cliente_id, hora)
+  created_by uuid REFERENCES auth.users(id)
 );
 CREATE INDEX IF NOT EXISTS idx_terminal_janelas_cliente
   ON terminal_janelas(cliente_id) WHERE ativo = true;
+
+-- 0069 — tipo de veiculo no slot. Precisa de ALTER e nao so do CREATE TABLE
+-- acima (mesmo motivo do contrato de frete da 0064): num banco que parou na
+-- 0061 o CREATE e no-op e a coluna nunca chegaria.
+--
+-- A UNIQUE mudou de (cliente_id, hora) para (cliente_id, hora, tipo_veiculo):
+-- na A.B/CSN 13:00 existe duas vezes, uma por tipo de veiculo. O DROP usa o
+-- nome que o Postgres gerou para a restricao inline da 0061 e converge de
+-- qualquer estado.
+ALTER TABLE terminal_janelas
+  ADD COLUMN IF NOT EXISTS tipo_veiculo text NOT NULL DEFAULT 'todos';
+ALTER TABLE terminal_janelas DROP CONSTRAINT IF EXISTS terminal_janelas_cliente_id_hora_key;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'terminal_janelas_tipo_veiculo_check') THEN
+    ALTER TABLE terminal_janelas ADD CONSTRAINT terminal_janelas_tipo_veiculo_check
+      CHECK (tipo_veiculo IN ('todos','cacamba','graneleiro'));
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'terminal_janelas_cliente_hora_tipo_key') THEN
+    ALTER TABLE terminal_janelas ADD CONSTRAINT terminal_janelas_cliente_hora_tipo_key
+      UNIQUE (cliente_id, hora, tipo_veiculo);
+  END IF;
+END $$;
 
 DROP TRIGGER IF EXISTS trg_terminal_janelas_updated ON terminal_janelas;
 CREATE TRIGGER trg_terminal_janelas_updated BEFORE UPDATE ON terminal_janelas
@@ -3393,6 +3416,7 @@ CREATE TABLE IF NOT EXISTS agendamentos (
   observacoes text,
   nota_fiscal text,
   nota_fiscal_origem text,
+  tipo_veiculo text,          -- 0069
   data_agendada date,
   hora_agendada time,
   hora_fora_da_grade boolean NOT NULL DEFAULT false,
@@ -3417,6 +3441,11 @@ CREATE TABLE IF NOT EXISTS agendamentos (
 ALTER TABLE agendamentos
   ADD COLUMN IF NOT EXISTS contrato_frete_path text;
 
+-- 0069 — tipo de veiculo do pedido, pelo mesmo motivo do ALTER acima. NULL e
+-- legitimo: terminal de grade unica, ou pedido registrado pela equipe.
+ALTER TABLE agendamentos
+  ADD COLUMN IF NOT EXISTS tipo_veiculo text;
+
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'agendamentos_status_check') THEN
@@ -3426,6 +3455,10 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'agendamentos_nf_origem_check') THEN
     ALTER TABLE agendamentos ADD CONSTRAINT agendamentos_nf_origem_check
       CHECK (nota_fiscal_origem IS NULL OR nota_fiscal_origem IN ('automatica','manual'));
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'agendamentos_tipo_veiculo_check') THEN
+    ALTER TABLE agendamentos ADD CONSTRAINT agendamentos_tipo_veiculo_check
+      CHECK (tipo_veiculo IS NULL OR tipo_veiculo IN ('cacamba','graneleiro'));
   END IF;
 END $$;
 
@@ -3521,10 +3554,14 @@ BEGIN
     IF v_slots = 0 THEN
       NEW.hora_fora_da_grade := false;
     ELSE
+      -- 0069 — o tipo entra na comparacao: cacamba confirmada as 06:00 na A.B
+      -- esta fora da grade DELA, ainda que 06:00 exista para graneleiro.
       NEW.hora_fora_da_grade := NOT EXISTS (
         SELECT 1 FROM terminal_janelas tj
           JOIN solicitacoes s ON s.cliente_id = tj.cliente_id
-         WHERE s.id = NEW.solicitacao_id AND tj.ativo = true AND tj.hora = NEW.hora_agendada);
+         WHERE s.id = NEW.solicitacao_id AND tj.ativo = true AND tj.hora = NEW.hora_agendada
+           AND (tj.tipo_veiculo = 'todos' OR NEW.tipo_veiculo IS NULL
+                OR tj.tipo_veiculo = NEW.tipo_veiculo));
     END IF;
   END IF;
   RETURN NEW;
@@ -3627,17 +3664,27 @@ GRANT SELECT ON clientes_publicos TO authenticated;
 -- Ocupacao da propria LHG por slot: referencia parcial, nunca disponibilidade.
 -- A vaga real vive no sistema do terminal e outras transportadoras tambem
 -- ocupam slots. DEFINER porque o parceiro so enxerga os proprios agendamentos.
+-- Forma FINAL da 0069 (com `tipo_veiculo` na saida). DROP obrigatorio: mudou a
+-- tabela de retorno, e isso CREATE OR REPLACE nao faz.
+--
+-- Agendamento SEM tipo conta nas duas linhas daquela hora, e nao em nenhuma: um
+-- veiculo nosso ocupa o terminal de qualquer jeito, e sumir da conta seria pior
+-- do que aparecer duas vezes num numero declaradamente de referencia.
+DROP FUNCTION IF EXISTS agendamentos_ocupacao_slot(uuid, date);
 CREATE OR REPLACE FUNCTION agendamentos_ocupacao_slot(p_cliente_id uuid, p_data date)
-RETURNS TABLE (hora time, duracao_minutos integer, capacidade integer, ocupados integer)
+RETURNS TABLE (hora time, tipo_veiculo text, duracao_minutos integer,
+               capacidade integer, ocupados integer)
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
-  SELECT tj.hora, tj.duracao_minutos, tj.capacidade,
+  SELECT tj.hora, tj.tipo_veiculo, tj.duracao_minutos, tj.capacidade,
          (SELECT count(*)::integer FROM agendamentos a
             JOIN solicitacoes s ON s.id = a.solicitacao_id
            WHERE a.status = 'agendado' AND a.data_agendada = p_data
-             AND a.hora_agendada = tj.hora AND s.cliente_id = p_cliente_id) AS ocupados
+             AND a.hora_agendada = tj.hora AND s.cliente_id = p_cliente_id
+             AND (tj.tipo_veiculo = 'todos' OR a.tipo_veiculo IS NULL
+                  OR a.tipo_veiculo = tj.tipo_veiculo)) AS ocupados
     FROM terminal_janelas tj
    WHERE tj.cliente_id = p_cliente_id AND tj.ativo = true
-   ORDER BY tj.hora;
+   ORDER BY tj.hora, tj.tipo_veiculo;
 $$;
 
 -- Grade padrao por id do cliente — o casamento por razao_social e fragil (a
@@ -3651,12 +3698,12 @@ BEGIN
     SELECT p_cliente_id, g.h::time, 60, 4, auth.uid()
       FROM generate_series(timestamp '2000-01-01 08:00', timestamp '2000-01-01 16:00',
                            interval '1 hour') AS g(h)
-    ON CONFLICT (cliente_id, hora) DO NOTHING;
+    ON CONFLICT (cliente_id, hora, tipo_veiculo) DO NOTHING;   -- 0069
   ELSIF p_modelo = 'janela_longa' THEN
     INSERT INTO terminal_janelas (cliente_id, hora, duracao_minutos, capacidade, created_by)
     SELECT p_cliente_id, g.h, 360, 10, auth.uid()
       FROM (VALUES ('06:00'::time), ('13:00'::time), ('19:00'::time)) AS g(h)
-    ON CONFLICT (cliente_id, hora) DO NOTHING;
+    ON CONFLICT (cliente_id, hora, tipo_veiculo) DO NOTHING;   -- 0069
   ELSE
     RAISE EXCEPTION 'Modelo de grade invalido: % (use horaria ou janela_longa).', p_modelo
       USING ERRCODE = '22023';
@@ -3686,29 +3733,32 @@ BEGIN
      SET status = 'substituido',
          motivo_reagendamento = COALESCE(NULLIF(btrim(p_motivo), ''), motivo_reagendamento)
    WHERE id = p_agendamento_id;
+  -- 0069 — o tipo vem junto: reagendar troca a janela, nao o veiculo.
   INSERT INTO agendamentos (solicitacao_id, data_preferida, hora_preferida, observacoes,
-                            nota_fiscal, nota_fiscal_origem,
+                            nota_fiscal, nota_fiscal_origem, tipo_veiculo,
                             substitui_agendamento_id, motivo_reagendamento)
   VALUES (v_antigo.solicitacao_id, p_nova_data, p_nova_hora, v_antigo.observacoes,
-          v_antigo.nota_fiscal, v_antigo.nota_fiscal_origem,
+          v_antigo.nota_fiscal, v_antigo.nota_fiscal_origem, v_antigo.tipo_veiculo,
           p_agendamento_id, NULLIF(btrim(p_motivo), ''))
   RETURNING id INTO v_novo;
   RETURN v_novo;
 END; $$;
 REVOKE ALL ON FUNCTION agendamento_reagendar_core(uuid, text, date, time) FROM public, anon, authenticated;
 
--- Forma FINAL da 0068 (com `p_nota_fiscal`). O DROP da assinatura de 4
--- argumentos e obrigatorio: lista de argumentos diferente cria SOBRECARGA, nao
--- substitui, e sobrariam duas versoes para o PostgREST escolher.
+-- Forma FINAL da 0069 (com `p_nota_fiscal` da 0068 e `p_tipo_veiculo`). Os DROPs
+-- das assinaturas antigas sao obrigatorios: lista de argumentos diferente cria
+-- SOBRECARGA, nao substitui, e sobrariam versoes para o PostgREST escolher.
 DROP FUNCTION IF EXISTS portal_solicitar_agendamento(uuid, date, time, text);
+DROP FUNCTION IF EXISTS portal_solicitar_agendamento(uuid, date, time, text, text);
 CREATE OR REPLACE FUNCTION portal_solicitar_agendamento(
   p_solicitacao_id uuid, p_data_preferida date, p_hora_preferida time, p_observacoes text,
-  p_nota_fiscal text DEFAULT NULL)
+  p_nota_fiscal text DEFAULT NULL, p_tipo_veiculo text DEFAULT NULL)
 RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 DECLARE
   v_parceiro uuid := get_current_parceiro_id();
   v_status text; v_cliente uuid; v_requer boolean; v_antecedencia integer;
-  v_min_data date; v_slots integer; v_nota text; v_id uuid;
+  v_min_data date; v_slots integer; v_separa boolean; v_tipo text;
+  v_nota text; v_id uuid;
 BEGIN
   IF v_parceiro IS NULL THEN
     RAISE EXCEPTION 'Sessao de parceiro nao identificada.' USING ERRCODE = '42501';
@@ -3740,13 +3790,30 @@ BEGIN
     RAISE EXCEPTION 'Este terminal exige % h de antecedencia.', COALESCE(v_antecedencia, 0)
       USING ERRCODE = 'PT422';
   END IF;
+  -- 0069 — o tipo de veiculo decide QUAL grade vale. Terminal que separa exige
+  -- o tipo mesmo sem hora escolhida: quem vai agendar precisa saber em qual
+  -- fila entrar.
+  v_tipo := NULLIF(btrim(lower(p_tipo_veiculo)), '');
+  IF v_tipo IS NOT NULL AND v_tipo NOT IN ('cacamba','graneleiro') THEN
+    RAISE EXCEPTION 'Tipo de veiculo invalido: % (use cacamba ou graneleiro).', v_tipo
+      USING ERRCODE = '22023';
+  END IF;
+  SELECT EXISTS (SELECT 1 FROM terminal_janelas
+                  WHERE cliente_id = v_cliente AND ativo = true
+                    AND tipo_veiculo <> 'todos') INTO v_separa;
+  IF v_separa AND v_tipo IS NULL THEN
+    RAISE EXCEPTION 'Informe o tipo de veiculo: este terminal tem horarios diferentes por tipo.'
+      USING ERRCODE = 'PT422';
+  END IF;
   IF p_hora_preferida IS NOT NULL THEN
     SELECT count(*) INTO v_slots FROM terminal_janelas
      WHERE cliente_id = v_cliente AND ativo = true;
     IF v_slots > 0 AND NOT EXISTS (
       SELECT 1 FROM terminal_janelas
-       WHERE cliente_id = v_cliente AND ativo = true AND hora = p_hora_preferida) THEN
-      RAISE EXCEPTION 'Horario indisponivel na grade deste terminal.' USING ERRCODE = 'PT422';
+       WHERE cliente_id = v_cliente AND ativo = true AND hora = p_hora_preferida
+         AND (tipo_veiculo = 'todos' OR v_tipo IS NULL OR tipo_veiculo = v_tipo)) THEN
+      RAISE EXCEPTION 'Horario indisponivel na grade deste terminal para este tipo de veiculo.'
+        USING ERRCODE = 'PT422';
     END IF;
   END IF;
   IF EXISTS (SELECT 1 FROM agendamentos
@@ -3758,9 +3825,9 @@ BEGIN
   -- Teto de tamanho: numero de nota nao passa disso, e o campo e livre.
   v_nota := NULLIF(left(btrim(p_nota_fiscal), 40), '');
   INSERT INTO agendamentos (solicitacao_id, data_preferida, hora_preferida, observacoes,
-                            nota_fiscal, nota_fiscal_origem)
+                            nota_fiscal, nota_fiscal_origem, tipo_veiculo)
   VALUES (p_solicitacao_id, p_data_preferida, p_hora_preferida, NULLIF(btrim(p_observacoes), ''),
-          v_nota, CASE WHEN v_nota IS NULL THEN NULL ELSE 'manual' END)
+          v_nota, CASE WHEN v_nota IS NULL THEN NULL ELSE 'manual' END, v_tipo)
   RETURNING id INTO v_id;
   RETURN v_id;
 END; $$;
@@ -3832,14 +3899,14 @@ END; $$;
 
 REVOKE ALL ON FUNCTION agendamentos_ocupacao_slot(uuid, date) FROM public, anon;
 REVOKE ALL ON FUNCTION terminal_aplicar_grade_padrao(uuid, text) FROM public, anon;
-REVOKE ALL ON FUNCTION portal_solicitar_agendamento(uuid, date, time, text, text) FROM public, anon;
+REVOKE ALL ON FUNCTION portal_solicitar_agendamento(uuid, date, time, text, text, text) FROM public, anon;
 REVOKE ALL ON FUNCTION portal_cancelar_agendamento(uuid) FROM public, anon;
 REVOKE ALL ON FUNCTION portal_reagendar_agendamento(uuid, text, date, time) FROM public, anon;
 REVOKE ALL ON FUNCTION agendamento_reagendar(uuid, text, date, time) FROM public, anon;
 REVOKE ALL ON FUNCTION agendamento_assumir(uuid) FROM public, anon;
 GRANT EXECUTE ON FUNCTION agendamentos_ocupacao_slot(uuid, date) TO authenticated;
 GRANT EXECUTE ON FUNCTION terminal_aplicar_grade_padrao(uuid, text) TO authenticated;
-GRANT EXECUTE ON FUNCTION portal_solicitar_agendamento(uuid, date, time, text, text) TO authenticated;
+GRANT EXECUTE ON FUNCTION portal_solicitar_agendamento(uuid, date, time, text, text, text) TO authenticated;
 GRANT EXECUTE ON FUNCTION portal_cancelar_agendamento(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION portal_reagendar_agendamento(uuid, text, date, time) TO authenticated;
 GRANT EXECUTE ON FUNCTION agendamento_reagendar(uuid, text, date, time) TO authenticated;
@@ -3963,6 +4030,12 @@ END $$;
 -- So para clientes JA marcados com requer_agendamento. Em base limpa nao faz
 -- nada — marcar o cliente e decisao da equipe, na tela, onde se escolhe o
 -- registro certo por id em vez de adivinhar por texto.
+-- ATENCAO — o `NOT EXISTS` nao estava na 0061 e entrou com a 0069: depois que a
+-- UNIQUE passou a incluir o tipo, (13:00,'todos') deixou de colidir com
+-- (13:00,'cacamba'), e este seed voltaria a criar os slots SEM tipo por cima de
+-- uma grade ja separada — desfazendo a grade da A.B a cada replay. Semear so
+-- terminal que ainda nao tem grade nenhuma preserva a intencao original (seed
+-- inicial) e torna o replay inofensivo.
 INSERT INTO terminal_janelas (cliente_id, hora, duracao_minutos, capacidade)
 SELECT c.id, g.h::time, 60, 4
   FROM clientes c
@@ -3972,7 +4045,8 @@ SELECT c.id, g.h::time, 60, 4
    AND (upper(c.razao_social) LIKE '%TCI%'
      OR upper(c.razao_social) LIKE '%ARCELOR%'
      OR upper(c.razao_social) LIKE '%METALSIDER%')
-ON CONFLICT (cliente_id, hora) DO NOTHING;
+   AND NOT EXISTS (SELECT 1 FROM terminal_janelas tj WHERE tj.cliente_id = c.id)
+ON CONFLICT (cliente_id, hora, tipo_veiculo) DO NOTHING;
 
 INSERT INTO terminal_janelas (cliente_id, hora, duracao_minutos, capacidade)
 SELECT c.id, g.h, 360, 10
@@ -3981,7 +4055,8 @@ SELECT c.id, g.h, 360, 10
  WHERE c.requer_agendamento = true
    AND (upper(c.razao_social) LIKE '%A. B.%'
      OR upper(c.razao_social) LIKE '%OPERADORA DE TERMINAIS%')
-ON CONFLICT (cliente_id, hora) DO NOTHING;
+   AND NOT EXISTS (SELECT 1 FROM terminal_janelas tj WHERE tj.cliente_id = c.id)
+ON CONFLICT (cliente_id, hora, tipo_veiculo) DO NOTHING;
 
 NOTIFY pgrst, 'reload schema';
 
@@ -4088,7 +4163,7 @@ NOTIFY pgrst, 'reload schema';
 
 
 -- =====================================================================
--- 0063 + 0066 + 0067 — Terminais: TCI, A.B/CSN e MRS Sao Bento (+ regra do TCI)
+-- 0063 + 0066 + 0067 + 0069 — Terminais: TCI, A.B/CSN e MRS Sao Bento
 -- =====================================================================
 -- Configuracao operacional, nao schema: marca os dois primeiros clientes que
 -- exigem agendamento e cria a grade de cada um. Por ID — a conferencia no
@@ -4116,12 +4191,43 @@ SELECT '99dbb554-5340-4b78-9e36-6eb7228d0835', g.h::time, 60, 4
   FROM generate_series(timestamp '2000-01-01 08:00',
                        timestamp '2000-01-01 16:00',
                        interval '1 hour') AS g(h)
-ON CONFLICT (cliente_id, hora) DO NOTHING;
+ON CONFLICT (cliente_id, hora, tipo_veiculo) DO NOTHING;
 
-INSERT INTO terminal_janelas (cliente_id, hora, duracao_minutos, capacidade)
-SELECT '652eb27d-c040-470a-8a96-314ae7011b59', g.h, 360, 10
-  FROM (VALUES ('06:00'::time), ('13:00'::time), ('19:00'::time)) AS g(h)
-ON CONFLICT (cliente_id, hora) DO NOTHING;
+-- A.B/CSN na forma FINAL da 0069: a grade dela NAO e uma so. Cacamba descarrega
+-- as 01, 07, 13, 19 e 22; graneleiro so as 06 e as 13 — por isso 13:00 aparece
+-- duas vezes, uma por tipo, o que a UNIQUE antiga (cliente_id, hora) proibia.
+-- A duracao e a distancia ate o proximo slot DO MESMO TIPO.
+INSERT INTO terminal_janelas (cliente_id, hora, tipo_veiculo, duracao_minutos, capacidade)
+SELECT '652eb27d-c040-470a-8a96-314ae7011b59', g.hora, g.tipo, g.duracao, 10
+  FROM (VALUES
+          ('01:00'::time, 'cacamba',    360),
+          ('07:00'::time, 'cacamba',    360),
+          ('13:00'::time, 'cacamba',    360),
+          ('19:00'::time, 'cacamba',    180),
+          ('22:00'::time, 'cacamba',    180),
+          ('06:00'::time, 'graneleiro', 420),
+          ('13:00'::time, 'graneleiro', 360)
+       ) AS g(hora, tipo, duracao)
+ON CONFLICT (cliente_id, hora, tipo_veiculo) DO NOTHING;
+
+-- Banco que ja tinha a grade antiga da 0063 (06/13/19 sem tipo): as linhas
+-- ganham o tipo a que pertencem em vez de serem apagadas, e o 13:00 do
+-- graneleiro entra pelo INSERT acima. So reescreve a duracao onde ela ainda
+-- esta no valor da 0063 — ajuste que a equipe tenha feito na tela vale.
+UPDATE terminal_janelas
+   SET tipo_veiculo = 'graneleiro',
+       duracao_minutos = CASE WHEN duracao_minutos = 360 THEN 420 ELSE duracao_minutos END
+ WHERE cliente_id = '652eb27d-c040-470a-8a96-314ae7011b59'
+   AND hora = '06:00' AND tipo_veiculo = 'todos';
+UPDATE terminal_janelas
+   SET tipo_veiculo = 'cacamba'
+ WHERE cliente_id = '652eb27d-c040-470a-8a96-314ae7011b59'
+   AND hora = '13:00' AND tipo_veiculo = 'todos';
+UPDATE terminal_janelas
+   SET tipo_veiculo = 'cacamba',
+       duracao_minutos = CASE WHEN duracao_minutos = 360 THEN 180 ELSE duracao_minutos END
+ WHERE cliente_id = '652eb27d-c040-470a-8a96-314ae7011b59'
+   AND hora = '19:00' AND tipo_veiculo = 'todos';
 
 -- ---------- 0066 — MRS Estacao Sao Bento (Mogi das Cruzes) ----------
 -- Primeiro terminal a mostrar que "segue o padrao do TCI" era o FORMATO (slots
@@ -4142,7 +4248,7 @@ SELECT '0281905e-646a-431f-abf1-80d7d7e757e1', g.h::time, 30, 3
   FROM generate_series(timestamp '2000-01-01 07:00',
                        timestamp '2000-01-01 17:30',
                        interval '30 minutes') AS g(h)
-ON CONFLICT (cliente_id, hora) DO NOTHING;
+ON CONFLICT (cliente_id, hora, tipo_veiculo) DO NOTHING;
 
 -- ---------- 0067 — Regra do TCI: exige telefone do motorista ----------
 -- `observacoes_agendamento` e o que o painel mostra como "Regra do terminal",
@@ -4171,8 +4277,11 @@ BEGIN
    WHERE cliente_id = '99dbb554-5340-4b78-9e36-6eb7228d0835' AND ativo;
   SELECT COALESCE(sum(capacidade), 0) INTO v_ab  FROM terminal_janelas
    WHERE cliente_id = '652eb27d-c040-470a-8a96-314ae7011b59' AND ativo;
-  IF v_tci <> 36 OR v_ab <> 30 THEN
-    RAISE WARNING 'Grade fora do padrao da SPEC: TCI=% (padrao 36), A.B=% (padrao 30).', v_tci, v_ab;
+  -- A.B: 70 = 5 slots de cacamba + 2 de graneleiro, 10 vagas cada (0069). Eram
+  -- 30 enquanto a grade era uma so. O numero e referencia da LHG; a vaga real
+  -- vive no sistema do terminal.
+  IF v_tci <> 36 OR v_ab <> 70 THEN
+    RAISE WARNING 'Grade fora do padrao da SPEC: TCI=% (padrao 36), A.B=% (padrao 70).', v_tci, v_ab;
   END IF;
 END $$;
 

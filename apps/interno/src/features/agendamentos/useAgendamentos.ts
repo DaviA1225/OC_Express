@@ -3,7 +3,7 @@ import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { registrarAcesso } from '@/lib/acesso'
 import { traduzirErroBanco } from '@/features/crud/useCrudQueries'
-import type { AgendamentoStatus, Tables } from '@/types/database.types'
+import type { AgendamentoStatus, Tables, TipoVeiculo } from '@/types/database.types'
 
 export const AGENDAMENTOS_BUCKET = 'agendamentos-docs'
 export const MAX_DOC_BYTES = 10 * 1024 * 1024
@@ -352,6 +352,11 @@ export function useCriarAgendamentoInterno() {
       dataPreferida: string
       horaPreferida: string | null
       observacoes: string | null
+      /** Opcional aqui, ao contrário do portal (0069): quem registra um pedido
+       *  que chegou por WhatsApp nem sempre sabe o tipo do veículo, e travar o
+       *  registro por isso deixaria o pedido fora da fila. Sem tipo, o painel
+       *  mostra a grade inteira etiquetada. */
+      tipoVeiculo: TipoVeiculo | null
     }) => {
       const { data, error } = await supabase
         .from('agendamentos')
@@ -360,6 +365,7 @@ export function useCriarAgendamentoInterno() {
           data_preferida: input.dataPreferida,
           hora_preferida: input.horaPreferida,
           observacoes: input.observacoes,
+          tipo_veiculo: input.tipoVeiculo,
         } as never)
         .select('id')
         .single()

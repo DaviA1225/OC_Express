@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { traduzirErroBanco } from '@/features/crud/useCrudQueries'
-import type { Tables } from '@/types/database.types'
+import type { Tables, TipoVeiculoSlot } from '@/types/database.types'
 
 export type TerminalJanela = Tables<'terminal_janelas'>
 
@@ -44,6 +44,7 @@ export function useTerminalJanelas(clienteId: string | null | undefined) {
         .select('*')
         .eq('cliente_id', clienteId as string)
         .order('hora', { ascending: true })
+        .order('tipo_veiculo', { ascending: true })
       if (error) throw error
       return (data ?? []) as TerminalJanela[]
     },
@@ -65,6 +66,7 @@ export function useGradesAtivas(clienteIds: string[]) {
         .in('cliente_id', clienteIds)
         .eq('ativo', true)
         .order('hora', { ascending: true })
+        .order('tipo_veiculo', { ascending: true })
       if (error) throw error
       const mapa = new Map<string, TerminalJanela[]>()
       for (const j of (data ?? []) as TerminalJanela[]) {
@@ -79,6 +81,9 @@ export function useGradesAtivas(clienteIds: string[]) {
 
 export interface SlotOcupacao {
   hora: string
+  /** 'todos' no terminal de grade única. Onde a grade é separada por tipo
+   *  (A.B/CSN), o mesmo horário pode aparecer duas vezes — uma por tipo. */
+  tipo_veiculo: TipoVeiculoSlot
   duracao_minutos: number
   capacidade: number | null
   /** Agendamentos da própria LHG naquele slot. NÃO é disponibilidade: outras
@@ -111,6 +116,7 @@ export function useSalvarJanela() {
       id?: string
       cliente_id: string
       hora: string
+      tipo_veiculo: TipoVeiculoSlot
       duracao_minutos: number
       capacidade: number | null
       ativo?: boolean
@@ -132,7 +138,7 @@ export function useSalvarJanela() {
     onError: (e: unknown) => {
       const err = e as { code?: string } | undefined
       if (err?.code === '23505') {
-        toast.error('Esse horário já existe na grade deste terminal.')
+        toast.error('Esse horário já existe na grade deste terminal para esse tipo de veículo.')
         return
       }
       toast.error(traduzirErroBanco(e))
@@ -176,18 +182,22 @@ export function useGerarGrade() {
     mutationFn: async (input: {
       clienteId: string
       horas: string[]
+      tipoVeiculo: TipoVeiculoSlot
       duracaoMinutos: number
       capacidade: number | null
     }) => {
       const linhas = input.horas.map((hora) => ({
         cliente_id: input.clienteId,
         hora,
+        tipo_veiculo: input.tipoVeiculo,
         duracao_minutos: input.duracaoMinutos,
         capacidade: input.capacidade,
       }))
       const { data, error } = await supabase
         .from('terminal_janelas')
-        .upsert(linhas as never, { onConflict: 'cliente_id,hora', ignoreDuplicates: true })
+        // O arbitro do upsert e a UNIQUE da 0069, que inclui o tipo: gerar a
+        // grade do graneleiro nao apaga nem colide com a da cacamba.
+        .upsert(linhas as never, { onConflict: 'cliente_id,hora,tipo_veiculo', ignoreDuplicates: true })
         .select('id')
       if (error) throw error
       return (data ?? []).length

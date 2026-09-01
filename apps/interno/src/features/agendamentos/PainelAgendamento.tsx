@@ -43,6 +43,7 @@ import {
   horaCurta,
   mascararCpf,
   numeroAgendamento,
+  tipoVeiculoLabel,
 } from '@/features/agendamentos/agendamento'
 
 interface Props {
@@ -111,7 +112,17 @@ function Conteudo({ row, onOpenChange }: { row: AgendamentoRow; onOpenChange: (o
   const notaFiscal = notaFiscalEditada ?? row.nota_fiscal ?? (nfAuto.data?.notaFiscal || '')
 
   const slots = ocupacao.data ?? []
-  const horaNaGrade = horaAgendada != null && slots.some((s) => s.hora === horaAgendada)
+
+  // O tipo pedido decide qual grade vale. 06:00 existe na A.B, mas só para
+  // graneleiro: uma caçamba confirmada ali está fora da grade DELA, e é assim
+  // que o banco marca `hora_fora_da_grade` (0069). Pedido sem tipo vê a grade
+  // inteira, com cada horário etiquetado.
+  const tipoPedido = row.tipo_veiculo
+  const slotsDoTipo =
+    tipoPedido == null
+      ? slots
+      : slots.filter((s) => s.tipo_veiculo === 'todos' || s.tipo_veiculo === tipoPedido)
+  const horaNaGrade = horaAgendada != null && slotsDoTipo.some((s) => s.hora === horaAgendada)
   const foraDaGrade = slots.length > 0 && horaAgendada != null && !horaNaGrade
 
   // Já concluído: o painel vira modo documentos. Serve para o contrato que
@@ -153,6 +164,7 @@ function Conteudo({ row, onOpenChange }: { row: AgendamentoRow; onOpenChange: (o
           {row.parceiro?.razao_social ?? 'Solicitação interna'} · Solicitação #
           {row.solicitacao?.numero_interno ?? '—'} · Pediu {dataCompleta(row.data_preferida)}
           {row.hora_preferida ? ` às ${horaCurta(row.hora_preferida)}` : ' (qualquer horário)'}
+          {tipoVeiculoLabel(row.tipo_veiculo) && ` · ${tipoVeiculoLabel(row.tipo_veiculo)}`}
         </DialogDescription>
       </DialogHeader>
 
@@ -191,6 +203,9 @@ function Conteudo({ row, onOpenChange }: { row: AgendamentoRow; onOpenChange: (o
               <LinhaCopiavel rotulo="1ª carreta" valor={dados.placaPrimeiraCarreta} />
             )}
             {dados.placaDolly && <LinhaCopiavel rotulo="Dolly" valor={dados.placaDolly} />}
+            {tipoVeiculoLabel(row.tipo_veiculo) && (
+              <LinhaCopiavel rotulo="Tipo de veículo" valor={tipoVeiculoLabel(row.tipo_veiculo)} />
+            )}
             <LinhaCopiavel rotulo="Nota fiscal" valor={notaFiscal || null} />
             <LinhaCopiavel rotulo="Motorista" valor={dados.motoristaNome} />
             {/* Sem máscara, diferente do CPF: o telefone já aparece aberto na
@@ -325,6 +340,7 @@ function Conteudo({ row, onOpenChange }: { row: AgendamentoRow; onOpenChange: (o
                     slots={slots}
                     value={horaAgendada}
                     onChange={setHoraAgendada}
+                    tipo={tipoPedido}
                     mostrarOcupacao
                     isLoading={ocupacao.isLoading}
                   />

@@ -1,4 +1,4 @@
-import type { AgendamentoStatus } from '@/types/database.types'
+import type { AgendamentoStatus, TipoVeiculo, TipoVeiculoSlot } from '@/types/database.types'
 
 /** `#A0412` — o "A" separa da numeração das solicitações na conversa da equipe. */
 export function numeroAgendamento(n: number): string {
@@ -19,6 +19,37 @@ export const AGENDAMENTO_STATUS_CLASSES: Record<AgendamentoStatus, string> = {
   agendado: 'bg-emerald-100 text-emerald-800',
   substituido: 'cat-steel',
   cancelado: 'bg-red-100 text-red-800',
+}
+
+/** Gêmeo do rótulo do portal. O vocabulário vem de `clientes.aceita_cacamba` /
+ *  `aceita_graneleiro` (0005) — a operação já fala assim. */
+export const TIPO_VEICULO_LABELS: Record<TipoVeiculo, string> = {
+  cacamba: 'Caçamba',
+  graneleiro: 'Graneleiro',
+}
+
+/** Rótulo do slot na grade, onde existe um terceiro valor ('todos'). */
+export const TIPO_SLOT_LABELS: Record<TipoVeiculoSlot, string> = {
+  todos: 'Todos',
+  cacamba: 'Caçamba',
+  graneleiro: 'Graneleiro',
+}
+
+export function tipoVeiculoLabel(tipo: string | null | undefined): string | null {
+  if (tipo === 'cacamba' || tipo === 'graneleiro') return TIPO_VEICULO_LABELS[tipo]
+  return null
+}
+
+/** Terminal que atende cada tipo de veículo num horário diferente (A.B/CSN). A
+ *  própria grade responde: basta um slot tipado. Terminal de grade única (TCI,
+ *  MRS) tem tudo em 'todos'. */
+export function separaPorTipo(slots: { tipo_veiculo: TipoVeiculoSlot }[]): boolean {
+  return slots.some((s) => s.tipo_veiculo !== 'todos')
+}
+
+export function tiposDaGrade(slots: { tipo_veiculo: TipoVeiculoSlot }[]): TipoVeiculo[] {
+  const ordem: TipoVeiculo[] = ['cacamba', 'graneleiro']
+  return ordem.filter((t) => slots.some((s) => s.tipo_veiculo === t))
 }
 
 /** `time` do Postgres chega como `HH:MM:SS`; a operação fala em `HH:MM`. */

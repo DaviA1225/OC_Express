@@ -29,12 +29,16 @@ import {
 import {
   AGENDAMENTO_STATUS_CLASSES,
   AGENDAMENTO_STATUS_LABELS,
+  TIPO_VEICULO_LABELS,
   dataCompleta,
   dataMinima,
   horaCurta,
   numeroAgendamento,
+  separaPorTipo,
+  tipoVeiculoLabel,
+  tiposDaGrade,
 } from './agendamento'
-import type { SolicitacaoStatus } from '@/types/database.types'
+import type { SolicitacaoStatus, TipoVeiculo } from '@/types/database.types'
 
 /** A NF nasce no carregamento, então o agendamento é evento POSTERIOR à saída
  *  da carga. Antes da OC enviada não há nota para levar ao terminal. */
@@ -137,6 +141,12 @@ export function AgendamentoCard({ solicitacaoId, clienteId, status }: Props) {
                           </span>
                         )}
                       </dd>
+                    </div>
+                  )}
+                  {tipoVeiculoLabel(a.tipo_veiculo) && (
+                    <div className="flex gap-2">
+                      <dt className="w-[64px] shrink-0 text-muted-foreground">Veículo</dt>
+                      <dd className="text-foreground">{tipoVeiculoLabel(a.tipo_veiculo)}</dd>
                     </div>
                   )}
                   {a.motivo_reagendamento && (
@@ -275,9 +285,21 @@ function NovoAgendamentoForm({
   const minimo = dataMinima(antecedencia)
   const [data, setData] = React.useState(minimo)
   const [hora, setHora] = React.useState<string | null>(null)
+  const [tipo, setTipo] = React.useState<TipoVeiculo | null>(null)
   const [observacoes, setObservacoes] = React.useState('')
 
   const ocupacao = useOcupacaoSlots(clienteId, data || null)
+
+  // A própria grade diz se este terminal separa horários por tipo de veículo.
+  const grade = ocupacao.data ?? []
+  const separa = separaPorTipo(grade)
+  const tipos = tiposDaGrade(grade)
+
+  function escolherTipo(novo: TipoVeiculo) {
+    setTipo(novo)
+    // A hora escolhida era da grade do outro tipo.
+    if (novo !== tipo) setHora(null)
+  }
 
   return (
     <>
@@ -302,12 +324,41 @@ function NovoAgendamentoForm({
           />
         </div>
 
+        {separa && (
+          <div className="space-y-1.5">
+            <Label>Tipo de veículo</Label>
+            <div className="flex flex-wrap gap-1.5">
+              {tipos.map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => escolherTipo(t)}
+                  aria-pressed={tipo === t}
+                  className={cn(
+                    'rounded-md border px-2.5 py-1.5 text-[12px] font-medium transition-colors',
+                    tipo === t
+                      ? 'border-primary bg-primary text-primary-foreground'
+                      : 'border-border bg-card text-foreground hover:border-primary/40 hover:bg-accent',
+                  )}
+                >
+                  {TIPO_VEICULO_LABELS[t]}
+                </button>
+              ))}
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              Este terminal descarrega cada tipo em horários diferentes. Sem o tipo, a grade
+              aparece inteira e você escolhe o horário na mão.
+            </p>
+          </div>
+        )}
+
         <div className="space-y-1.5">
           <Label>Horário desejado</Label>
           <GradeSlots
-            slots={ocupacao.data ?? []}
+            slots={grade}
             value={hora}
             onChange={setHora}
+            tipo={tipo}
             permitirQualquer
             mostrarOcupacao
             isLoading={ocupacao.isLoading}
@@ -340,6 +391,7 @@ function NovoAgendamentoForm({
                 dataPreferida: data,
                 horaPreferida: hora,
                 observacoes: observacoes.trim() || null,
+                tipoVeiculo: tipo,
               })
               onOpenChange(false)
             }}

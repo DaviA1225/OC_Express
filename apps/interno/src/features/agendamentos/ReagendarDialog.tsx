@@ -109,10 +109,15 @@ function Conteudo({
 
         <div className="space-y-1.5">
           <Label>Horário desejado</Label>
+          {/* A grade segue o tipo do agendamento atual: reagendar troca a
+              janela, não o veículo, e a RPC copia o tipo para o pedido novo.
+              Mostrar a grade do outro tipo aqui ofereceria horário que o
+              terminal recusa para este caminhão. */}
           <GradeSlots
             slots={ocupacao.data ?? []}
             value={novaHora}
             onChange={setNovaHora}
+            tipo={agendamento.tipo_veiculo}
             permitirQualquer
             mostrarOcupacao
             isLoading={ocupacao.isLoading}

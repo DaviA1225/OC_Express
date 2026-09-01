@@ -36,14 +36,23 @@ import {
 import {
   AGENDAMENTO_STATUS_CLASSES,
   AGENDAMENTO_STATUS_LABELS,
+  TIPO_VEICULO_ESCOLHA,
   dataCompleta,
   dataCurta,
   dataMinima,
   divergiu,
   horaCurta,
   numeroAgendamento,
+  separaPorTipo,
+  tipoVeiculoLabel,
+  tiposDaGrade,
 } from './agendamento'
-import type { AgendamentoStatus, SolicitacaoStatus, Views } from '@sislog/shared/types'
+import type {
+  AgendamentoStatus,
+  SolicitacaoStatus,
+  TipoVeiculo,
+  Views,
+} from '@sislog/shared/types'
 
 type ClientePublico = Views<'clientes_publicos'>
 
@@ -161,6 +170,15 @@ export function AgendamentoCard({ solicitacaoId, status, cliente }: Props) {
                   <p className="mt-2 text-[13px] tabular-nums text-foreground">
                     Pedido para {dataCompleta(a.data_preferida)}
                     {a.hora_preferida ? ` às ${horaCurta(a.hora_preferida)}` : ' (qualquer horário)'}
+                  </p>
+                )}
+
+                {/* O tipo decide a grade: no terminal que separa, 13:00 de
+                    caçamba e 13:00 de graneleiro são filas diferentes. */}
+                {tipoVeiculoLabel(a.tipo_veiculo) && (
+                  <p className="mt-1.5 text-[12px] text-muted-foreground">
+                    <span className="font-medium text-foreground">Veículo: </span>
+                    {tipoVeiculoLabel(a.tipo_veiculo)}
                   </p>
                 )}
 
@@ -355,6 +373,30 @@ function Formulario({
   const slots = useSlotsDoTerminal(cliente?.id ?? null, data || null)
   const enviando = solicitar.isPending || reagendar.isPending
 
+  // A grade responde se este terminal separa horários por tipo de veículo — não
+  // há campo no cliente para isso, e não precisa haver: basta um slot tipado.
+  const grade = slots.data ?? []
+  const separa = separaPorTipo(grade)
+  const tipos = tiposDaGrade(grade)
+
+  // Reagendar mantém o veículo: quem atrasou foi o mesmo caminhão, e a RPC
+  // copia o tipo do agendamento anterior. Trocar de tipo é outro pedido.
+  const tipoFixo = reagendarDe?.tipo_veiculo ?? null
+  const [tipoEscolhido, setTipoEscolhido] = React.useState<TipoVeiculo | null>(tipoFixo)
+  const tipo = reagendarDe ? tipoFixo : tipoEscolhido
+
+  // Sem o tipo não dá para oferecer horário: na A.B, caçamba descarrega às 19h
+  // e graneleiro não. Mostrar a grade inteira antes da escolha seria oferecer
+  // horários que o terminal recusa.
+  const faltaTipo = separa && tipo == null
+
+  function escolherTipo(novo: TipoVeiculo) {
+    setTipoEscolhido(novo)
+    // A hora escolhida pertencia à grade do outro tipo. Mantê-la selecionada
+    // enviaria um horário que não existe para o veículo agora escolhido.
+    if (novo !== tipo) setHora(null)
+  }
+
   return (
     <>
       <DialogHeader>
@@ -399,9 +441,59 @@ function Formulario({
           )}
         </div>
 
+        {separa && (
+          <div className="space-y-1.5">
+            <Label>Tipo de veículo *</Label>
+            {reagendarDe ? (
+              <p className="rounded-md border bg-muted/40 px-3 py-2 text-[13px] text-foreground">
+                {tipoVeiculoLabel(tipoFixo) ?? 'Não informado'}
+                <span className="ml-1.5 text-[12px] text-muted-foreground">
+                  — o mesmo do agendamento atual.
+                </span>
+              </p>
+            ) : (
+              <>
+                <div className="flex flex-wrap gap-1.5">
+                  {tipos.map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => escolherTipo(t)}
+                      aria-pressed={tipo === t}
+                      className={cn(
+                        'rounded-md border px-3 py-2 text-[13px] font-medium transition-colors',
+                        tipo === t
+                          ? 'border-primary bg-primary text-primary-foreground'
+                          : 'border-border bg-background text-foreground hover:border-primary/40 hover:bg-muted',
+                      )}
+                    >
+                      {TIPO_VEICULO_ESCOLHA[t]}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[12px] text-muted-foreground">
+                  Este terminal descarrega cada tipo em horários diferentes.
+                </p>
+              </>
+            )}
+          </div>
+        )}
+
         <div className="space-y-1.5">
           <Label>Horário</Label>
-          <GradeSlots slots={slots.data ?? []} value={hora} onChange={setHora} isLoading={slots.isLoading} />
+          {faltaTipo ? (
+            <p className="rounded-md border border-dashed px-3 py-2 text-[12px] text-muted-foreground">
+              Escolha o tipo de veículo para ver os horários deste terminal.
+            </p>
+          ) : (
+            <GradeSlots
+              slots={grade}
+              value={hora}
+              onChange={setHora}
+              tipo={tipo}
+              isLoading={slots.isLoading}
+            />
+          )}
         </div>
 
         {!reagendarDe && (
@@ -448,7 +540,11 @@ function Formulario({
           </Button>
           <Button
             type="button"
-            disabled={!data || enviando}
+            // Enquanto a grade não chega não se sabe se o terminal separa por
+            // tipo. Enviar aí levaria a uma recusa do banco por um campo que a
+            // tela ainda nem mostrou.
+            disabled={!data || faltaTipo || slots.isLoading || enviando}
+            title={faltaTipo ? 'Escolha o tipo de veículo.' : undefined}
             onClick={async () => {
               if (reagendarDe) {
                 await reagendar.mutateAsync({
@@ -465,6 +561,7 @@ function Formulario({
                   horaPreferida: hora,
                   observacoes: observacoes.trim() || null,
                   notaFiscal: notaFiscal.trim() || null,
+                  tipoVeiculo: tipo,
                 })
               }
               onOpenChange(false)
