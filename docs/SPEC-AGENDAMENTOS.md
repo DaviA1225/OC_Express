@@ -926,9 +926,11 @@ Três consequências que valem registro:
   da fila; sem tipo, o painel mostra a grade inteira etiquetada.
 - **A conferência de sanidade da A.B mudou de 30 para 70 veículos/dia** (5 slots
   de caçamba + 2 de graneleiro, 10 vagas cada). A capacidade por slot foi
-  herdada da 0063 e **ainda não foi confirmada com o terminal** — é a mesma
-  questão 3, agora também para a A.B. O número é referência da LHG; a vaga real
-  vive no sistema do terminal.
+  herdada da 0063 e **confirmada com a operação em 01/09/2026**: são 10 vagas
+  por horário da grade, não por hora de janela — uma janela de 6 h comporta 10
+  veículos, não 60. Fecha a questão 3 para a A.B; TCI, ArcelorMittal e
+  Metalsider seguem com números não confirmados. O número é referência da LHG; a
+  vaga real vive no sistema do terminal.
 
 ---
 

@@ -150,6 +150,11 @@ Nenhuma das três é gravável direto: toda escrita passa por função
   pentest (`scripts/pentest-rls.mjs`).
 - Buckets `ocs-pdf` e `solicitacoes-anexos` **privados**; acesso só por URL
   assinada com validade curta.
+- A view `clientes_publicos` **deixou de responder à role `anon`** (0072): a
+  carteira de clientes de minério (razão social, cidade, UF) era legível por
+  quem tivesse a chave pública do bundle. Agora exige sessão. Ao recriar a view,
+  repetir o `REVOKE` — o `anon` reganha o SELECT pelos default privileges do
+  schema toda vez que o objeto nasce.
 - CAPTCHA (Turnstile) e rate limit no login; CSP enforced nos dois apps.
 - **Termo de Uso e Confidencialidade aceito no primeiro acesso**, nos dois apps,
   registrado em `termos_aceite` (migration 0070) com usuário, versão e data. O
