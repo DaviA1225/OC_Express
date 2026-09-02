@@ -3,7 +3,7 @@ import { useNavigate, Navigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { ArrowLeft, ArrowRight, Clock, Eye, EyeOff, Loader2 } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Clock, Eye, EyeOff, Loader2, HeartHandshake } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -18,6 +18,23 @@ import { lerMotivoSaida, limparMotivoSaida } from '@sislog/shared/sessao'
 // Chave pública do Turnstile. Quando ausente, o captcha fica desligado e o login
 // segue como antes — o gate real é habilitado no Dashboard do Supabase.
 const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined
+
+/**
+ * Página pública de apresentação do SisLog. Ela vive no app INTERNO, que é
+ * outro projeto Vercel com domínio próprio, então daqui é link externo e não
+ * rota.
+ *
+ * Duplicar a página no portal seria a alternativa, e é pior: uma landing tem
+ * texto, telas e pedido de apoio que mudam juntos, e duas cópias divergem no
+ * primeiro ajuste. Uma página, uma URL.
+ *
+ * Sem a variável, o botão simplesmente não aparece. Link quebrado numa tela de
+ * login de parceiro é pior do que botão nenhum, e o domínio do app já quebrou
+ * integração aqui antes (a allowlist de CORS das Edge Functions).
+ */
+const URL_APRESENTACAO =
+  (import.meta.env.VITE_URL_APRESENTACAO as string | undefined) ??
+  (import.meta.env.DEV ? 'http://localhost:5173/sobre' : 'https://sislog.vercel.app/sobre')
 
 const loginSchema = z.object({
   email: z.string().min(1, 'Informe seu e-mail').email('E-mail inválido'),
@@ -267,6 +284,23 @@ export default function LoginPage() {
             {' · '}
             <TermosLeitura audiencia="parceiro" />
           </p>
+
+          {/* Abaixo da linha institucional e com peso próprio: é o convite para
+              ver como o sistema funciona do outro lado do portal e, quem quiser,
+              apoiar o projeto. Contornado, e não sólido, para não disputar com o
+              "Entrar" — a tela ainda é de login. */}
+          {URL_APRESENTACAO && (
+            <a
+              href={URL_APRESENTACAO}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="mt-4 flex h-11 w-full items-center justify-center gap-2 rounded-[4px] border border-primary/40 bg-primary/[0.06] text-[13px] font-semibold text-primary transition-colors hover:border-primary/70 hover:bg-primary/[0.12] focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-[#F5F7F9] dark:focus-visible:ring-offset-[var(--canvas-dark)]"
+            >
+              <HeartHandshake className="h-4 w-4" />
+              Conheça o sistema e apoie o projeto
+              <ArrowRight className="h-4 w-4" />
+            </a>
+          )}
         </div>
       </div>
     </div>
