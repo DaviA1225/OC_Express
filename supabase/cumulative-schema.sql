@@ -1,5 +1,5 @@
 -- =====================================================================
--- OC Express / SisLog LHG — Schema cumulativo (migrations 0001 → 0071)
+-- OC Express / SisLog LHG — Schema cumulativo (migrations 0001 → 0072)
 -- =====================================================================
 --
 -- Este arquivo agrega TODAS as migrations num único script IDEMPOTENTE.
@@ -528,6 +528,10 @@ SELECT id, razao_social, cidade, uf
 FROM clientes
 WHERE ativo = true;
 
+-- 0072 — mesma revogacao do bloco da 0062, repetida aqui porque este CREATE
+-- tambem faz a view nascer (e nascer legivel pelo anon) num banco novo.
+REVOKE ALL ON clientes_publicos FROM anon;
+REVOKE ALL ON clientes_publicos FROM public;
 GRANT SELECT ON clientes_publicos TO authenticated;
 
 COMMENT ON VIEW clientes_publicos IS
@@ -3682,6 +3686,12 @@ SELECT id, razao_social, cidade, uf,
 FROM clientes
 WHERE ativo = true
   AND cliente_minerio = true;
+
+-- 0072 — o REVOKE fica AQUI, colado no CREATE, e nao numa secao no fim: o anon
+-- recebe SELECT dos default privileges do schema `public` toda vez que a view
+-- nasce, entao recriar a view desfaz qualquer revogacao feita antes.
+REVOKE ALL ON clientes_publicos FROM anon;
+REVOKE ALL ON clientes_publicos FROM public;
 GRANT SELECT ON clientes_publicos TO authenticated;
 
 -- ---------- RPCs ----------
