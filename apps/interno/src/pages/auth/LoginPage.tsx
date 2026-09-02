@@ -1,9 +1,9 @@
 import * as React from 'react'
-import { useNavigate, Navigate } from 'react-router-dom'
+import { useNavigate, Navigate, Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { ArrowLeft, ArrowRight, Clock, Eye, EyeOff, Loader2 } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Clock, Eye, EyeOff, Loader2, HeartHandshake } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -290,6 +290,18 @@ export default function LoginPage() {
             {' · '}
             <TermosLeitura audiencia="interno" />
           </p>
+
+          {/* Abaixo da linha institucional e com peso próprio: é o convite para
+              conhecer o sistema e apoiar o projeto. Contornado, e não sólido,
+              para não disputar com o "Entrar" — a tela ainda é de login. */}
+          <Link
+            to="/sobre"
+            className="mt-4 flex h-11 w-full items-center justify-center gap-2 rounded-[4px] border border-[#FF5100]/40 bg-[#FF5100]/[0.06] text-[13px] font-semibold text-primary-strong transition-colors hover:border-[#FF5100]/70 hover:bg-[#FF5100]/[0.12] focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-[#F5F7F9] dark:focus-visible:ring-offset-[var(--canvas-dark)]"
+          >
+            <HeartHandshake className="h-4 w-4" />
+            Conheça o sistema e apoie o projeto
+            <ArrowRight className="h-4 w-4" />
+          </Link>
         </div>
       </div>
     </div>
