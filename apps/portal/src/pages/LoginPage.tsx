@@ -36,6 +36,12 @@ const URL_APRESENTACAO =
   (import.meta.env.VITE_URL_APRESENTACAO as string | undefined) ??
   (import.meta.env.DEV ? 'http://localhost:5173/sobre' : 'https://sislog.vercel.app/sobre')
 
+/** `origem=portal` faz a página de apresentação devolver o visitante para O
+ *  PORTAL, e não para o login interno, onde o parceiro não tem conta. A página
+ *  usa esse valor para ESCOLHER entre destinos que ela já conhece; nenhuma URL
+ *  viaja daqui para lá. */
+const URL_APRESENTACAO_PARCEIRO = `${URL_APRESENTACAO}?origem=portal`
+
 const loginSchema = z.object({
   email: z.string().min(1, 'Informe seu e-mail').email('E-mail inválido'),
   password: z.string().min(1, 'Informe sua senha'),
@@ -291,7 +297,7 @@ export default function LoginPage() {
               "Entrar" — a tela ainda é de login. */}
           {URL_APRESENTACAO && (
             <a
-              href={URL_APRESENTACAO}
+              href={URL_APRESENTACAO_PARCEIRO}
               target="_blank"
               rel="noreferrer noopener"
               className="mt-4 flex h-11 w-full items-center justify-center gap-2 rounded-[4px] border border-primary/40 bg-primary/[0.06] text-[13px] font-semibold text-primary transition-colors hover:border-primary/70 hover:bg-primary/[0.12] focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-[#F5F7F9] dark:focus-visible:ring-offset-[var(--canvas-dark)]"

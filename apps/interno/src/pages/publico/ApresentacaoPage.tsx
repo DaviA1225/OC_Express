@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import {
   ArrowRight,
   ArrowLeft,
@@ -34,6 +34,41 @@ import { FLUXO } from './fluxo'
  *  em vez de chave digitada de propósito: chave de PIX transcrita à mão é
  *  exatamente como se erra o destinatário de uma transferência. */
 const PIX_QR = '/pix-sislog.jpeg'
+
+/**
+ * De onde a visita veio, e para onde o botão de voltar deve levar.
+ *
+ * O parceiro chega aqui pelo login do PORTAL, que é outro domínio. Sem isto, o
+ * "Entrar" o mandaria para o login do sistema interno, onde ele não tem conta,
+ * e a visita terminaria numa porta que não é dele.
+ *
+ * O `?origem=` só ESCOLHE entre destinos conhecidos, nunca fornece a URL. É a
+ * diferença entre um seletor e um open redirect: se a página aceitasse
+ * `?voltar=<url>`, bastaria alguém distribuir um link do SisLog apontando para
+ * um site de phishing, com a nossa marca em volta do botão.
+ */
+const URL_PORTAL =
+  (import.meta.env.VITE_URL_PORTAL as string | undefined) ??
+  'https://oc-sislog-portal.vercel.app'
+
+const DESTINOS = {
+  interno: { rotulo: 'Entrar', rodape: 'Ir para o login', url: '/login', externo: false },
+  portal: {
+    rotulo: 'Voltar ao portal',
+    rodape: 'Voltar ao portal do parceiro',
+    url: URL_PORTAL,
+    externo: true,
+  },
+} as const
+
+type Origem = keyof typeof DESTINOS
+
+function useDestino() {
+  const [params] = useSearchParams()
+  const origem = params.get('origem')
+  const chave: Origem = origem === 'portal' ? 'portal' : 'interno'
+  return DESTINOS[chave]
+}
 
 const PROBLEMAS = [
   'Cada OC digitada campo a campo numa planilha, lento e repetitivo, dezenas de vezes ao dia.',
@@ -132,15 +167,31 @@ function Cabecalho() {
           >
             Apoiar
           </a>
-          <Button asChild variant="outline" className="h-9">
-            <Link to="/login">
-              <ArrowLeft className="h-4 w-4" />
-              Entrar
-            </Link>
-          </Button>
+          <BotaoVoltar />
         </div>
       </div>
     </header>
+  )
+}
+
+/** Volta para a porta de entrada de quem está lendo: o login interno, ou o
+ *  portal do parceiro quando a visita veio de lá. */
+function BotaoVoltar() {
+  const destino = useDestino()
+  return (
+    <Button asChild variant="outline" className="h-9">
+      {destino.externo ? (
+        <a href={destino.url}>
+          <ArrowLeft className="h-4 w-4" />
+          {destino.rotulo}
+        </a>
+      ) : (
+        <Link to={destino.url}>
+          <ArrowLeft className="h-4 w-4" />
+          {destino.rotulo}
+        </Link>
+      )}
+    </Button>
   )
 }
 
@@ -379,6 +430,21 @@ function Apoio() {
   )
 }
 
+function LinkRodape() {
+  const destino = useDestino()
+  const classe =
+    'text-[12px] font-medium text-[#6B7280] underline-offset-2 hover:text-[#1A1F28] hover:underline dark:hover:text-white'
+  return destino.externo ? (
+    <a href={destino.url} className={classe}>
+      {destino.rodape}
+    </a>
+  ) : (
+    <Link to={destino.url} className={classe}>
+      {destino.rodape}
+    </Link>
+  )
+}
+
 function Rodape() {
   return (
     <footer className="border-t border-[#E1E4EA] px-5 py-8 dark:border-[var(--border-dark)]">
@@ -386,12 +452,7 @@ function Rodape() {
         <p className="text-[12px] text-[#6B7280]">
           LHG Logística · SisLog v{SISLOG_VERSAO} · sistema interno de ordens de carregamento
         </p>
-        <Link
-          to="/login"
-          className="text-[12px] font-medium text-[#6B7280] underline-offset-2 hover:text-[#1A1F28] hover:underline dark:hover:text-white"
-        >
-          Ir para o login
-        </Link>
+        <LinkRodape />
       </div>
     </footer>
   )
