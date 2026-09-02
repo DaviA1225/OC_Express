@@ -15,7 +15,7 @@ export const FLUXO = [
     icone: Truck,
     titulo: 'O atendente completa',
     texto:
-      'Motorista, veículo, carreta, cliente e material vêm de cadastros já existentes — escolhidos, não digitados. CPF, CNPJ e placa são conferidos na hora.',
+      'Motorista, veículo, carreta, cliente e material vêm de cadastros já existentes, escolhidos e não digitados. CPF, CNPJ e placa são conferidos na hora.',
   },
   {
     icone: FileText,
@@ -27,7 +27,7 @@ export const FLUXO = [
     icone: Send,
     titulo: 'O motorista recebe',
     texto:
-      'A OC vai por WhatsApp num link assinado que vale dias — o motorista não tem conta, não instala nada e não depende de e-mail.',
+      'A OC vai por WhatsApp num link assinado que vale dias, e o motorista não tem conta, não instala nada e não depende de e-mail.',
   },
   {
     icone: CalendarClock,
@@ -39,6 +39,6 @@ export const FLUXO = [
     icone: CheckCircle2,
     titulo: 'Tudo fica registrado',
     texto:
-      'Quem fez, quando e o quê. A carga vira histórico, indicador e trilha de auditoria — não uma linha perdida numa planilha.',
+      'Quem fez, quando e o quê. A carga vira histórico, indicador e trilha de auditoria, e não uma linha perdida numa planilha.',
   },
 ] as const

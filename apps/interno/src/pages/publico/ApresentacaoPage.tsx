@@ -36,10 +36,10 @@ import { FLUXO } from './fluxo'
 const PIX_QR = '/pix-sislog.jpeg'
 
 const PROBLEMAS = [
-  'Cada OC digitada campo a campo numa planilha — lento e repetitivo, dezenas de vezes ao dia.',
+  'Cada OC digitada campo a campo numa planilha, lento e repetitivo, dezenas de vezes ao dia.',
   'Placa, CPF ou material trocados só aparecem no caminhão: retrabalho e atraso no pátio.',
   'Onde está cada OC? Acompanhamento por conversa e memória, não por sistema.',
-  'A planilha vive numa máquina só — sem histórico, sem visão da equipe, sem indicador.',
+  'A planilha vive numa máquina só, sem histórico, sem visão da equipe, sem indicador.',
 ] as const
 
 const IMPACTOS = [
@@ -53,7 +53,7 @@ const IMPACTOS = [
     icone: Route,
     titulo: 'Nada se perde no caminho',
     texto:
-      'Cada carga tem estado, linha do tempo e responsável. O que estava na cabeça de quem atendeu passa a estar no sistema — e aparece para a equipe inteira na hora.',
+      'Cada carga tem estado, linha do tempo e responsável. O que estava na cabeça de quem atendeu passa a estar no sistema, e aparece para a equipe inteira na hora.',
   },
   {
     icone: ShieldCheck,
@@ -85,7 +85,7 @@ const SUPERFICIES = [
     icone: MessageSquareText,
     titulo: 'Agente de WhatsApp',
     texto:
-      'A mensagem do solicitante vira solicitação sozinha, com leitura por IA — sem ninguém digitar, a qualquer hora.',
+      'A mensagem do solicitante vira solicitação sozinha, com leitura por IA, sem ninguém digitar e a qualquer hora.',
   },
 ] as const
 
@@ -181,7 +181,7 @@ function Hero() {
         A Ordem de Carregamento deixou de ser uma planilha.
       </h1>
       <p className="mt-5 max-w-[64ch] text-[15px] leading-relaxed text-[#6B7280]">
-        O SisLog emite, acompanha e audita cada Ordem de Carregamento do transporte de minério —
+        O SisLog emite, acompanha e audita cada Ordem de Carregamento do transporte de minério,
         do pedido que chega até a descarga no terminal. Foi feito para a operação da LHG Logística,
         e é ela que o usa todo dia útil.
       </p>
@@ -257,21 +257,21 @@ function Fluxo() {
 function Telas() {
   return (
     <Secao id="telas">
-      <Titulo apoio="As telas em que o atendente passa o dia. São reproduções fiéis da interface, com dados fictícios — nome, CPF, placa e cliente de verdade não aparecem em página pública.">
+      <Titulo apoio="As telas em que o atendente passa o dia. São reproduções fiéis da interface, com dados fictícios, porque nome, CPF, placa e cliente de verdade não aparecem em página pública.">
         O que o atendente vê
       </Titulo>
 
       <div className="mt-8 grid gap-8 lg:grid-cols-2">
         <Tela
           titulo="Solicitações"
-          legenda="A fila do dia. Busca por número, motorista, CPF, placa ou cliente, filtro por estado e o relógio de cada pedido à vista — o que está parado há tempo demais aparece marcado."
+          legenda="A fila do dia. Busca por número, motorista, CPF, placa ou cliente, filtro por estado e o relógio de cada pedido à vista, e o que está parado há tempo demais aparece marcado."
         >
           <TelaFila />
         </Tela>
 
         <Tela
           titulo="Solicitação #0287"
-          legenda="A solicitação aberta. Os dados vêm dos cadastros, não da digitação, e o CPF fica mascarado até alguém copiar — momento em que o acesso é registrado. Um clique gera o PDF da OC; outro manda por WhatsApp."
+          legenda="A solicitação aberta. Os dados vêm dos cadastros, não da digitação, e o CPF fica mascarado até alguém copiar, momento em que o acesso é registrado. Um clique gera o PDF da OC; outro manda por WhatsApp."
         >
           <TelaSolicitacao />
         </Tela>
@@ -279,7 +279,7 @@ function Telas() {
         <div className="lg:col-span-2">
           <Tela
             titulo="Agendamento de descarga"
-            legenda="O painel de agendamento. O SisLog não conversa com o sistema do terminal — então prepara o que precisa ser colado lá, com um clique por campo, e guarda a janela confirmada junto do comprovante. A grade de horários muda conforme o tipo do veículo, porque no terminal ela muda mesmo."
+            legenda="O painel de agendamento. O SisLog não conversa com o sistema do terminal, então prepara o que precisa ser colado lá, com um clique por campo, e guarda a janela confirmada junto do comprovante. A grade de horários muda conforme o tipo do veículo, porque no terminal ela muda mesmo."
           >
             <TelaAgendamento />
           </Tela>
@@ -316,7 +316,7 @@ function Impacto() {
 function Superficies() {
   return (
     <Secao>
-      <Titulo apoio="Três portas de entrada, uma só base de dados — o que uma altera, a outra enxerga na hora.">
+      <Titulo apoio="Três portas de entrada, uma só base de dados, e o que uma altera a outra enxerga na hora.">
         Por onde a carga entra
       </Titulo>
       <div className="mt-6 grid gap-4 sm:grid-cols-3">
@@ -347,8 +347,8 @@ function Apoio() {
               Ajude a manter o SisLog no ar
             </h2>
             <p className="mt-3 text-[14px] leading-relaxed text-[#6B7280]">
-              O sistema roda em infraestrutura paga — banco de dados, hospedagem e domínio — e é
-              mantido fora do horário da operação. Qualquer valor ajuda a pagar essa conta e a
+              O sistema roda em infraestrutura paga, com banco de dados, hospedagem e domínio,
+              e é mantido fora do horário da operação. Qualquer valor ajuda a pagar essa conta e a
               manter o desenvolvimento andando.
             </p>
             <p className="mt-3 text-[14px] leading-relaxed text-[#6B7280]">
