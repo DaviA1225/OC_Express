@@ -12,6 +12,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { TurnstileWidget, type TurnstileHandle } from '@/components/TurnstileWidget'
 import { useAuth } from '@/hooks/useAuth'
 import { emailLembrado, esquecerEmail, lembrarEmail } from '@sislog/shared/cookies'
+import { TermosLeitura } from '@/features/termos/TermosLeitura'
 import { lerMotivoSaida, limparMotivoSaida } from '@sislog/shared/sessao'
 
 // Chave pública do Turnstile. Quando ausente, o captcha fica desligado e o login
@@ -263,6 +264,8 @@ export default function LoginPage() {
             >
               Suporte
             </button>
+            {' · '}
+            <TermosLeitura audiencia="parceiro" />
           </p>
         </div>
       </div>

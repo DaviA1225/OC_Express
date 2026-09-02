@@ -16,6 +16,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { TERMOS_VERSAO, termosDeUso } from '@sislog/shared/termos'
 import { SISLOG_VERSAO } from '@sislog/shared/versao'
 import { useAceiteDeTermos, useAceitarTermos } from './useTermos'
+import { TermosTexto } from './TermosTexto'
 
 /**
  * Gêmeo de `apps/interno/src/features/termos/TermosDialog.tsx`, com o texto do
@@ -68,29 +69,7 @@ export function TermosDialog() {
         </DialogHeader>
 
         <DialogBody className="space-y-4">
-          {termo.secoes.map((secao) => (
-            <section key={secao.titulo} className="space-y-1.5">
-              <h3 className="text-[13px] font-semibold text-foreground">{secao.titulo}</h3>
-              {secao.paragrafos?.map((p) => (
-                <p key={p} className="text-[12px] leading-relaxed text-muted-foreground">
-                  {p}
-                </p>
-              ))}
-              {secao.itens && (
-                <ul className="space-y-1">
-                  {secao.itens.map((item) => (
-                    <li
-                      key={item}
-                      className="flex gap-2 text-[12px] leading-relaxed text-muted-foreground"
-                    >
-                      <span aria-hidden className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-primary" />
-                      <span>{item}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
-          ))}
+          <TermosTexto termo={termo} />
 
           <div className="flex items-start gap-2 rounded-md border bg-muted/40 p-3">
             <Checkbox
