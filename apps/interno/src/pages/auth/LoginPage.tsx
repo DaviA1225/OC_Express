@@ -14,6 +14,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { emailLembrado, esquecerEmail, lembrarEmail } from '@sislog/shared/cookies'
 import { lerMotivoSaida, limparMotivoSaida } from '@sislog/shared/sessao'
 import { SISLOG_VERSAO } from '@sislog/shared/versao'
+import { TermosLeitura } from '@/features/termos/TermosLeitura'
 
 // Chave pública do Turnstile. Quando ausente, o captcha fica desligado e o login
 // segue como antes — o gate real é habilitado no Dashboard do Supabase.
@@ -286,6 +287,8 @@ export default function LoginPage() {
             >
               Suporte
             </button>
+            {' · '}
+            <TermosLeitura audiencia="interno" />
           </p>
         </div>
       </div>
