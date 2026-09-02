@@ -39,6 +39,9 @@ const RelatoriosInternosPage = lazy(() => import('@/pages/relatorios/RelatoriosI
 const AtividadeEquipePage = lazy(() => import('@/pages/atividade/AtividadeEquipePage'))
 const PerfilPage = lazy(() => import('@/pages/perfil/PerfilPage'))
 const NotFoundPage = lazy(() => import('@/pages/errors/NotFoundPage'))
+// Página pública de apresentação. Lazy como as demais: quem só vai logar não
+// baixa a maquete do painel junto com a tela de login.
+const ApresentacaoPage = lazy(() => import('@/pages/publico/ApresentacaoPage'))
 
 function PageFallback() {
   return (
@@ -59,6 +62,9 @@ export default function App() {
         <Suspense fallback={<PageFallback />}>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
+            {/* Fora do ProtectedRoute de propósito: é para quem ainda não
+                entrou, e para quem nem tem conta. */}
+            <Route path="/sobre" element={<ApresentacaoPage />} />
 
             <Route element={<ProtectedRoute />}>
               <Route element={<AppLayout />}>
