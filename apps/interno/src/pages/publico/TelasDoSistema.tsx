@@ -3,19 +3,19 @@ import { Search, FileText, Send, Copy, Clock, CheckCircle2, CalendarClock, Paper
 import { cn } from '@/lib/utils'
 
 /**
- * Reproduções das telas que o atendente usa todo dia — fila, solicitação
+ * Reproduções das telas que o atendente usa todo dia: fila, solicitação
  * aberta e painel de agendamento.
  *
  * SÃO REPRODUÇÕES, não capturas de tela, e a diferença é deliberada: um print
  * do sistema real numa página pública publicaria nome e CPF de motorista, placa
  * e carteira de clientes da LHG. É o mesmo dado que a migration 0072 acabou de
- * tirar do alcance de quem não tem sessão — não faria sentido devolvê-lo aqui
+ * tirar do alcance de quem não tem sessão, e não faria sentido devolvê-lo aqui
  * em forma de imagem.
  *
  * O que é fiel: a estrutura, os rótulos, os estados e as cores, lidos dos
  * componentes de verdade (`SolicitacaoStatusBadge`, `features/solicitacoes/
  * status.ts`, `features/agendamentos/`). O CPF aparece mascarado porque o
- * sistema o mascara mesmo — revelar só ao copiar é regra de LGPD dele.
+ * sistema o mascara mesmo, porque revelar só ao copiar é regra de LGPD dele.
  *
  * O que é inventado: pessoas, placas e empresas. Nenhuma existe.
  */
@@ -72,7 +72,7 @@ export function Tela({
   )
 }
 
-/** 1 — A fila. É a primeira tela do dia. */
+/** 1. A fila. É a primeira tela do dia. */
 export function TelaFila() {
   return (
     <div className="space-y-3">
@@ -201,7 +201,7 @@ function Campo({
   )
 }
 
-/** 2 — A solicitação aberta: onde a OC nasce. */
+/** 2. A solicitação aberta: onde a OC nasce. */
 export function TelaSolicitacao() {
   const etapas = [
     { rotulo: 'Recebida', feito: true },
@@ -273,7 +273,7 @@ export function TelaSolicitacao() {
   )
 }
 
-/** 3 — O painel de agendamento: o SisLog não fala com o sistema do terminal,
+/** 3. O painel de agendamento: o SisLog não fala com o sistema do terminal,
  *  então prepara o que precisa ser colado nele. */
 export function TelaAgendamento() {
   const linhas = [
