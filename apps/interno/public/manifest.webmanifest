@@ -1,0 +1,19 @@
+{
+  "id": "/",
+  "name": "SisLog · Sistema de Gestão de Carregamentos",
+  "short_name": "SisLog",
+  "description": "Emissão e acompanhamento de Ordens de Carregamento da operação.",
+  "lang": "pt-BR",
+  "dir": "ltr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#1D1E1B",
+  "theme_color": "#1D1E1B",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
