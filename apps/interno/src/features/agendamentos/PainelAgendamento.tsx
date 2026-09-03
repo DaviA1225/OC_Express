@@ -22,17 +22,20 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import { cn, formatTelefone } from '@/lib/utils'
 import { registrarAcesso } from '@/lib/acesso'
 import { GradeSlots } from '@/features/agendamentos/GradeSlots'
 import { useOcupacaoSlots } from '@/features/agendamentos/useTerminais'
 import {
+  MAX_OBS_PARCEIRO_CHARS,
   dadosDoVeiculo,
   getDocumentoSignedUrl,
   nomeTerminal,
   useAgendamento,
   useConcluirAgendamento,
   useNotaFiscalAutomatica,
+  useSalvarObservacaoParceiro,
   useUploadDocumento,
   type AgendamentoRow,
   type TipoDocumento,
@@ -99,6 +102,13 @@ function Conteudo({ row, onOpenChange }: { row: AgendamentoRow; onOpenChange: (o
   const nfAuto = useNotaFiscalAutomatica(row)
   const upload = useUploadDocumento()
   const concluir = useConcluirAgendamento()
+  const salvarObs = useSalvarObservacaoParceiro()
+
+  // Recado que a equipe manda junto com os documentos (0073). O valor salvo vive
+  // na linha; o estado guarda só o que está sendo digitado.
+  const [obsParceiro, setObsParceiro] = React.useState(row.observacoes_para_parceiro ?? '')
+  const obsSalva = row.observacoes_para_parceiro ?? ''
+  const obsAlterada = obsParceiro.trim() !== obsSalva.trim()
 
   // NF do módulo de Embarques. A importação é diária, então agendamento pedido
   // logo após o carregamento cai no caso manual — é o esperado, não um erro.
@@ -396,6 +406,51 @@ function Conteudo({ row, onOpenChange }: { row: AgendamentoRow; onOpenChange: (o
               ? 'O parceiro já vê estes documentos no portal. Trocar um arquivo aqui substitui o que ele baixa.'
               : 'O contrato de frete da Pamcard sai antes do comprovante do terminal, mas os dois só chegam ao parceiro na conclusão — ele recebe o pacote inteiro de uma vez.'}
           </p>
+
+          {/* Recado que viaja com os documentos (0073). Fica depois dos anexos
+              porque é isso que a operação faz: junta os PDFs e, se precisar,
+              explica alguma coisa sobre aquela janela. O rótulo diz para QUEM o
+              texto é — este campo não é bloco de anotação interna, e a linha
+              inteira é legível pelo parceiro dono. */}
+          <div className="space-y-1.5 border-t pt-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <Label htmlFor="observacoes_parceiro">Observação para o parceiro (opcional)</Label>
+              {obsParceiro.length > MAX_OBS_PARCEIRO_CHARS - 200 && (
+                <span className="text-[11px] tabular-nums text-muted-foreground">
+                  {obsParceiro.length}/{MAX_OBS_PARCEIRO_CHARS}
+                </span>
+              )}
+            </div>
+            <Textarea
+              id="observacoes_parceiro"
+              value={obsParceiro}
+              onChange={(e) => setObsParceiro(e.target.value.slice(0, MAX_OBS_PARCEIRO_CHARS))}
+              maxLength={MAX_OBS_PARCEIRO_CHARS}
+              rows={3}
+              readOnly={encerrado}
+              placeholder="Ex.: o terminal só recebe até 16h — chegar com 30 min de antecedência."
+              className={encerrado ? 'bg-muted text-muted-foreground' : undefined}
+            />
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <p className="max-w-[46ch] text-[11px] leading-relaxed text-muted-foreground">
+                {concluido
+                  ? 'O parceiro lê este texto no portal, ao lado do comprovante. Salvar publica na hora.'
+                  : 'Chega ao parceiro junto com os documentos, na conclusão. Anotação que ele não pode ler não vai aqui.'}
+              </p>
+              {obsAlterada && !encerrado && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={salvarObs.isPending}
+                  onClick={() => salvarObs.mutate({ id: row.id, texto: obsParceiro })}
+                >
+                  {salvarObs.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                  Salvar observação
+                </Button>
+              )}
+            </div>
+          </div>
         </section>
       </DialogBody>
 
@@ -426,6 +481,9 @@ function Conteudo({ row, onOpenChange }: { row: AgendamentoRow; onOpenChange: (o
                     ? 'automatica'
                     : 'manual'
                   : null,
+                // Vai na mesma escrita: quem digitou o recado e clicou direto em
+                // Concluir não pode perder o texto por não ter salvado antes.
+                observacoesParaParceiro: obsParceiro.trim() || null,
               })
               onOpenChange(false)
             }}

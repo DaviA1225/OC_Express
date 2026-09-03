@@ -198,6 +198,17 @@ export function AgendamentoCard({ solicitacaoId, status, cliente }: Props) {
                   </p>
                 )}
 
+                {/* Recado que a equipe escreveu junto com os documentos (0073).
+                    Aparece só em 'agendado', a mesma regra dos anexos: o pacote
+                    chega inteiro. Vem destacado porque costuma ser condição da
+                    descarga — horário de portaria, via impressa, portão. */}
+                {a.status === 'agendado' && a.observacoes_para_parceiro && (
+                  <p className="mt-2 rounded-md border border-primary/30 bg-background px-2.5 py-2 text-[12px] leading-relaxed text-foreground">
+                    <span className="font-medium">Observação da LHG: </span>
+                    {a.observacoes_para_parceiro}
+                  </p>
+                )}
+
                 <div className="mt-2.5 flex flex-wrap items-center gap-2">
                   {/* Os arquivos são gravados na linha conforme a equipe anexa,
                       mas só aparecem aqui quando o agendamento é concluído: o

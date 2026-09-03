@@ -8,6 +8,10 @@ import type { AgendamentoStatus, Tables, TipoVeiculo } from '@/types/database.ty
 export const AGENDAMENTOS_BUCKET = 'agendamentos-docs'
 export const MAX_DOC_BYTES = 10 * 1024 * 1024
 
+/** Teto do recado ao parceiro, espelhando o CHECK da 0073. É um bilhete ao lado
+ *  do comprovante, não um relatório. */
+export const MAX_OBS_PARCEIRO_CHARS = 1000
+
 export type Agendamento = Tables<'agendamentos'>
 
 /** Tipo de documento no bucket. O caminho é `{agendamento_id}/{tipo}-{ts}.pdf`,
@@ -264,6 +268,9 @@ export interface ConclusaoInput {
   horaAgendada: string
   notaFiscal: string | null
   notaFiscalOrigem: 'automatica' | 'manual' | null
+  /** Recado ao parceiro digitado no painel. Vai na mesma escrita da conclusão
+   *  para que quem escreveu e clicou em Concluir não perca o texto. */
+  observacoesParaParceiro: string | null
 }
 
 /** Conclui: status `agendado`. Os documentos já foram gravados na linha no
@@ -283,6 +290,7 @@ export function useConcluirAgendamento() {
           hora_agendada: input.horaAgendada,
           nota_fiscal: input.notaFiscal,
           nota_fiscal_origem: input.notaFiscalOrigem,
+          observacoes_para_parceiro: input.observacoesParaParceiro,
         } as never)
         .eq('id', input.id)
       if (error) throw error
@@ -290,6 +298,30 @@ export function useConcluirAgendamento() {
     onSuccess: () => {
       invalidarTudo(qc)
       toast.success('Agendamento concluído. O parceiro já vê o comprovante no portal.')
+    },
+    onError: (e: unknown) => toast.error(traduzirErroBanco(e)),
+  })
+}
+
+/** Salva sozinho o recado que a equipe escreve para o parceiro.
+ *
+ *  Existe separado da conclusão pelo mesmo motivo dos uploads: o texto precisa
+ *  sobreviver a fechar o painel, e um agendamento já concluído continua
+ *  aceitando o recado — é o caso de quem descobre depois que o terminal mudou o
+ *  portão. Como o status não muda, o trigger de transição não recalcula nada. */
+export function useSalvarObservacaoParceiro() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, texto }: { id: string; texto: string }) => {
+      const { error } = await supabase
+        .from('agendamentos')
+        .update({ observacoes_para_parceiro: texto.trim() || null } as never)
+        .eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      invalidarTudo(qc)
+      toast.success('Observação salva.')
     },
     onError: (e: unknown) => toast.error(traduzirErroBanco(e)),
   })

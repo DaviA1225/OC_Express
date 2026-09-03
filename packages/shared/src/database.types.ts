@@ -523,6 +523,11 @@ export interface Database {
           data_preferida: string
           hora_preferida: string | null
           observacoes: string | null
+          // 0073 — recado da equipe ENDERECADO ao parceiro, escrito no painel
+          // junto com os documentos. Não é anotação interna: o parceiro dono lê
+          // a linha inteira pelo RLS, e o portal exibe este texto ao lado do
+          // comprovante quando o agendamento é concluído.
+          observacoes_para_parceiro: string | null
           nota_fiscal: string | null
           nota_fiscal_origem: NotaFiscalOrigem | null
           // 0069 — informado no pedido quando o terminal separa a grade por
@@ -573,6 +578,7 @@ export interface Database {
           tipo_veiculo?: TipoVeiculo | null
           data_agendada?: string | null
           hora_agendada?: string | null
+          observacoes_para_parceiro?: string | null
           comprovante_path?: string | null
           nf_pdf_path?: string | null
           contrato_frete_path?: string | null

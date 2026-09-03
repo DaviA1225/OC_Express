@@ -1,5 +1,5 @@
 -- =====================================================================
--- OC Express / SisLog LHG — Schema cumulativo (migrations 0001 → 0072)
+-- OC Express / SisLog LHG — Schema cumulativo (migrations 0001 → 0073)
 -- =====================================================================
 --
 -- Este arquivo agrega TODAS as migrations num único script IDEMPOTENTE.
@@ -3418,6 +3418,7 @@ CREATE TABLE IF NOT EXISTS agendamentos (
   data_preferida date NOT NULL,
   hora_preferida time,
   observacoes text,
+  observacoes_para_parceiro text,   -- 0073
   nota_fiscal text,
   nota_fiscal_origem text,
   tipo_veiculo text,          -- 0069
@@ -3450,6 +3451,13 @@ ALTER TABLE agendamentos
 ALTER TABLE agendamentos
   ADD COLUMN IF NOT EXISTS tipo_veiculo text;
 
+-- 0073 — recado da equipe ENDERECADO ao parceiro, escrito junto com os
+-- documentos e lido por ele no portal. Mesmo motivo de ALTER dos dois acima.
+-- Nao confundir com anotacao interna: a linha inteira e legivel pelo parceiro
+-- dono (policy da 0061), e por isso o nome diz para quem o texto e.
+ALTER TABLE agendamentos
+  ADD COLUMN IF NOT EXISTS observacoes_para_parceiro text;
+
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'agendamentos_status_check') THEN
@@ -3463,6 +3471,13 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'agendamentos_tipo_veiculo_check') THEN
     ALTER TABLE agendamentos ADD CONSTRAINT agendamentos_tipo_veiculo_check
       CHECK (tipo_veiculo IS NULL OR tipo_veiculo IN ('cacamba','graneleiro'));
+  END IF;
+  -- 0073 — teto do recado ao parceiro: e um bilhete ao lado do comprovante,
+  -- nao um relatorio. O front trava no mesmo numero pelo `maxLength`.
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'agendamentos_obs_parceiro_tamanho') THEN
+    ALTER TABLE agendamentos ADD CONSTRAINT agendamentos_obs_parceiro_tamanho
+      CHECK (observacoes_para_parceiro IS NULL
+             OR char_length(observacoes_para_parceiro) <= 1000);
   END IF;
 END $$;
 
