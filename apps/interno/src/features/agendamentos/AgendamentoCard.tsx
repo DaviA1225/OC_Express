@@ -157,6 +157,15 @@ export function AgendamentoCard({ solicitacaoId, clienteId, status }: Props) {
                   )}
                 </dl>
 
+                {/* Fora da <dl> de propósito: é uma frase, não um campo de duas
+                    colunas — e o rótulo precisa dizer que o parceiro já leu. */}
+                {a.observacoes_para_parceiro && (
+                  <p className="mt-1.5 text-[12px] leading-relaxed text-muted-foreground">
+                    <span className="font-medium text-foreground">Observação ao parceiro: </span>
+                    {a.observacoes_para_parceiro}
+                  </p>
+                )}
+
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   {a.comprovante_path && <LinkDocumento path={a.comprovante_path} rotulo="Comprovante" />}
                   {a.contrato_frete_path && (

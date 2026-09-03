@@ -265,6 +265,7 @@ A conferência de vaga continua sendo feita no sistema do terminal, pela equipe.
 | `data_preferida` | date NOT NULL | |
 | `hora_preferida` | time | Slot desejado; NULL = qualquer horário |
 | `observacoes` | text | Texto livre do solicitante |
+| `observacoes_para_parceiro` | text | Recado da equipe **endereçado ao parceiro** (0073); máx. 1000 caracteres |
 | `nota_fiscal` | text | Auto do módulo de Embarques ou manual |
 | `nota_fiscal_origem` | text | `automatica` ou `manual` |
 | `data_agendada` | date | Preenchido na conclusão |
@@ -539,9 +540,15 @@ quando divergem:
 ```
 Pediu:     18/03 · manhã
 Agendado:  19/03 · 14:00        [Baixar comprovante]
+
+Observação da LHG: o terminal só recebe até 16h.
 ```
 
 Divergência é rotina (2.3) — mostrar sem alarme, mas sem esconder.
+
+A **observação da LHG** (0073) aparece destacada e só em `agendado`, junto dos
+documentos: costuma ser condição da descarga — horário de portaria, via impressa,
+portão de entrada —, não um comentário.
 
 ### 5.3 RPCs do portal
 
@@ -668,6 +675,7 @@ sem proteger nada. O CPF continua mascarado e registrado ao copiar (seção 8).
 | Comprovante (PDF) | sim |
 | Contrato de frete da Pamcard (PDF) | sim |
 | PDF da NF | opcional |
+| Observação para o parceiro | opcional |
 
 O contrato de frete **sai antes** do comprovante do terminal, mas os dois são
 enviados ao parceiro de uma vez. Por isso ele é obrigatório para concluir
@@ -678,6 +686,18 @@ gravar o arquivo e entregá-lo ao parceiro são momentos diferentes.
 Os arquivos são gravados na linha **no upload**, não na conclusão. Fechar o
 painel no meio não perde o que já foi anexado, e não sobra arquivo órfão no
 bucket.
+
+Abaixo dos anexos fica a **observação para o parceiro** (0073), campo livre e
+opcional: "o terminal só recebe até 16h", "levar a via impressa", "a janela mudou
+porque o portão 3 fechou". Ela viaja com os documentos — o portal só a revela
+quando o status é `agendado` — e é salva do mesmo jeito que eles: botão próprio,
+que funciona inclusive depois de concluído, e também embarcada na conclusão, para
+quem digita e clica em Concluir direto não perder o texto.
+
+O nome da coluna e o rótulo da tela dizem **para quem** o texto é. Isso não é
+zelo de vocabulário: a decisão 11.2 tirou de propósito o campo de "observações
+internas" desta tabela, porque o parceiro lê a linha inteira pelo RLS. Anotação
+que ele não pode ler continua sem lugar aqui.
 
 O campo de hora é a **mesma grade de slots** do portal, com o horário pedido pelo
 parceiro pré-selecionado. Um clique confirma; outro clique escolhe o slot que o
@@ -772,6 +792,11 @@ Dois pontos para a política de retenção (seção 8 do `COMPLIANCE.md`):
 - Comprovantes acompanham o prazo da solicitação (proposta: 5 anos)
 - O CPF no bloco de cópia (5.5) aparece **mascarado** na tela, revelado apenas ao
   clicar em copiar, e o acesso é registrado em auditoria
+- A observação para o parceiro (0073) é **campo livre lido por terceiro**. Não
+  cria categoria nova de dado, mas é o tipo de campo onde dado pessoal entra sem
+  querer: a tela nomeia o destinatário no rótulo, e o que se escreve ali vale
+  como enviado ao parceiro. Escrita e alteração ficam no log de auditoria da
+  tabela (`aud_agendamentos`)
 
 ---
 
@@ -931,6 +956,23 @@ Três consequências que valem registro:
   veículos, não 60. Fecha a questão 3 para a A.B; TCI, ArcelorMittal e
   Metalsider seguem com números não confirmados. O número é referência da LHG; a
   vaga real vive no sistema do terminal.
+
+**10. O texto livre da equipe voltou — endereçado ao parceiro (0073).** A
+decisão 2 desta seção tirou "observações internas" da tabela: texto livre da
+equipe numa linha que o parceiro lê pelo RLS vaza na primeira vez que alguém
+escrever ali. A 0073 acrescenta `observacoes_para_parceiro`, e **não** desfaz
+aquilo — é o contrário: o campo existe justamente para ser lido pelo parceiro,
+que é o que a operação vinha fazendo por WhatsApp depois de mandar os PDFs.
+
+O risco da decisão 2 continua real, e o que o mantém sob controle é o nome. A
+coluna não se chama `observacoes_equipe` (que soaria como o
+`observacoes_internas` de `solicitacoes`) e a tela não diz "observações": diz
+**"Observação para o parceiro"**, com a frase "chega ao parceiro junto com os
+documentos". Um campo de rascunho da operação continua sem existir nesta tabela.
+
+Duas consequências: o reagendamento **não** copia o recado para a linha nova —
+ele explica a janela e os documentos daquele agendamento —, e o portal só o
+mostra em `agendado`, a mesma regra dos anexos da decisão 8.
 
 ---
 
