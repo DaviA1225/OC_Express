@@ -68,7 +68,7 @@ const CHART_PRIMARY = '#FF5100'  // laranja LHG
 const CHART_SECONDARY = '#10b981'// emerald (mantido como sinal universal de "concluído")
 
 export default function DashboardPage() {
-  const { de, ate, setIntervalo, limpar, noPadrao } = useIntervaloPersistido(
+  const { de, ate, deCampo, ateCampo, setIntervalo, limpar, noPadrao } = useIntervaloPersistido(
     'dashboard',
     INTERVALO_PADRAO,
   )
@@ -102,8 +102,8 @@ export default function DashboardPage() {
         </div>
         <IntervaloDatas
           idPrefix="dash"
-          de={de}
-          ate={ate}
+          de={deCampo}
+          ate={ateCampo}
           onChange={setIntervalo}
           mostrarLimpar={!noPadrao}
           onLimpar={limpar}
