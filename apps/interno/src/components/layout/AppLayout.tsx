@@ -4,6 +4,7 @@ import { SidebarContent } from './Sidebar'
 import { Header } from './Header'
 import { GlobalProgressBar } from './GlobalProgressBar'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
+import { ErrorBoundary, ErroDaTela } from '@/components/shared/ErrorBoundary'
 import { NovaSolicitacaoProvider } from '@/features/solicitacoes/NovaSolicitacaoProvider'
 import { useRealtimeSubscriptions } from '@/features/realtime/useRealtimeSubscriptions'
 
@@ -76,7 +77,11 @@ export function AppLayout() {
         <main className="flex-1 overflow-y-auto bg-muted/60 p-3 print:overflow-visible print:bg-transparent print:p-0 sm:p-4 md:p-6">
           <div className="min-h-full rounded-lg border bg-background p-4 print:rounded-none print:border-0 print:p-0 sm:p-5 md:p-6">
             <NovaSolicitacaoProvider>
-              <Outlet />
+              {/* Erro numa tela fica nela: menu e cabeçalho seguem vivos, e
+                  trocar de rota descarta o erro. */}
+              <ErrorBoundary resetKey={location.pathname} fallback={(p) => <ErroDaTela {...p} />}>
+                <Outlet />
+              </ErrorBoundary>
             </NovaSolicitacaoProvider>
           </div>
         </main>
