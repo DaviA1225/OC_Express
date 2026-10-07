@@ -306,6 +306,12 @@ para "dar profundidade decorativa" a um card é proibida.
   drawer, recolhível para 64px) e o botão "Menu" e o logo do header somem; em tela
   estreita segue o drawer. Rodapé com **barra de status** (usuário, ambiente,
   conexão, atalhos F2/F3/Ctrl K, versão). O layout clássico é o padrão de todos.
+  **Fase 2:** em Solicitações a lista vira **grade densa** (Nº, status, cliente,
+  motorista, placa, origem, criada, SLA) e o clique abre o **detalhe no painel à
+  direita** (440px, ≥ xl) — o mesmo componente da página de detalhe em modo
+  embutido, coluna única. Linha ativa: fundo `primary` 6% + barra de 3px do acento à
+  esquerda (mesmo sinal do item ativo da navegação). ↑/↓ andam, Enter/duplo clique
+  abre em tela cheia. Abaixo de xl o clique abre a página, como no clássico.
 - **Header (interno):** full-width, 3 zonas — esquerda (botão **"Menu"**: ☰ 22px +
   rótulo 15px, 46px de altura, em **outline branco** — borda e texto brancos sobre o header grafite,
   fundo transparente — como entrada da navegação que substituiu a sidebar + logo),
