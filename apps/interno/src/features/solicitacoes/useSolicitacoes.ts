@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 import { ilikeFilter, ilikePattern } from '@sislog/shared/postgrest'
 import { supabase } from '@/lib/supabase'
 import { traduzirErroBanco } from '@/features/crud/useCrudQueries'
+import { removerArquivosOrfaos } from '@/features/anexos/useAnexos'
 import { SLA_ALERT_HOURS, SLA_PENDING_STATUSES } from '@/features/solicitacoes/status'
 import type {
   Tables,
@@ -683,11 +684,21 @@ export function useBulkDeleteSolicitacoes() {
     BulkContext
   >({
     mutationFn: async ({ ids }) => {
+      // O CASCADE leva as linhas de `solicitacao_anexos`, mas não os arquivos:
+      // banco e storage não dividem transação. Guardamos os paths ANTES, porque
+      // depois do DELETE não há mais de onde lê-los, e removemos em seguida.
+      const { data: anexos } = await supabase
+        .from('solicitacao_anexos')
+        .select('storage_path')
+        .in('solicitacao_id', ids)
       const { error } = await supabase
         .from('solicitacoes')
         .delete()
         .in('id', ids)
       if (error) throw error
+      void removerArquivosOrfaos(
+        ((anexos ?? []) as { storage_path: string }[]).map((a) => a.storage_path),
+      )
       return { ids }
     },
     onMutate: async ({ ids }) => {

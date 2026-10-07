@@ -77,8 +77,9 @@ errado não varrer a trilha inteira.
 
 ## 3. Direitos do titular (art. 18)
 
-Implementado em `supabase/migrations/0057`. Ainda **sem tela** — as duas
-funções rodam pelo SQL Editor.
+Implementado em `supabase/migrations/0057`. Atendido pela aba **Pedidos do
+titular** em `/privacidade` (admin e gerente; anonimizar só admin). As chamadas
+SQL abaixo continuam valendo e são o que a tela executa.
 
 ### Acesso e portabilidade (art. 18, II e V)
 
@@ -89,7 +90,8 @@ SELECT exportar_dados_titular('123.456.789-00');
 Devolve um JSON com cadastro, solicitações em que a pessoa aparece, metadados
 dos anexos e a trilha de auditoria do cadastro dela. Exige perfil **admin ou
 gerente**. O conteúdo dos anexos não vai no JSON: baixar pelos `storage_path`
-que ele lista.
+que ele lista. Pela tela, a exportação entra no `log_acesso` como `export_csv`
+com recurso `titular` e o CPF mascarado.
 
 ### Correção (art. 18, III)
 
@@ -105,7 +107,8 @@ SELECT anonimizar_titular('123.456.789-00');
 SELECT anonimizar_titular('123.456.789-00', p_confirmar => true);
 ```
 
-Exige perfil **admin**. Anonimiza em vez de apagar, e isso é deliberado: um
+Exige perfil **admin**. Na tela, o botão roda a simulação primeiro, mostra os
+números e só aplica depois de digitar ANONIMIZAR. Anonimiza em vez de apagar, e isso é deliberado: um
 motorista aparece em dezenas de OCs já finalizadas que a empresa é obrigada a
 guardar por prazo fiscal. Apagar a linha quebraria a FK ou levaria a OC junto.
 A função troca nome, CPF, telefone e observações por marcadores, desativa o
@@ -138,7 +141,15 @@ da migration 0057.
   login, logout, troca de senha.
 
 Nenhuma das três é gravável direto: toda escrita passa por função
-`SECURITY DEFINER`. Leitura restrita a admin, gerente e supervisor.
+`SECURITY DEFINER`. Leitura restrita a admin, gerente e supervisor. O
+`log_acesso` se consulta pela aba **Registro de acesso** em `/privacidade`.
+
+**Arquivos órfãos** (`storage_remocao_pendente`, 0060): a aba **Arquivos
+órfãos** em `/privacidade` lista os anexos apagados cujo arquivo ficou no bucket
+e remove do storage dando baixa na fila. A exclusão de solicitação em lote
+também passou a remover os arquivos dos anexos que o CASCADE leva — ao
+contrário do que o comentário da 0060 supunha, o app apaga solicitação (ação em
+lote, admin), e foi assim que os primeiros órfãos apareceram, em 2026-10-06.
 
 ---
 
@@ -194,8 +205,8 @@ Nenhuma das três é gravável direto: toda escrita passa por função
 | 3 | Definir formalmente **controlador × operador** em cada relação | Jurídica |
 | 4 | Política de senha no Supabase Dashboard (mínimo 10 + letras e dígitos) | Técnica |
 | 5 | MFA obrigatório para perfis internos | Técnica |
-| 6 | Tela para `log_acesso` e para a fila de órfãos do storage | Técnica |
-| 7 | Tela para os pedidos de titular (hoje só SQL Editor) | Técnica |
+| ~~6~~ | ~~Tela para `log_acesso` e para a fila de órfãos do storage~~ — feito em `/privacidade` | Técnica |
+| ~~7~~ | ~~Tela para os pedidos de titular~~ — feito em `/privacidade` | Técnica |
 | 8 | **Expiração de sessão no servidor** (Auth → Sessions no Dashboard): o limite de 50 min hoje é aplicado pelo cliente | Técnica |
 
 As pendências 1 a 3 são as que um pedido da ANPD cobraria primeiro, e nenhuma

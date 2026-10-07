@@ -20,6 +20,7 @@ import {
   Gauge,
   Activity,
   ShieldAlert,
+  Fingerprint,
   ChevronsLeft,
   ChevronsRight,
   X,
@@ -34,6 +35,7 @@ import {
   canViewProdutividade,
   canViewAtividade,
   canViewSeguranca,
+  canViewPrivacidade,
 } from '@/features/auth/permissions'
 import { useRecebidasCount } from '@/features/solicitacoes/useSolicitacoes'
 import { useAgendamentosPendentesCount } from '@/features/agendamentos/useAgendamentos'
@@ -84,6 +86,7 @@ const sistemaProdutividade: NavItem = { to: '/relatorios-internos', label: 'Rela
 const sistemaAtividade: NavItem = { to: '/atividade', label: 'Atividade da Equipe', icon: Activity }
 const sistemaAuditoria: NavItem = { to: '/auditoria', label: 'Auditoria', icon: Search }
 const sistemaSeguranca: NavItem = { to: '/seguranca', label: 'Segurança', icon: ShieldAlert }
+const sistemaPrivacidade: NavItem = { to: '/privacidade', label: 'Privacidade', icon: Fingerprint }
 
 interface SidebarProps {
   collapsed: boolean
@@ -101,6 +104,7 @@ export function SidebarContent({ collapsed, onToggleCollapse, onNavigate, onClos
   const showProdutividade = canViewProdutividade(profile)
   const showAtividade = canViewAtividade(profile)
   const showSeguranca = canViewSeguranca(profile)
+  const showPrivacidade = canViewPrivacidade(profile)
   const recebidas = useRecebidasCount()
   const recebidasCount = recebidas.data ?? 0
   const agendamentos = useAgendamentosPendentesCount()
@@ -177,7 +181,7 @@ export function SidebarContent({ collapsed, onToggleCollapse, onNavigate, onClos
           ))}
         </ul>
 
-        {(showUsuarios || showAuditoria || showRelatorios || showProdutividade || showAtividade || showSeguranca) && (
+        {(showUsuarios || showAuditoria || showRelatorios || showProdutividade || showAtividade || showSeguranca || showPrivacidade) && (
           <>
             <SectionLabel collapsed={collapsed}>Sistema</SectionLabel>
             <ul className="space-y-1.5">
@@ -219,6 +223,13 @@ export function SidebarContent({ collapsed, onToggleCollapse, onNavigate, onClos
               {showSeguranca && (
                 <NavListItem
                   item={sistemaSeguranca}
+                  collapsed={collapsed}
+                  onNavigate={onNavigate}
+                />
+              )}
+              {showPrivacidade && (
+                <NavListItem
+                  item={sistemaPrivacidade}
                   collapsed={collapsed}
                   onNavigate={onNavigate}
                 />

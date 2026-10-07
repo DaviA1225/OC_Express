@@ -6,6 +6,23 @@ import { traduzirErroBanco } from '@/features/crud/useCrudQueries'
 import type { Tables } from '@/types/database.types'
 
 export const ANEXOS_BUCKET = 'solicitacoes-anexos'
+
+/**
+ * Apaga do bucket arquivos cujas linhas em `solicitacao_anexos` já foram
+ * embora, e dá baixa (ou grava o erro) na fila da 0060. Usada quando a linha
+ * some por CASCADE — a exclusão de solicitação — e ninguém mais lembraria do
+ * arquivo. Nunca lança: a exclusão que o usuário pediu já aconteceu, e o que
+ * falhar aqui fica visível em /privacidade.
+ */
+export async function removerArquivosOrfaos(paths: string[]): Promise<void> {
+  if (paths.length === 0) return
+  const { error: rmErr } = await supabase.storage.from(ANEXOS_BUCKET).remove(paths)
+  for (const p of paths) {
+    const baixa = { p_path: p, p_erro: rmErr?.message ?? null } as never
+    const { error } = await supabase.rpc('marcar_storage_removido', baixa)
+    if (error) console.warn('[anexos] baixa da fila de remocao falhou', error.message)
+  }
+}
 export const MAX_FILE_BYTES = 10 * 1024 * 1024
 export const ACCEPTED_MIME_PREFIXES = ['image/', 'application/pdf']
 
