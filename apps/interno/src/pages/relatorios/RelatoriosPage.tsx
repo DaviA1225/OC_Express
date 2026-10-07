@@ -297,29 +297,29 @@ export default function RelatoriosPage() {
         <KpiCard
           label="Total de OCs"
           value={kpis?.total ?? 0}
-          icon={<ClipboardList className="h-4 w-4 text-foreground/70" />}
-          accent="bg-muted/60 border"
+          icon={<ClipboardList className="h-4 w-4" />}
+          accent="text-foreground/70"
           isLoading={ds.isLoading}
         />
         <KpiCard
           label="Finalizadas"
           value={kpis?.finalizadas ?? 0}
-          icon={<ClipboardCheck className="h-4 w-4 text-foreground/70" />}
-          accent="bg-muted/60 border"
+          icon={<ClipboardCheck className="h-4 w-4" />}
+          accent="text-foreground/70"
           isLoading={ds.isLoading}
         />
         <KpiCard
           label="Taxa de finalização"
           value={kpis ? `${(kpis.taxaFinalizacao * 100).toFixed(1)}%` : '—'}
-          icon={<Percent className="h-4 w-4 text-foreground/70" />}
-          accent="bg-muted/60 border"
+          icon={<Percent className="h-4 w-4" />}
+          accent="text-foreground/70"
           isLoading={ds.isLoading}
         />
         <KpiCard
           label="Tempo médio (criada → finalizada)"
           value={kpis?.tempoMedioHoras != null ? `${kpis.tempoMedioHoras.toFixed(1)} h` : '—'}
-          icon={<Hourglass className="h-4 w-4 text-foreground/70" />}
-          accent="bg-muted/60 border"
+          icon={<Hourglass className="h-4 w-4" />}
+          accent="text-foreground/70"
           isLoading={ds.isLoading}
         />
       </div>
@@ -424,17 +424,27 @@ interface KpiCardProps {
   isLoading: boolean
 }
 
+// Mesmo cartão de KPI do Dashboard (DashboardPage.tsx): chip do ícone no tom
+// do acento e número de 28px — as duas telas mostram os mesmos indicadores e
+// não podiam parecer de sistemas diferentes.
 function KpiCard({ label, value, icon, accent, isLoading }: KpiCardProps) {
   return (
     <div className="rounded-lg border bg-card p-4">
-      <div className="flex items-center justify-between">
-        <p className="text-[11px] font-medium uppercase tracking-[0.5px] text-muted-foreground">{label}</p>
-        <span className={cn('flex h-7 w-7 items-center justify-center rounded-md', accent)}>{icon}</span>
+      <div className="flex items-start justify-between gap-2">
+        <p className="min-w-0 text-[11px] font-medium uppercase tracking-[0.5px] text-muted-foreground">{label}</p>
+        <span
+          className={cn(
+            'flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-primary/15 bg-gradient-to-br from-primary/15 to-primary/[0.04] dark:from-primary/20 dark:to-primary/5',
+            accent,
+          )}
+        >
+          {icon}
+        </span>
       </div>
       {isLoading ? (
-        <Skeleton className="mt-2 h-8 w-20" />
+        <Skeleton className="mt-3 h-9 w-24" />
       ) : (
-        <p className="mt-1 text-[24px] font-medium tabular-nums text-foreground">{value}</p>
+        <p className="mt-2 text-[28px] font-medium leading-none tabular-nums text-foreground">{value}</p>
       )}
     </div>
   )
@@ -549,7 +559,7 @@ function TopList({ items, isLoading, emptyText }: TopListProps) {
   }
   const max = items[0]?.total ?? 1
   return (
-    <ul className="space-y-1">
+    <ul className="space-y-1.5">
       {items.map((it, i) => {
         const pct = (it.total / max) * 100
         return (
@@ -557,7 +567,7 @@ function TopList({ items, isLoading, emptyText }: TopListProps) {
             <span className="w-5 text-right tabular-nums text-muted-foreground">{i + 1}.</span>
             <div className="relative min-w-0 flex-1 rounded bg-muted">
               <div
-                className="h-6 rounded bg-primary/15"
+                className="h-6 rounded bg-gradient-to-r from-primary/30 to-primary/[0.08]"
                 style={{ width: `${pct}%` }}
               />
               <span className="absolute inset-0 flex items-center px-2 text-foreground">
@@ -600,7 +610,7 @@ function ParceiroRanking({
   }
   const max = items[0]?.total ?? 1
   return (
-    <ul className="space-y-1">
+    <ul className="space-y-1.5">
       {items.map((p, i) => {
         const pct = (p.total / max) * 100
         const share = total > 0 ? Math.round((p.total / total) * 100) : 0
@@ -610,7 +620,7 @@ function ParceiroRanking({
               {i === 0 ? <Trophy className="h-3.5 w-3.5 text-amber-500" aria-label="Mais enviou" /> : `${i + 1}.`}
             </span>
             <div className="relative min-w-0 flex-1 rounded bg-muted">
-              <div className="h-6 rounded bg-primary/15" style={{ width: `${pct}%` }} />
+              <div className="h-6 rounded bg-gradient-to-r from-primary/30 to-primary/[0.08]" style={{ width: `${pct}%` }} />
               <span className="absolute inset-0 flex items-center px-2 text-foreground">
                 <span className="truncate">{p.label}</span>
               </span>
