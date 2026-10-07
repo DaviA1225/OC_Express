@@ -140,7 +140,7 @@ export function SidebarContent({ collapsed, onToggleCollapse, onNavigate, onClos
         <div className="flex items-center gap-2">
           <img src="/favicon.svg" alt="" aria-hidden className="h-8 w-8 shrink-0" />
           {!collapsed && (
-            <span className="text-[16px] font-medium text-foreground">SisLog</span>
+            <span className="text-[14px] font-medium text-foreground">SisLog</span>
           )}
         </div>
         {!collapsed && onClose && (
@@ -241,7 +241,7 @@ export function SidebarContent({ collapsed, onToggleCollapse, onNavigate, onClos
 
       <div className="p-2">
         {!collapsed && (
-          <p className="px-2 pb-1.5 text-[11px] tabular-nums text-muted-foreground">
+          <p className="px-2 pb-1.5 text-[10px] tabular-nums text-muted-foreground">
             SisLog v{SISLOG_VERSAO}
           </p>
         )}
@@ -252,16 +252,16 @@ export function SidebarContent({ collapsed, onToggleCollapse, onNavigate, onClos
           )}
         >
           <Avatar className="h-10 w-10 shrink-0">
-            <AvatarFallback className="bg-accent text-[14px] font-medium text-accent-foreground">
+            <AvatarFallback className="bg-accent text-[12px] font-medium text-accent-foreground">
               {iniciais(profile?.nome_completo ?? '?')}
             </AvatarFallback>
           </Avatar>
           {!collapsed && (
             <div className="min-w-0 leading-tight">
-              <p className="truncate text-[15px] font-medium text-foreground">
+              <p className="truncate text-[13px] font-medium text-foreground">
                 {profile?.nome_completo ?? 'Usuário'}
               </p>
-              <p className="truncate text-[12px] text-muted-foreground">
+              <p className="truncate text-[11px] text-muted-foreground">
                 {PERFIL_LABELS[profile?.perfil ?? ''] ?? profile?.perfil ?? '—'}
               </p>
             </div>
@@ -303,7 +303,7 @@ function SectionLabel({
     return <div className="my-3 h-px bg-border" />
   }
   return (
-    <div className="mb-1.5 mt-4 px-2 text-[12px] font-medium uppercase tracking-[0.5px] text-muted-foreground">
+    <div className="mb-1.5 mt-4 px-2 text-[11px] font-medium uppercase tracking-[0.5px] text-muted-foreground">
       {children}
     </div>
   )
@@ -330,7 +330,7 @@ function NavListItem({
         onClick={onNavigate}
         className={({ isActive }) =>
           cn(
-            'group relative flex h-[46px] items-center gap-3 rounded-lg border text-[15px] font-medium transition-all duration-200 ease-out',
+            'group relative flex h-[46px] items-center gap-3 rounded-lg border text-[13px] font-medium transition-all duration-200 ease-out',
             // O item avança um passo curto na direção da página ao receber o
             // ponteiro — mesmo gesto no item ativo, para o menu inteiro reagir.
             'hover:translate-x-1',
@@ -355,7 +355,7 @@ function NavListItem({
             <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-amber-500" />
           ) : (
             <span
-              className="ml-auto inline-flex h-[22px] min-w-[22px] items-center justify-center rounded-full bg-amber-500 px-1.5 text-[12px] font-semibold text-white"
+              className="ml-auto inline-flex h-[22px] min-w-[22px] items-center justify-center rounded-full bg-amber-500 px-1.5 text-[10px] font-semibold text-white"
               title={badgeTitle}
             >
               {badgeCount}

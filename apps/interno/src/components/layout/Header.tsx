@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { Menu, Search, ChevronDown, LogOut, UserCircle, Sun, Moon, Rows3, Check } from 'lucide-react'
+import { Menu, Search, ChevronDown, LogOut, UserCircle, Sun, Moon, Rows3, Check, LayoutGrid } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -15,6 +15,7 @@ import { useDensity } from '@/hooks/useDensity'
 import { cn } from '@/lib/utils'
 import type { RealtimeStatus } from '@/features/realtime/useRealtimeSubscriptions'
 import { NotificationsBell } from '@/features/notifications/NotificationsBell'
+import { useLayoutPreferido } from '@/features/layout/useLayoutPreferido'
 
 interface HeaderProps {
   onOpenMobileMenu: () => void
@@ -26,6 +27,7 @@ export function Header({ onOpenMobileMenu, onOpenSearch, realtimeStatus = 'conne
   const { profile, user, signOut } = useAuth()
   const navigate = useNavigate()
   const { density, toggle: toggleDensity } = useDensity()
+  const { modoErp, podeUsarErp, salvando, definir } = useLayoutPreferido()
 
   const nome = profile?.nome_completo ?? user?.email ?? 'Usuário'
   const inicial = nome.trim().charAt(0).toUpperCase() || '?'
@@ -44,12 +46,14 @@ export function Header({ onOpenMobileMenu, onOpenSearch, realtimeStatus = 'conne
           variant="ghost"
           onClick={onOpenMobileMenu}
           aria-label="Abrir menu de navegação"
-          className="h-[46px] gap-2 border border-white/30 bg-transparent px-3 text-[15px] font-semibold text-white hover:bg-white/15 hover:text-white sm:px-4"
+          // No modo ERP a barra de módulos fica fixa ao lado no desktop; o
+          // botão só sobra em tela estreita, onde a barra não cabe.
+          className={cn(modoErp && 'lg:hidden', 'h-[46px] gap-2 border border-white/30 bg-transparent px-3 text-[15px] font-semibold text-white hover:bg-white/15 hover:text-white sm:px-4')}
         >
           <Menu className="h-[22px] w-[22px]" />
           Menu
         </Button>
-        <div className="flex items-center gap-2">
+        <div className={cn('flex items-center gap-2', modoErp && 'lg:hidden')}>
           <img src="/favicon.svg" alt="" aria-hidden className="h-7 w-7 shrink-0" />
           <span className="hidden text-[15px] font-semibold text-white sm:inline">
             SisLog
@@ -128,6 +132,16 @@ export function Header({ onOpenMobileMenu, onOpenSearch, realtimeStatus = 'conne
             <span className="flex-1">Densidade compacta</span>
             {density === 'compact' && <Check className="ml-2 h-3.5 w-3.5 text-primary-strong" />}
           </DropdownMenuItem>
+          {podeUsarErp && (
+            <DropdownMenuItem
+              disabled={salvando}
+              onClick={(e) => { e.preventDefault(); void definir(modoErp ? 'classico' : 'erp') }}
+            >
+              <LayoutGrid className="mr-2 h-4 w-4" />
+              <span className="flex-1">Modo ERP (beta)</span>
+              {modoErp && <Check className="ml-2 h-3.5 w-3.5 text-primary-strong" />}
+            </DropdownMenuItem>
+          )}
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={handleSignOut} className="text-destructive focus:text-destructive">
             <LogOut className="mr-2 h-4 w-4" />

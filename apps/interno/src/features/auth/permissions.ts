@@ -61,6 +61,14 @@ export function canAnonimizarTitular(p: PerfilRow | null): boolean {
   return is(p, 'admin')
 }
 
+/**
+ * Modo ERP (0074): em piloto, só admin e analista podem ligar. Mesma regra da
+ * RPC `definir_meu_layout` — a tela só esconde o que o servidor recusaria.
+ */
+export function canUsarLayoutErp(p: PerfilRow | null): boolean {
+  return is(p, 'admin', 'analista')
+}
+
 /** Parceiros: visualização livre para todo o time interno. */
 export function canViewParceiros(p: PerfilRow | null): boolean {
   return is(p, 'admin', 'gerente', 'supervisor', 'analista', 'assistente')

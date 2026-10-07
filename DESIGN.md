@@ -293,12 +293,19 @@ para "dar profundidade decorativa" a um card é proibida.
 - **Navegação (interno):** em **drawer** (`Sheet` 300px, teto de 85vw), aberto
   pelo botão ☰ do header — não há mais sidebar fixa 220px/64px. Cada item é um
   bloco de 46px de altura (raio 8px, padding lateral 16px, ícone Lucide 22px +
-  rótulo 15px peso 500), na mesma escala do botão "Menu" que o abre. **Item ativo** = fundo
+  rótulo 13px peso 500). A caixa segue a escala do botão "Menu" que o abre; o
+  texto voltou a 13px a pedido da operação (15px ficou grande demais). **Item ativo** = fundo
   `accent` (cinza neutro, NÃO a cor de marca) + texto `accent-foreground` + peso
   500 + **barra vertical de 3px** à esquerda no laranja `primary` (indicador de
   nav via pseudo-elemento `::before`, não stripe decorativo de card). Hover = fundo
-  `muted` sutil. Labels de seção UPPERCASE 12px `muted-foreground`. Rodapé do drawer:
+  `muted` sutil. Labels de seção UPPERCASE 11px `muted-foreground`. Rodapé do drawer:
   versão do app + bloco avatar/nome/perfil do usuário. Ver `SPEC-FRONTEND.md` §3.2.
+- **Modo ERP (beta, opt-in — 0074):** admin e analista ligam em "Modo ERP (beta)" no
+  menu do usuário; a escolha fica em `perfis_usuarios.layout_preferido`. No desktop
+  (≥ lg) a navegação vira **barra de módulos fixa** à esquerda (o mesmo conteúdo do
+  drawer, recolhível para 64px) e o botão "Menu" e o logo do header somem; em tela
+  estreita segue o drawer. Rodapé com **barra de status** (usuário, ambiente,
+  conexão, atalhos F2/F3/Ctrl K, versão). O layout clássico é o padrão de todos.
 - **Header (interno):** full-width, 3 zonas — esquerda (botão **"Menu"**: ☰ 22px +
   rótulo 15px, 46px de altura, em **outline branco** — borda e texto brancos sobre o header grafite,
   fundo transparente — como entrada da navegação que substituiu a sidebar + logo),
