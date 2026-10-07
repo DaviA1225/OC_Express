@@ -7,9 +7,14 @@ import { supabase } from '@/lib/supabase'
  * Gate de manutenção do sistema interno.
  *
  * Lê a flag `system_status.maintenance` (tabela de linha única, migration 0045)
- * no boot e a cada 30s, para congelar o acesso durante um deploy sem revelar que
- * é upgrade — a tela é neutra ("temporariamente indisponível"), não uma falsa
- * queda. Sessões já abertas caem no bloqueio no próximo poll.
+ * no boot, a cada 2 min e ao voltar o foco da janela, para congelar o acesso
+ * durante um deploy sem revelar que é upgrade — a tela é neutra
+ * ("temporariamente indisponível"), não uma falsa queda. Sessões já abertas
+ * caem no bloqueio no próximo poll.
+ *
+ * Eram 30s. Cada poll de cada aba aberta é uma linha de log, e o plano Free
+ * estourou a cota de logs (2026-10). Ligar a manutenção agora pede esperar
+ * 2 min antes do deploy.
  *
  * FAIL-OPEN: `fetchSystemStatus` volta `maintenance: false` em caso de erro de
  * rede, então um soluço do Supabase não derruba o app sozinho.
@@ -23,7 +28,7 @@ export function MaintenanceGate({ children }: { children: ReactNode }) {
   const { data, isLoading } = useQuery({
     queryKey: ['system-status'],
     queryFn: () => fetchSystemStatus(supabase),
-    refetchInterval: 30_000,
+    refetchInterval: 120_000,
     refetchOnWindowFocus: true,
     staleTime: 0,
     retry: 0,
