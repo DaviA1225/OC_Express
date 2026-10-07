@@ -44,9 +44,9 @@ export function Header({ onOpenMobileMenu, onOpenSearch, realtimeStatus = 'conne
           variant="ghost"
           onClick={onOpenMobileMenu}
           aria-label="Abrir menu de navegação"
-          className="h-9 gap-1.5 border border-white/30 bg-transparent px-2.5 text-[13px] font-semibold text-white hover:bg-white/15 hover:text-white sm:px-3"
+          className="h-[46px] gap-2 border border-white/30 bg-transparent px-3 text-[15px] font-semibold text-white hover:bg-white/15 hover:text-white sm:px-4"
         >
-          <Menu className="h-[18px] w-[18px]" />
+          <Menu className="h-[22px] w-[22px]" />
           Menu
         </Button>
         <div className="flex items-center gap-2">
