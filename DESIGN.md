@@ -290,16 +290,17 @@ para "dar profundidade decorativa" a um card é proibida.
 - **Focus:** ring 2px laranja (`ring-ring`), offset 1px.
 
 ### Navigation
-- **Navegação (interno):** em **drawer** (`Sheet` ~260px), aberto pelo botão ☰ do
-  header — não há mais sidebar fixa 220px/64px. Cada item é um bloco (raio 8px,
-  padding 9px 12px, ícone Lucide + rótulo 13px peso 500). **Item ativo** = fundo
+- **Navegação (interno):** em **drawer** (`Sheet` 300px, teto de 85vw), aberto
+  pelo botão ☰ do header — não há mais sidebar fixa 220px/64px. Cada item é um
+  bloco de 46px de altura (raio 8px, padding lateral 16px, ícone Lucide 22px +
+  rótulo 15px peso 500), na mesma escala do botão "Menu" que o abre. **Item ativo** = fundo
   `accent` (cinza neutro, NÃO a cor de marca) + texto `accent-foreground` + peso
   500 + **barra vertical de 3px** à esquerda no laranja `primary` (indicador de
   nav via pseudo-elemento `::before`, não stripe decorativo de card). Hover = fundo
-  `muted` sutil. Labels de seção UPPERCASE 11px `muted-foreground`. Rodapé do drawer:
+  `muted` sutil. Labels de seção UPPERCASE 12px `muted-foreground`. Rodapé do drawer:
   versão do app + bloco avatar/nome/perfil do usuário. Ver `SPEC-FRONTEND.md` §3.2.
-- **Header (interno):** full-width, 3 zonas — esquerda (botão **"Menu"**: ☰ +
-  rótulo, em **outline branco** — borda e texto brancos sobre o header grafite,
+- **Header (interno):** full-width, 3 zonas — esquerda (botão **"Menu"**: ☰ 22px +
+  rótulo 15px, 46px de altura, em **outline branco** — borda e texto brancos sobre o header grafite,
   fundo transparente — como entrada da navegação que substituiu a sidebar + logo),
   centro (busca global), direita (status de rede + tema + notificações + menu do
   usuário). Não repete o título da página (cada tela tem seu próprio `h1`). O botão

@@ -57,7 +57,7 @@ export function AppLayout() {
       <GlobalProgressBar />
       {/* Navegação em drawer (hamburger) — não há mais sidebar fixa. */}
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-        <SheetContent side="left" hideClose className="w-[260px] p-0">
+        <SheetContent side="left" hideClose className="w-[300px] max-w-[85vw] p-0">
           <SidebarContent
             collapsed={false}
             onNavigate={() => setMobileOpen(false)}

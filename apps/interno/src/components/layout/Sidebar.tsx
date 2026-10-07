@@ -138,9 +138,9 @@ export function SidebarContent({ collapsed, onToggleCollapse, onNavigate, onClos
         )}
       >
         <div className="flex items-center gap-2">
-          <img src="/favicon.svg" alt="" aria-hidden className="h-7 w-7 shrink-0" />
+          <img src="/favicon.svg" alt="" aria-hidden className="h-8 w-8 shrink-0" />
           {!collapsed && (
-            <span className="text-[14px] font-medium text-foreground">SisLog</span>
+            <span className="text-[16px] font-medium text-foreground">SisLog</span>
           )}
         </div>
         {!collapsed && onClose && (
@@ -148,15 +148,15 @@ export function SidebarContent({ collapsed, onToggleCollapse, onNavigate, onClos
             type="button"
             onClick={onClose}
             aria-label="Fechar menu"
-            className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="flex h-10 w-10 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-            <X className="h-5 w-5" />
+            <X className="h-6 w-6" />
           </button>
         )}
       </div>
 
       <nav className="flex-1 overflow-y-auto px-3 py-2">
-        <ul className="space-y-1.5">
+        <ul className="space-y-1">
           {operacional.map((item) => (
             <NavListItem
               key={item.to}
@@ -170,7 +170,7 @@ export function SidebarContent({ collapsed, onToggleCollapse, onNavigate, onClos
         </ul>
 
         <SectionLabel collapsed={collapsed}>Cadastros</SectionLabel>
-        <ul className="space-y-1.5">
+        <ul className="space-y-1">
           {cadastros.map((item) => (
             <NavListItem
               key={item.to}
@@ -184,7 +184,7 @@ export function SidebarContent({ collapsed, onToggleCollapse, onNavigate, onClos
         {(showUsuarios || showAuditoria || showRelatorios || showProdutividade || showAtividade || showSeguranca || showPrivacidade) && (
           <>
             <SectionLabel collapsed={collapsed}>Sistema</SectionLabel>
-            <ul className="space-y-1.5">
+            <ul className="space-y-1">
               {showRelatorios && (
                 <NavListItem
                   item={sistemaRelatorios}
@@ -241,27 +241,27 @@ export function SidebarContent({ collapsed, onToggleCollapse, onNavigate, onClos
 
       <div className="p-2">
         {!collapsed && (
-          <p className="px-2 pb-1.5 text-[10px] tabular-nums text-muted-foreground">
+          <p className="px-2 pb-1.5 text-[11px] tabular-nums text-muted-foreground">
             SisLog v{SISLOG_VERSAO}
           </p>
         )}
         <div
           className={cn(
-            'flex items-center gap-2 rounded-lg px-2 py-1.5',
+            'flex items-center gap-3 rounded-lg px-2 py-2',
             collapsed && 'justify-center px-0',
           )}
         >
-          <Avatar className="h-8 w-8 shrink-0">
-            <AvatarFallback className="bg-accent text-[12px] font-medium text-accent-foreground">
+          <Avatar className="h-10 w-10 shrink-0">
+            <AvatarFallback className="bg-accent text-[14px] font-medium text-accent-foreground">
               {iniciais(profile?.nome_completo ?? '?')}
             </AvatarFallback>
           </Avatar>
           {!collapsed && (
             <div className="min-w-0 leading-tight">
-              <p className="truncate text-[13px] font-medium text-foreground">
+              <p className="truncate text-[15px] font-medium text-foreground">
                 {profile?.nome_completo ?? 'Usuário'}
               </p>
-              <p className="truncate text-[11px] text-muted-foreground">
+              <p className="truncate text-[12px] text-muted-foreground">
                 {PERFIL_LABELS[profile?.perfil ?? ''] ?? profile?.perfil ?? '—'}
               </p>
             </div>
@@ -303,7 +303,7 @@ function SectionLabel({
     return <div className="my-3 h-px bg-border" />
   }
   return (
-    <div className="mb-1 mt-3 px-2 text-[11px] font-medium uppercase tracking-[0.5px] text-muted-foreground">
+    <div className="mb-1.5 mt-4 px-2 text-[12px] font-medium uppercase tracking-[0.5px] text-muted-foreground">
       {children}
     </div>
   )
@@ -330,32 +330,32 @@ function NavListItem({
         onClick={onNavigate}
         className={({ isActive }) =>
           cn(
-            'group relative flex items-center gap-2 rounded-lg border py-2 text-[13px] font-medium transition-all duration-200 ease-out',
+            'group relative flex h-[46px] items-center gap-3 rounded-lg border text-[15px] font-medium transition-all duration-200 ease-out',
             // O item avança um passo curto na direção da página ao receber o
             // ponteiro — mesmo gesto no item ativo, para o menu inteiro reagir.
             'hover:translate-x-1',
-            collapsed ? 'justify-center px-0' : 'px-3',
+            collapsed ? 'justify-center px-0' : 'px-4',
             isActive
-              ? 'border-border bg-accent text-accent-foreground before:absolute before:left-0 before:top-1/2 before:h-5 before:w-[3px] before:-translate-y-1/2 before:rounded-r-full before:bg-primary before:content-[""]'
+              ? 'border-border bg-accent text-accent-foreground before:absolute before:left-0 before:top-1/2 before:h-6 before:w-[3px] before:-translate-y-1/2 before:rounded-r-full before:bg-primary before:content-[""]'
               : cn(
                   'border-border bg-muted/40 text-foreground/80 hover:border-primary/40 hover:bg-accent hover:text-foreground',
                   // A barra de acento do item ativo "cresce" a partir do centro
                   // no hover — antecipa o estado para onde o clique leva.
-                  'before:absolute before:left-0 before:top-1/2 before:h-5 before:w-[3px] before:-translate-y-1/2 before:scale-y-0 before:rounded-r-full before:bg-primary before:opacity-0 before:transition before:duration-200 before:ease-out before:content-[""]',
+                  'before:absolute before:left-0 before:top-1/2 before:h-6 before:w-[3px] before:-translate-y-1/2 before:scale-y-0 before:rounded-r-full before:bg-primary before:opacity-0 before:transition before:duration-200 before:ease-out before:content-[""]',
                   'hover:before:scale-y-100 hover:before:opacity-100',
                 ),
           )
         }
         title={collapsed ? [item.label, badgeCount > 0 ? badgeTitle : null].filter(Boolean).join(' — ') : undefined}
       >
-        <Icon className="h-[18px] w-[18px] shrink-0 transition-transform duration-200 ease-out group-hover:scale-125" />
+        <Icon className="h-[22px] w-[22px] shrink-0 transition-transform duration-200 ease-out group-hover:scale-125" />
         {!collapsed && <span className="truncate">{item.label}</span>}
         {badgeCount > 0 && (
           collapsed ? (
             <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-amber-500" />
           ) : (
             <span
-              className="ml-auto inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-semibold text-white"
+              className="ml-auto inline-flex h-[22px] min-w-[22px] items-center justify-center rounded-full bg-amber-500 px-1.5 text-[12px] font-semibold text-white"
               title={badgeTitle}
             >
               {badgeCount}

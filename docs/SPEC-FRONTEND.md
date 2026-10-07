@@ -129,13 +129,13 @@ Toda página autenticada compartilha o mesmo layout base:
   não só no mobile.
 
 ### 3.2 Navegação (drawer)
-A navegação vive num **drawer** (`Sheet`, ~260px, sobreposto à esquerda), aberto
+A navegação vive num **drawer** (`Sheet`, 300px, teto de 85vw, sobreposto à esquerda), aberto
 pelo botão ☰ do header. Conteúdo, em ordem:
 
 1. Topo do drawer: logo/nome do sistema à esquerda e **botão de fechar (X)** à
    direita, na mesma linha; as páginas vêm logo abaixo (sem linha divisória).
 2. Bloco operacional (sem label): Dashboard · Solicitações · Cargas de Retorno.
-3. Label "CADASTROS" (11px, uppercase, letter-spacing 0.5px, cor `--text-muted`).
+3. Label "CADASTROS" (12px, uppercase, letter-spacing 0.5px, cor `--text-muted`).
 4. Bloco de cadastros: Motoristas · Veículos · Carretas · Clientes · Materiais ·
    Subcontratadas · Parceiros.
 5. Label "SISTEMA" (mesmo estilo da label anterior).
@@ -143,16 +143,18 @@ pelo botão ☰ do header. Conteúdo, em ordem:
    Atividade da Equipe · Usuários (apenas admin) · Auditoria · Segurança.
 
 Cada página é uma **seção** própria: bloco com cantos de 8px (`border-radius`),
-**fundo sutil** (`--muted/40`), **borda hairline** (`--border`) e padding 8px 12px,
-com ícone do Lucide à esquerda + rótulo (13px, peso 500). As seções são separadas
-por **espaço vazio** (sem linha divisória).
+**fundo sutil** (`--muted/40`), **borda hairline** (`--border`), 46px de altura e
+padding lateral de 16px, com ícone do Lucide (22px) à esquerda + rótulo (15px, peso
+500) — a mesma escala do botão "Menu" do header (2026-10). As seções são separadas
+por **espaço vazio** de 4px (sem linha divisória).
 
 **Hover (animação suave, `duration-200 ease-out`):** a borda acende no acento
 (`--primary/40`), o fundo intensifica para `--accent` e há um leve deslize à direita
 (2px). `prefers-reduced-motion` respeitado (sem o deslize).
 
 O drawer ocupa a **largura total** do painel (sem borda lateral nem faixa vazia à
-direita). Espaçamento calibrado para caber sem barra de rolagem.
+direita). Com os itens de 46px, a lista inteira (até 19 itens) passa da altura de
+um notebook: a área das páginas rola, e o topo e o rodapé ficam fixos.
 
 **Item ativo:** NÃO usa fundo preenchido na cor de marca. Usa fundo `--bg-accent`
 (cinza neutro padrão do sistema), texto `--text-accent`, peso 500, e uma **barra
@@ -161,8 +163,8 @@ vertical de 3px na borda esquerda** (via `::before`) no acento `--primary`
 reservado à barra do item ativo — a Regra da Voz Única (`DESIGN.md`) continua
 valendo: o acento não preenche a superfície do item.
 
-**Rodapé do drawer:** a versão do app (10px, `--text-muted`) acima de um bloco
-com **avatar de iniciais + nome + perfil** do usuário logado.
+**Rodapé do drawer:** a versão do app (11px, `--text-muted`) acima de um bloco
+com **avatar de iniciais (40px) + nome (15px) + perfil (12px)** do usuário logado.
 
 ### 3.3 Header (full-width, 3 zonas)
 O header ocupa toda a largura e se organiza em três zonas horizontais:
