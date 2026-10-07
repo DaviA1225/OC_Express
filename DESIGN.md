@@ -312,6 +312,11 @@ para "dar profundidade decorativa" a um card é proibida.
   embutido, coluna única. Linha ativa: fundo `primary` 6% + barra de 3px do acento à
   esquerda (mesmo sinal do item ativo da navegação). ↑/↓ andam, Enter/duplo clique
   abre em tela cheia. Abaixo de xl o clique abre a página, como no clássico.
+  **Fase 3:** faixa de **janelas em abas** abaixo do header — uma aba fixa de área de
+  trabalho (acompanha a tela de módulo, com filtros) + uma aba por solicitação aberta
+  em tela cheia (até 8; a mais antiga sai). Aba ativa: fundo `background`, peso 500 e
+  filete de 2px do acento no topo; fechar pelo X ou clique do meio. Abas abertas
+  ficam no navegador, por usuário.
 - **Header (interno):** full-width, 3 zonas — esquerda (botão **"Menu"**: ☰ 22px +
   rótulo 15px, 46px de altura, em **outline branco** — borda e texto brancos sobre o header grafite,
   fundo transparente — como entrada da navegação que substituiu a sidebar + logo),
