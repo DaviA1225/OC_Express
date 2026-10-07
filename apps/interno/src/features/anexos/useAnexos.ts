@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
+import { comprimirAnexo } from '@sislog/shared/compressao'
 import { registrarAcesso } from '@/lib/acesso'
 import { traduzirErroBanco } from '@/features/crud/useCrudQueries'
 import type { Tables } from '@/types/database.types'
@@ -57,7 +58,9 @@ export function useAnexos(solicitacaoId: string | null | undefined) {
 export function useUploadAnexo() {
   const qc = useQueryClient()
   return useMutation<Anexo, unknown, { solicitacaoId: string; file: File }>({
-    mutationFn: async ({ solicitacaoId, file }) => {
+    mutationFn: async ({ solicitacaoId, file: original }) => {
+      // O limite vale para o que SOBE: confere depois de comprimir.
+      const { file } = await comprimirAnexo(original)
       if (file.size > MAX_FILE_BYTES) {
         throw new Error(`Arquivo excede o limite de ${(MAX_FILE_BYTES / 1024 / 1024).toFixed(0)}MB.`)
       }

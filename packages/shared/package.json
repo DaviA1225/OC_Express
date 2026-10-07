@@ -13,13 +13,16 @@
     "./sessao": "./src/sessao.ts",
     "./cookies": "./src/cookies.ts",
     "./termos": "./src/termos.ts",
-    "./versao": "./src/versao.ts"
+    "./versao": "./src/versao.ts",
+    "./compressao": "./src/compressao.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.105.1"
+    "@supabase/supabase-js": "^2.105.1",
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^6.4.299"
   },
   "devDependencies": {
     "typescript": "~6.0.2"
