@@ -10,6 +10,7 @@ import { NovaSolicitacaoProvider } from '@/features/solicitacoes/NovaSolicitacao
 import { useRealtimeSubscriptions } from '@/features/realtime/useRealtimeSubscriptions'
 import { useLayoutPreferido } from '@/features/layout/useLayoutPreferido'
 import { BarraStatusErp, AtalhosErp } from './BarraStatusErp'
+import { JanelasErp } from './JanelasErp'
 
 const GlobalSearchDialog = React.lazy(() =>
   import('@/features/search/GlobalSearchDialog').then((m) => ({ default: m.GlobalSearchDialog })),
@@ -111,6 +112,7 @@ export function AppLayout() {
             realtimeStatus={realtimeStatus}
           />
         </div>
+        {modoErp && <JanelasErp />}
         <main className="flex-1 overflow-y-auto bg-muted/60 p-3 print:overflow-visible print:bg-transparent print:p-0 sm:p-4 md:p-6">
           <div className="min-h-full rounded-lg border bg-background p-4 print:rounded-none print:border-0 print:p-0 sm:p-5 md:p-6">
             <NovaSolicitacaoProvider>
