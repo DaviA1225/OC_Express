@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'sonner'
 import App from './App.tsx'
 import { MaintenanceGate } from './components/MaintenanceGate'
+import { ErrorBoundary, ErroGeral } from './components/shared/ErrorBoundary'
 import { ThemeProvider } from './hooks/useTheme'
 import { DensityProvider } from './hooks/useDensity'
 import './index.css'
@@ -31,9 +32,11 @@ createRoot(document.getElementById('root')!).render(
       <DensityProvider>
         <QueryClientProvider client={queryClient}>
           <BrowserRouter>
-            <MaintenanceGate>
-              <App />
-            </MaintenanceGate>
+            <ErrorBoundary fallback={({ error }) => <ErroGeral error={error} />}>
+              <MaintenanceGate>
+                <App />
+              </MaintenanceGate>
+            </ErrorBoundary>
             <Toaster position="bottom-right" richColors closeButton />
           </BrowserRouter>
         </QueryClientProvider>

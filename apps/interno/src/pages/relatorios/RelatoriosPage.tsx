@@ -74,7 +74,7 @@ const MATERIAL_COLORS = ['#FF5100', '#4E6986', '#9A6A3B', '#5E7A52', '#6E6594', 
 
 export default function RelatoriosPage() {
   const [params, setParams] = useSearchParams()
-  const { de, ate, setIntervalo, limpar, noPadrao } = useIntervaloPersistido(
+  const { de, ate, deCampo, ateCampo, setIntervalo, limpar, noPadrao } = useIntervaloPersistido(
     'relatorios',
     INTERVALO_PADRAO,
   )
@@ -261,8 +261,8 @@ export default function RelatoriosPage() {
         <div className="flex items-center gap-2">
           <IntervaloDatas
             idPrefix="rel"
-            de={de}
-            ate={ate}
+            de={deCampo}
+            ate={ateCampo}
             onChange={setIntervalo}
             mostrarLimpar={!noPadrao}
             onLimpar={limpar}

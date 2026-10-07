@@ -37,7 +37,7 @@ const INTERVALO_PADRAO = intervaloPadrao(30)
 const PARADA_ALERTA_HORAS = 24
 
 export default function RelatoriosInternosPage() {
-  const { de, ate, setIntervalo, limpar, noPadrao } = useIntervaloPersistido(
+  const { de, ate, deCampo, ateCampo, setIntervalo, limpar, noPadrao } = useIntervaloPersistido(
     'relatorios-internos',
     INTERVALO_PADRAO,
   )
@@ -93,8 +93,8 @@ export default function RelatoriosInternosPage() {
         <div className="flex items-center gap-2">
           <IntervaloDatas
             idPrefix="rel-int"
-            de={de}
-            ate={ate}
+            de={deCampo}
+            ate={ateCampo}
             onChange={setIntervalo}
             mostrarLimpar={!noPadrao}
             onLimpar={limpar}
