@@ -367,7 +367,9 @@ export function useSolicitacao(id: string | null | undefined) {
 /**
  * Conta as solicitações com status 'recebida' (novas, ainda não iniciadas) para
  * o indicador ao lado de "Solicitações" na sidebar. `head: true` traz só o
- * count, sem as linhas. Recarrega a cada 30s e ao voltar o foco da janela.
+ * count, sem as linhas. Quem mantém o número em dia é o realtime
+ * (`useRealtimeSubscriptions` invalida esta chave a cada mudança em
+ * solicitações); o intervalo é só rede de segurança para quando o canal cai.
  */
 export function useRecebidasCount() {
   return useQuery({
@@ -380,7 +382,7 @@ export function useRecebidasCount() {
       if (error) throw error
       return count ?? 0
     },
-    refetchInterval: 30_000,
+    refetchInterval: 300_000,
     refetchOnWindowFocus: true,
   })
 }
