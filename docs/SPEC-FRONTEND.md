@@ -135,7 +135,7 @@ pelo botão ☰ do header. Conteúdo, em ordem:
 1. Topo do drawer: logo/nome do sistema à esquerda e **botão de fechar (X)** à
    direita, na mesma linha; as páginas vêm logo abaixo (sem linha divisória).
 2. Bloco operacional (sem label): Dashboard · Solicitações · Cargas de Retorno.
-3. Label "CADASTROS" (12px, uppercase, letter-spacing 0.5px, cor `--text-muted`).
+3. Label "CADASTROS" (11px, uppercase, letter-spacing 0.5px, cor `--text-muted`).
 4. Bloco de cadastros: Motoristas · Veículos · Carretas · Clientes · Materiais ·
    Subcontratadas · Parceiros.
 5. Label "SISTEMA" (mesmo estilo da label anterior).
@@ -144,8 +144,9 @@ pelo botão ☰ do header. Conteúdo, em ordem:
 
 Cada página é uma **seção** própria: bloco com cantos de 8px (`border-radius`),
 **fundo sutil** (`--muted/40`), **borda hairline** (`--border`), 46px de altura e
-padding lateral de 16px, com ícone do Lucide (22px) à esquerda + rótulo (15px, peso
-500) — a mesma escala do botão "Menu" do header (2026-10). As seções são separadas
+padding lateral de 16px, com ícone do Lucide (22px) à esquerda + rótulo (13px, peso
+500) — a caixa na escala do botão "Menu" do header (2026-10); o texto voltou a 13px
+porque 15px ficou grande demais. As seções são separadas
 por **espaço vazio** de 4px (sem linha divisória).
 
 **Hover (animação suave, `duration-200 ease-out`):** a borda acende no acento
@@ -163,8 +164,8 @@ vertical de 3px na borda esquerda** (via `::before`) no acento `--primary`
 reservado à barra do item ativo — a Regra da Voz Única (`DESIGN.md`) continua
 valendo: o acento não preenche a superfície do item.
 
-**Rodapé do drawer:** a versão do app (11px, `--text-muted`) acima de um bloco
-com **avatar de iniciais (40px) + nome (15px) + perfil (12px)** do usuário logado.
+**Rodapé do drawer:** a versão do app (10px, `--text-muted`) acima de um bloco
+com **avatar de iniciais (40px) + nome (13px) + perfil (11px)** do usuário logado.
 
 ### 3.3 Header (full-width, 3 zonas)
 O header ocupa toda a largura e se organiza em três zonas horizontais:
