@@ -13,6 +13,9 @@ export type Json =
 
 export type PerfilUsuario = 'admin' | 'gerente' | 'supervisor' | 'analista' | 'assistente'
 
+/** 0074 — layout do sistema interno escolhido pelo usuário (modo ERP opt-in). */
+export type LayoutPreferido = 'classico' | 'erp'
+
 export type SolicitacaoStatus =
   | 'recebida'
   | 'em_cadastro'
@@ -87,6 +90,8 @@ export interface Database {
           created_at: string
           updated_at: string
           created_by: string | null
+          // 0074 — modo ERP opt-in. Troca só pela RPC `definir_meu_layout`.
+          layout_preferido: LayoutPreferido
         }
         Insert: {
           id?: string
@@ -97,6 +102,7 @@ export interface Database {
           created_at?: string
           updated_at?: string
           created_by?: string | null
+          layout_preferido?: LayoutPreferido
         }
         Update: Partial<Database['public']['Tables']['perfis_usuarios']['Insert']>
       }
@@ -943,6 +949,11 @@ export interface Database {
       }
       atualizar_meu_nome: {
         Args: { novo_nome: string }
+        Returns: undefined
+      }
+      // 0074 — o usuário troca só o próprio layout; 'erp' exige admin/analista.
+      definir_meu_layout: {
+        Args: { p_layout: LayoutPreferido }
         Returns: undefined
       }
       marcar_meu_convite_aceito: {

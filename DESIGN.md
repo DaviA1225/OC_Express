@@ -299,6 +299,12 @@ para "dar profundidade decorativa" a um card é proibida.
   nav via pseudo-elemento `::before`, não stripe decorativo de card). Hover = fundo
   `muted` sutil. Labels de seção UPPERCASE 12px `muted-foreground`. Rodapé do drawer:
   versão do app + bloco avatar/nome/perfil do usuário. Ver `SPEC-FRONTEND.md` §3.2.
+- **Modo ERP (beta, opt-in — 0074):** admin e analista ligam em "Modo ERP (beta)" no
+  menu do usuário; a escolha fica em `perfis_usuarios.layout_preferido`. No desktop
+  (≥ lg) a navegação vira **barra de módulos fixa** à esquerda (o mesmo conteúdo do
+  drawer, recolhível para 64px) e o botão "Menu" e o logo do header somem; em tela
+  estreita segue o drawer. Rodapé com **barra de status** (usuário, ambiente,
+  conexão, atalhos F2/F3/Ctrl K, versão). O layout clássico é o padrão de todos.
 - **Header (interno):** full-width, 3 zonas — esquerda (botão **"Menu"**: ☰ 22px +
   rótulo 15px, 46px de altura, em **outline branco** — borda e texto brancos sobre o header grafite,
   fundo transparente — como entrada da navegação que substituiu a sidebar + logo),

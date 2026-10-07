@@ -1,5 +1,5 @@
 -- =====================================================================
--- OC Express / SisLog LHG — Schema cumulativo (migrations 0001 → 0073)
+-- OC Express / SisLog LHG — Schema cumulativo (migrations 0001 → 0074)
 -- =====================================================================
 --
 -- Este arquivo agrega TODAS as migrations num único script IDEMPOTENTE.
@@ -4413,6 +4413,53 @@ BEGIN
     RAISE WARNING 'Grade fora do padrao da SPEC: TCI=% (padrao 36), A.B=% (padrao 70).', v_tci, v_ab;
   END IF;
 END $$;
+
+NOTIFY pgrst, 'reload schema';
+
+
+-- =====================================================================
+-- 0074 — Layout preferido por usuario (modo ERP, fase 1). So DDL + RPC,
+-- sem policy: fica no fim, antes da secao 12.
+-- =====================================================================
+ALTER TABLE perfis_usuarios
+  ADD COLUMN IF NOT EXISTS layout_preferido text NOT NULL DEFAULT 'classico';
+
+ALTER TABLE perfis_usuarios DROP CONSTRAINT IF EXISTS perfis_usuarios_layout_preferido_check;
+ALTER TABLE perfis_usuarios ADD CONSTRAINT perfis_usuarios_layout_preferido_check
+  CHECK (layout_preferido IN ('classico', 'erp'));
+
+-- ============================================================
+-- RPC: o usuário troca só o PRÓPRIO layout
+-- ============================================================
+-- O UPDATE em perfis_usuarios é admin-only (0025), para ninguém escalar o
+-- próprio `perfil` pela API. Mesmo desenho do `atualizar_meu_nome`: a função
+-- toca uma coluna só, da própria linha.
+--
+-- Voltar ao clássico é sempre permitido, para qualquer perfil — se alguém for
+-- rebaixado de analista com o ERP ligado, precisa conseguir sair dele.
+
+CREATE OR REPLACE FUNCTION definir_meu_layout(p_layout text)
+RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+BEGIN
+  IF p_layout IS NULL OR p_layout NOT IN ('classico', 'erp') THEN
+    RAISE EXCEPTION 'layout invalido: %', p_layout USING ERRCODE = 'check_violation';
+  END IF;
+
+  IF p_layout = 'erp' AND COALESCE(meu_perfil_interno(), '') NOT IN ('admin', 'analista') THEN
+    RAISE EXCEPTION 'forbidden: o modo ERP esta em piloto (admin e analista)'
+      USING ERRCODE = 'insufficient_privilege';
+  END IF;
+
+  UPDATE perfis_usuarios
+     SET layout_preferido = p_layout
+   WHERE user_id = auth.uid() AND ativo = true;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION definir_meu_layout(text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION definir_meu_layout(text) TO authenticated;
 
 NOTIFY pgrst, 'reload schema';
 
