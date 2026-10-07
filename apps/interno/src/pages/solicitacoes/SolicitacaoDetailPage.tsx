@@ -61,8 +61,18 @@ type MaterialOpt = Pick<Tables<'materiais'>, 'id' | 'nome' | 'filial' | 'origem_
 const SUBTIPOS: MaterialSubtipo[] = ['SINTER', 'HEMATITA', 'LUMP']
 const LOCAIS_CARREGAMENTO = ['TUPACERY', 'URUCUM'] as const
 
-export function SolicitacaoDetailPage() {
-  const { id } = useParams<{ id: string }>()
+interface SolicitacaoDetailPageProps {
+  /**
+   * Modo ERP (fase 2): o detalhe abre num painel ao lado da grade. O id vem do
+   * painel em vez da rota, e o layout vira uma coluna só — as 3 colunas da
+   * página cheia dependem da largura da TELA e espremeriam o painel.
+   */
+  embutido?: { id: string }
+}
+
+export function SolicitacaoDetailPage({ embutido }: SolicitacaoDetailPageProps = {}) {
+  const params = useParams<{ id: string }>()
+  const id = embutido?.id ?? params.id
   const navigate = useNavigate()
   const { profile } = useAuth()
   const canEdit = canEditSolicitacoes(profile)
@@ -122,7 +132,9 @@ export function SolicitacaoDetailPage() {
           <Button variant="outline" onClick={() => { void detail.refetch() }}>
             <RotateCcw className="h-4 w-4" /> Tentar de novo
           </Button>
-          <Button variant="ghost" onClick={() => navigate('/solicitacoes')}>Voltar</Button>
+          {!embutido && (
+            <Button variant="ghost" onClick={() => navigate('/solicitacoes')}>Voltar</Button>
+          )}
         </div>
       </div>
     )
@@ -132,11 +144,14 @@ export function SolicitacaoDetailPage() {
     return (
       <div className="rounded-lg border bg-card p-6 text-center text-[13px] text-muted-foreground">
         Solicitação não encontrada.
-        <div className="mt-3">
-          <Button variant="outline" onClick={() => navigate('/solicitacoes')}>
-            Voltar para Solicitações
-          </Button>
-        </div>
+        {/* No painel a lista já está ao lado: "voltar" só a recarregaria. */}
+        {!embutido && (
+          <div className="mt-3">
+            <Button variant="outline" onClick={() => navigate('/solicitacoes')}>
+              Voltar para Solicitações
+            </Button>
+          </div>
+        )}
       </div>
     )
   }
@@ -162,11 +177,13 @@ export function SolicitacaoDetailPage() {
 
   return (
     <div className="space-y-4">
-      <nav className="flex items-center gap-1 text-[12px] text-muted-foreground">
-        <Link to="/solicitacoes" className="hover:text-foreground">Solicitações</Link>
-        <ChevronRight className="h-3 w-3" />
-        <span className="text-foreground">{formatNumeroOC(s.numero_interno)}</span>
-      </nav>
+      {!embutido && (
+        <nav className="flex items-center gap-1 text-[12px] text-muted-foreground">
+          <Link to="/solicitacoes" className="hover:text-foreground">Solicitações</Link>
+          <ChevronRight className="h-3 w-3" />
+          <span className="text-foreground">{formatNumeroOC(s.numero_interno)}</span>
+        </nav>
+      )}
 
       {s.status === 'cancelada' && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3">
@@ -352,15 +369,17 @@ export function SolicitacaoDetailPage() {
               </DropdownMenuContent>
             </DropdownMenu>
           )}
-          <Button variant="outline" size="sm" onClick={() => navigate('/solicitacoes')}>
-            <ArrowLeft className="h-4 w-4" />
-            Voltar
-          </Button>
+          {!embutido && (
+            <Button variant="outline" size="sm" onClick={() => navigate('/solicitacoes')}>
+              <ArrowLeft className="h-4 w-4" />
+              Voltar
+            </Button>
+          )}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="space-y-4 lg:col-span-2">
+      <div className={cn('grid grid-cols-1 gap-4', !embutido && 'lg:grid-cols-3')}>
+        <div className={cn('space-y-4', !embutido && 'lg:col-span-2')}>
           <SolicitanteCard
             solicitacao={s}
             editable={editable && !isParceiro}

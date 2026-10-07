@@ -18,6 +18,8 @@ import { useDebounce } from '@/hooks/useDebounce'
 import { useAuth } from '@/hooks/useAuth'
 import { canEditSolicitacoes, canUseBulkActions } from '@/features/auth/permissions'
 import { useNovaSolicitacao } from '@/features/solicitacoes/NovaSolicitacaoProvider'
+import { useLayoutPreferido } from '@/features/layout/useLayoutPreferido'
+import { SolicitacoesGradeErp } from './SolicitacoesGradeErp'
 import { useCrudOptions } from '@/features/crud/useCrudOptions'
 import {
   useSolicitacoesList,
@@ -85,6 +87,10 @@ export function SolicitacoesListPage() {
   })()
   const apenasAtrasadas = params.get('atrasadas') === '1'
   const view: 'grade' | 'lista' = params.get('view') === 'lista' ? 'lista' : 'grade'
+  // Modo ERP (fase 2): grade densa + detalhe ao lado. A linha aberta no painel
+  // fica na URL (?sel=) para sobreviver a recarregar e voltar do detalhe.
+  const { modoErp } = useLayoutPreferido()
+  const selecionada = params.get('sel')
   const page = Math.max(1, Number(params.get('page')) || 1)
   const pageSize = 30
 
@@ -171,6 +177,10 @@ export function SolicitacoesListPage() {
   const setPage = (p: number) =>
     updateParams((n) => {
       if (p > 1) n.set('page', String(p)); else n.delete('page')
+    })
+  const setSelecionada = (id: string | null) =>
+    updateParams((n) => {
+      if (id) n.set('sel', id); else n.delete('sel')
     })
   const setView = (v: 'grade' | 'lista') =>
     updateParams((n) => {
@@ -346,6 +356,7 @@ export function SolicitacoesListPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {!modoErp && (
           <div className="flex items-center rounded-md border p-0.5" role="group" aria-label="Modo de exibição">
             <button
               type="button"
@@ -372,6 +383,7 @@ export function SolicitacoesListPage() {
               <ListIcon className="h-4 w-4" />
             </button>
           </div>
+          )}
           <Button
             type="button"
             variant="outline"
@@ -544,6 +556,8 @@ export function SolicitacoesListPage() {
         <>
           {canBulk && (
             <div className="flex flex-wrap items-center gap-2">
+              {/* No modo ERP o checkbox do cabeçalho da grade faz este papel. */}
+              {!modoErp && (
               <Button
                 type="button"
                 variant="ghost"
@@ -554,6 +568,7 @@ export function SolicitacoesListPage() {
                 {allVisibleSelected ? <CheckSquare className="h-4 w-4" /> : <Square className="h-4 w-4" />}
                 {allVisibleSelected ? 'Desmarcar página' : 'Selecionar página'}
               </Button>
+              )}
               {selectedIds.size > 0 && (
                 <span className="text-[12px] text-muted-foreground">
                   {selectedIds.size} {selectedIds.size === 1 ? 'selecionada' : 'selecionadas'}
@@ -577,7 +592,19 @@ export function SolicitacoesListPage() {
             />
           )}
 
-          {view === 'grade' ? (
+          {modoErp ? (
+            <SolicitacoesGradeErp
+              rows={list.data!.data}
+              selecionada={selecionada}
+              onSelecionar={setSelecionada}
+              onAbrir={(id) => navigate(`/solicitacoes/${id}`)}
+              selectable={canBulk}
+              selectedIds={selectedIds}
+              onToggleSelect={toggleId}
+              onToggleAll={toggleAll}
+              allVisibleSelected={allVisibleSelected}
+            />
+          ) : view === 'grade' ? (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {list.data!.data.map((row) => (
                 <SolicitacaoCard
