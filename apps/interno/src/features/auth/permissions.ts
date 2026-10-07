@@ -43,6 +43,24 @@ export function canViewSeguranca(p: PerfilRow | null): boolean {
   return is(p, 'admin')
 }
 
+/**
+ * Privacidade (LGPD): registro de acesso e fila de órfãos do storage. Mesmos
+ * perfis que o RLS de `log_acesso` e `storage_remocao_pendente` (0059/0060).
+ */
+export function canViewPrivacidade(p: PerfilRow | null): boolean {
+  return is(p, 'admin', 'gerente', 'supervisor')
+}
+
+/** Pedido do titular — exportar: admin e gerente (checado também na 0057). */
+export function canExportarTitular(p: PerfilRow | null): boolean {
+  return is(p, 'admin', 'gerente')
+}
+
+/** Pedido do titular — anonimizar: só admin (checado também na 0057). */
+export function canAnonimizarTitular(p: PerfilRow | null): boolean {
+  return is(p, 'admin')
+}
+
 /** Parceiros: visualização livre para todo o time interno. */
 export function canViewParceiros(p: PerfilRow | null): boolean {
   return is(p, 'admin', 'gerente', 'supervisor', 'analista', 'assistente')

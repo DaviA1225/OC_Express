@@ -641,6 +641,38 @@ export interface Database {
         }
         Update: Partial<Database['public']['Tables']['log_auditoria']['Insert']>
       }
+      // 0059 — acesso a dado pessoal. Só `registrar_acesso` escreve.
+      log_acesso: {
+        Row: {
+          id: string
+          usuario_id: string | null
+          acao: string
+          recurso: string | null
+          detalhe: Json | null
+          ip: string | null
+          user_agent: string | null
+          origem: 'interno' | 'portal'
+          created_at: string
+        }
+        Insert: Record<string, never>
+        Update: Record<string, never>
+      }
+      // 0060 — fila de arquivos cujo anexo foi apagado. Baixa só por
+      // `marcar_storage_removido`.
+      storage_remocao_pendente: {
+        Row: {
+          id: string
+          bucket: string
+          path: string
+          motivo: string
+          solicitacao_id: string | null
+          created_at: string
+          removido_em: string | null
+          erro: string | null
+        }
+        Insert: Record<string, never>
+        Update: Record<string, never>
+      }
       parceiros: {
         Row: {
           id: string
@@ -1024,8 +1056,8 @@ export interface Database {
         Args: { p_cliente_id: string; p_modelo: 'horaria' | 'janela_longa' }
         Returns: number
       }
-      // 0057 — direitos do titular. Sem UI ainda: chamadas pelo SQL Editor.
-      // Tipadas aqui para quando a tela existir e para documentar a assinatura.
+      // 0057 — direitos do titular. Chamadas pela aba "Pedidos do titular"
+      // de /privacidade.
       exportar_dados_titular: {
         Args: { p_cpf: string }
         Returns: Json
