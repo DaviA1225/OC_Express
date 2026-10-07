@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
+import { comprimirAnexo } from '@sislog/shared/compressao'
 import { registrarAcesso } from '@/lib/acesso'
 import { traduzirErroBanco } from '@/features/cadastros/useParceiroCrud'
 import type { Tables } from '@sislog/shared/types'
@@ -27,7 +28,9 @@ function buildStoragePath(solicitacaoId: string, file: File): string {
 /** Sobe um arquivo para o storage e grava o metadado em `solicitacao_anexos`.
  *  Versao "muda" — sem toast — para uso em fluxos em lote (Nova solicitacao).
  *  Lanca em caso de erro. */
-export async function uploadAnexoFile(solicitacaoId: string, file: File): Promise<Anexo> {
+export async function uploadAnexoFile(solicitacaoId: string, original: File): Promise<Anexo> {
+  // O limite vale para o que SOBE: confere depois de comprimir.
+  const { file } = await comprimirAnexo(original)
   if (file.size > MAX_FILE_BYTES) {
     throw new Error(`"${file.name}" excede o limite de ${(MAX_FILE_BYTES / 1024 / 1024).toFixed(0)}MB.`)
   }
