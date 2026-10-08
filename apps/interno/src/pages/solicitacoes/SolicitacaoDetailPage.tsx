@@ -163,7 +163,10 @@ export function SolicitacaoDetailPage({ embutido }: SolicitacaoDetailPageProps =
   const isParceiro = s.origem === 'parceiro'
   // Solicitação de parceiro chega sem material definido; ele é obrigatório para
   // sair de "recebida" (constraint solicitacoes_material_obrigatorio_apos_cadastro).
-  const materialPendente = s.origem === 'parceiro' && !s.material_id && s.tipo !== 'retorno'
+  // Vale também para o retorno (0075): é o material que diz se a OC exige
+  // instrução — Pedra, Milho e Areia dispensam. Sem material, o botão cairia em
+  // "+ Adicionar instrução".
+  const materialPendente = s.origem === 'parceiro' && !s.material_id
   // "Devolver ao parceiro" só faz sentido em solicitação de parceiro ainda em
   // andamento e sem outra pendência aberta.
   const podeDevolver =
@@ -1028,7 +1031,7 @@ function DestinoMaterialCard({ solicitacao, editable, onSave }: CardProps) {
       {!editing ? (
         <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-[13px]">
           <Field label="Cliente" value={solicitacao.cliente?.razao_social} />
-          {solicitacao.origem === 'parceiro' && !solicitacao.material_id && !isRetorno ? (
+          {solicitacao.origem === 'parceiro' && !solicitacao.material_id ? (
             <div>
               <dt className="text-[10px] uppercase tracking-[0.5px] text-muted-foreground">Material</dt>
               <dd className="font-medium text-amber-700 dark:text-amber-400">Material a definir</dd>
