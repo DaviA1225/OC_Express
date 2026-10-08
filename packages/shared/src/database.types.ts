@@ -915,6 +915,22 @@ export interface Database {
           requer_agendamento: boolean | null
           terminal_nome: string | null
           antecedencia_minima_horas: number | null
+          // 0075 — a view lista minério E retorno; as flags separam as listas
+          // no portal como o interno separa.
+          cliente_minerio: boolean | null
+          cliente_retorno: boolean | null
+        }
+      }
+      // 0075 — cargas de retorno ativas para o seletor de retorno do portal.
+      // `observacoes` NÃO entra: texto livre da equipe (mesma regra da 0062).
+      cargas_retorno_publicas: {
+        Row: {
+          id: string | null
+          cliente_id: string | null
+          local_carregamento: string | null
+          razao_social: string | null
+          cidade: string | null
+          uf: string | null
         }
       }
       portal_solicitacoes: {
@@ -939,6 +955,8 @@ export interface Database {
           created_at: string | null
           enviada_em: string | null
           finalizada_em: string | null
+          // 0075 — carga de retorno escolhida (cliente + local).
+          local_carregamento: string | null
         }
       }
     }
@@ -973,6 +991,9 @@ export interface Database {
           p_pamcard_status: string
           p_pamcard_numero: string | null
           p_observacoes: string | null
+          // 0075 — opcionais: sem eles o tipo e o local ficam como estão.
+          p_tipo?: SolicitacaoTipo | null
+          p_local_carregamento?: string | null
         }
         Returns: string
       }

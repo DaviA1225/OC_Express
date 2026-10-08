@@ -13,7 +13,7 @@ import {
 } from '@/features/solicitacoes/useSolicitacoes'
 import { podeEditar } from '@/features/solicitacoes/status'
 import { formatNumeroOC } from '@/lib/utils'
-import type { PamcardStatus } from '@sislog/shared/types'
+import type { PamcardStatus, SolicitacaoTipo } from '@sislog/shared/types'
 
 export default function EditarSolicitacaoPage() {
   const { id } = useParams<{ id: string }>()
@@ -66,6 +66,7 @@ export default function EditarSolicitacaoPage() {
   }
 
   const defaultValues: SolicitacaoFormValues = {
+    tipo: (sol.tipo as SolicitacaoTipo | null) ?? 'carregamento',
     parceiro_motorista_id: sol.parceiro_motorista_id ?? '',
     parceiro_veiculo_id: sol.parceiro_veiculo_id ?? '',
     parceiro_carreta_id: sol.parceiro_carreta_id ?? '',
@@ -73,6 +74,7 @@ export default function EditarSolicitacaoPage() {
     parceiro_dolly_id: sol.parceiro_dolly_id ?? '',
     parceiro_subcontratada_id: sol.parceiro_subcontratada_id ?? '',
     cliente_id: sol.cliente_id ?? '',
+    local_carregamento: sol.local_carregamento ?? '',
     pamcard_status: (sol.pamcard_status as PamcardStatus | null) ?? 'tem_cartao',
     pamcard_numero: sol.pamcard_numero ?? '',
     observacoes: sol.observacoes ?? '',
@@ -82,6 +84,8 @@ export default function EditarSolicitacaoPage() {
     try {
       await editar.mutateAsync({
         id: sol.id as string,
+        tipo: v.tipo,
+        local_carregamento: v.tipo === 'retorno' ? v.local_carregamento : null,
         parceiro_motorista_id: v.parceiro_motorista_id,
         parceiro_veiculo_id: v.parceiro_veiculo_id,
         parceiro_carreta_id: v.parceiro_carreta_id || null,

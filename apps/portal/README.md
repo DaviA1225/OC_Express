@@ -95,7 +95,11 @@ conveniente:
   o INSERT gera o `id` no cliente (`crypto.randomUUID`) para conhecer o
   destino da redireção.
 - **`clientes_publicos`**: view que expõe só `id, razao_social, cidade, uf`
-  dos clientes ativos da LHG — nunca frete, status, contatos etc.
+  (mais os campos estruturados de agendamento e as flags minério/retorno) dos
+  clientes ativos da LHG — nunca frete, status, contatos etc.
+- **`cargas_retorno_publicas`** (0075): cargas de retorno ativas (cliente +
+  local de carregamento) para o parceiro abrir solicitação de retorno — sem as
+  observações internas.
 - **Storage `solicitacoes-anexos`** filtrado por
   `solicitacao_pertence_ao_parceiro_logado()`.
 - **Auditoria (`eventos_portal`)**: única porta de escrita é a função

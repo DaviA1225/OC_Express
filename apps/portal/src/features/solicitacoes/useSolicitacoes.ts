@@ -4,10 +4,11 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import { registrarEvento } from '@/lib/eventos'
 import { traduzirErroBanco } from '@/features/cadastros/useParceiroCrud'
-import type { Tables, Views, PamcardStatus } from '@sislog/shared/types'
+import type { Tables, Views, PamcardStatus, SolicitacaoTipo } from '@sislog/shared/types'
 
 export type PortalSolicitacao = Views<'portal_solicitacoes'>
 export type ClientePublico = Views<'clientes_publicos'>
+export type CargaRetornoPublica = Views<'cargas_retorno_publicas'>
 
 // --- Bases do parceiro -------------------------------------------------------
 // A view `portal_solicitacoes` expõe apenas IDs (decisão de segurança do
@@ -62,7 +63,7 @@ export const useSubcontratadasBase = () =>
 export const usePamcardsBase = () => useParceiroBase('parceiro_pamcards', 'numero')
 
 /** Clientes da LHG disponíveis para o parceiro escolher (view pública —
- *  só `id, razao_social, cidade, uf` dos clientes ativos). */
+ *  clientes ativos de minério e de retorno, só com colunas seguras). */
 export function useClientesPublicos() {
   return useQuery({
     queryKey: ['clientes-publicos'],
@@ -73,6 +74,23 @@ export function useClientesPublicos() {
         .order('razao_social', { ascending: true })
       if (error) throw error
       return (data ?? []) as ClientePublico[]
+    },
+  })
+}
+
+/** Cargas de retorno ativas (cliente + local de carregamento) — o seletor de
+ *  retorno, igual ao do interno. Escolher uma define cliente e local. */
+export function useCargasRetornoPublicas() {
+  return useQuery({
+    queryKey: ['cargas-retorno-publicas'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('cargas_retorno_publicas')
+        .select('*')
+        .order('razao_social', { ascending: true })
+        .order('local_carregamento', { ascending: true })
+      if (error) throw error
+      return (data ?? []) as CargaRetornoPublica[]
     },
   })
 }
@@ -141,6 +159,9 @@ export function useSolicitacaoPortal(id: string | undefined) {
 }
 
 export interface NovaSolicitacaoInput {
+  tipo: SolicitacaoTipo
+  /** Só no retorno (vem da carga escolhida); no minério a equipe define. */
+  local_carregamento: string | null
   parceiro_motorista_id: string
   parceiro_veiculo_id: string
   parceiro_carreta_id: string | null
@@ -153,8 +174,9 @@ export interface NovaSolicitacaoInput {
   observacoes: string | null
 }
 
-/** Cria uma solicitação de carregamento a partir do portal. O material é
- *  deixado em branco — a equipe interna define no processamento (SPEC 5.5). */
+/** Cria uma solicitação de minério ou de retorno a partir do portal. O
+ *  material é deixado em branco — a equipe interna define no processamento
+ *  (SPEC 5.5). */
 export function useCriarSolicitacao() {
   const qc = useQueryClient()
   const { parceiro, parceiroUsuario } = useAuth()
@@ -170,7 +192,7 @@ export function useCriarSolicitacao() {
       const id = crypto.randomUUID()
       const { error } = await supabase.from('solicitacoes').insert({
         id,
-        tipo: 'carregamento',
+        tipo: input.tipo,
         origem: 'parceiro',
         status: 'recebida',
         parceiro_id: parceiro.id,
@@ -182,6 +204,7 @@ export function useCriarSolicitacao() {
         parceiro_dolly_id: input.parceiro_dolly_id,
         parceiro_subcontratada_id: input.parceiro_subcontratada_id,
         cliente_id: input.cliente_id,
+        local_carregamento: input.tipo === 'retorno' ? input.local_carregamento : null,
         material_id: null,
         pamcard_status: input.pamcard_status,
         pamcard_numero: input.pamcard_numero,
@@ -236,6 +259,7 @@ export function useDuplicarSolicitacao() {
         parceiro_dolly_id: src.parceiro_dolly_id,
         parceiro_subcontratada_id: src.parceiro_subcontratada_id,
         cliente_id: src.cliente_id,
+        local_carregamento: src.tipo === 'retorno' ? src.local_carregamento : null,
         material_id: null,
         pamcard_status: src.pamcard_status,
         pamcard_numero: src.pamcard_numero,
@@ -279,6 +303,8 @@ export function useEditarSolicitacao() {
         p_pamcard_status: campos.pamcard_status,
         p_pamcard_numero: campos.pamcard_numero,
         p_observacoes: campos.observacoes,
+        p_tipo: campos.tipo,
+        p_local_carregamento: campos.tipo === 'retorno' ? campos.local_carregamento : null,
       } as never
       const { error } = await supabase.rpc('portal_editar_solicitacao', args)
       if (error) throw error

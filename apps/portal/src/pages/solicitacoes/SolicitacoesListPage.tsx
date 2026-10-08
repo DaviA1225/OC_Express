@@ -278,6 +278,9 @@ function SolicitacaoCard({ view, temPendencia }: { view: SolicitacaoView; temPen
         <div className="flex items-center gap-2">
           <Building2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
           <span className="truncate text-foreground">{cliente}</span>
+          {sol.tipo === 'retorno' && (
+            <span className="shrink-0 text-[12px] text-muted-foreground">· Retorno</span>
+          )}
         </div>
       </div>
     </Link>

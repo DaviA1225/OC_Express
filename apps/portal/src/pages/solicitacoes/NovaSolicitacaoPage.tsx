@@ -63,6 +63,8 @@ export default function NovaSolicitacaoPage() {
     let novoId: string | null = null
     try {
       novoId = await criar.mutateAsync({
+        tipo: v.tipo,
+        local_carregamento: v.tipo === 'retorno' ? v.local_carregamento : null,
         parceiro_motorista_id: v.parceiro_motorista_id,
         parceiro_veiculo_id: v.parceiro_veiculo_id,
         parceiro_carreta_id: v.parceiro_carreta_id || null,
@@ -123,8 +125,8 @@ export default function NovaSolicitacaoPage() {
         Nova solicitação
       </h1>
       <p className="mt-1 text-[13px] text-muted-foreground">
-        Preencha os dados do carregamento. A equipe da LHG define o material e
-        processa a solicitação.
+        Preencha os dados do carregamento, de minério ou de retorno. A equipe da
+        LHG define o material e processa a solicitação.
       </p>
 
       <SolicitacaoForm
