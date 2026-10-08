@@ -1,5 +1,5 @@
 -- =====================================================================
--- OC Express / SisLog LHG — Schema cumulativo (migrations 0001 → 0075)
+-- OC Express / SisLog LHG — Schema cumulativo (migrations 0001 → 0076)
 -- =====================================================================
 --
 -- Este arquivo agrega TODAS as migrations num único script IDEMPOTENTE.
@@ -718,13 +718,14 @@ CREATE INDEX IF NOT EXISTS idx_solicitacoes_parceiro ON solicitacoes(parceiro_id
 
 ALTER TABLE solicitacoes
   DROP CONSTRAINT IF EXISTS solicitacoes_material_obrigatorio_apos_cadastro;
+-- Forma FINAL da 0076: o retorno deixou de ser isento (o parceiro abre retorno
+-- sem material desde a 0075). Replayar a forma antiga reabriria o furo.
 ALTER TABLE solicitacoes
   ADD CONSTRAINT solicitacoes_material_obrigatorio_apos_cadastro
   CHECK (
     status IN ('recebida', 'cancelada')
-    OR tipo = 'retorno'
     OR material_id IS NOT NULL
-  ) NOT VALID;
+  );
 
 -- `parceiro_usuario_id IS NOT NULL` NAO entra aqui, embora a 0018 original
 -- exigisse: ver a 0054 no fim do arquivo. A forma antiga proibia o ON DELETE

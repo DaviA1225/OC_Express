@@ -586,7 +586,13 @@ function StatusActions({ status, hasInstrucao, requerInstrucao, onAdvanceInstruc
           <ChevronLeft className="h-4 w-4" />
           Voltar para Recebida
         </Button>
-        {requerInstrucao ? (
+        {/* Sem material não se sabe se a OC exige instrução: nem instrução nem OC
+            até o material ser definido (o banco já impede chegar aqui — 0076). */}
+        {bloquearAvanco ? (
+          <Button size="sm" disabled title={'Defina o material no card "Destino e material"'}>
+            Defina o material
+          </Button>
+        ) : requerInstrucao ? (
           <Button size="sm" onClick={onAdvanceInstrucao} disabled={disabled}>
             + Adicionar instrução
           </Button>
@@ -643,7 +649,7 @@ function StatusActions({ status, hasInstrucao, requerInstrucao, onAdvanceInstruc
       </div>
     )
   }
-  if (!hasInstrucao && requerInstrucao && status !== 'cancelada' && status !== 'finalizada') {
+  if (!hasInstrucao && requerInstrucao && !bloquearAvanco && status !== 'cancelada' && status !== 'finalizada') {
     return (
       <Button size="sm" onClick={onAdvanceInstrucao} disabled={disabled}>
         + Adicionar instrução
