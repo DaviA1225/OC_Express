@@ -778,7 +778,7 @@ function SolicitacaoCard({ row, sinalPendencia, selectable, selected, onToggleSe
             value={[row.veiculo?.placa, row.carreta?.placa].filter(Boolean).join(' / ') || null}
           />
           <Field label="Cliente" value={row.cliente?.razao_social} />
-          {row.origem === 'parceiro' && !row.material_id && row.tipo !== 'retorno' ? (
+          {row.origem === 'parceiro' && !row.material_id ? (
             <div>
               <dt className="text-[10px] uppercase tracking-[0.5px] text-muted-foreground">Material</dt>
               <dd className="font-medium text-amber-700 dark:text-amber-400">Material a definir</dd>
