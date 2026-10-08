@@ -306,6 +306,22 @@ export function SolicitacoesListPage() {
   const runBulkTransit = async (status: SolicitacaoStatus) => {
     const ids = Array.from(selectedIds)
     if (ids.length === 0) return
+    // Sem material não dá para saber se a OC exige instrução (Pedra, Milho e
+    // Areia dispensam), e o banco recusa sair de "recebida" sem ele (0076).
+    // Avisa quais são, em vez de deixar o lote falhar com erro de constraint.
+    if (status === 'em_cadastro') {
+      const semMaterial = (list.data?.data ?? []).filter(
+        (r) => selectedIds.has(r.id) && !r.material_id,
+      )
+      if (semMaterial.length > 0) {
+        toast.error(
+          `Defina o material antes de marcar em emissão: ${semMaterial
+            .map((r) => formatNumeroOC(r.numero_interno))
+            .join(', ')}.`,
+        )
+        return
+      }
+    }
     const extra =
       status === 'finalizada'
         ? { finalizada_em: new Date().toISOString() }
