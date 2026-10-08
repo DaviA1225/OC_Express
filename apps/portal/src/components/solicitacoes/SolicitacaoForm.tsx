@@ -22,9 +22,10 @@ import {
   useSubcontratadasBase,
   usePamcardsBase,
   useClientesPublicos,
+  useCargasRetornoPublicas,
 } from '@/features/solicitacoes/useSolicitacoes'
 import { formatarPamcardParaExibicao } from '@sislog/shared/formatters'
-import type { PamcardStatus } from '@sislog/shared/types'
+import type { PamcardStatus, SolicitacaoTipo } from '@sislog/shared/types'
 
 import { solicitacaoSchema, type SolicitacaoFormValues } from './solicitacaoForm.schema'
 
@@ -51,6 +52,10 @@ interface SolicitacaoFormProps {
   children?: React.ReactNode
 }
 
+/** Valor do seletor de retorno quando a carga gravada não está mais na lista
+ *  (desativada depois). */
+const CARGA_GRAVADA = '__carga_gravada__'
+
 /** Formulário compartilhado entre criar e editar uma solicitação do portal.
  *  Mantém os campos, validação e diálogos de cadastro rápido; a página define
  *  o que fazer no envio (insert vs update) e os anexos via `children`. */
@@ -70,6 +75,7 @@ export function SolicitacaoForm({
   const subcontratadas = useSubcontratadasBase()
   const pamcards = usePamcardsBase()
   const clientes = useClientesPublicos()
+  const cargasRetorno = useCargasRetornoPublicas()
 
   const {
     handleSubmit,
@@ -134,13 +140,63 @@ export function SolicitacaoForm({
       hint: p.apelido ? formatarPamcardParaExibicao(p.numero) : undefined,
     }))
 
+  const tipo = watch('tipo')
+  const clienteId = watch('cliente_id')
+  const localCarregamento = watch('local_carregamento')
+
+  // Minério lista só clientes de minério, como o interno; o retorno é escolhido
+  // pela carga. Mantém o cliente já selecionado mesmo se a flag mudou depois.
   const clienteOptions: ComboboxOption[] = (clientes.data ?? [])
     .filter((c): c is typeof c & { id: string } => !!c.id)
+    .filter((c) => c.cliente_minerio !== false || c.id === clienteId)
     .map((c) => ({
       value: c.id,
       label: c.razao_social ?? 'Cliente',
       hint: [c.cidade, c.uf].filter(Boolean).join(' / ') || undefined,
     }))
+
+  // Carga de retorno: o par (cliente, local) é o que a solicitação grava, então
+  // o item selecionado é derivado dele — serve igual para criar e editar.
+  const cargaRetornoOptions: ComboboxOption[] = (cargasRetorno.data ?? [])
+    .filter((c): c is typeof c & { id: string } => !!c.id)
+    .map((c) => ({
+      value: c.id,
+      label: c.razao_social ?? 'Cliente',
+      hint:
+        [c.local_carregamento, c.cidade && c.uf ? `${c.cidade}/${c.uf}` : null]
+          .filter(Boolean)
+          .join(' · ') || undefined,
+    }))
+  const cargaSelecionada = (cargasRetorno.data ?? []).find(
+    (c) => c.cliente_id === clienteId && c.local_carregamento === localCarregamento,
+  )
+  // Solicitação antiga cuja carga foi desativada depois: mostra o que está
+  // gravado em vez de deixar o seletor vazio.
+  const temCargaGravada = tipo === 'retorno' && !!clienteId && !!localCarregamento
+  if (temCargaGravada && !cargaSelecionada && !cargasRetorno.isLoading) {
+    const cli = (clientes.data ?? []).find((c) => c.id === clienteId)
+    cargaRetornoOptions.unshift({
+      value: CARGA_GRAVADA,
+      label: cli?.razao_social ?? 'Cliente',
+      hint: localCarregamento,
+    })
+  }
+  const cargaRetornoValue = cargaSelecionada?.id ?? (temCargaGravada ? CARGA_GRAVADA : '')
+
+  const trocarTipo = (next: SolicitacaoTipo) => {
+    if (next === tipo) return
+    setValue('tipo', next, { shouldValidate: false })
+    // As listas de cliente diferem entre minério e retorno: recomeça a escolha.
+    setValue('cliente_id', '', { shouldValidate: false })
+    setValue('local_carregamento', '', { shouldValidate: false })
+  }
+
+  const escolherCarga = (id: string | null) => {
+    if (id === CARGA_GRAVADA) return
+    const carga = (cargasRetorno.data ?? []).find((c) => c.id === id)
+    setValue('cliente_id', carga?.cliente_id ?? '', { shouldValidate: true })
+    setValue('local_carregamento', carga?.local_carregamento ?? '', { shouldValidate: true })
+  }
 
   const pamcardStatus = watch('pamcard_status')
   const pamcardNumero = watch('pamcard_numero') ?? ''
@@ -242,15 +298,45 @@ export function SolicitacaoForm({
       </Section>
 
       <Section title="Destino" description="O cliente é escolhido entre os atendidos pela LHG.">
-        <ComboField
-          label="Cliente *"
-          placeholder="Selecionar cliente"
-          options={clienteOptions}
-          loading={clientes.isLoading}
-          value={watch('cliente_id')}
-          onChange={(val) => set('cliente_id', val ?? '')}
-          error={errors.cliente_id?.message}
-        />
+        <div className="space-y-1.5">
+          <Label>Tipo *</Label>
+          <RadioGroup
+            value={tipo}
+            onValueChange={(v) => trocarTipo(v as SolicitacaoTipo)}
+            className="flex gap-4 pt-1"
+          >
+            <label className="flex items-center gap-2 text-[13px]">
+              <RadioGroupItem value="carregamento" />
+              Minério
+            </label>
+            <label className="flex items-center gap-2 text-[13px]">
+              <RadioGroupItem value="retorno" />
+              Retorno
+            </label>
+          </RadioGroup>
+        </div>
+        {tipo === 'retorno' ? (
+          <ComboField
+            label="Carga de retorno *"
+            placeholder="Selecionar carga de retorno"
+            options={cargaRetornoOptions}
+            loading={cargasRetorno.isLoading}
+            value={cargaRetornoValue}
+            onChange={escolherCarga}
+            error={errors.local_carregamento?.message}
+            emptyMessage="Nenhuma carga de retorno disponível."
+          />
+        ) : (
+          <ComboField
+            label="Cliente *"
+            placeholder="Selecionar cliente"
+            options={clienteOptions}
+            loading={clientes.isLoading}
+            value={clienteId}
+            onChange={(val) => set('cliente_id', val ?? '')}
+            error={errors.cliente_id?.message}
+          />
+        )}
       </Section>
 
       <Section
@@ -441,6 +527,7 @@ function ComboField({
   onCreateNew,
   createNewLabel,
   error,
+  emptyMessage = 'Nenhum registro na sua base.',
 }: {
   label: string
   placeholder: string
@@ -451,6 +538,7 @@ function ComboField({
   onCreateNew?: (search: string) => void
   createNewLabel?: string
   error?: string
+  emptyMessage?: string
 }) {
   return (
     <div className="space-y-1.5">
@@ -463,7 +551,7 @@ function ComboField({
         loading={loading}
         onCreateNew={onCreateNew}
         createNewLabel={createNewLabel}
-        emptyMessage="Nenhum registro na sua base."
+        emptyMessage={emptyMessage}
       />
       {error && <p className="text-[11px] text-destructive">{error}</p>}
     </div>

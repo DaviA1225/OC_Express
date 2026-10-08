@@ -231,7 +231,11 @@ export default function SolicitacaoDetailPage() {
         <h2 className="text-[15px] font-semibold text-foreground">Dados da solicitação</h2>
         <dl className="mt-4 grid gap-x-6 gap-y-3.5 sm:grid-cols-2">
           <DataRow label="Solicitante" value={solicitante} />
+          <DataRow label="Tipo" value={sol.tipo === 'retorno' ? 'Retorno' : 'Minério'} />
           <DataRow label="Cliente" value={cliente?.razao_social ?? 'Não identificado'} />
+          {sol.tipo === 'retorno' && (
+            <DataRow label="Local de carregamento" value={sol.local_carregamento || '—'} />
+          )}
           <DataRow
             label="Motorista"
             value={motorista ? `${motorista.nome_completo}, ${motorista.cpf}` : 'Não identificado'}
