@@ -11,7 +11,9 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/hooks/useAuth'
+import { supabase } from '@/lib/supabase'
 import {
+  idDaSessao,
   marcarAtividade,
   observarInatividade,
   registrarMotivoSaida,
@@ -39,20 +41,31 @@ export function VigiaDeSessao() {
   const { session, signOut } = useAuth()
   const [restanteMs, setRestanteMs] = React.useState<number | null>(null)
 
-  const temSessao = !!session
+  // A identidade da sessão, não o objeto: renovar o token troca o `session`
+  // a cada hora, e religar o vigia por isso seria desperdício. Login novo
+  // troca o id e religa — é o que faz o relógio começar do zero.
+  const idSessao = session ? idDaSessao(session.access_token) : null
 
   // `signOut` muda de identidade a cada render do provider. Sem o ref, o efeito
-  // abaixo religaria o vigia a cada render — e religar zera o carimbo de
-  // atividade, o que faria a sessão nunca expirar.
+  // abaixo desligaria e religaria o vigia (ouvintes, timer) a cada render.
   const signOutRef = React.useRef(signOut)
   React.useEffect(() => {
     signOutRef.current = signOut
   }, [signOut])
 
   React.useEffect(() => {
-    if (!temSessao) return
+    if (idSessao === null) return
 
     const desligar = observarInatividade({
+      idSessao,
+      // Batimento para o hook da 0077. Erro de rede não interessa aqui: o
+      // limite do cliente continua de pé, e o próximo clique tenta de novo.
+      aoRegistrarNoServidor: () => {
+        void supabase.rpc('registrar_atividade_sessao').then(
+          () => undefined,
+          () => undefined,
+        )
+      },
       aoAvisar: setRestanteMs,
       aoRetomar: () => setRestanteMs(null),
       aoExpirar: () => {
@@ -69,9 +82,9 @@ export function VigiaDeSessao() {
     // ativa derrubar a contagem de outra que estava só aberta — a segunda
     // cairia para o próprio relógio, já vencido, e deslogaria alguém que
     // acabou de interagir ao lado. Quem zera é o `observarInatividade` na
-    // largada, que é o momento em que zerar importa: no login.
+    // largada, quando vê uma sessão nova: no login.
     return desligar
-  }, [temSessao])
+  }, [idSessao])
 
   function continuar() {
     marcarAtividade()

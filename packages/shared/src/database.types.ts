@@ -974,6 +974,11 @@ export interface Database {
         Args: { p_layout: LayoutPreferido }
         Returns: undefined
       }
+      // 0077 — batimento de atividade; a sessão vem do JWT.
+      registrar_atividade_sessao: {
+        Args: Record<string, never>
+        Returns: undefined
+      }
       marcar_meu_convite_aceito: {
         Args: Record<string, never>
         Returns: string | null
