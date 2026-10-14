@@ -69,6 +69,14 @@ export function canUsarLayoutErp(p: PerfilRow | null): boolean {
   return is(p, 'admin', 'analista')
 }
 
+/**
+ * Modo do agente de IA do WhatsApp (0078): só admin liga, desliga ou põe em
+ * sombra. Mesma regra da RLS de `agente_config`.
+ */
+export function canAlterarModoAgente(p: PerfilRow | null): boolean {
+  return is(p, 'admin')
+}
+
 /** Parceiros: visualização livre para todo o time interno. */
 export function canViewParceiros(p: PerfilRow | null): boolean {
   return is(p, 'admin', 'gerente', 'supervisor', 'analista', 'assistente')

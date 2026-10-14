@@ -22,6 +22,7 @@ const ROTA_DOCUMENTO = /^\/solicitacoes\/([0-9a-f-]{36})$/i
 const MODULOS: [prefixo: string, nome: string][] = [
   ['/dashboard', 'Dashboard'],
   ['/solicitacoes', 'Solicitações'],
+  ['/conversas', 'Conversas'],
   ['/agendamentos', 'Agendamentos'],
   ['/cargas-retorno', 'Cargas de retorno'],
   ['/conferencia-viagem', 'Conferência de viagem'],

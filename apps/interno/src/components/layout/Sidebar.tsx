@@ -4,6 +4,7 @@ import { SISLOG_VERSAO } from '@sislog/shared/versao'
 import {
   LayoutDashboard,
   Inbox,
+  MessageSquare,
   CalendarClock,
   RotateCcw,
   ClipboardCheck,
@@ -39,6 +40,7 @@ import {
 } from '@/features/auth/permissions'
 import { useRecebidasCount } from '@/features/solicitacoes/useSolicitacoes'
 import { useAgendamentosPendentesCount } from '@/features/agendamentos/useAgendamentos'
+import { useConversasAtencaoCount } from '@/features/agente/useConversas'
 
 interface NavItem {
   to: string
@@ -65,6 +67,7 @@ function iniciais(nome: string): string {
 const operacional: NavItem[] = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/solicitacoes', label: 'Solicitações', icon: Inbox },
+  { to: '/conversas', label: 'Conversas', icon: MessageSquare },
   { to: '/agendamentos', label: 'Agendamentos', icon: CalendarClock },
   { to: '/cargas-retorno', label: 'Cargas de Retorno', icon: RotateCcw },
   { to: '/conferencia-viagem', label: 'Conferência de Viagem', icon: ClipboardCheck },
@@ -109,13 +112,20 @@ export function SidebarContent({ collapsed, onToggleCollapse, onNavigate, onClos
   const recebidasCount = recebidas.data ?? 0
   const agendamentos = useAgendamentosPendentesCount()
   const agendamentosCount = agendamentos.data ?? 0
+  const atencaoAgente = useConversasAtencaoCount()
+  const atencaoCount = (atencaoAgente.data?.comHumano ?? 0) + (atencaoAgente.data?.rascunhos ?? 0)
 
   // Contadores por rota: o badge é sempre "o que está esperando a equipe" —
-  // solicitações recebidas e agendamentos ainda não concluídos.
+  // solicitações recebidas, conversas que o agente passou para a equipe (ou
+  // rascunhos dele a decidir) e agendamentos ainda não concluídos.
   const badges: Record<string, { count: number; title: string }> = {
     '/solicitacoes': {
       count: recebidasCount,
       title: `${recebidasCount} solicitação(ões) com status Recebida`,
+    },
+    '/conversas': {
+      count: atencaoCount,
+      title: `${atencaoAgente.data?.comHumano ?? 0} conversa(s) com a equipe · ${atencaoAgente.data?.rascunhos ?? 0} rascunho(s) do agente`,
     },
     '/agendamentos': {
       count: agendamentosCount,

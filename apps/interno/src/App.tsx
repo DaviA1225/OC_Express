@@ -35,6 +35,7 @@ const ConferenciaViagemPage = lazy(() => import('@/pages/conferencia/Conferencia
 const AuditoriaPage = lazy(() => import('@/pages/auditoria/AuditoriaPage'))
 const SegurancaPage = lazy(() => import('@/pages/seguranca/SegurancaPage'))
 const PrivacidadePage = lazy(() => import('@/pages/privacidade/PrivacidadePage'))
+const ConversasPage = lazy(() => import('@/pages/conversas/ConversasPage'))
 const RelatoriosPage = lazy(() => import('@/pages/relatorios/RelatoriosPage'))
 const RelatoriosInternosPage = lazy(() => import('@/pages/relatorios/RelatoriosInternosPage'))
 const AtividadeEquipePage = lazy(() => import('@/pages/atividade/AtividadeEquipePage'))
@@ -73,6 +74,7 @@ export default function App() {
                 <Route path="/dashboard" element={<DashboardPage />} />
                 <Route path="/solicitacoes" element={<SolicitacoesListPage />} />
                 <Route path="/solicitacoes/:id" element={<SolicitacaoDetailPage />} />
+                <Route path="/conversas" element={<ConversasPage />} />
                 <Route path="/agendamentos" element={<AgendamentosPage />} />
                 <Route path="/cargas-retorno" element={<CargasRetornoPage />} />
                 <Route path="/conferencia-viagem" element={<ConferenciaViagemPage />} />

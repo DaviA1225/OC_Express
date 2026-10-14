@@ -84,10 +84,29 @@ o agente transfere para humano.
 | Fase | Entrega | Estado |
 |---|---|---|
 | 1 | Webhook, fila, mídia, ciclo do agente, ferramentas, modo sombra, migration 0078, Edge Function de login | **código pronto, não implantado** |
-| 1b | Tela **Conversas** no interno: ver conversas, assumir/devolver, responder, aprovar/rejeitar rascunhos, trocar o modo | a fazer |
+| 1b | Tela **Conversas** no interno: ver conversas, assumir/devolver, responder, aprovar/rejeitar rascunhos, trocar o modo | **código pronto** |
 | 1c | Avaliação: casos de teste montados com mensagens reais, rodados contra o agente antes de cada mudança de prompt | a fazer |
 | 2 | Autonomia no número de teste → número principal | depende de 1b/1c |
 | 3 | PDF da OC no servidor (portar `OCDocument.tsx` para `packages/shared`), envio automático ao motorista quando a OC fica pronta, modelos de mensagem aprovados pela Meta para fora da janela de 24 h | a fazer |
+
+## 6.1 Tela Conversas (`/conversas`, fase 1b)
+
+- Para toda a equipe interna; item "Conversas" no menu com contador de conversas com a
+  equipe + rascunhos a decidir. Só admin troca o modo.
+- Lista à esquerda (busca por nome/telefone; filtros Todas · Com a equipe · Rascunhos),
+  conversa à direita. Linha do tempo com mensagens, mídia (áudio com transcrição, foto,
+  PDF por URL assinada de 1 h) e as ações do agente.
+- **Assumir** (direto pela RLS) pausa o agente na conversa; **Devolver ao agente** passa
+  pelo servidor e ele retoma as mensagens que ficaram na fila, sabendo o que a equipe disse.
+- **Responder**: só com a conversa assumida (ou no modo sombra) e dentro das 24 h da Meta.
+  No modo sombra, cada resposta sugerida tem "Enviar esta resposta".
+- **Rascunhos** (modo sombra): Aprovar executa a ferramenta com o login de quem aprovou
+  (auditoria no nome dele), com as mesmas validações do agente; Rejeitar só marca.
+- O navegador nunca vê o token da Meta: `/api/agente` é reescrito pelo `vercel.json` do
+  interno para `api/painel` do agente (**domínio assumido: `sislog-agente.vercel.app`** —
+  ajustar o rewrite se o projeto Vercel tiver outro nome). No dev, o Vite faz proxy para
+  `AGENTE_DEV_URL` (padrão `http://localhost:3000`).
+- CSP do interno ganhou `media-src` para tocar o áudio do bucket.
 
 ## 7. Checklist de implantação (fase 1)
 
@@ -95,7 +114,8 @@ o agente transfere para humano.
 2. Criar o usuário do agente no Auth + linha em `perfis_usuarios` (perfil `assistente`, nome "Agente IA").
 3. `supabase secrets set AGENTE_EMAIL=... AGENTE_LOGIN_SECRET=...` e `supabase functions deploy agente-sessao`.
 4. Meta: app + número de teste + token permanente de System User + webhook apontando para `/api/whatsapp`.
-5. Projeto Vercel `apps/agente-whatsapp` com as variáveis do `.env.example`.
+5. Projeto Vercel `apps/agente-whatsapp` com as variáveis do `.env.example`, **com o nome
+   `sislog-agente`** (o rewrite `/api/agente` do interno aponta para esse domínio).
 6. Ligar `agente_config.modo = 'autonomo'` **no número de teste** e testar com a equipe fazendo o papel de solicitante.
 
 ## 8. Riscos conhecidos
