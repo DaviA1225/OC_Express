@@ -181,6 +181,14 @@ lote, admin), e foi assim que os primeiros órfãos apareceram, em 2026-10-06.
   `signOut()`, que revoga o refresh token no servidor — a estação que ficou
   aberta na sala de operação deixa de ser um acesso válido. O padrão anterior
   era sessão perpétua (o Supabase renova o token sozinho, indefinidamente).
+  Recarregar a página ou reabrir o navegador **não** zera a contagem: o
+  carimbo de atividade fica preso à sessão.
+- **O servidor também aplica o limite** (migration 0077): um hook de Custom
+  Access Token recusa renovar o token de sessão sem interação há mais de
+  60 minutos — 10 de folga sobre o cliente, para o servidor nunca derrubar
+  antes do aviso. Cobre o navegador fechado sem logout e o refresh token
+  copiado do disco. O recurso nativo (*Auth → Sessions → Inactivity timeout*)
+  é de plano pago; o hook faz o mesmo no Free.
 - O "lembrar" da tela de login guarda **apenas o e-mail**, em cookie
   `SameSite=Lax` + `Secure`, por escolha explícita do usuário na caixa
   *"Lembrar meu e-mail neste computador"*. **Senha e token de sessão nunca são
@@ -207,7 +215,7 @@ lote, admin), e foi assim que os primeiros órfãos apareceram, em 2026-10-06.
 | 5 | MFA obrigatório para perfis internos | Técnica |
 | ~~6~~ | ~~Tela para `log_acesso` e para a fila de órfãos do storage~~ — feito em `/privacidade` | Técnica |
 | ~~7~~ | ~~Tela para os pedidos de titular~~ — feito em `/privacidade` | Técnica |
-| 8 | **Expiração de sessão no servidor** (Auth → Sessions no Dashboard): o limite de 50 min hoje é aplicado pelo cliente | Técnica |
+| 8 | **Expiração de sessão no servidor** — código na 0077; falta **ligar o hook** no Dashboard (Auth → Hooks → Customize Access Token → `public.hook_limite_inatividade`) | Técnica |
 
 As pendências 1 a 3 são as que um pedido da ANPD cobraria primeiro, e nenhuma
 delas se resolve em código.

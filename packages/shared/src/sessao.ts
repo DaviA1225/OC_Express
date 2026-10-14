@@ -34,6 +34,18 @@
  * sozinho renovariam a sessão de uma estação vazia, que é exatamente o caso
  * que este módulo existe para fechar.
  *
+ * **O carimbo pertence a uma sessão.** Ele é gravado junto com o `session_id`
+ * do JWT. Recarregar a página ou reabrir o navegador mantém a sessão — e o
+ * carimbo antigo vale: quem fechou o navegador e voltou duas horas depois cai
+ * na primeira checagem. Um login novo tem outro `session_id`, então o carimbo
+ * de quem usou a máquina antes é descartado. (Até a 0077 o vigia zerava o
+ * relógio a cada carregamento, e um F5 renovava a sessão.)
+ *
+ * **O servidor também conta.** Interações reais mandam um batimento
+ * (`registrar_atividade_sessao`, no máximo a cada 5 min); o hook da 0077 recusa
+ * renovar o token de sessão parada há mais de 60 min. É a rede de segurança
+ * para o navegador fechado sem logout e para o token copiado do disco.
+ *
  * Sem React aqui de propósito: os dois apps consomem isto, e cada um monta o
  * aviso com o próprio kit de UI.
  */
@@ -64,6 +76,10 @@ const THROTTLE_GRAVACAO_MS = 20_000
 /** Eventos que contam como interação. Ver a nota sobre `mousemove` acima. */
 const EVENTOS_ATIVIDADE = ['pointerdown', 'keydown', 'wheel', 'touchstart'] as const
 
+/** Teto do batimento no servidor. O hook da 0077 corta aos 60 min, 10 acima
+ *  do limite do cliente, justamente para absorver este atraso. */
+const THROTTLE_SERVIDOR_MS = 5 * 60_000
+
 export type MotivoSaida = 'inatividade'
 
 // Espelho em memória: em aba anônima ou com armazenamento bloqueado o
@@ -71,23 +87,56 @@ export type MotivoSaida = 'inatividade'
 // parar de funcionar por isso — degrada para "por aba" em vez de sumir.
 let carimboEmMemoria = Date.now()
 let ultimaGravacao = 0
+let ultimoEnvioServidor = 0
+/** Sessão dona do carimbo. Vazia antes de o vigia ligar. */
+let sessaoAtual = ''
 
 function agora(): number {
   return Date.now()
 }
 
-/** Instante da última interação, em epoch ms. */
-export function lerUltimaAtividade(): number {
+/**
+ * `session_id` do access token, ou '' se não der para ler. Só decodifica o
+ * payload — não valida assinatura, e nem precisa: é uma chave de carimbo local,
+ * não uma decisão de acesso.
+ */
+export function idDaSessao(accessToken: string | null | undefined): string {
+  try {
+    const payload = accessToken?.split('.')[1]
+    if (!payload) return ''
+    const json = atob(payload.replace(/-/g, '+').replace(/_/g, '/'))
+    const id = (JSON.parse(json) as { session_id?: unknown }).session_id
+    return typeof id === 'string' ? id : ''
+  } catch {
+    return ''
+  }
+}
+
+/** Carimbo gravado para a sessão atual, ou null se não houver (outra sessão,
+ *  formato antigo, valor corrompido, armazenamento bloqueado). */
+function lerCarimboGravado(): number | null {
+  // Sem id não dá para saber de quem é o carimbo: tratar como sessão nova
+  // (relógio zera a cada carregamento) é melhor que derrubar um login novo
+  // com o carimbo de outra pessoa.
+  if (!sessaoAtual) return null
   try {
     const bruto = window.localStorage.getItem(CHAVE_ATIVIDADE)
-    const valor = bruto ? Number(bruto) : NaN
+    if (!bruto) return null
+    const sep = bruto.lastIndexOf('|')
+    if (sep < 0 || bruto.slice(0, sep) !== sessaoAtual) return null
+    const valor = Number(bruto.slice(sep + 1))
     // Valor corrompido (mão humana no DevTools, extensão) não pode virar uma
-    // sessão eterna nem um logout imediato: cai no espelho em memória.
-    if (!Number.isFinite(valor) || valor <= 0) return carimboEmMemoria
+    // sessão eterna nem um logout imediato.
+    if (!Number.isFinite(valor) || valor <= 0) return null
     return valor
   } catch {
-    return carimboEmMemoria
+    return null
   }
+}
+
+/** Instante da última interação, em epoch ms. */
+export function lerUltimaAtividade(): number {
+  return lerCarimboGravado() ?? carimboEmMemoria
 }
 
 /** Carimba "o usuário interagiu agora". Idempotente e barata: o throttle segura
@@ -98,7 +147,7 @@ export function marcarAtividade(): void {
   if (t - ultimaGravacao < THROTTLE_GRAVACAO_MS) return
   ultimaGravacao = t
   try {
-    window.localStorage.setItem(CHAVE_ATIVIDADE, String(t))
+    window.localStorage.setItem(CHAVE_ATIVIDADE, `${sessaoAtual}|${t}`)
   } catch {
     // Sem armazenamento: o espelho em memória já foi atualizado.
   }
@@ -109,6 +158,7 @@ export function marcarAtividade(): void {
 export function limparAtividade(): void {
   carimboEmMemoria = agora()
   ultimaGravacao = 0
+  ultimoEnvioServidor = 0
   try {
     window.localStorage.removeItem(CHAVE_ATIVIDADE)
   } catch {
@@ -157,6 +207,11 @@ export function limparMotivoSaida(): void {
 }
 
 export interface OpcoesVigia {
+  /** `session_id` do JWT (ver `idDaSessao`). Amarra o carimbo à sessão. */
+  idSessao: string
+  /** Batimento no servidor (a RPC `registrar_atividade_sessao`). Chamada no
+   *  máximo a cada 5 min, só por interação real. Falha é ignorada. */
+  aoRegistrarNoServidor?: () => void
   /** Padrão: `INATIVIDADE_MS`. */
   ttlMs?: number
   /** Padrão: `AVISO_MS`. */
@@ -172,8 +227,8 @@ export interface OpcoesVigia {
 /**
  * Liga o vigia. Devolve a função de desligar (chamar ao deslogar/desmontar).
  *
- * Carimba a atividade na largada: quem acabou de entrar não pode herdar o
- * relógio de uma sessão anterior daquela máquina.
+ * Na largada, sessão nova (login) começa o relógio do zero; sessão restaurada
+ * (F5, navegador reaberto) herda o carimbo gravado e é conferida na hora.
  */
 export function observarInatividade(opcoes: OpcoesVigia): () => void {
   const ttlMs = opcoes.ttlMs ?? INATIVIDADE_MS
@@ -182,14 +237,35 @@ export function observarInatividade(opcoes: OpcoesVigia): () => void {
   let expirado = false
   let avisando = false
 
-  // `limparAtividade` também zera o throttle, então o `marcarAtividade` logo
-  // abaixo grava de fato em vez de cair no teto de 20 s.
-  limparAtividade()
-  marcarAtividade()
+  sessaoAtual = opcoes.idSessao
+
+  const avisarServidor = () => {
+    if (!opcoes.aoRegistrarNoServidor) return
+    const t = agora()
+    if (t - ultimoEnvioServidor < THROTTLE_SERVIDOR_MS) return
+    ultimoEnvioServidor = t
+    try {
+      opcoes.aoRegistrarNoServidor()
+    } catch {
+      // O limite do cliente segue valendo sem o batimento.
+    }
+  }
+
+  const gravado = lerCarimboGravado()
+  if (gravado === null) {
+    // Sessão que este navegador ainda não viu: é login. `limparAtividade`
+    // também zera os throttles, então as duas chamadas abaixo valem de fato.
+    limparAtividade()
+    marcarAtividade()
+    avisarServidor()
+  } else {
+    carimboEmMemoria = gravado
+  }
 
   const aoInteragir = () => {
     if (expirado) return
     marcarAtividade()
+    avisarServidor()
     if (avisando) {
       avisando = false
       opcoes.aoRetomar()
@@ -227,6 +303,8 @@ export function observarInatividade(opcoes: OpcoesVigia): () => void {
   }
   document.addEventListener('visibilitychange', aoMudarVisibilidade)
   const timer = window.setInterval(conferir, INTERVALO_TICK_MS)
+  // Sessão restaurada com carimbo vencido cai já, sem esperar o primeiro tick.
+  conferir()
 
   function desligar() {
     window.clearInterval(timer)
