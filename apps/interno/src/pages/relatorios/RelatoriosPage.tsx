@@ -1,4 +1,5 @@
 import * as React from 'react'
+import { DADOS_SIMULADOS } from '@/features/metricas/fonte'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
@@ -180,7 +181,10 @@ export default function RelatoriosPage() {
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button type="button" variant="outline" disabled={exportando}>
+                {/* Com dados simulados, nada de CSV: o arquivo sairia do sistema
+                    sem a faixa de aviso e ainda registraria export_csv no log de
+                    acesso (LGPD) por uma exportação falsa. */}
+                <Button type="button" variant="outline" disabled={exportando || DADOS_SIMULADOS} title={DADOS_SIMULADOS ? 'Exportação liberada quando os dados reais estiverem ligados' : undefined}>
                   {exportando ? <Spinner /> : <Download className="h-4 w-4" />}
                   <span className="hidden sm:inline">Exportar</span>
                   <ChevronDown className="h-4 w-4" />

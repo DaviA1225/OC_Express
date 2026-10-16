@@ -1,4 +1,6 @@
 import * as React from 'react'
+import { useAuth } from '@/hooks/useAuth'
+import { canViewRelatorios } from '@/features/auth/permissions'
 import { Link } from 'react-router-dom'
 import { AlertTriangle, Clock, Inbox, MonitorPlay, PackageCheck, Timer, TriangleAlert } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -43,6 +45,7 @@ export default function DashboardPage() {
   const hoje = usePainelHoje(filtros)
   const metas = useMetasSla()
   const agora = useAgora(30_000)
+  const podeVerRelatorios = canViewRelatorios(useAuth().profile)
 
   const e = estado.data
   const h = hoje.data
@@ -121,7 +124,7 @@ export default function DashboardPage() {
           value={hoje.isLoading ? <Esqueleto /> : hoje.isError ? '—' : <Lead p={h?.lead7d} />}
           delta={h && amostraOk(h.lead7d) && amostraOk(h.lead7d_ant) ? deltaPct(h.lead7d.p50 as number, h.lead7d_ant.p50 as number, 'vs. 7 dias anteriores', false) : undefined}
           hint={h && (amostraOk(h.lead7d) ? <span className="tabular-nums">P90 {fmtDur(h.lead7d.p90)} · n={fmtInt(h.lead7d.n)}</span> : 'amostra pequena')}
-          to="/relatorios?aba=fluxo"
+          to={podeVerRelatorios ? '/relatorios?aba=fluxo' : undefined}
         />
         <KpiTile
           label="OCs vencendo"

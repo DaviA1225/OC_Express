@@ -1,4 +1,5 @@
 import * as React from 'react'
+import { DADOS_SIMULADOS } from '@/features/metricas/fonte'
 import { toast } from 'sonner'
 import { Save, Undo2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -243,7 +244,12 @@ function Formulario({ config, podeEditar, autorNome }: { config: ConfigMetasSla;
             <Button type="button" variant="outline" disabled={!alterado || salvar.isPending} onClick={() => descartar.onOpenChange(false)}>
               <Undo2 className="h-4 w-4" /> Descartar
             </Button>
-            <Button type="submit" disabled={!alterado || salvar.isPending}>
+            {/* Simulado: a config vive só na memória da aba — "salvou" seria mentira. */}
+            <Button
+              type="submit"
+              disabled={!alterado || salvar.isPending || DADOS_SIMULADOS}
+              title={DADOS_SIMULADOS ? 'Salvar fica disponível quando os dados reais estiverem ligados' : undefined}
+            >
               {salvar.isPending ? <Spinner /> : <Save className="h-4 w-4" />}
               Salvar
             </Button>

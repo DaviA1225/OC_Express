@@ -1,4 +1,5 @@
 import { toast } from 'sonner'
+import { DADOS_SIMULADOS } from '@/features/metricas/fonte'
 import { AlarmClock, CheckCircle2, ClipboardList, Download, Handshake, TriangleAlert } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -66,7 +67,7 @@ export default function RelatoriosInternosPage() {
               mostrarLimpar={!intervalo.noPadrao}
               onLimpar={intervalo.limpar}
             />
-            <Button type="button" variant="outline" onClick={exportar} disabled={q.isLoading || !data} title="Exportar produtividade em CSV">
+            <Button type="button" variant="outline" onClick={exportar} disabled={q.isLoading || !data || DADOS_SIMULADOS} title={DADOS_SIMULADOS ? 'Exportação liberada quando os dados reais estiverem ligados' : 'Exportar produtividade em CSV'}>
               <Download className="h-4 w-4" />
               <span className="hidden sm:inline">Exportar</span>
             </Button>
