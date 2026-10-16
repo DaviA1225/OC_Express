@@ -618,6 +618,80 @@ BEGIN
 END; $function$;
 
 -- ─────────────────────────────────────────────────────────────────────────────
+-- 6b. LGPD: aceite do termo e registro de acesso da conta da TV contam como
+--     'interno' (corpos iguais aos vigentes, só a origem muda)
+-- ─────────────────────────────────────────────────────────────────────────────
+
+CREATE OR REPLACE FUNCTION public.registrar_aceite_termos(p_versao text)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+  v_user   uuid := auth.uid();
+  v_versao text := NULLIF(btrim(left(p_versao, 40)), '');
+  v_origem text;
+  v_id     uuid;
+BEGIN
+  IF v_user IS NULL THEN
+    RAISE EXCEPTION 'Sessao nao identificada.' USING ERRCODE = '42501';
+  END IF;
+  IF v_versao IS NULL THEN
+    RAISE EXCEPTION 'Versao do termo nao informada.' USING ERRCODE = '22004';
+  END IF;
+
+  -- 0079: a conta da TV não é is_interno(), mas também não é do portal.
+  v_origem := CASE WHEN is_interno() OR is_painel_tv() THEN 'interno' ELSE 'portal' END;
+
+  INSERT INTO termos_aceite (user_id, versao, origem)
+  VALUES (v_user, v_versao, v_origem)
+  ON CONFLICT (user_id, versao) DO NOTHING
+  RETURNING id INTO v_id;
+
+  IF v_id IS NULL THEN
+    SELECT id INTO v_id FROM termos_aceite
+     WHERE user_id = v_user AND versao = v_versao;
+  END IF;
+
+  RETURN v_id;
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.registrar_acesso(p_acao text, p_recurso text DEFAULT NULL::text, p_detalhe jsonb DEFAULT NULL::jsonb)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+  v_user uuid := auth.uid(); v_headers json; v_ip text; v_ua text;
+  v_origem text; v_detalhe jsonb; v_id uuid;
+BEGIN
+  IF v_user IS NULL THEN RETURN NULL; END IF;
+  IF p_acao NOT IN ('export_csv', 'download_oc_pdf', 'abrir_anexo',
+                    'abrir_documento_agendamento', 'copiar_cpf') THEN
+    RETURN NULL;  -- entrada invalida nao derruba o fluxo do usuario
+  END IF;
+  BEGIN v_headers := current_setting('request.headers', true)::json;
+  EXCEPTION WHEN OTHERS THEN v_headers := NULL; END;
+  IF v_headers IS NOT NULL THEN
+    v_ip := NULLIF(btrim(split_part(v_headers ->> 'x-forwarded-for', ',', 1)), '');
+    v_ua := left(v_headers ->> 'user-agent', 500);
+  END IF;
+  -- 0079: a conta da TV não é is_interno(), mas também não é do portal.
+  v_origem := CASE WHEN is_interno() OR is_painel_tv() THEN 'interno' ELSE 'portal' END;
+  v_detalhe := p_detalhe;
+  IF v_detalhe IS NOT NULL AND length(v_detalhe::text) > 1024 THEN
+    v_detalhe := jsonb_build_object('truncado', true);
+  END IF;
+  INSERT INTO log_acesso (usuario_id, acao, recurso, detalhe, ip, user_agent, origem)
+  VALUES (v_user, p_acao, left(p_recurso, 120), v_detalhe, v_ip, v_ua, v_origem)
+  RETURNING id INTO v_id;
+  RETURN v_id;
+END; $function$;
+
+-- ─────────────────────────────────────────────────────────────────────────────
 -- 7. Consulta de consistência (rodar depois de aplicar; tudo deve dar 0)
 -- ─────────────────────────────────────────────────────────────────────────────
 -- SELECT

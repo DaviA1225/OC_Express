@@ -197,7 +197,8 @@ BEGIN
                             AND s.pamcard_providenciado_em IS NULL
                             AND s.status NOT IN ('finalizada', 'cancelada')
                             AND dash_filtro(s.origem, s.cliente_id, s.local_carregamento, p_origem, p_cliente_id, p_local)),
-    'pendencias_parceiro', (SELECT count(*) FROM solicitacao_pendencias p JOIN solicitacoes s ON s.id = p.solicitacao_id
+    -- Solicitações distintas (uma com 2 pendências conta 1, como na lista).
+    'pendencias_parceiro', (SELECT count(DISTINCT p.solicitacao_id) FROM solicitacao_pendencias p JOIN solicitacoes s ON s.id = p.solicitacao_id
                              WHERE p.status = 'aberta' AND p.parceiro_id IS NOT NULL
                                AND dash_filtro(s.origem, s.cliente_id, s.local_carregamento, p_origem, p_cliente_id, p_local)),
     'por_local', coalesce((SELECT jsonb_agg(jsonb_build_object('local', local, 'qtd', qtd, 'fora_sla', fora_sla) ORDER BY rk)
