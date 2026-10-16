@@ -5,12 +5,14 @@ import { History, MapPin, ArrowRight, User, Truck } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { SolicitacaoStatusBadge } from '@/components/shared/SolicitacaoStatusBadge'
 import { formatNumeroOC } from '@/lib/utils'
-import { HISTORICO_JANELA_DIAS, useHistoricoOperacional } from './useHistorico'
+import { HISTORICO_JANELA_DIAS, useHistoricoOperacional, type IdsProprios } from './useHistorico'
 
 interface Props {
   solicitacaoId: string
-  motoristaId: string | null
-  veiculoId: string | null
+  /** CPF e placa, não ids: o mesmo motorista/cavalo pode estar no cadastro
+   *  interno e no do parceiro (ver useHistoricoOperacional). */
+  motoristaCpf: string | null
+  idsProprios: IdsProprios
   clienteId: string | null
   motoristaNome?: string | null
   veiculoPlaca?: string | null
@@ -18,20 +20,21 @@ interface Props {
 
 export function HistoricoCard({
   solicitacaoId,
-  motoristaId,
-  veiculoId,
+  motoristaCpf,
+  idsProprios,
   clienteId,
   motoristaNome,
   veiculoPlaca,
 }: Props) {
   const q = useHistoricoOperacional({
-    motoristaId,
-    veiculoId,
+    motoristaCpf,
+    veiculoPlaca: veiculoPlaca ?? null,
+    idsProprios,
     clienteId,
     currentId: solicitacaoId,
   })
 
-  if (!motoristaId) {
+  if (!motoristaCpf) {
     return (
       <section className="rounded-lg border bg-card">
         <header className="flex items-center gap-2 border-b px-4 py-2">
@@ -57,7 +60,9 @@ export function HistoricoCard({
         <span className="text-meta text-muted-foreground">Últimos {HISTORICO_JANELA_DIAS}d</span>
       </header>
       <div className="space-y-3 p-4">
-        {q.isLoading || !data ? (
+        {q.isError ? (
+          <p className="text-body text-muted-foreground">Não foi possível carregar o histórico agora.</p>
+        ) : q.isLoading || !data ? (
           <div className="space-y-2">
             <Skeleton className="h-12 w-full" />
             <Skeleton className="h-12 w-full" />

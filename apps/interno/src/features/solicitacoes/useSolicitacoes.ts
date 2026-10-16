@@ -424,6 +424,83 @@ export function useRecebidasCount() {
   })
 }
 
+/**
+ * Etapas que formam a fila de trabalho: o que ainda depende da equipe. A OC
+ * enviada já está com o motorista e só espera a finalização — fica fora da
+ * fila e acessível pelo chip "OC enviada" (Davi, 2026-10-16).
+ */
+export const FILA_STATUSES: SolicitacaoStatus[] = ['recebida', 'em_cadastro', 'instrucao_emitida', 'oc_gerada']
+/** Chips da fila: as etapas dela + OC enviada (filtrável, fora do padrão). */
+export const FILA_CHIPS: SolicitacaoStatus[] = [...FILA_STATUSES, 'oc_enviada']
+
+/**
+ * A próxima da fila depois da solicitação atual, na MESMA ordem da lista (mais
+ * recentes no topo, então a "próxima" é a anterior em chegada), voltando ao
+ * topo quando a atual é a última. Uma consulta só, no clique — percorrer a
+ * fila sem voltar à lista.
+ */
+export async function fetchProximaDaFila(atual: { id: string; created_at: string }): Promise<string | null> {
+  const depois = await supabase
+    .from('solicitacoes')
+    .select('id')
+    .in('status', FILA_STATUSES)
+    .lt('created_at', atual.created_at)
+    .order('created_at', { ascending: false })
+    .order('id', { ascending: false })
+    .limit(1)
+  if (depois.error) throw depois.error
+  const prox = (depois.data ?? []) as { id: string }[]
+  if (prox[0]) return prox[0].id
+  const inicio = await supabase
+    .from('solicitacoes')
+    .select('id')
+    .in('status', FILA_STATUSES)
+    .neq('id', atual.id)
+    .order('created_at', { ascending: false })
+    .limit(1)
+  if (inicio.error) throw inicio.error
+  return ((inicio.data ?? []) as { id: string }[])[0]?.id ?? null
+}
+
+/**
+ * Quantas solicitações há em cada etapa da fila, com os MESMOS filtros da lista
+ * (menos etapa, busca e página) — senão o chip diria "Recebida 12" com a lista
+ * mostrando 3. UMA requisição (só a coluna status das abertas, poucas dezenas
+ * de linhas) em vez de um count por etapa; a chave fica sob `['solicitacoes']`
+ * para o realtime invalidá-la junto com a lista, e só roda com a fila na tela
+ * (`ativo`) — cada requisição a mais por evento pesa na cota de logs.
+ * O PostgREST corta em 1000 linhas: acima disso o total vira "1000+".
+ */
+export function useContagemFila(
+  // Sem De/Até de propósito: a lista não os usa, e quando usar, a contagem tem
+  // que cortar o dia igual a ela (aplicarIntervaloDias, PR #110).
+  filters: Pick<ListFilters, 'periodo' | 'materialId' | 'tipo' | 'origem' | 'pamcard' | 'apenasAtrasadas'>,
+  ativo: boolean,
+) {
+  return useQuery({
+    enabled: ativo,
+    queryKey: ['solicitacoes', 'contagem-fila', filters],
+    queryFn: async () => {
+      let query = supabase.from('solicitacoes').select('status').in('status', FILA_CHIPS)
+      if (filters.materialId) query = query.eq('material_id', filters.materialId)
+      if (filters.tipo !== 'todos') query = query.eq('tipo', filters.tipo)
+      query = applyOrigemPamcardFilters(query, filters)
+      if (filters.apenasAtrasadas) query = query.in('status', SLA_PENDING_STATUSES).lt('created_at', slaThresholdISO())
+      const since = periodoToISO(filters.periodo)
+      if (since) query = query.gte('created_at', since)
+      const { data, error } = await query.range(0, 999)
+      if (error) throw error
+      const porEtapa = Object.fromEntries(FILA_CHIPS.map((st) => [st, 0])) as Record<SolicitacaoStatus, number>
+      const linhas = (data ?? []) as { status: SolicitacaoStatus }[]
+      for (const r of linhas) porEtapa[r.status] += 1
+      // O total do botão "Fila de trabalho" é só a fila (sem as OCs enviadas).
+      const total = linhas.filter((r) => FILA_STATUSES.includes(r.status)).length
+      return { porEtapa, total, truncado: linhas.length >= 1000 }
+    },
+    staleTime: 30_000,
+  })
+}
+
 export function useCreateSolicitacao() {
   const qc = useQueryClient()
   return useMutation({

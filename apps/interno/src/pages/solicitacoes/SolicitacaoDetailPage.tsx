@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { AlertCircle, ArrowLeft, Check, CheckCircle2, ChevronLeft, Copy, CreditCard, Mail, MessageCircle, MoreHorizontal, Pencil, RotateCcw, Undo2, X } from 'lucide-react'
+import { AlertCircle, ArrowLeft, Check, CheckCircle2, ChevronLeft, ChevronRight, Copy, CreditCard, Mail, MessageCircle, MoreHorizontal, Pencil, RotateCcw, Undo2, X } from 'lucide-react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { toast } from 'sonner'
@@ -38,6 +38,8 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { AnexosCard } from '@/features/anexos/AnexosCard'
 import { HistoricoCard } from '@/features/solicitacoes/HistoricoCard'
+import { fetchProximaDaFila } from '@/features/solicitacoes/useSolicitacoes'
+import { useCabecalhoFixo } from '@/hooks/useCabecalhoFixo'
 import { AgendamentoCard } from '@/features/agendamentos/AgendamentoCard'
 import { usePendencias, useDevolverParceiro, useMarcarPendenciaVista, useMarcarPendencia, useResolverPendenciaInterna, type Pendencia } from '@/features/solicitacoes/usePendencias'
 const GerarOCDialog = React.lazy(() =>
@@ -113,6 +115,22 @@ export function SolicitacaoDetailPage({ embutido }: SolicitacaoDetailPageProps =
       return data as Pick<Tables<'materiais'>, 'cnpj_filial' | 'filial' | 'origem_padrao' | 'observacoes_padrao'>
     },
   })
+
+  const [sentinelaCabecalho, cabecalhoFixo] = useCabecalhoFixo()
+  const [buscandoProxima, setBuscandoProxima] = React.useState(false)
+  const abrirProximaDaFila = async () => {
+    if (!detail.data) return
+    setBuscandoProxima(true)
+    try {
+      const prox = await fetchProximaDaFila(detail.data)
+      if (prox) navigate(`/solicitacoes/${prox}`)
+      else toast.info('Não há outra solicitação na fila de trabalho.')
+    } catch {
+      toast.error('Não foi possível buscar a próxima da fila.')
+    } finally {
+      setBuscandoProxima(false)
+    }
+  }
 
   if (detail.isLoading) {
     return (
@@ -272,6 +290,22 @@ export function SolicitacaoDetailPage({ embutido }: SolicitacaoDetailPageProps =
         </div>
       )}
 
+      {/* Cabeçalho fixo: número, status e a ação da etapa ficam à mão enquanto
+          o atendente rola para preencher os blocos (antes era preciso voltar ao
+          topo para avançar). Só na página inteira — o painel do modo ERP já
+          tem o próprio cabeçalho. */}
+      {!embutido && <div ref={sentinelaCabecalho} aria-hidden className="h-0" />}
+      <div
+        className={cn(
+          // O sticky para no padding do <main>: topo negativo + margem/padding
+          // iguais ao padding dele cobrem a faixa de cima sem deslocar nada (`!`
+          // vence a margem do space-y-4 do pai).
+          !embutido &&
+            'sticky -top-3 z-20 -mx-3 !-mt-3 border-b border-transparent bg-canvas px-3 pb-2 pt-3 sm:-top-4 sm:-mx-4 sm:!-mt-4 sm:px-4 sm:pt-4 md:-top-5 md:-mx-6 md:!-mt-5 md:px-6 md:pt-5 print:static print:!m-0 print:border-0 print:p-0',
+          // Só cor da borda e sombra mudam ao grudar: nada de salto de layout.
+          !embutido && cabecalhoFixo && 'border-border shadow-sm',
+        )}
+      >
       <PageHeader
         className="mb-0"
         breadcrumb={embutido ? undefined : [
@@ -375,9 +409,22 @@ export function SolicitacaoDetailPage({ embutido }: SolicitacaoDetailPageProps =
               Voltar
             </Button>
           )}
+          {!embutido && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={abrirProximaDaFila}
+              disabled={buscandoProxima}
+              title="Abrir a próxima solicitação da fila de trabalho, na ordem da lista (sem os filtros da lista)"
+            >
+              {buscandoProxima ? <Spinner /> : <ChevronRight className="h-4 w-4" />}
+              Próxima da fila
+            </Button>
+          )}
         </>
         }
       />
+      </div>
 
       <div className={cn('grid grid-cols-1 gap-4', !embutido && 'lg:grid-cols-3')}>
         <div className={cn('space-y-4', !embutido && 'lg:col-span-2')}>
@@ -427,8 +474,13 @@ export function SolicitacaoDetailPage({ embutido }: SolicitacaoDetailPageProps =
           <AgendamentoCard solicitacaoId={s.id} clienteId={s.cliente_id} status={s.status} />
           <HistoricoCard
             solicitacaoId={s.id}
-            motoristaId={s.motorista_id}
-            veiculoId={s.veiculo_id}
+            motoristaCpf={s.motorista?.cpf ?? null}
+            idsProprios={{
+              motoristaId: s.motorista_id,
+              parceiroMotoristaId: s.parceiro_motorista_id,
+              veiculoId: s.veiculo_id,
+              parceiroVeiculoId: s.parceiro_veiculo_id,
+            }}
             clienteId={s.cliente_id}
             motoristaNome={s.motorista?.nome_completo ?? null}
             veiculoPlaca={s.veiculo?.placa ?? null}
