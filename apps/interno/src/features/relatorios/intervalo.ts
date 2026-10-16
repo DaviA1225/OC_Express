@@ -1,12 +1,12 @@
 // Intervalo De/Até das telas de análise (Relatórios e Produtividade). As datas
 // são `yyyy-mm-dd`, como o `<input type="date">` usa, e chegam inteiras às
-// RPCs (`p_de`, `p_ate`, inclusivas, cortadas no fuso de São Paulo no servidor).
+// RPCs (`p_de`, `p_ate`, inclusivas, cortadas no fuso de Mato Grosso do Sul no servidor).
 
-import { hojeSP, somarDiasIso } from '@/lib/datasSp'
+import { hojeOperacao, somarDiasIso } from '@/lib/datasOperacao'
 
-/** Intervalo inicial das telas: os últimos N dias terminando hoje (dia de São Paulo). */
+/** Intervalo inicial das telas: os últimos N dias terminando hoje (dia de Mato Grosso do Sul). */
 export function intervaloPadrao(dias: number): { de: string; ate: string } {
-  const ate = hojeSP()
+  const ate = hojeOperacao()
   return { de: somarDiasIso(ate, -(dias - 1)), ate }
 }
 

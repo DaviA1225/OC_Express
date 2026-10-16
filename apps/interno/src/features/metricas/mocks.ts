@@ -15,8 +15,8 @@
 // vazios), `?cenario=grande` (volumes de milhares), `?cenario=meta` (meta
 // diária de 45 se a config estiver sem meta). Sem parâmetro = operação normal.
 //
-// Dias e horas no fuso do navegador (a operação está em São Paulo); as RPCs
-// reais cortam em America/Sao_Paulo no servidor.
+// Dias e horas no fuso do navegador (a operação está em Mato Grosso do Sul); as RPCs
+// reais cortam em America/Campo_Grande no servidor.
 
 import type { SolicitacaoStatus } from '@/types/database.types'
 import { classificarSla, ETAPAS_FILA, ETAPAS_SLA, mapaSla, minutosNaEtapa, SLA_FALLBACK } from './sla'
@@ -161,12 +161,12 @@ function chaveDia(d: Date): string {
 }
 
 /**
- * Balde no formato do contrato (timestamptz com -03:00): o relógio local do
- * gerador vira o relógio de parede de SP, como o servidor faria.
+ * Balde no formato do contrato (timestamptz com -04:00): o relógio local do
+ * gerador vira o relógio de parede de MS, como o servidor faria.
  */
-function isoSP(d: Date): string {
+function isoOperacao(d: Date): string {
   const p = (n: number) => String(n).padStart(2, '0')
-  return `${chaveDia(d)}T${p(d.getHours())}:00:00-03:00`
+  return `${chaveDia(d)}T${p(d.getHours())}:00:00-04:00`
 }
 
 function lerDia(s: string): Date {
@@ -233,7 +233,7 @@ let config: ConfigMetasSla = {
     id: uuid('sla', i),
     status,
     ...SLA_FALLBACK[status],
-    atualizado_em: '2026-10-16T08:00:00-03:00',
+    atualizado_em: '2026-10-16T08:00:00-04:00',
     atualizado_por: null,
   })),
   metas: {
@@ -243,7 +243,7 @@ let config: ConfigMetasSla = {
     alerta_validade_h: 24,
     expediente_inicio: '07:00',
     expediente_fim: '18:00',
-    atualizado_em: '2026-10-16T08:00:00-03:00',
+    atualizado_em: '2026-10-16T08:00:00-04:00',
     atualizado_por: null,
   },
   ultima_alteracao: null,
@@ -602,7 +602,7 @@ export function mockRelatorioSerie(p: FiltrosPeriodo, gran: Granularidade, agora
       const hfa = porHora(a.finalizadas, fr, agoraPar, par)
       for (let h = 0; h < 24; h++) {
         linhas.push({
-          balde: isoSP(new Date(dia.getFullYear(), dia.getMonth(), dia.getDate(), h)),
+          balde: isoOperacao(new Date(dia.getFullYear(), dia.getMonth(), dia.getDate(), h)),
           entradas: he[h], finalizadas: hf[h], canceladas: hc[h], entradas_ant: hea[h], finalizadas_ant: hfa[h],
         })
       }
@@ -615,7 +615,7 @@ export function mockRelatorioSerie(p: FiltrosPeriodo, gran: Granularidade, agora
     const a = diaRecortado(somarDias(dia, -n), fr, p, cenario)
     // Semana começa na segunda-feira.
     const chave = gran === 'semana' ? somarDias(dia, -((dia.getDay() + 6) % 7)) : dia
-    const balde = isoSP(chave)
+    const balde = isoOperacao(chave)
     const ult = linhas[linhas.length - 1]
     const alvo = ult && ult.balde === balde ? ult : null
     if (alvo) {

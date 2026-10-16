@@ -84,7 +84,7 @@ export function mapaSla(etapas: Pick<SlaEtapa, 'status' | 'aviso_min' | 'alerta_
 
 // ── Vetores de teste (os mesmos da §6.3 do plano, para SQL e front) ─────────
 //
-// Referência: agora = 2026-10-16T15:00:00-03:00; limites 120/480 min.
+// Referência: agora = 2026-10-16T15:00:00-04:00; limites 120/480 min.
 // No SQL: select sla_classificar(status, desde::timestamptz, agora::timestamptz, aviso, alerta, ativo)
 
 export interface VetorSla {
@@ -98,7 +98,7 @@ export interface VetorSla {
   esperado: ClasseSla | null
 }
 
-const AGORA = '2026-10-16T15:00:00-03:00'
+const AGORA = '2026-10-16T15:00:00-04:00'
 const menos = (min: number) => new Date(new Date(AGORA).getTime() - min * 60_000).toISOString()
 
 export const VETORES_SLA: VetorSla[] = [

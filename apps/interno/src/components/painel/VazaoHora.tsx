@@ -3,7 +3,7 @@ import { Bar, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, 
 import { ChartTooltip } from '@/components/charts/ChartTooltip'
 import { axisProps, gridProps } from '@/components/charts/chartTheme'
 import { DRILL_ATIVO, linkSolicitacoes } from '@/features/metricas/links'
-import { hojeSP } from '@/lib/datasSp'
+import { hojeOperacao } from '@/lib/datasOperacao'
 import type { FiltrosComuns, PainelHora } from '@/features/metricas/tipos'
 import { fmtDec, fmtInt } from '@/lib/format'
 import { cn } from '@/lib/utils'
@@ -37,7 +37,7 @@ export function VazaoHora({ porHora, filtros, tv }: Props) {
   const altura = tv ? 360 : 240
   const abrirHora = (hora: number) => {
     if (!filtros || !DRILL_ATIVO) return
-    const hoje = hojeSP()
+    const hoje = hojeOperacao()
     navigate(linkSolicitacoes({ status: 'finalizada', data: 'finalizada', de: hoje, ate: hoje, hora }, filtros))
   }
   return (

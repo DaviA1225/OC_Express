@@ -17,7 +17,7 @@ import { VazaoHora } from '@/components/painel/VazaoHora'
 import { FaixaSimulacaoProducao, SeloSimulado } from '@/features/metricas/SeloSimulado'
 import { DRILL_ATIVO, MSG_DRILL_INATIVO, drillTo, linkSolicitacoes } from '@/features/metricas/links'
 import { LinkDrill } from '@/components/painel/LinkDrill'
-import { diaSP } from '@/lib/datasSp'
+import { diaOperacao } from '@/lib/datasOperacao'
 import { fmtHoraMin, projetarRitmo, rotuloHorario } from '@/features/metricas/rotulos'
 import { ETAPAS_FILA } from '@/features/metricas/sla'
 import { useAgora } from '@/features/metricas/useAgora'
@@ -112,7 +112,7 @@ export default function DashboardPage() {
           value={valor(hoje.isLoading, hoje.isError, h?.finalizadas)}
           delta={h ? deltaPct(h.finalizadas, h.finalizadas_ref, `vs. ontem até ${fmtHoraMin(agora).replace(':', 'h')}`, true) : undefined}
           hint={h && <Ritmo finalizadas={h.finalizadas} projecao={projetarRitmo(h, expediente, new Date(agora))} meta={metaVisivel(h.meta, filtros)} fim={expediente.expediente_fim} />}
-          to={h ? drillTo(linkSolicitacoes({ status: 'finalizada', data: 'finalizada', de: diaSP(agora), ate: diaSP(agora) }, filtros)) : undefined}
+          to={h ? drillTo(linkSolicitacoes({ status: 'finalizada', data: 'finalizada', de: diaOperacao(agora), ate: diaOperacao(agora) }, filtros)) : undefined}
           title={DRILL_ATIVO ? undefined : MSG_DRILL_INATIVO}
         />
         <KpiTile

@@ -7,7 +7,7 @@
 // Convenções:
 // - durações em MINUTOS (`*_min`), percentis como `p50`/`p90` em minutos;
 // - percentuais (`*_pct`) como FRAÇÃO 0–1 (fmtPct já espera fração);
-// - datas de filtro `YYYY-MM-DD` (dia em America/Sao_Paulo, inclusivo);
+// - datas de filtro `YYYY-MM-DD` (dia em America/Campo_Grande, inclusivo);
 // - timestamps ISO 8601.
 
 import type { SolicitacaoStatus } from '@/types/database.types'
@@ -24,7 +24,7 @@ export interface FiltrosComuns {
   local: string | null
 }
 
-/** Período das RPCs de relatório: p_de, p_ate (datas SP, inclusivas). */
+/** Período das RPCs de relatório: p_de, p_ate (datas MS, inclusivas). */
 export interface Periodo {
   de: string
   ate: string
@@ -105,7 +105,7 @@ export interface Percentis {
 }
 
 export interface PainelHora {
-  /** 0–23, hora de São Paulo. */
+  /** 0–23, hora de Mato Grosso do Sul. */
   hora: number
   finalizadas: number
   entradas: number
@@ -156,7 +156,7 @@ export type Granularidade = 'hora' | 'dia' | 'semana'
 export interface SerieLinha {
   /**
    * CONTRATO: timestamptz (ISO 8601 com fuso) do INÍCIO do balde em
-   * America/Sao_Paulo — hora cheia, 00:00 do dia ou 00:00 da segunda-feira. O
+   * America/Campo_Grande — hora cheia, 00:00 do dia ou 00:00 da segunda-feira. O
    * front lê com `lerBalde` (periodo.ts), que também tolera `yyyy-mm-dd`.
    */
   balde: string
