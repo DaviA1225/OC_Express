@@ -15,6 +15,7 @@ import { useMetasSla } from '@/features/metricas/useMetasSla'
 import { usePainelEstadoAtual, usePainelHoje } from '@/features/metricas/usePainel'
 import { useOpcoesClientes } from '@/features/metricas/useRelatorioMetricas'
 import type { PainelEstadoAtual, PainelHoje } from '@/features/metricas/tipos'
+import { relogioOperacao } from '@/lib/datasOperacao'
 import { fmtDelta, fmtDur, fmtInt } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
@@ -334,7 +335,7 @@ function PainelRitmo({
         />
       </div>
       <Secao titulo="Vazão por hora">
-        <VazaoHora porHora={hoje.por_hora} tv />
+        <VazaoHora porHora={hoje.por_hora} tv horaAtual={relogioOperacao(agora).getHours()} />
       </Secao>
     </div>
   )

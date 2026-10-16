@@ -17,7 +17,7 @@ import { VazaoHora } from '@/components/painel/VazaoHora'
 import { FaixaSimulacaoProducao, SeloSimulado } from '@/features/metricas/SeloSimulado'
 import { DRILL_ATIVO, MSG_DRILL_INATIVO, drillTo, linkSolicitacoes } from '@/features/metricas/links'
 import { LinkDrill } from '@/components/painel/LinkDrill'
-import { diaOperacao } from '@/lib/datasOperacao'
+import { diaOperacao, relogioOperacao } from '@/lib/datasOperacao'
 import { fmtHoraMin, projetarRitmo, rotuloHorario } from '@/features/metricas/rotulos'
 import { ETAPAS_FILA } from '@/features/metricas/sla'
 import { useAgora } from '@/features/metricas/useAgora'
@@ -174,7 +174,7 @@ export default function DashboardPage() {
           onRetry={() => void hoje.refetch()}
           alturaEsqueleto={260}
         >
-          {h && <VazaoHora porHora={h.por_hora} filtros={filtros} />}
+          {h && <VazaoHora porHora={h.por_hora} filtros={filtros} horaAtual={relogioOperacao(agora).getHours()} />}
         </Bloco>
         <Bloco
           titulo="Pendências"

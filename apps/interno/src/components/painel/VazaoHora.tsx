@@ -4,7 +4,7 @@ import { Bar, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, 
 import { ChartTooltip } from '@/components/charts/ChartTooltip'
 import { animacaoSerie, axisProps, gridProps } from '@/components/charts/chartTheme'
 import { DRILL_ATIVO, linkSolicitacoes } from '@/features/metricas/links'
-import { hojeOperacao, relogioOperacao } from '@/lib/datasOperacao'
+import { hojeOperacao } from '@/lib/datasOperacao'
 import type { FiltrosComuns, PainelHora } from '@/features/metricas/tipos'
 import { fmtDec, fmtInt } from '@/lib/format'
 import { cn } from '@/lib/utils'
@@ -17,6 +17,9 @@ interface Props {
   porHora: PainelHora[]
   filtros?: FiltrosComuns
   tv?: boolean
+  /** Hora atual (0–23) em MS, vinda do relógio da página: número, então o
+   *  memo só re-renderiza quando a hora vira. */
+  horaAtual: number
 }
 
 /**
@@ -25,13 +28,12 @@ interface Props {
  * secundária. Clique numa barra abre a lista das finalizadas naquela hora
  * (com os dados reais ligados).
  */
-export const VazaoHora = memo(function VazaoHora({ porHora, filtros, tv }: Props) {
+export const VazaoHora = memo(function VazaoHora({ porHora, filtros, tv, horaAtual }: Props) {
   const navigate = useNavigate()
   // Dados e clique estáveis: o Recharts reinicia a animação quando a referência
   // muda, e a página re-renderiza a cada 30 s pelo relógio.
   // Horas que ainda não chegaram ficam sem valor (null): a linha de entradas
   // para na hora atual em vez de despencar a zero; a média segue até o fim.
-  const horaAtual = relogioOperacao(new Date()).getHours()
   const dados = useMemo(() => {
     const comDado = porHora.filter((h) => h.finalizadas > 0 || h.entradas > 0 || h.ref > 0).map((h) => h.hora)
     const ini = Math.min(6, ...comDado)
