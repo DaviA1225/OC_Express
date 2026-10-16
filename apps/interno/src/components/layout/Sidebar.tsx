@@ -21,6 +21,7 @@ import {
   Activity,
   ShieldAlert,
   Fingerprint,
+  Target,
   ChevronsLeft,
   ChevronsRight,
   X,
@@ -36,6 +37,7 @@ import {
   canViewAtividade,
   canViewSeguranca,
   canViewPrivacidade,
+  canViewMetasSla,
 } from '@/features/auth/permissions'
 import { iniciais, labelPerfil } from '@/features/auth/perfis'
 import { useRecebidasCount } from '@/features/solicitacoes/useSolicitacoes'
@@ -108,6 +110,7 @@ export function SidebarContent({ collapsed, onToggleCollapse, onNavigate, onClos
       itens: [
         { to: '/cadastros/parceiros', label: 'Parceiros e acessos', icon: Network },
         { to: '/cadastros/usuarios', label: 'Usuários', icon: Users, visivel: canViewUsuarios(profile) },
+        { to: '/admin/metas', label: 'Metas e SLA', icon: Target, visivel: canViewMetasSla(profile) },
         { to: '/auditoria', label: 'Auditoria', icon: Search, visivel: canViewAuditoria(profile) },
         { to: '/seguranca', label: 'Segurança', icon: ShieldAlert, visivel: canViewSeguranca(profile) },
         { to: '/privacidade', label: 'Privacidade', icon: Fingerprint, visivel: canViewPrivacidade(profile) },

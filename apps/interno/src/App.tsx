@@ -41,6 +41,7 @@ const AtividadeEquipePage = lazy(() => import('@/pages/atividade/AtividadeEquipe
 const PerfilPage = lazy(() => import('@/pages/perfil/PerfilPage'))
 const NotFoundPage = lazy(() => import('@/pages/errors/NotFoundPage'))
 const TvPage = lazy(() => import('@/pages/operacao/TvPage'))
+const MetasSlaPage = lazy(() => import('@/pages/admin/MetasSlaPage'))
 
 function PageFallback() {
   return (
@@ -106,6 +107,10 @@ export default function App() {
                 </Route>
                 <Route element={<PerfilRoute allowed={['admin']} />}>
                   <Route path="/seguranca" element={<SegurancaPage />} />
+                </Route>
+                {/* Metas e SLA: a gestão vê, só o admin edita (a tela respeita canEditMetasSla). */}
+                <Route element={<PerfilRoute allowed={['admin', 'gerente', 'supervisor']} />}>
+                  <Route path="/admin/metas" element={<MetasSlaPage />} />
                 </Route>
                 <Route element={<PerfilRoute allowed={['admin', 'gerente', 'supervisor']} />}>
                   <Route path="/privacidade" element={<PrivacidadePage />} />
