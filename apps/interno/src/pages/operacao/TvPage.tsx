@@ -18,6 +18,7 @@ import type { PainelEstadoAtual, PainelHoje } from '@/features/metricas/tipos'
 import { relogioOperacao } from '@/lib/datasOperacao'
 import { fmtDelta, fmtDur, fmtInt } from '@/lib/format'
 import { cn } from '@/lib/utils'
+import { useAuth } from '@/hooks/useAuth'
 
 const PAINEIS = ['Fila e SLA', 'Ritmo do dia', 'Atenção'] as const
 const ROTACAO_MS = 20_000
@@ -30,6 +31,8 @@ const EXPEDIENTE_PADRAO = { expediente_inicio: '07:00', expediente_fim: '18:00' 
  */
 export default function TvPage() {
   useEscuroForcado()
+  const { profile, signOut } = useAuth()
+  const ehTv = profile?.perfil === 'painel_tv'
   const [params, setParams] = useSearchParams()
   const { filtros } = useFiltrosAnalise('tv')
   const estado = usePainelEstadoAtual(filtros, 'tv')
@@ -176,13 +179,20 @@ export default function TvPage() {
           {fixo != null ? 'Painel fixo' : pausado ? 'Rotação pausada' : `Troca a cada ${ROTACAO_MS / 1000} s`} · ← → trocam · espaço pausa
         </span>
         {wakeLock === 'sem-suporte' && <span>Mantenha a tela ligada nas configurações da TV.</span>}
-        {/* Até o PR-B1 não existe o perfil `painel_tv`: a TV roda na conta de uma
-            pessoa e cai pelo limite de inatividade. REMOVER este aviso no B1,
-            quando a conta dedicada (sessão sem expiração) entrar. */}
-        <span>Sessão pessoal: expira após 50 min sem interação</span>
-        <Link to="/dashboard" className="hover:text-foreground hover:underline">
-          Sair do modo TV
-        </Link>
+        {/* Conta pessoal na TV: o logout por inatividade é GLOBAL e derruba a
+            pessoa em todos os computadores. A conta "Painel TV" não expira. */}
+        {ehTv ? (
+          <button type="button" onClick={() => void signOut()} className="hover:text-foreground hover:underline">
+            Sair
+          </button>
+        ) : (
+          <>
+            <span>Conta pessoal: sai de todos os computadores após 50 min sem uso — na sala, use a conta Painel TV</span>
+            <Link to="/dashboard" className="hover:text-foreground hover:underline">
+              Sair do modo TV
+            </Link>
+          </>
+        )}
       </footer>
     </div>
   )

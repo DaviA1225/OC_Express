@@ -23,8 +23,7 @@ export function useFilaPrevia() {
 export function useSalvarMetasSla() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ entrada, autorNome }: { entrada: ConfigMetasSlaEntrada; autorNome: string | null }) =>
-      salvarConfigMetasSla(entrada, autorNome),
+    mutationFn: ({ entrada }: { entrada: ConfigMetasSlaEntrada }) => salvarConfigMetasSla(entrada),
     onSuccess: (dados) => {
       qc.setQueryData(['metas-operacao'], dados)
       void qc.invalidateQueries({ queryKey: ['metas-operacao', 'fila-previa'] })

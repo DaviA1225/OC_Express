@@ -38,13 +38,16 @@ import {
  * O preço é conhecido: quem estiver logado em dois computadores cai nos dois.
  */
 export function VigiaDeSessao() {
-  const { session, signOut } = useAuth()
+  const { session, profile, signOut } = useAuth()
   const [restanteMs, setRestanteMs] = React.useState<number | null>(null)
 
   // A identidade da sessão, não o objeto: renovar o token troca o `session`
   // a cada hora, e religar o vigia por isso seria desperdício. Login novo
   // troca o id e religa — é o que faz o relógio começar do zero.
-  const idSessao = session ? idDaSessao(session.access_token) : null
+  // A conta da TV não expira por inatividade (decisão D4; o hook da 0079
+  // também libera a renovação dela no servidor).
+  const ehTv = profile?.perfil === 'painel_tv'
+  const idSessao = session && !ehTv ? idDaSessao(session.access_token) : null
 
   // `signOut` muda de identidade a cada render do provider. Sem o ref, o efeito
   // abaixo desligaria e religaria o vigia (ouvintes, timer) a cada render.

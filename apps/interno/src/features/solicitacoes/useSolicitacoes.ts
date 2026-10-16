@@ -1,11 +1,14 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { aplicarRecorte, clausulaSla, type ContextoRecorte, type RecorteLista } from './recorteLista'
+import { SLA_FALLBACK } from '@/features/metricas/sla'
+
+const CTX_PADRAO: ContextoRecorte = { sla: SLA_FALLBACK, alertaValidadeH: 24 }
 import { inicioDoDiaOperacao } from '@/lib/datasOperacao'
 import { toast } from 'sonner'
 import { ilikeFilter, ilikePattern } from '@sislog/shared/postgrest'
 import { supabase } from '@/lib/supabase'
 import { traduzirErroBanco } from '@/features/crud/useCrudQueries'
 import { removerArquivosOrfaos } from '@/features/anexos/useAnexos'
-import { SLA_ALERT_HOURS, SLA_PENDING_STATUSES } from '@/features/solicitacoes/status'
 import type {
   Tables,
   TablesInsert,
@@ -126,6 +129,10 @@ export interface ListFilters {
   // ambos vierem, os dois se aplicam (AND). Usado no filtro De/Até.
   dataInicio?: string | null
   dataFim?: string | null
+  /** Recorte vindo de um drill-down do Painel/Relatórios (recorteLista.ts). */
+  recorte?: RecorteLista | null
+  /** Config vigente que o recorte usa (SLA por etapa, alerta de validade). */
+  recorteCtx?: ContextoRecorte
   page: number
   pageSize: number
 }
@@ -253,10 +260,6 @@ function aplicarIntervaloDias<T extends { gte: (c: string, v: string) => T; lt: 
   return query
 }
 
-function slaThresholdISO(): string {
-  return new Date(Date.now() - SLA_ALERT_HOURS * 3_600_000).toISOString()
-}
-
 function periodoToISO(periodo: PeriodoFiltro): string | null {
   const now = new Date()
   if (periodo === 'hoje') {
@@ -276,26 +279,53 @@ function periodoToISO(periodo: PeriodoFiltro): string | null {
 }
 
 /**
- * Carrega TODAS as solicitações que casam com os filtros (ignora paginação).
- * Usado na exportação para CSV. Limite de 10k para evitar abusos.
+ * Monta a consulta da lista com TODOS os filtros (lista e CSV usam a mesma —
+ * já houve CSV ignorando "Atrasadas" por ter a sua própria cópia dos filtros).
+ * Com drill por id (concluídas em 48 h, SLA estourado, canceladas no período)
+ * a origem da consulta vira a RPC `solicitacoes_drill` (0080), que devolve as
+ * próprias linhas de solicitacoes — select/embed/count/range funcionam igual.
  */
-export async function fetchSolicitacoesParaExport(
-  filters: Omit<ListFilters, 'page' | 'pageSize'>,
-): Promise<SolicitacaoListRow[]> {
-  let query = supabase.from('solicitacoes').select(SELECT_WITH_JOINS)
+async function montarConsulta(filters: Omit<ListFilters, 'page' | 'pageSize'>, count: boolean) {
+  const r = filters.recorte ?? null
+  const opts = count ? { count: 'exact' as const } : undefined
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let query: any = r?.drill && r.de && r.ate
+    ? (supabase.rpc as unknown as (fn: string, a: Record<string, unknown>, o?: { count: 'exact' }) => { select: (s: string) => unknown })(
+        'solicitacoes_drill',
+        { p_tipo: r.drill, p_de: r.de, p_ate: r.ate, p_origem: 'todas', p_cliente_id: null, p_local: null },
+        opts,
+      ).select(SELECT_WITH_JOINS)
+    : supabase.from('solicitacoes').select(SELECT_WITH_JOINS, opts)
+
   if (filters.statuses.length > 0) query = query.in('status', filters.statuses)
   if (filters.materialId) query = query.eq('material_id', filters.materialId)
   if (filters.atendenteId) query = query.eq('atendente_id', filters.atendenteId)
   if (filters.tipo !== 'todos') query = query.eq('tipo', filters.tipo)
   query = applyOrigemPamcardFilters(query, filters)
   if (filters.apenasAtrasadas) {
-    query = query
-      .in('status', SLA_PENDING_STATUSES)
-      .lt('created_at', slaThresholdISO())
+    // "Atrasadas" = fora do SLA da etapa (mesma regra do Painel, 0079).
+    const c = clausulaSla((filters.recorteCtx ?? CTX_PADRAO).sla, 'fora')
+    query = c ? query.or(c) : query.eq('id', '00000000-0000-0000-0000-000000000000')
   }
   const since = periodoToISO(filters.periodo)
   if (since) query = query.gte('created_at', since)
   query = aplicarIntervaloDias(query, filters.dataInicio, filters.dataFim)
+
+  if (r) {
+    query = aplicarRecorte(query, r, filters.recorteCtx ?? CTX_PADRAO)
+    if (r.pendencia) {
+      // Pendências abertas com o parceiro (P12): poucas — cabem num .in().
+      const { data, error } = await supabase
+        .from('solicitacao_pendencias')
+        .select('solicitacao_id')
+        .eq('status', 'aberta')
+        .not('parceiro_id', 'is', null)
+        .range(0, 119)
+      if (error) throw error
+      const ids = Array.from(new Set(((data ?? []) as { solicitacao_id: string }[]).map((p) => p.solicitacao_id)))
+      query = query.in('id', ids.length ? ids : ['00000000-0000-0000-0000-000000000000'])
+    }
+  }
 
   if (filters.search.trim()) {
     const t = filters.search.trim()
@@ -303,8 +333,18 @@ export async function fetchSolicitacoesParaExport(
     query = query.or(buildSearchOrClause(t, aux))
   }
 
-  query = query.order('created_at', { ascending: false }).range(0, 9999)
-  const { data, error } = await query
+  return query.order('created_at', { ascending: false })
+}
+
+/**
+ * Carrega TODAS as solicitações que casam com os filtros (ignora paginação).
+ * Usado na exportação para CSV. Limite de 10k para evitar abusos.
+ */
+export async function fetchSolicitacoesParaExport(
+  filters: Omit<ListFilters, 'page' | 'pageSize'>,
+): Promise<SolicitacaoListRow[]> {
+  const query = await montarConsulta(filters, false)
+  const { data, error } = await query.range(0, 9999)
   if (error) throw error
   return ((data ?? []) as unknown as SolicitacaoListRow[]).map(normalizeParceiroJoins)
 }
@@ -313,45 +353,10 @@ export function useSolicitacoesList(filters: ListFilters) {
   return useQuery({
     queryKey: ['solicitacoes', filters],
     queryFn: async () => {
-      let query = supabase
-        .from('solicitacoes')
-        .select(SELECT_WITH_JOINS, { count: 'exact' })
-
-      if (filters.statuses.length > 0) {
-        query = query.in('status', filters.statuses)
-      }
-      if (filters.materialId) {
-        query = query.eq('material_id', filters.materialId)
-      }
-      if (filters.atendenteId) {
-        query = query.eq('atendente_id', filters.atendenteId)
-      }
-      if (filters.tipo !== 'todos') {
-        query = query.eq('tipo', filters.tipo)
-      }
-      query = applyOrigemPamcardFilters(query, filters)
-      if (filters.apenasAtrasadas) {
-        query = query
-          .in('status', SLA_PENDING_STATUSES)
-          .lt('created_at', slaThresholdISO())
-      }
-      const since = periodoToISO(filters.periodo)
-      if (since) query = query.gte('created_at', since)
-      query = aplicarIntervaloDias(query, filters.dataInicio, filters.dataFim)
-
-      if (filters.search.trim()) {
-        const t = filters.search.trim()
-        const aux = await fetchSearchAuxIds(t)
-        query = query.or(buildSearchOrClause(t, aux))
-      }
-
-      query = query.order('created_at', { ascending: false })
-
+      const query = await montarConsulta(filters, true)
       const from = (filters.page - 1) * filters.pageSize
       const to = from + filters.pageSize - 1
-      query = query.range(from, to)
-
-      const { data, error, count } = await query
+      const { data, error, count } = await query.range(from, to)
       if (error) throw error
       return {
         data: ((data ?? []) as unknown as SolicitacaoListRow[]).map(normalizeParceiroJoins),
@@ -450,7 +455,7 @@ export async function fetchProximaDaFila(atual: { id: string; created_at: string
 export function useContagemFila(
   // Sem De/Até de propósito: a lista não os usa, e quando usar, a contagem tem
   // que cortar o dia igual a ela (aplicarIntervaloDias, PR #110).
-  filters: Pick<ListFilters, 'periodo' | 'materialId' | 'tipo' | 'origem' | 'pamcard' | 'apenasAtrasadas'>,
+  filters: Pick<ListFilters, 'periodo' | 'materialId' | 'tipo' | 'origem' | 'pamcard' | 'apenasAtrasadas' | 'recorteCtx'>,
   ativo: boolean,
 ) {
   return useQuery({
@@ -461,7 +466,10 @@ export function useContagemFila(
       if (filters.materialId) query = query.eq('material_id', filters.materialId)
       if (filters.tipo !== 'todos') query = query.eq('tipo', filters.tipo)
       query = applyOrigemPamcardFilters(query, filters)
-      if (filters.apenasAtrasadas) query = query.in('status', SLA_PENDING_STATUSES).lt('created_at', slaThresholdISO())
+      if (filters.apenasAtrasadas) {
+        const c = clausulaSla((filters.recorteCtx ?? CTX_PADRAO).sla, 'fora')
+        query = c ? query.or(c) : query.eq('id', '00000000-0000-0000-0000-000000000000')
+      }
       const since = periodoToISO(filters.periodo)
       if (since) query = query.gte('created_at', since)
       const { data, error } = await query.range(0, 999)
@@ -579,8 +587,7 @@ export function useDuplicateSolicitacao() {
     },
     onSuccess: (created) => {
       qc.invalidateQueries({ queryKey: ['solicitacoes'] })
-      qc.invalidateQueries({ queryKey: ['dashboard-estado-atual'] })
-      qc.invalidateQueries({ queryKey: ['dashboard-status-breakdown'] })
+      qc.invalidateQueries({ queryKey: ['painel'] })
       toast.success(`Solicitação duplicada como #${String(created.numero_interno).padStart(4, '0')}`)
     },
     onError: (e: unknown) => toast.error(traduzirErroBanco(e)),
@@ -761,8 +768,7 @@ export function useBulkTransitStatus() {
       for (const id of vars.ids) {
         qc.invalidateQueries({ queryKey: ['solicitacao', id] })
       }
-      qc.invalidateQueries({ queryKey: ['dashboard-estado-atual'] })
-      qc.invalidateQueries({ queryKey: ['dashboard-status-breakdown'] })
+      qc.invalidateQueries({ queryKey: ['painel'] })
     },
   })
 }
@@ -827,8 +833,7 @@ export function useBulkDeleteSolicitacoes() {
     },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ['solicitacoes'] })
-      qc.invalidateQueries({ queryKey: ['dashboard-estado-atual'] })
-      qc.invalidateQueries({ queryKey: ['dashboard-status-breakdown'] })
+      qc.invalidateQueries({ queryKey: ['painel'] })
     },
   })
 }

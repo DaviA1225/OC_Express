@@ -61,7 +61,7 @@ export default function MetasSlaPage() {
       {config.data && (
         // A chave remonta o formulário quando a config salva muda — o rascunho
         // recomeça dos valores novos sem efeito sincronizando estado.
-        <Formulario key={versao(config.data)} config={config.data} podeEditar={podeEditar} autorNome={profile?.nome_completo ?? null} />
+        <Formulario key={versao(config.data)} config={config.data} podeEditar={podeEditar} />
       )}
     </div>
   )
@@ -155,7 +155,7 @@ function validar(r: Rascunho): { erros: Erros; entrada: ConfigMetasSlaEntrada | 
 
 // ── Formulário ──────────────────────────────────────────────────────────────
 
-function Formulario({ config, podeEditar, autorNome }: { config: ConfigMetasSla; podeEditar: boolean; autorNome: string | null }) {
+function Formulario({ config, podeEditar }: { config: ConfigMetasSla; podeEditar: boolean }) {
   const inicial = React.useMemo(() => paraRascunho(config), [config])
   const [r, setR] = React.useState<Rascunho>(inicial)
   const [tentou, setTentou] = React.useState(false)
@@ -187,7 +187,7 @@ function Formulario({ config, podeEditar, autorNome }: { config: ConfigMetasSla;
       return
     }
     salvar.mutate(
-      { entrada, autorNome },
+      { entrada },
       {
         onSuccess: () => toast.success('Metas e SLA salvos. O Painel já usa os novos limites.'),
         onError: (err) => toast.error(err instanceof Error ? err.message : 'Falha ao salvar'),

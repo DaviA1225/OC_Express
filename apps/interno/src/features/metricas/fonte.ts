@@ -1,26 +1,13 @@
 // Ponto ÚNICO de acesso aos dados dos dashboards (Painel, TV, Relatórios,
 // Produtividade, Metas e SLA). As telas e os hooks só falam com este arquivo.
 //
-// ─── Troca simulada → RPC ───────────────────────────────────────────────────
-// Hoje `FONTE = 'simulada'`: tudo vem de `mocks.ts`. Quando a migration 0080
-// (RPCs da §2.5 do plano) estiver no remoto:
-//   1. regenerar `packages/shared/src/database.types.ts` (as RPCs entram em
-//      Database['public']['Functions']);
-//   2. trocar a constante abaixo para 'rpc';
-//   3. substituir `rpc()` (cast sem tipo) por `supabase.rpc` tipado e apagar
-//      `mocks.ts` + o selo "Dados simulados" (some sozinho com FONTE='rpc').
-// Os nomes de parâmetro (`p_de`, `p_origem`…) e os retornos (tipos.ts) já
-// seguem o plano; nenhuma tela muda.
-//
-// Trava de produção: com `FONTE === 'simulada'` num build de produção
-// (`import.meta.env.PROD`), Painel, Relatórios, Produtividade, Metas e TV
-// mostram uma faixa "Dados simulados — não usar para decisão" de largura total
-// (FaixaSimulacaoProducao, em SeloSimulado.tsx), além do selo, e os links de
-// drill-down ficam desligados (links.ts, DRILL_ATIVO).
-// ────────────────────────────────────────────────────────────────────────────
+// Dados reais: RPCs da migration 0080 (supabase/migrations/0080_rpcs_dashboards.sql)
+// e as tabelas sla_etapas/metas_operacao da 0079. Os retornos seguem tipos.ts.
+// As RPCs ainda não estão nos tipos gerados (packages/shared/src/database.types.ts):
+// por isso `rpc()` faz a chamada sem tipo — regenerar os tipos e trocar por
+// `supabase.rpc` tipado quando a 0080 estiver no remoto.
 
 import { supabase } from '@/lib/supabase'
-import * as mock from './mocks'
 import type {
   ConfigMetasSla,
   ConfigMetasSlaEntrada,
@@ -43,30 +30,13 @@ import type {
   TempoEtapaLinha,
 } from './tipos'
 
-export const FONTE = 'simulada' as 'simulada' | 'rpc'
+/** Fonte dos dados: sempre o banco (o modo simulado saiu com a 0080). */
+export const FONTE = 'rpc' as const
 
-/** Verdadeiro enquanto as telas mostram dados de mentira (selo no cabeçalho). */
-export const DADOS_SIMULADOS = FONTE === 'simulada'
+/** Mantido para as telas que escondiam ações no modo simulado: agora sempre falso. */
+export const DADOS_SIMULADOS = false
 
-/** Latência artificial do modo simulado — o esqueleto aparece como no real. */
-const LATENCIA_MS = 350
-
-function cenario(): mock.Cenario {
-  try {
-    const c = new URLSearchParams(window.location.search).get('cenario')
-    return c === 'vazio' || c === 'grande' || c === 'meta' ? c : 'normal'
-  } catch {
-    return 'normal'
-  }
-}
-
-function simular<T>(fn: (agora: Date, c: mock.Cenario) => T): Promise<T> {
-  return new Promise((resolve) => {
-    window.setTimeout(() => resolve(fn(new Date(), cenario())), LATENCIA_MS)
-  })
-}
-
-// As RPCs ainda não existem nos tipos gerados; até o passo 1 acima, chamada sem tipo.
+// Chamada sem tipo enquanto as RPCs não estão em database.types.ts.
 type RpcSemTipo = (fn: string, args?: Record<string, unknown>) => PromiseLike<{ data: unknown; error: { message: string } | null }>
 
 async function rpc<T>(nome: string, args: Record<string, unknown>): Promise<T> {
@@ -86,63 +56,52 @@ function argsP(p: FiltrosPeriodo): Record<string, unknown> {
 // ── Painel / TV ─────────────────────────────────────────────────────────────
 
 export function buscarPainelEstadoAtual(f: FiltrosComuns): Promise<PainelEstadoAtual> {
-  if (FONTE === 'simulada') return simular((agora, c) => mock.mockPainelEstadoAtual(f, agora, c))
   return rpc('painel_estado_atual', argsF(f))
 }
 
 export function buscarPainelHoje(f: FiltrosComuns): Promise<PainelHoje> {
-  if (FONTE === 'simulada') return simular((agora, c) => mock.mockPainelHoje(f, agora, c))
   return rpc('painel_hoje', argsF(f))
 }
 
 // ── Relatórios ──────────────────────────────────────────────────────────────
 
 export function buscarRelatorioResumo(p: FiltrosPeriodo): Promise<RelatorioResumo> {
-  if (FONTE === 'simulada') return simular((agora, c) => mock.mockRelatorioResumo(p, agora, c))
   return rpc('relatorio_resumo', argsP(p))
 }
 
 export function buscarRelatorioSerie(p: FiltrosPeriodo, granularidade: Granularidade): Promise<SerieLinha[]> {
-  if (FONTE === 'simulada') return simular((agora, c) => mock.mockRelatorioSerie(p, granularidade, agora, c))
   return rpc('relatorio_serie', { ...argsP(p), p_granularidade: granularidade })
 }
 
 export function buscarRelatorioTempoEtapas(p: FiltrosPeriodo): Promise<TempoEtapaLinha[]> {
-  if (FONTE === 'simulada') return simular((agora, c) => mock.mockRelatorioTempoEtapas(p, agora, c))
   return rpc('relatorio_tempo_etapas', argsP(p))
 }
 
 export function buscarRelatorioRanking(p: FiltrosPeriodo, dimensao: DimensaoRanking, limite = 50): Promise<RankingLinha[]> {
-  if (FONTE === 'simulada') return simular((agora, c) => mock.mockRelatorioRanking(p, dimensao, limite, agora, c))
   return rpc('relatorio_ranking', { ...argsP(p), p_dimensao: dimensao, p_limite: limite })
 }
 
 export function buscarRelatorioLocais(p: Periodo): Promise<LocalLinha[]> {
-  if (FONTE === 'simulada') return simular((agora, c) => mock.mockRelatorioLocais(p, agora, c))
   return rpc('relatorio_locais', { p_de: p.de, p_ate: p.ate })
 }
 
 export function buscarMapaCalor(p: FiltrosPeriodo): Promise<MapaCalorCelula[]> {
-  if (FONTE === 'simulada') return simular((agora, c) => mock.mockMapaCalor(p, agora, c))
   return rpc('relatorio_mapa_calor', argsP(p))
 }
 
 export function buscarProdutividade(p: Periodo): Promise<Produtividade> {
-  if (FONTE === 'simulada') return simular((agora, c) => mock.mockProdutividade(p, agora, c))
   return rpc('relatorio_produtividade', { p_de: p.de, p_ate: p.ate })
 }
 
 /** Uma página (≤ 1000 linhas) do CSV de dados tidy (§5). */
 export function buscarExportacaoPagina(p: FiltrosPeriodo, offset: number, limite = 1000): Promise<ExportLinha[]> {
   const lim = Math.min(limite, 1000)
-  if (FONTE === 'simulada') return simular((agora, c) => mock.mockExportacao(p, offset, lim, agora, c))
   return rpc('exportar_solicitacoes_periodo', { ...argsP(p), p_offset: offset, p_limite: lim })
 }
 
 // ── Opções dos filtros ──────────────────────────────────────────────────────
 
 export async function buscarOpcoesClientes(): Promise<OpcaoCliente[]> {
-  if (FONTE === 'simulada') return simular(() => mock.mockOpcoesClientes())
   const { data, error } = await supabase.from('clientes').select('id, razao_social').order('razao_social').range(0, 999)
   if (error) throw error
   return ((data ?? []) as { id: string; razao_social: string }[]).map((c) => ({ id: c.id, nome: c.razao_social }))
@@ -162,7 +121,6 @@ const METAS_PADRAO: ConfigMetasSla['metas'] = {
 }
 
 export async function buscarConfigMetasSla(): Promise<ConfigMetasSla> {
-  if (FONTE === 'simulada') return simular(() => mock.mockConfigMetasSla())
   const sb = supabase as unknown as { from: (t: string) => { select: (c: string) => PromiseLike<{ data: unknown; error: { message: string } | null }> } }
   const [et, me] = await Promise.all([
     sb.from('sla_etapas').select('*'),
@@ -184,30 +142,16 @@ export async function buscarConfigMetasSla(): Promise<ConfigMetasSla> {
   return { etapas, metas, ultima_alteracao: ultima ? { em: ultima.atualizado_em, por_nome: porNome } : null }
 }
 
-/**
- * Salva a config. No real, a RLS só deixa o admin escrever e o trigger carimba
- * `atualizado_em/por`; `autorNome` só serve ao modo simulado.
- */
-export async function salvarConfigMetasSla(entrada: ConfigMetasSlaEntrada, autorNome: string | null): Promise<ConfigMetasSla> {
-  if (FONTE === 'simulada') return simular(() => mock.mockSalvarConfigMetasSla(entrada, autorNome))
-  const sb = supabase as unknown as {
-    from: (t: string) => { update: (v: unknown) => { eq: (c: string, v: unknown) => { select: (c: string) => PromiseLike<{ data: unknown[] | null; error: { message: string } | null }> } } }
-  }
-  for (const e of entrada.etapas) {
-    const { data, error } = await sb.from('sla_etapas').update(e).eq('status', e.status).select('id')
-    if (error) throw error
-    // RLS nega UPDATE em silêncio (0 linhas): sem isto, "salvo" sem ter salvo.
-    if (!data || data.length === 0) throw new Error('Sem permissão para alterar o SLA.')
-  }
-  const { data, error } = await sb.from('metas_operacao').update(entrada.metas).eq('singleton', true).select('id')
-  if (error) throw error
-  if (!data || data.length === 0) throw new Error('Sem permissão para alterar as metas.')
+/** Salva a config; o trigger carimba `atualizado_em/por`. */
+export async function salvarConfigMetasSla(entrada: ConfigMetasSlaEntrada): Promise<ConfigMetasSla> {
+  // Uma transação só no banco (salvar_metas_sla, 0080): ou grava tudo, ou nada.
+  // Só admin; o banco devolve 'forbidden' (42501) para os demais.
+  await rpc<null>('salvar_metas_sla', { p: entrada })
   return buscarConfigMetasSla()
 }
 
 /** Fila atual (status + status_desde) para a prévia da tela de Metas. */
 export async function buscarFilaPrevia(): Promise<ItemFilaPrevia[]> {
-  if (FONTE === 'simulada') return simular((agora, c) => mock.mockFilaPrevia(agora, c))
   const sb = supabase as unknown as {
     from: (t: string) => { select: (c: string) => { in: (c: string, v: string[]) => { range: (a: number, b: number) => PromiseLike<{ data: unknown; error: { message: string } | null }> } } }
   }
