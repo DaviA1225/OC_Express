@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { SLA_ALERT_HOURS } from '@/features/solicitacoes/status'
+import { hojeSP } from '@/features/solicitacoes/useSolicitacoes'
 
 export type NotificationKind = 'pendencia_resolvida' | 'pendente' | 'sem_oc' | 'oc_nao_enviada' | 'validade_vencendo'
 
@@ -22,9 +23,6 @@ const PENDENCIA_RESOLVIDA_LIMIT_H = 72
 
 function isoNowMinusHours(h: number): string {
   return new Date(Date.now() - h * 3_600_000).toISOString()
-}
-function isoNowPlusHours(h: number): string {
-  return new Date(Date.now() + h * 3_600_000).toISOString()
 }
 
 function ageHours(iso: string): number {
@@ -73,7 +71,8 @@ export function useNotifications() {
     queryFn: async (): Promise<NotificationItem[]> => {
       const cutoffSlaAtraso = isoNowMinusHours(SLA_ALERT_HOURS)
       const cutoffStuck = isoNowMinusHours(STUCK_THRESHOLD_H)
-      const validadeLimit = isoNowPlusHours(VALIDADE_LIMIT_H)
+      // Validade é DATE: compara com o "hoje" de São Paulo, não com o dia UTC.
+      const validadeLimit = hojeSP(new Date(Date.now() + VALIDADE_LIMIT_H * 3_600_000))
       const cutoffPendencia = isoNowMinusHours(PENDENCIA_RESOLVIDA_LIMIT_H)
 
       const [atrasadas, semOc, ocNaoEnviada, validade, pendenciasResolvidas] = await Promise.all([
@@ -101,10 +100,9 @@ export function useNotifications() {
         supabase
           .from('solicitacoes')
           .select(SELECT)
-          .eq('status', 'oc_enviada')
-          .eq('cte_emitido', false)
-          .lt('validade_fim', validadeLimit)
-          .gte('validade_fim', new Date().toISOString().slice(0, 10))
+          .in('status', ['oc_gerada', 'oc_enviada'])
+          .lte('validade_fim', validadeLimit)
+          .gte('validade_fim', hojeSP())
           .order('validade_fim', { ascending: true })
           .limit(20),
         // Tolerante a falha: se a tabela ainda não existir no ambiente (migration

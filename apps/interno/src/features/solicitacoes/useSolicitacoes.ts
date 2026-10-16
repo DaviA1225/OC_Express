@@ -120,7 +120,8 @@ export interface ListFilters {
   // simplesmente esquecia de passá-lo e baixava mais linhas do que a tela
   // mostrava. Com o campo obrigatório o compilador cobra quem monta o filtro.
   apenasAtrasadas: boolean
-  // Intervalo explícito por created_at (ISO). Independente de `periodo` — se
+  // Intervalo explícito por created_at, em DIAS (yyyy-mm-dd) no fuso de São
+  // Paulo; os dois extremos são inclusivos. Independente de `periodo` — se
   // ambos vierem, os dois se aplicam (AND). Usado no filtro De/Até.
   dataInicio?: string | null
   dataFim?: string | null
@@ -238,6 +239,36 @@ function applyOrigemPamcardFilters<T>(
   return q as T
 }
 
+/**
+ * Início (00:00) do dia `yyyy-mm-dd` em America/Sao_Paulo, como ISO em UTC.
+ * O Brasil não tem horário de verão desde 2019, então o offset é fixo (-03:00).
+ * Independe do fuso do navegador. Retorna null se a data for inválida.
+ */
+export function inicioDoDiaSP(dia: string, somarDias = 0): string | null {
+  const [y, m, d] = dia.split('-').map(Number)
+  if (!y || !m || !d) return null
+  // 00:00 em SP = 03:00 UTC; Date.UTC normaliza a virada de mês/ano.
+  return new Date(Date.UTC(y, m - 1, d + somarDias, 3, 0, 0, 0)).toISOString()
+}
+
+/** "Hoje" (yyyy-mm-dd) em America/Sao_Paulo, independente do fuso do navegador. */
+export function hojeSP(agora: Date = new Date()): string {
+  return new Date(agora.getTime() - 3 * 3_600_000).toISOString().slice(0, 10)
+}
+
+/** Aplica o intervalo De/Até (dias em SP): gte no início de `de`, lt no dia seguinte a `ate`. */
+function aplicarIntervaloDias<T extends { gte: (c: string, v: string) => T; lt: (c: string, v: string) => T }>(
+  query: T,
+  de?: string | null,
+  ate?: string | null,
+): T {
+  const ini = de ? inicioDoDiaSP(de) : null
+  const fim = ate ? inicioDoDiaSP(ate, 1) : null
+  if (ini) query = query.gte('created_at', ini)
+  if (fim) query = query.lt('created_at', fim)
+  return query
+}
+
 function slaThresholdISO(): string {
   return new Date(Date.now() - SLA_ALERT_HOURS * 3_600_000).toISOString()
 }
@@ -280,8 +311,7 @@ export async function fetchSolicitacoesParaExport(
   }
   const since = periodoToISO(filters.periodo)
   if (since) query = query.gte('created_at', since)
-  if (filters.dataInicio) query = query.gte('created_at', filters.dataInicio)
-  if (filters.dataFim) query = query.lte('created_at', filters.dataFim)
+  query = aplicarIntervaloDias(query, filters.dataInicio, filters.dataFim)
 
   if (filters.search.trim()) {
     const t = filters.search.trim()
@@ -323,8 +353,7 @@ export function useSolicitacoesList(filters: ListFilters) {
       }
       const since = periodoToISO(filters.periodo)
       if (since) query = query.gte('created_at', since)
-      if (filters.dataInicio) query = query.gte('created_at', filters.dataInicio)
-      if (filters.dataFim) query = query.lte('created_at', filters.dataFim)
+      query = aplicarIntervaloDias(query, filters.dataInicio, filters.dataFim)
 
       if (filters.search.trim()) {
         const t = filters.search.trim()
