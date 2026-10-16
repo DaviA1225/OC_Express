@@ -333,7 +333,9 @@ async function montarConsulta(filters: Omit<ListFilters, 'page' | 'pageSize'>, c
     query = query.or(buildSearchOrClause(t, aux))
   }
 
-  return query.order('created_at', { ascending: false })
+  // Embrulhado: o builder do PostgREST é "thenable" — devolvê-lo direto de uma
+  // função async faria o await EXECUTAR a consulta (sem range nem count).
+  return { query: query.order('created_at', { ascending: false }) }
 }
 
 /**
@@ -343,7 +345,7 @@ async function montarConsulta(filters: Omit<ListFilters, 'page' | 'pageSize'>, c
 export async function fetchSolicitacoesParaExport(
   filters: Omit<ListFilters, 'page' | 'pageSize'>,
 ): Promise<SolicitacaoListRow[]> {
-  const query = await montarConsulta(filters, false)
+  const { query } = await montarConsulta(filters, false)
   const { data, error } = await query.range(0, 9999)
   if (error) throw error
   return ((data ?? []) as unknown as SolicitacaoListRow[]).map(normalizeParceiroJoins)
@@ -353,7 +355,7 @@ export function useSolicitacoesList(filters: ListFilters) {
   return useQuery({
     queryKey: ['solicitacoes', filters],
     queryFn: async () => {
-      const query = await montarConsulta(filters, true)
+      const { query } = await montarConsulta(filters, true)
       const from = (filters.page - 1) * filters.pageSize
       const to = from + filters.pageSize - 1
       const { data, error, count } = await query.range(from, to)
