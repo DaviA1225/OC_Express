@@ -16,19 +16,18 @@ import {
   ClipboardList,
   ClipboardCheck,
   Hourglass,
-  TrendingUp,
-  TrendingDown,
-  Minus,
   AlertTriangle,
   Inbox,
   ArrowRight,
   RefreshCw,
-  Info,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Tooltip as UITooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { PageHeader } from '@/components/layout/PageHeader'
+import { KpiTile } from '@/components/shared/KpiTile'
+import { ChartTooltip } from '@/components/charts/ChartTooltip'
+import { axisProps, gridProps, seriesColor } from '@/components/charts/chartTheme'
 import {
   useRelatorioDataset,
   calcKPIs,
@@ -46,26 +45,28 @@ import {
 import { IntervaloDatas } from '@/features/relatorios/IntervaloDatas'
 import { useIntervaloPersistido } from '@/features/relatorios/useIntervaloPersistido'
 import { useEstadoAtual, useStatusBreakdown, type StatusBreakdownItem } from '@/features/dashboard/useDashboard'
-import { STATUS_LABELS } from '@/features/solicitacoes/status'
-import { cn } from '@/lib/utils'
+import { STATUS_LABELS, STATUS_COLOR_VAR } from '@/features/solicitacoes/status'
+import { fmtDelta, fmtDurHoras, fmtInt, fmtPct } from '@/lib/format'
 import type { SolicitacaoStatus } from '@/types/database.types'
 
 // Intervalo inicial: só o dia de hoje, o mesmo recorte que o preset padrão
 // anterior mostrava. "Limpar" volta para cá.
 const INTERVALO_PADRAO = intervaloPadrao(1)
 
-const STATUS_HEX: Record<SolicitacaoStatus, string> = {
-  recebida: '#94a3b8',
-  em_cadastro: '#FF8A50',       // laranja LHG claro
-  instrucao_emitida: '#f59e0b',
-  oc_gerada: '#C44612',          // laranja LHG queimado
-  oc_enviada: '#10b981',
-  finalizada: '#059669',
-  cancelada: '#ef4444',
-}
+// Séries do volume: criadas no acento (chart-1), finalizadas em aço (chart-2).
+const COR_CRIADAS = seriesColor(0)
+const COR_FINALIZADAS = seriesColor(1)
 
-const CHART_PRIMARY = '#FF5100'  // laranja LHG
-const CHART_SECONDARY = '#10b981'// emerald (mantido como sinal universal de "concluído")
+// Ordem fixa do fluxo — a legenda do donut lista todos os status, mesmo os zerados.
+const ORDEM_STATUS: SolicitacaoStatus[] = [
+  'recebida',
+  'em_cadastro',
+  'instrucao_emitida',
+  'oc_gerada',
+  'oc_enviada',
+  'finalizada',
+  'cancelada',
+]
 
 export default function DashboardPage() {
   const { de, ate, deCampo, ateCampo, setIntervalo, limpar, noPadrao } = useIntervaloPersistido(
@@ -92,97 +93,80 @@ export default function DashboardPage() {
   const pendentesAtuais = estado.data?.pendentes ?? 0
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-[22px] font-semibold tracking-tight text-foreground">
-            Visão geral
-          </h1>
-          <p className="text-[12px] text-muted-foreground">{periodo.label}</p>
-        </div>
-        <IntervaloDatas
-          idPrefix="dash"
-          de={deCampo}
-          ate={ateCampo}
-          onChange={setIntervalo}
-          mostrarLimpar={!noPadrao}
-          onLimpar={limpar}
-        />
-      </div>
+    <div className="space-y-4">
+      <PageHeader
+        title="Visão geral"
+        description={periodo.label}
+        actions={
+          <IntervaloDatas
+            idPrefix="dash"
+            de={deCampo}
+            ate={ateCampo}
+            onChange={setIntervalo}
+            mostrarLimpar={!noPadrao}
+            onLimpar={limpar}
+          />
+        }
+      />
 
-      {/* Estado operacional — "agora" (herói da operação) */}
+      {/* Estado operacional — "agora" */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <KpiCard
+        <Kpi
           label="Pendentes em aberto"
-          hint="Solicitações ainda na fila: recebida, em emissão ou instrução emitida."
+          hint="Na fila: recebida, em emissão ou instrução emitida"
           value={pendentesAtuais}
-          subValue="Fila aguardando atendimento"
-          icon={<Inbox className="h-[18px] w-[18px]" />}
-          accent="text-foreground/70"
+          icon={Inbox}
           isLoading={estado.isLoading}
           isError={estado.isError}
           onRetry={() => { void estado.refetch() }}
           to="/solicitacoes?status=recebida,em_cadastro,instrucao_emitida"
-          size="lg"
         />
-        <KpiCard
+        <Kpi
           label="Atrasadas"
-          hint="Pendentes há mais de 8 horas, fora do prazo de atendimento."
+          hint={atrasadas > 0 ? 'Pendentes há mais de 8 horas, prioridade' : 'Nenhuma fora do prazo de 8 horas'}
           value={atrasadas}
-          subValue={
-            atrasadas > 0
-              ? 'Pendentes há mais de 8 horas, prioridade'
-              : 'Nenhuma fora do prazo'
-          }
-          icon={<AlertTriangle className="h-[18px] w-[18px]" />}
-          accent="text-foreground/70"
+          icon={AlertTriangle}
           isLoading={estado.isLoading}
           isError={estado.isError}
           onRetry={() => { void estado.refetch() }}
           to="/solicitacoes?atrasadas=1"
-          size="lg"
-          tone="alert"
+          alerta={atrasadas > 0}
         />
       </div>
 
       {/* Volume no período (contexto histórico) */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <KpiCard
+        <Kpi
           label="Total de OCs"
-          hint="Solicitações criadas no período selecionado."
+          hint="Solicitações criadas no período"
           value={kpis?.total}
           previous={kpisAnt?.total}
-          icon={<ClipboardList className="h-4 w-4" />}
-          accent="text-foreground/70"
+          icon={ClipboardList}
           isLoading={ds.isLoading}
           isError={ds.isError}
           onRetry={() => { void ds.refetch() }}
           to="/solicitacoes"
           higherIsBetter
         />
-        <KpiCard
+        <Kpi
           label="Finalizadas"
-          hint="Solicitações concluídas no período."
+          hint={kpis ? `${fmtPct(kpis.taxaFinalizacao, { casas: 0 })} de conclusão` : undefined}
           value={kpis?.finalizadas}
-          subValue={kpis ? `${(kpis.taxaFinalizacao * 100).toFixed(0)}% de conclusão` : undefined}
           previous={kpisAnt?.finalizadas}
-          icon={<ClipboardCheck className="h-4 w-4" />}
-          accent="text-foreground/70"
+          icon={ClipboardCheck}
           isLoading={ds.isLoading}
           isError={ds.isError}
           onRetry={() => { void ds.refetch() }}
           to="/solicitacoes?status=finalizada"
           higherIsBetter
         />
-        <KpiCard
+        <Kpi
           label="Tempo médio"
-          hint="Tempo médio da criação até a finalização da OC, no período."
-          value={kpis?.tempoMedioHoras != null ? Number(kpis.tempoMedioHoras.toFixed(1)) : null}
-          unit="h"
-          subValue="Criada → finalizada"
+          hint="Da criação até a finalização"
+          value={kpis?.tempoMedioHoras ?? null}
+          formatar={fmtDurHoras}
           previous={kpisAnt?.tempoMedioHoras ?? null}
-          icon={<Hourglass className="h-4 w-4" />}
-          accent="text-foreground/70"
+          icon={Hourglass}
           isLoading={ds.isLoading}
           isError={ds.isError}
           onRetry={() => { void ds.refetch() }}
@@ -224,7 +208,7 @@ function VerRelatoriosLink() {
   return (
     <Link
       to="/relatorios"
-      className="inline-flex items-center gap-1 text-[12px] font-medium text-primary-strong hover:underline"
+      className="inline-flex items-center gap-1 text-body-sm font-medium text-primary-strong hover:underline"
     >
       Ver relatórios
       <ArrowRight className="h-3 w-3" />
@@ -233,136 +217,75 @@ function VerRelatoriosLink() {
 }
 
 
-interface KpiCardProps {
+interface KpiProps {
   label: string
   value: number | null | undefined
-  unit?: string
-  subValue?: string
-  previous?: number | null | undefined
-  icon: React.ReactNode
-  accent: string
+  /** Formatação do valor (padrão fmtInt). */
+  formatar?: (n: number) => string
   hint?: string
+  previous?: number | null | undefined
+  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>
   isLoading: boolean
   isError?: boolean
   onRetry?: () => void
   higherIsBetter?: boolean
   to?: string
-  size?: 'md' | 'lg'
-  tone?: 'default' | 'alert'
+  alerta?: boolean
 }
 
-function KpiCard({
-  label, value, unit, subValue, previous, icon, accent, hint, isLoading,
-  isError, onRetry, higherIsBetter, to, size = 'md', tone = 'default',
-}: KpiCardProps) {
+// Adaptador do <KpiTile> para o Painel: carregamento, erro com retry, delta vs.
+// período anterior e drill-down para a lista filtrada.
+function Kpi({
+  label, value, formatar = fmtInt, hint, previous, icon, isLoading,
+  isError, onRetry, higherIsBetter, to, alerta,
+}: KpiProps) {
   const delta = computeDelta(value, previous)
-  const isLg = size === 'lg'
-  const isAlert = tone === 'alert' && (value ?? 0) > 0
-  const interactive = !!to && !isError
+  const pronto = !isLoading && !isError
+  const interativo = !!to && pronto
 
-  // Número "hero" (KPIs de estado: Pendentes/Atrasadas) ganha gradiente do acento
-  // — só no modo escuro (DESIGN.md §7). Modo claro segue sólido.
-  const numberCls = cn(
-    'font-medium tabular-nums leading-none',
-    isLg ? 'text-[36px]' : 'text-[28px]',
-    // Não-hero: cor sólida (segue o tema).
-    !isLg && (isAlert ? 'text-red-700 dark:text-red-300' : 'text-foreground'),
-    // Hero (Pendentes/Atrasadas): número em gradiente do acento nos DOIS modos —
-    // claro usa tons escuros legíveis no branco, escuro usa tons claros (DESIGN.md §7).
-    isLg && 'bg-gradient-to-br bg-clip-text text-transparent',
-    isLg &&
-      (isAlert
-        ? 'from-[#EF4444] to-[#B91C1C] dark:from-[#FF9B9B] dark:to-[#EF4444]'
-        : 'from-[#FF5100] to-[#D3641A] dark:from-[var(--orange-tint)] dark:to-[#FF5100]'),
+  return (
+    <KpiTile
+      label={label}
+      icon={icon}
+      tone={alerta && pronto ? 'alert' : 'default'}
+      value={
+        isLoading ? (
+          <Skeleton className="inline-block h-8 w-24 align-middle" />
+        ) : isError || value == null ? (
+          '—'
+        ) : (
+          formatar(value)
+        )
+      }
+      delta={
+        pronto && delta != null && higherIsBetter !== undefined
+          ? {
+              valor: delta.flat ? 'Sem variação' : fmtDelta(delta.pct / 100),
+              comparador: 'vs. período anterior',
+              direcao: delta.flat ? 'flat' : delta.pct > 0 ? 'up' : 'down',
+              subirEhBom: higherIsBetter,
+            }
+          : undefined
+      }
+      hint={isError ? <KpiError onRetry={onRetry} /> : pronto ? hint : undefined}
+      to={interativo ? to : undefined}
+    />
   )
-
-  const inner = (
-    <>
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-1.5">
-          <p className={cn(
-            'font-medium uppercase tracking-[0.5px]',
-            isLg ? 'text-[12px]' : 'text-[11px]',
-            isAlert ? 'text-red-700 dark:text-red-300' : 'text-muted-foreground',
-          )}>
-            {label}
-          </p>
-          {hint && <MetricHint text={hint} />}
-        </div>
-        <span className={cn(
-          'flex items-center justify-center rounded-md border',
-          isLg ? 'h-9 w-9' : 'h-8 w-8',
-          isAlert
-            ? 'border-red-200 bg-red-100 text-red-600 dark:border-red-900/60 dark:bg-red-950/50 dark:text-red-300'
-            : cn('border-primary/15 bg-gradient-to-br from-primary/15 to-primary/[0.04] dark:from-primary/20 dark:to-primary/5', accent),
-        )}>
-          {icon}
-        </span>
-      </div>
-      {isLoading ? (
-        <Skeleton className={cn('mt-3', isLg ? 'h-11 w-28' : 'h-9 w-24')} />
-      ) : isError ? (
-        <KpiError onRetry={onRetry} />
-      ) : (
-        <div className="mt-2 flex items-baseline gap-1">
-          <span className={numberCls}>
-            {value == null ? '—' : value}
-          </span>
-          {unit && value != null && (
-            <span className="text-[14px] text-muted-foreground">{unit}</span>
-          )}
-        </div>
-      )}
-      {!isLoading && !isError && subValue && (
-        <p className={cn(
-          'mt-1.5 text-[11px]',
-          isAlert ? 'text-red-600/90 dark:text-red-300/80' : 'text-muted-foreground',
-        )}>
-          {subValue}
-        </p>
-      )}
-      {!isLoading && !isError && delta != null && higherIsBetter !== undefined && (
-        <DeltaPill delta={delta} higherIsBetter={higherIsBetter} />
-      )}
-    </>
-  )
-
-  const base = cn(
-    'block rounded-lg border p-4 transition-colors',
-    isAlert
-      ? 'border-red-200 bg-red-50 shadow-[0_0_30px_-8px_rgba(239,68,68,0.28)] dark:border-red-900/60 dark:bg-red-950/30 dark:shadow-[0_0_36px_-6px_rgba(239,68,68,0.4)]'
-      : 'bg-card',
-    interactive && (isAlert
-      ? 'hover:bg-red-100 dark:hover:bg-red-950/50'
-      : 'hover:border-primary/40 hover:bg-muted/30'),
-  )
-
-  if (interactive && to) {
-    return (
-      <Link
-        to={to}
-        className={cn(base, 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring')}
-      >
-        {inner}
-      </Link>
-    )
-  }
-  return <div className={base}>{inner}</div>
 }
 
 function KpiError({ onRetry }: { onRetry?: () => void }) {
   return (
-    <div className="mt-2">
-      <p className="flex items-center gap-1.5 text-[13px] font-medium text-red-700 dark:text-red-300">
+    <div>
+      <p className="flex items-center gap-1.5 font-medium text-danger">
         <AlertTriangle className="h-3.5 w-3.5 shrink-0" /> Erro ao carregar
       </p>
       {onRetry && (
         <button
           type="button"
           onClick={(e) => { e.preventDefault(); onRetry() }}
-          className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-primary-strong hover:underline"
+          className="mt-1 inline-flex items-center gap-1 text-meta font-medium text-primary-strong hover:underline"
         >
-          <RefreshCw className="h-3 w-3" /> Tentar de novo
+          <RefreshCw className="h-3 w-3" /> Tentar novamente
         </button>
       )}
     </div>
@@ -375,15 +298,15 @@ function ChartError({ onRetry, height }: { onRetry?: () => void; height: number 
       className="flex flex-col items-center justify-center gap-2 text-center"
       style={{ height }}
     >
-      <AlertTriangle className="h-5 w-5 text-red-500" />
-      <p className="text-[13px] font-medium text-foreground">Não foi possível carregar</p>
+      <AlertTriangle className="h-5 w-5 text-danger" />
+      <p className="text-body font-medium text-foreground">Não foi possível carregar</p>
       {onRetry && (
         <button
           type="button"
           onClick={onRetry}
-          className="inline-flex items-center gap-1 text-[12px] font-medium text-primary-strong hover:underline"
+          className="inline-flex items-center gap-1 text-body-sm font-medium text-primary-strong hover:underline"
         >
-          <RefreshCw className="h-3 w-3" /> Tentar de novo
+          <RefreshCw className="h-3 w-3" /> Tentar novamente
         </button>
       )}
     </div>
@@ -392,66 +315,12 @@ function ChartError({ onRetry, height }: { onRetry?: () => void; height: number 
 
 function computeDelta(current: number | null | undefined, previous: number | null | undefined): {
   pct: number
-  abs: number
-  hasBaseline: boolean
+  flat: boolean
 } | null {
   if (current == null || previous == null) return null
   if (!Number.isFinite(current) || !Number.isFinite(previous)) return null
-  const abs = current - previous
-  if (previous === 0) {
-    return { pct: current === 0 ? 0 : 100, abs, hasBaseline: false }
-  }
-  return { pct: ((current - previous) / previous) * 100, abs, hasBaseline: true }
-}
-
-function DeltaPill({
-  delta,
-  higherIsBetter,
-}: {
-  delta: { pct: number; abs: number; hasBaseline: boolean }
-  higherIsBetter: boolean
-}) {
-  const isUp = delta.pct > 0.5
-  const isDown = delta.pct < -0.5
-  const isFlat = !isUp && !isDown
-  const positive = isUp ? higherIsBetter : isDown ? !higherIsBetter : null
-  const Icon = isUp ? TrendingUp : isDown ? TrendingDown : Minus
-  const cls =
-    positive == null
-      ? 'text-muted-foreground'
-      : positive
-      ? 'text-emerald-600 dark:text-emerald-400'
-      : 'text-red-600 dark:text-red-400'
-  const sign = isUp ? '+' : ''
-  return (
-    <div className={cn('mt-3 flex items-center gap-1 text-[11px] font-medium', cls)}>
-      <Icon className="h-3 w-3" />
-      <span>
-        {isFlat ? 'Sem variação' : `${sign}${delta.pct.toFixed(1)}%`}
-      </span>
-      <span className="text-muted-foreground">vs período anterior</span>
-    </div>
-  )
-}
-
-function MetricHint({ text }: { text: string }) {
-  return (
-    <UITooltip>
-      <TooltipTrigger asChild>
-        <span
-          tabIndex={0}
-          aria-label={text}
-          onClick={(e) => { e.preventDefault(); e.stopPropagation() }}
-          className="inline-flex shrink-0 cursor-help text-muted-foreground/60 transition-colors hover:text-muted-foreground focus-visible:text-foreground focus-visible:outline-none"
-        >
-          <Info className="h-3 w-3" />
-        </span>
-      </TooltipTrigger>
-      <TooltipContent side="top" className="max-w-[220px] text-[12px] font-normal normal-case tracking-normal">
-        {text}
-      </TooltipContent>
-    </UITooltip>
-  )
+  const pct = previous === 0 ? (current === 0 ? 0 : 100) : ((current - previous) / previous) * 100
+  return { pct, flat: pct <= 0.5 && pct >= -0.5 }
 }
 
 interface CardProps {
@@ -466,8 +335,8 @@ function Card({ title, subtitle, action, children }: CardProps) {
     <section className="rounded-lg border bg-card">
       <header className="flex items-center justify-between border-b px-4 py-3">
         <div>
-          <h2 className="text-[14px] font-medium text-foreground">{title}</h2>
-          {subtitle && <p className="text-[11px] text-muted-foreground">{subtitle}</p>}
+          <h2 className="text-body-lg font-medium text-foreground">{title}</h2>
+          {subtitle && <p className="text-meta text-muted-foreground">{subtitle}</p>}
         </div>
         {action}
       </header>
@@ -488,7 +357,7 @@ function VolumeChart({ data, isLoading, isError, onRetry }: VolumeChartProps) {
   if (isError) return <ChartError onRetry={onRetry} height={260} />
   if (data.length === 0) {
     return (
-      <div className="flex h-[240px] items-center justify-center text-[13px] text-muted-foreground">
+      <div className="flex h-[240px] items-center justify-center text-body text-muted-foreground">
         Sem dados no período.
       </div>
     )
@@ -504,30 +373,31 @@ function VolumeChart({ data, isLoading, isError, onRetry }: VolumeChartProps) {
       </p>
       <ResponsiveContainer>
         <LineChart accessibilityLayer data={formatted} margin={{ top: 8, right: 16, left: -10, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-          <XAxis dataKey="label" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
-          <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+          <CartesianGrid {...gridProps} />
+          <XAxis dataKey="label" {...axisProps} interval="preserveStartEnd" />
+          <YAxis {...axisProps} allowDecimals={false} />
           <Tooltip
-            contentStyle={{ fontSize: 12, borderRadius: 6 }}
-            labelFormatter={(_, p) => {
-              const item = p?.[0]?.payload as { dia: string } | undefined
-              return item?.dia ? format(parseDayKey(item.dia), "dd 'de' MMMM", { locale: ptBR }) : ''
-            }}
-            formatter={(value, name) => [
-              `${value ?? 0}`,
-              String(name) === 'total' ? 'Criadas' : 'Finalizadas',
-            ]}
+            cursor={{ stroke: 'var(--chart-grid)' }}
+            content={(p) => (
+              <ChartTooltip
+                {...p}
+                formatLabel={() => {
+                  const item = p.payload?.[0]?.payload as { dia: string } | undefined
+                  return item?.dia ? format(parseDayKey(item.dia), "dd 'de' MMMM", { locale: ptBR }) : ''
+                }}
+              />
+            )}
           />
-          <Line type="monotone" dataKey="total" stroke={CHART_PRIMARY} strokeWidth={2} dot={{ r: 2 }} activeDot={{ r: 4 }} />
-          <Line type="monotone" dataKey="finalizadas" stroke={CHART_SECONDARY} strokeWidth={2} dot={{ r: 2 }} activeDot={{ r: 4 }} />
+          <Line type="monotone" dataKey="total" name="Criadas" stroke={COR_CRIADAS} strokeWidth={2} dot={{ r: 2 }} activeDot={{ r: 4 }} />
+          <Line type="monotone" dataKey="finalizadas" name="Finalizadas" stroke={COR_FINALIZADAS} strokeWidth={2} dot={{ r: 2 }} activeDot={{ r: 4 }} />
         </LineChart>
       </ResponsiveContainer>
-      <div className="mt-2 flex items-center justify-center gap-4 text-[11px] text-muted-foreground">
+      <div className="mt-2 flex items-center justify-center gap-4 text-meta text-muted-foreground">
         <span className="flex items-center gap-1.5">
-          <span className="h-1.5 w-3 rounded-full" style={{ backgroundColor: CHART_PRIMARY }} /> Criadas
+          <span className="h-0.5 w-3" style={{ backgroundColor: COR_CRIADAS }} /> Criadas
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="h-1.5 w-3 rounded-full" style={{ backgroundColor: CHART_SECONDARY }} /> Finalizadas
+          <span className="h-0.5 w-3" style={{ backgroundColor: COR_FINALIZADAS }} /> Finalizadas
         </span>
       </div>
     </div>
@@ -539,57 +409,54 @@ function StatusDonut({ data, isLoading, isError, onRetry }: { data: StatusBreakd
   if (isError) return <ChartError onRetry={onRetry} height={220} />
   if (data.length === 0) {
     return (
-      <div className="flex h-[220px] items-center justify-center text-[13px] text-muted-foreground">
+      <div className="flex h-[220px] items-center justify-center text-body text-muted-foreground">
         Sem solicitações ainda.
       </div>
     )
   }
   const total = data.reduce((acc, d) => acc + d.count, 0)
-  const chartData = data.map((d) => ({ name: STATUS_LABELS[d.status], value: d.count, status: d.status }))
+  const porStatus = new Map(data.map((d) => [d.status, d.count]))
+  // Todos os status na ordem do fluxo (zerados inclusive) — a legenda não esconde nenhum.
+  const legenda = ORDEM_STATUS.map((s) => ({ name: STATUS_LABELS[s], value: porStatus.get(s) ?? 0, status: s }))
+  const fatias = legenda.filter((d) => d.value > 0)
   return (
-    <div className="space-y-3">
-      <div className="relative h-[180px]" role="img" aria-label="Distribuição de solicitações por status; detalhada na legenda abaixo">
+    <div className="grid grid-cols-1 items-center gap-4 sm:grid-cols-[180px_1fr]">
+      <div className="relative h-[180px]" role="img" aria-label="Distribuição de solicitações por status; detalhada na legenda">
         <ResponsiveContainer>
           <PieChart>
             <Pie
-              data={chartData}
+              data={fatias}
               dataKey="value"
               nameKey="name"
               innerRadius={50}
               outerRadius={75}
-              paddingAngle={2}
-              stroke="none"
+              paddingAngle={1}
+              stroke="hsl(var(--card))"
             >
-              {chartData.map((entry) => (
-                <Cell key={entry.status} fill={STATUS_HEX[entry.status]} />
+              {fatias.map((entry) => (
+                <Cell key={entry.status} fill={STATUS_COLOR_VAR[entry.status]} />
               ))}
             </Pie>
-            <Tooltip
-              formatter={(value, name) => [`${value ?? 0}`, String(name ?? '')]}
-              contentStyle={{ fontSize: 12, borderRadius: 6 }}
-            />
+            <Tooltip content={<ChartTooltip />} />
           </PieChart>
         </ResponsiveContainer>
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-[10px] uppercase tracking-[0.5px] text-muted-foreground">Total</span>
-          <span className="text-[20px] font-medium tabular-nums text-foreground">{total}</span>
+          <span className="text-meta text-muted-foreground">Total</span>
+          <span className="font-display text-title font-medium tabular-nums text-foreground">{fmtInt(total)}</span>
         </div>
       </div>
       <ul className="space-y-1">
-        {chartData.slice(0, 5).map((d) => {
-          const pct = total > 0 ? Math.round((d.value / total) * 100) : 0
-          return (
-            <li key={d.status} className="flex items-center justify-between text-[12px]">
-              <div className="flex min-w-0 items-center gap-2">
-                <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: STATUS_HEX[d.status] }} />
-                <span className="truncate text-foreground">{d.name}</span>
-              </div>
-              <span className="ml-2 shrink-0 text-muted-foreground tabular-nums">
-                {d.value} <span className="text-[10px]">({pct}%)</span>
-              </span>
-            </li>
-          )
-        })}
+        {legenda.map((d) => (
+          <li key={d.status} className="flex items-center justify-between text-body-sm">
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="h-2 w-2 shrink-0 rounded-[1px]" style={{ backgroundColor: STATUS_COLOR_VAR[d.status] }} />
+              <span className="truncate text-foreground">{d.name}</span>
+            </div>
+            <span className="ml-2 shrink-0 tabular-nums text-muted-foreground">
+              {fmtInt(d.value)} <span className="text-meta">({fmtPct(total > 0 ? d.value / total : 0, { casas: 0 })})</span>
+            </span>
+          </li>
+        ))}
       </ul>
     </div>
   )
@@ -621,29 +488,32 @@ function TopList({
   if (isError) return <ChartError onRetry={onRetry} height={180} />
   if (items.length === 0) {
     return (
-      <div className="flex h-[180px] items-center justify-center text-[13px] text-muted-foreground">
+      <div className="flex h-[180px] items-center justify-center text-body text-muted-foreground">
         {emptyMessage}
       </div>
     )
   }
   const max = items[0]?.total ?? 1
   return (
-    <ul className="space-y-1.5">
-      {items.map((it, i) => {
-        const pct = (it.total / max) * 100
-        return (
-          <li key={it.id} className="flex items-center gap-2 text-[12px]">
-            <span className="w-4 text-right tabular-nums text-muted-foreground">{i + 1}.</span>
-            <div className="relative min-w-0 flex-1 rounded bg-muted">
-              <div className="h-6 rounded bg-gradient-to-r from-primary/30 to-primary/[0.08]" style={{ width: `${pct}%` }} />
-              <span className="absolute inset-0 flex items-center px-2 text-foreground">
-                <span className="truncate">{it.label}</span>
-              </span>
-            </div>
-            <span className="w-8 text-right tabular-nums font-medium text-foreground">{it.total}</span>
-          </li>
-        )
-      })}
+    <ul className="space-y-2">
+      {items.map((it, i) => (
+        <RankRow key={it.id} posicao={i + 1} label={it.label} valor={fmtInt(it.total)} pct={(it.total / max) * 100} />
+      ))}
     </ul>
+  )
+}
+
+// Linha de ranking: posição tabular, rótulo, valor e barra sólida fina (chart-1,
+// cantos 2px) — sem gradiente, sem troféu.
+function RankRow({ posicao, label, valor, pct }: { posicao: number; label: string; valor: string; pct: number }) {
+  return (
+    <li className="grid grid-cols-[1.25rem_minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1 text-body-sm">
+      <span className="text-right tabular-nums text-muted-foreground">{posicao}</span>
+      <span className="truncate text-foreground">{label}</span>
+      <span className="text-right font-medium tabular-nums text-foreground">{valor}</span>
+      <div className="col-start-2 h-1.5 rounded-[2px] bg-muted">
+        <div className="h-full rounded-[2px] bg-chart-1" style={{ width: `${pct}%` }} />
+      </div>
+    </li>
   )
 }

@@ -2,8 +2,8 @@ import * as React from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Loader2 } from 'lucide-react'
-import { CrudListPage, useCrudListState, type ColumnDef } from '@/components/shared/CrudListPage'
+import { Spinner } from '@/components/shared/Spinner'
+import { CrudListPage, RotuloSituacao, useCrudListState, type ColumnDef } from '@/components/shared/CrudListPage'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { useCrudList, useActiveCount, useUpsertRow, useToggleActive, useDeleteRow, useBulkToggleActive, useBulkDeleteRows } from '@/features/crud/useCrudQueries'
 import { useAuth } from '@/hooks/useAuth'
@@ -19,12 +19,13 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
 import { isValidCnpj } from '@/lib/validators'
 import { formatCnpj } from '@/lib/utils'
 import type { Tables } from '@/types/database.types'
+import { CadastroField } from '@/components/forms/CadastroField'
+import { useDescartarAlteracoes } from '@/features/crud/useDescartarAlteracoes'
 
 type Row = Tables<'materiais'>
 
@@ -54,11 +55,11 @@ export default function MateriaisPage() {
     ascending: true,
   })
   const totalActive = useActiveCount('materiais')
-  const upsert = useUpsertRow('materiais', 'Material')
-  const toggle = useToggleActive('materiais', 'Material')
-  const remove = useDeleteRow('materiais', 'Material')
-  const bulkToggle = useBulkToggleActive('materiais', 'Material')
-  const bulkDelete = useBulkDeleteRows('materiais', 'Material')
+  const upsert = useUpsertRow('materiais', { singular: 'Material', plural: 'Materiais', genero: 'm' })
+  const toggle = useToggleActive('materiais', { singular: 'Material', plural: 'Materiais', genero: 'm' })
+  const remove = useDeleteRow('materiais', { singular: 'Material', plural: 'Materiais', genero: 'm' })
+  const bulkToggle = useBulkToggleActive('materiais', { singular: 'Material', plural: 'Materiais', genero: 'm' })
+  const bulkDelete = useBulkDeleteRows('materiais', { singular: 'Material', plural: 'Materiais', genero: 'm' })
 
   const [editing, setEditing] = React.useState<Row | null>(null)
   const [open, setOpen] = React.useState(false)
@@ -73,15 +74,10 @@ export default function MateriaisPage() {
     {
       header: 'Instrução',
       accessor: (r) => (
-        <span
-          className={
-            r.requer_instrucao
-              ? 'inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800'
-              : 'inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground'
-          }
-          title={r.requer_instrucao ? 'Exige nº de instrução antes de gerar a OC' : 'Não exige instrução, gera OC direto'}
-        >
-          {r.requer_instrucao ? 'Exige' : 'Dispensa'}
+        <span title={r.requer_instrucao ? 'Exige nº de instrução antes de gerar a OC' : 'Não exige instrução, gera OC direto'}>
+          <RotuloSituacao tom={r.requer_instrucao ? 'aviso' : 'neutro'}>
+            {r.requer_instrucao ? 'Exige' : 'Dispensa'}
+          </RotuloSituacao>
         </span>
       ),
     },
@@ -144,9 +140,9 @@ export default function MateriaisPage() {
         onOpenChange={(o) => !o && setConfirmRow(null)}
         title={confirmRow?.ativo ? 'Desativar material?' : 'Reativar material?'}
         description={confirmRow?.ativo
-          ? 'O material não aparecerá nas listas ativas. Você pode reativá-lo depois.'
+          ? 'O material não aparecerá nas listas ativas. É possível reativá-lo depois.'
           : 'O material voltará a aparecer nas listas ativas.'}
-        confirmLabel={confirmRow?.ativo ? 'Sim, desativar' : 'Sim, reativar'}
+        confirmLabel={confirmRow?.ativo ? 'Desativar' : 'Reativar'}
         destructive={confirmRow?.ativo}
         onConfirm={async () => {
           if (confirmRow) {
@@ -165,7 +161,7 @@ export default function MateriaisPage() {
             ? `O cadastro de "${deleteRow.nome}" será removido permanentemente. Essa ação não pode ser desfeita. Se houver solicitações vinculadas, a exclusão será bloqueada.`
             : ''
         }
-        confirmLabel="Sim, excluir"
+        confirmLabel="Excluir"
         destructive
         onConfirm={async () => {
           if (deleteRow) {
@@ -192,7 +188,7 @@ function MaterialForm({ open, onOpenChange, editing, onSubmit }: FormProps) {
     reset,
     setValue,
     watch,
-    formState: { errors, isSubmitting },
+    formState: { errors, isSubmitting, isDirty },
   } = useForm<FormValues>({ resolver: zodResolver(schema) })
 
   React.useEffect(() => {
@@ -213,106 +209,91 @@ function MaterialForm({ open, onOpenChange, editing, onSubmit }: FormProps) {
   const obs = watch('observacoes_padrao') ?? ''
   const requerInstrucao = watch('requer_instrucao')
 
+  const guarda = useDescartarAlteracoes(isDirty, onOpenChange, isSubmitting)
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <>
+    <Dialog open={open} onOpenChange={guarda.onOpenChange}>
       <DialogContent className="max-w-[640px]">
         <form onSubmit={handleSubmit(onSubmit)} noValidate>
           <DialogHeader>
             <DialogTitle>{editing ? 'Editar material' : 'Novo material'}</DialogTitle>
             <DialogDescription>
-              Cadastre os materiais transportados. As observações abaixo aparecem na OC.
+              As observações padrão aparecem na OC.
             </DialogDescription>
           </DialogHeader>
           <DialogBody className="space-y-4">
             <div className="grid grid-cols-[1.4fr_1fr] gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="nome">Nome *</Label>
-                <Input id="nome" autoFocus {...register('nome')} placeholder="MINÉRIO, PEDRA, AREIA…" />
-                {errors.nome && (
-                  <p className="text-[11px] text-destructive">{errors.nome.message}</p>
-                )}
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="cnpj_filial">CNPJ da filial *</Label>
+              <CadastroField label="Nome" required id="nome" error={errors.nome?.message}>
+                <Input autoFocus {...register('nome')} placeholder="MINÉRIO, PEDRA, AREIA…" />
+              </CadastroField>
+              <CadastroField label="CNPJ da filial" required id="cnpj_filial" error={errors.cnpj_filial?.message}>
                 <Input
-                  id="cnpj_filial"
                   value={cnpj}
-                  onChange={(e) => setValue('cnpj_filial', formatCnpj(e.target.value), { shouldValidate: true })}
+                  onChange={(e) => setValue('cnpj_filial', formatCnpj(e.target.value), { shouldValidate: true, shouldDirty: true })}
                   placeholder="00.000.000/0000-00"
                 />
-                {errors.cnpj_filial && (
-                  <p className="text-[11px] text-destructive">{errors.cnpj_filial.message}</p>
-                )}
-              </div>
+              </CadastroField>
             </div>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="filial">Filial *</Label>
-              <Input id="filial" {...register('filial')} placeholder="MIRANDA - MS" />
-              {errors.filial && (
-                <p className="text-[11px] text-destructive">{errors.filial.message}</p>
-              )}
-            </div>
+            <CadastroField label="Filial" required id="filial" error={errors.filial?.message}>
+              <Input {...register('filial')} placeholder="MIRANDA - MS" />
+            </CadastroField>
 
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="origem_padrao">Origem padrão</Label>
-                <Input id="origem_padrao" {...register('origem_padrao')} placeholder="TERENOS - MS" />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="destino_padrao">Destino padrão</Label>
-                <Input id="destino_padrao" {...register('destino_padrao')} placeholder="CORUMBÁ - MS" />
-              </div>
+              <CadastroField label="Origem padrão" id="origem_padrao">
+                <Input {...register('origem_padrao')} placeholder="TERENOS - MS" />
+              </CadastroField>
+              <CadastroField label="Destino padrão" id="destino_padrao">
+                <Input {...register('destino_padrao')} placeholder="CORUMBÁ - MS" />
+              </CadastroField>
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="observacoes_padrao">Observações padrão</Label>
-              <Textarea
-                id="observacoes_padrao"
-                rows={3}
-                {...register('observacoes_padrao')}
-                placeholder="1° Obrigatório: Uso de EPIs (capacete, calça, colete e botina). Caçambas limpas."
-              />
+              <CadastroField label="Observações padrão" id="observacoes_padrao">
+                <Textarea
+                  rows={3}
+                  {...register('observacoes_padrao')}
+                  placeholder="1° Obrigatório: Uso de EPIs (capacete, calça, colete e botina). Caçambas limpas."
+                />
+              </CadastroField>
               {obs.trim() && (
                 <div className="rounded-md border bg-muted px-3 py-2">
-                  <p className="text-[10px] uppercase tracking-[0.5px] text-muted-foreground mb-1">
+                  <p className="mb-1 text-meta text-muted-foreground">
                     Pré-visualização no PDF
                   </p>
-                  <pre className="whitespace-pre-wrap font-mono text-[11px] text-foreground">
+                  <pre className="whitespace-pre-wrap font-mono text-meta text-foreground">
                     {obs}
                   </pre>
                 </div>
               )}
             </div>
 
-            <div className="rounded-md border bg-card px-3 py-2.5">
+            <div className="rounded-md border px-3 py-2.5">
               <label className="flex items-start gap-2.5 cursor-pointer">
                 <Checkbox
                   checked={!!requerInstrucao}
-                  onCheckedChange={(v) => setValue('requer_instrucao', v === true, { shouldValidate: true })}
+                  onCheckedChange={(v) => setValue('requer_instrucao', v === true, { shouldValidate: true, shouldDirty: true })}
                   className="mt-0.5"
                 />
                 <span className="space-y-0.5">
-                  <span className="block text-[13px] font-medium leading-none">
+                  <span className="block text-body font-medium leading-none">
                     Exige nº de instrução para gerar a OC
                   </span>
-                  <span className="block text-[11px] text-muted-foreground">
+                  <span className="block text-body-sm text-muted-foreground">
                     Marque se a OC desse material precisa de instrução ou número de pedido.
                   </span>
                 </span>
               </label>
             </div>
           </DialogBody>
-          <DialogFooter>
-            <span className="text-[11px] text-muted-foreground/80">
-              Enter para salvar · Esc para cancelar
-            </span>
+          <DialogFooter className="justify-end">
             <div className="flex items-center gap-2">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
+              <Button type="button" variant="outline" onClick={() => guarda.onOpenChange(false)} disabled={isSubmitting}>
                 Cancelar
               </Button>
               <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                {isSubmitting && <Spinner />}
                 Salvar
               </Button>
             </div>
@@ -320,5 +301,7 @@ function MaterialForm({ open, onOpenChange, editing, onSubmit }: FormProps) {
         </form>
       </DialogContent>
     </Dialog>
+    {guarda.dialog}
+    </>
   )
 }

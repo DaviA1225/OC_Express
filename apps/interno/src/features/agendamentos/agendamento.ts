@@ -14,11 +14,11 @@ export const AGENDAMENTO_STATUS_LABELS: Record<AgendamentoStatus, string> = {
 }
 
 export const AGENDAMENTO_STATUS_CLASSES: Record<AgendamentoStatus, string> = {
-  solicitado: 'bg-slate-100 text-slate-700',
+  solicitado: 'status-recebida',
   em_andamento: 'status-em_cadastro',
-  agendado: 'bg-emerald-100 text-emerald-800',
+  agendado: 'bg-success-subtle text-success',
   substituido: 'cat-steel',
-  cancelado: 'bg-red-100 text-red-800',
+  cancelado: 'status-cancelada',
 }
 
 /** Gêmeo do rótulo do portal. O vocabulário vem de `clientes.aceita_cacamba` /

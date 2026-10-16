@@ -3,14 +3,7 @@ import { SISLOG_VERSAO } from '@sislog/shared/versao'
 import { useAuth } from '@/hooks/useAuth'
 import { useNovaSolicitacao } from '@/features/solicitacoes/NovaSolicitacaoProvider'
 import type { RealtimeStatus } from '@/features/realtime/useRealtimeSubscriptions'
-
-const PERFIL_LABELS: Record<string, string> = {
-  admin: 'Administrador',
-  gerente: 'Gerente',
-  supervisor: 'Supervisor',
-  analista: 'Analista',
-  assistente: 'Assistente',
-}
+import { labelPerfil } from '@/features/auth/perfis'
 
 // Mesma regra do selo de ambiente da tela de login.
 const AMBIENTE =
@@ -30,9 +23,9 @@ const CONEXAO: Record<RealtimeStatus, string> = {
 export function BarraStatusErp({ realtimeStatus }: { realtimeStatus: RealtimeStatus }) {
   const { profile } = useAuth()
   return (
-    <footer className="flex min-h-[28px] shrink-0 flex-wrap items-center gap-x-5 gap-y-1 border-t bg-background px-4 py-1 text-[12px] text-muted-foreground print:hidden">
+    <footer className="flex min-h-[28px] shrink-0 flex-wrap items-center gap-x-5 gap-y-1 border-t bg-card px-4 py-1 text-body-sm text-muted-foreground print:hidden">
       <span>
-        {profile?.nome_completo ?? 'Usuário'} · {PERFIL_LABELS[profile?.perfil ?? ''] ?? '—'}
+        {profile?.nome_completo ?? 'Usuário'} · {labelPerfil(profile?.perfil)}
       </span>
       <span>Ambiente: {AMBIENTE}</span>
       <span>{CONEXAO[realtimeStatus]}</span>
@@ -47,7 +40,7 @@ export function BarraStatusErp({ realtimeStatus }: { realtimeStatus: RealtimeSta
 
 function Atalho({ tecla }: { tecla: string }) {
   return (
-    <kbd className="rounded-sm border bg-muted px-1 py-px font-sans text-[11px] text-foreground">{tecla}</kbd>
+    <kbd className="rounded-[2px] border bg-muted px-1 py-px font-sans text-meta text-foreground">{tecla}</kbd>
   )
 }
 

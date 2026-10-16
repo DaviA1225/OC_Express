@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { pdf } from '@react-pdf/renderer'
-import { Loader2, Download } from 'lucide-react'
+import { Download } from 'lucide-react'
+import { Spinner } from '@/components/shared/Spinner'
 import { toast } from 'sonner'
 import {
   Dialog,
@@ -200,7 +201,7 @@ export function GerarOCDialog({ open, onOpenChange, solicitacao, material, onSav
       })
       onOpenChange(false)
       if (onSaved) onSaved()
-      else toast.success('OC salva no Storage e status atualizado')
+      else toast.success('OC gerada.')
     } catch (err) {
       toast.error(traduzirErroBanco(err))
     } finally {
@@ -221,7 +222,7 @@ export function GerarOCDialog({ open, onOpenChange, solicitacao, material, onSav
           <DialogHeader>
             <DialogTitle>Material não vinculado</DialogTitle>
             <DialogDescription>
-              Vincule um material à solicitação antes de gerar a OC, o CNPJ e a filial vêm do material.
+              Vincule um material à solicitação antes de gerar a OC. O CNPJ e a filial vêm do material.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -239,7 +240,7 @@ export function GerarOCDialog({ open, onOpenChange, solicitacao, material, onSav
           <DialogHeader>
             <DialogTitle>Pré-visualização da OC nº {data?.numero}</DialogTitle>
             <DialogDescription>
-              Confira o conteúdo. Ao confirmar, o PDF será salvo no Storage e o status irá para "OC gerada".
+              Confira o conteúdo. Ao confirmar, o PDF é arquivado na solicitação e o status passa para "OC gerada".
             </DialogDescription>
           </DialogHeader>
           <DialogBody className="max-h-[70vh] p-0">
@@ -250,14 +251,14 @@ export function GerarOCDialog({ open, onOpenChange, solicitacao, material, onSav
                 style={{ width: '100%', height: '70vh', border: 'none' }}
               />
             ) : (
-              <div className="flex h-[70vh] items-center justify-center text-[13px] text-muted-foreground">
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              <div className="flex h-[70vh] items-center justify-center text-body text-muted-foreground">
+                <Spinner className="mr-2" />
                 Gerando pré-visualização…
               </div>
             )}
           </DialogBody>
           <DialogFooter>
-            <span className="text-[11px] text-muted-foreground/80">
+            <span className="text-meta text-tertiary">
               Esc para fechar
             </span>
             <div className="flex items-center gap-2">
@@ -273,13 +274,13 @@ export function GerarOCDialog({ open, onOpenChange, solicitacao, material, onSav
                   </a>
                 ) : (
                   <span>
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <Spinner />
                     Gerando…
                   </span>
                 )}
               </Button>
               <Button onClick={handleConfirmar} disabled={saving || !blob || building}>
-                {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+                {saving && <Spinner />}
                 Confirmar e salvar
               </Button>
             </div>
@@ -292,7 +293,7 @@ export function GerarOCDialog({ open, onOpenChange, solicitacao, material, onSav
         onOpenChange={setConfirmReplace}
         title="Substituir PDF existente?"
         description="Já existe uma OC gerada para essa solicitação. Confirmar irá sobrescrever o arquivo anterior."
-        confirmLabel="Sim, substituir"
+        confirmLabel="Substituir"
         destructive
         onConfirm={async () => {
           await doSave()

@@ -11,6 +11,7 @@ import { useRealtimeSubscriptions } from '@/features/realtime/useRealtimeSubscri
 import { useLayoutPreferido } from '@/features/layout/useLayoutPreferido'
 import { BarraStatusErp, AtalhosErp } from './BarraStatusErp'
 import { JanelasErp } from './JanelasErp'
+import { useEntradaDeRota } from '@/hooks/useMovimento'
 
 const GlobalSearchDialog = React.lazy(() =>
   import('@/features/search/GlobalSearchDialog').then((m) => ({ default: m.GlobalSearchDialog })),
@@ -41,6 +42,8 @@ export function AppLayout() {
   }
   const [mobileOpen, setMobileOpen] = React.useState(false)
   const [searchOpen, setSearchOpen] = React.useState(false)
+  // Troca de rota: só o conteúdo faz fade + 4px; menu e cabeçalho ficam parados.
+  const conteudoRef = useEntradaDeRota<HTMLDivElement>(location.pathname)
   const [lastPath, setLastPath] = React.useState(location.pathname)
   if (lastPath !== location.pathname) {
     setLastPath(location.pathname)
@@ -113,8 +116,10 @@ export function AppLayout() {
           />
         </div>
         {modoErp && <JanelasErp />}
-        <main className="flex-1 overflow-y-auto bg-muted/60 p-3 print:overflow-visible print:bg-transparent print:p-0 sm:p-4 md:p-6">
-          <div className="min-h-full rounded-lg border bg-background p-4 print:rounded-none print:border-0 print:p-0 sm:p-5 md:p-6">
+        {/* A página assenta direto no canvas; cada seção é uma superfície
+            (bg-card + borda) de UM nível — sem o painel-dentro-do-painel. */}
+        <main className="flex-1 overflow-y-auto bg-canvas p-3 print:overflow-visible print:bg-transparent print:p-0 sm:p-4 md:px-6 md:py-5">
+          <div ref={conteudoRef} className="min-h-full">
             <NovaSolicitacaoProvider>
               {modoErp && <AtalhosErp />}
               {/* Erro numa tela fica nela: menu e cabeçalho seguem vivos, e

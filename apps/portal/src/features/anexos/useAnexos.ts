@@ -5,6 +5,7 @@ import { comprimirAnexo } from '@sislog/shared/compressao'
 import { registrarAcesso } from '@/lib/acesso'
 import { traduzirErroBanco } from '@/features/cadastros/useParceiroCrud'
 import type { Tables } from '@sislog/shared/types'
+import { fmtInt } from '@/lib/format'
 
 export const ANEXOS_BUCKET = 'solicitacoes-anexos'
 export const MAX_FILE_BYTES = 10 * 1024 * 1024
@@ -32,7 +33,7 @@ export async function uploadAnexoFile(solicitacaoId: string, original: File): Pr
   // O limite vale para o que SOBE: confere depois de comprimir.
   const { file } = await comprimirAnexo(original)
   if (file.size > MAX_FILE_BYTES) {
-    throw new Error(`"${file.name}" excede o limite de ${(MAX_FILE_BYTES / 1024 / 1024).toFixed(0)}MB.`)
+    throw new Error(`"${file.name}" excede o limite de ${fmtInt(MAX_FILE_BYTES / 1024 / 1024)} MB.`)
   }
   if (file.type && !isMimeAccepted(file.type)) {
     throw new Error(`"${file.name}": tipo nao suportado. Aceita imagens e PDF.`)
@@ -89,11 +90,10 @@ export function useUploadAnexo() {
     mutationFn: ({ solicitacaoId, file }) => uploadAnexoFile(solicitacaoId, file),
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: ['anexos', vars.solicitacaoId] })
-      toast.success('Anexo adicionado')
+      toast.success('Anexo adicionado.')
     },
     onError: (e: unknown) => {
-      const message = e instanceof Error ? e.message : traduzirErroBanco(e)
-      toast.error(message)
+      toast.error(traduzirErroBanco(e))
     },
   })
 }
@@ -139,7 +139,7 @@ export function useDeleteAnexo() {
     },
     onSuccess: (res) => {
       qc.invalidateQueries({ queryKey: ['anexos', res.solicitacaoId] })
-      toast.success('Anexo removido')
+      toast.success('Anexo removido.')
     },
     onError: (e: unknown) => toast.error(traduzirErroBanco(e)),
   })

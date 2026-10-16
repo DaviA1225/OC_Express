@@ -1,38 +1,103 @@
 ---
 name: SisLog LHG
-description: Sistema de Ordens de Carregamento — painel de operação industrial, grafite com laranja LHG como acento.
+description: Sistema de Ordens de Carregamento — painel de operação industrial, grafite frio com laranja LHG como acento.
 colors:
   ink: "#1A1F28"
-  graphite-bar: "#1D1E1B"
+  header: "#1A1F28"
+  header-dark: "#0A0C0F"
   orange: "#FF5100"
+  orange-fill: "#CC4100"
+  orange-fill-hover: "#AD3700"
+  orange-text: "#B23C0B"
   orange-deep: "#D3641A"
   surface: "#FFFFFF"
-  canvas: "#F5F7F9"
-  slate-500: "#6B7280"
-  accent-gray: "#EDEFF2"
-  border: "#E1E4EA"
+  canvas: "#EEF1F4"
+  muted: "#F3F5F8"
+  accent-gray: "#E8ECF1"
+  row-hover: "#F1F4F7"
+  border: "#DCE1E8"
+  border-strong: "#7D8696"
+  text-2: "#5B6472"
+  text-3: "#5F6777"
+  secondary: "#2A303B"
+  destructive: "#C8312B"
+  success: "#1E7A47"
+  success-subtle: "#E7F5EC"
+  success-border: "#A8D9BA"
+  warning: "#8A5300"
+  warning-subtle: "#FFF4DB"
+  warning-border: "#F0C46A"
+  danger: "#B42318"
+  danger-subtle: "#FDECEA"
+  danger-border: "#F2B8B2"
+  info: "#2F5B8A"
+  info-subtle: "#EAF1F8"
+  info-border: "#B7CCE3"
+  canvas-dark: "#0E1115"
+  surface-dark: "#161A20"
+  raised-dark: "#1E232B"
+  row-hover-dark: "#262C35"
+  border-dark: "#343B45"
+  border-strong-dark: "#6A7280"
+  text-dark: "#E6E9EE"
+  text-2-dark: "#A4ABB6"
+  text-3-dark: "#8A919C"
+  orange-dark: "#FF6A1F"
+  orange-ink-dark: "#1A0A02"
+  orange-text-dark: "#FF8A4C"
+  secondary-dark: "#2A303A"
+  destructive-dark: "#F2706A"
+  destructive-ink-dark: "#1F0606"
+  success-dark: "#3DD68C"
+  success-ink-dark: "#06210F"
+  success-subtle-dark: "#11261B"
+  success-border-dark: "#2A5C40"
+  warning-dark: "#F2C46B"
+  warning-ink-dark: "#1F1503"
+  warning-subtle-dark: "#2A2210"
+  warning-border-dark: "#6B5320"
+  danger-dark: "#FF8A80"
+  danger-subtle-dark: "#2E1716"
+  danger-border-dark: "#6E2B28"
+  info-dark: "#8DB4E0"
+  info-subtle-dark: "#15202D"
+  info-border-dark: "#2F4864"
   portal-blue: "#1E40AF"
   portal-blue-deep: "#1E3A8A"
-  status-recebida-bg: "#F1F5F9"
-  status-recebida-fg: "#475569"
-  status-em-emissao-bg: "#FFE8D6"
-  status-em-emissao-fg: "#C44612"
-  status-instrucao-bg: "#FEF3C7"
-  status-instrucao-fg: "#92400E"
-  status-oc-gerada-bg: "#F4D4BD"
-  status-oc-gerada-fg: "#8F3700"
-  status-oc-enviada-bg: "#D1FAE5"
-  status-oc-enviada-fg: "#065F46"
-  status-finalizada-bg: "#A7F3D0"
-  status-finalizada-fg: "#064E3B"
-  status-cancelada-bg: "#FEE2E2"
-  status-cancelada-fg: "#991B1B"
-  status-dark-recebida-fg: "#cbd5e1"
-  status-dark-oc-gerada-fg: "#FFB37A"
-  status-dark-instrucao-fg: "#fcd34d"
-  status-dark-oc-enviada-fg: "#6ee7b7"
-  status-dark-finalizada-fg: "#a7f3d0"
-  status-dark-cancelada-fg: "#fca5a5"
+  status-recebida-bg: "#EEF1F5"
+  status-recebida-fg: "#3F4A5A"
+  status-recebida-dot: "#6E7686"
+  status-em-emissao-bg: "#FFEBDD"
+  status-em-emissao-fg: "#B23C0B"
+  status-instrucao-bg: "#FBF1C7"
+  status-instrucao-fg: "#634C00"
+  status-instrucao-dot: "#9A7A00"
+  status-oc-gerada-bg: "#E3EDFB"
+  status-oc-gerada-fg: "#1D4E8F"
+  status-oc-gerada-dot: "#2F6FC4"
+  status-oc-enviada-bg: "#EEE8FA"
+  status-oc-enviada-fg: "#4E2F9E"
+  status-oc-enviada-dot: "#7352C7"
+  status-finalizada-bg: "#D3EEDD"
+  status-finalizada-fg: "#0F5131"
+  status-cancelada-bg: "#FDECEA"
+  status-cancelada-fg: "#A1261E"
+  status-dark-recebida-bg: "#232933"
+  status-dark-recebida-fg: "#C3CAD5"
+  status-dark-em-emissao-bg: "#33200F"
+  status-dark-em-emissao-fg: "#FFA877"
+  status-dark-instrucao-bg: "#2E2A10"
+  status-dark-instrucao-dot: "#D9B92E"
+  status-dark-oc-gerada-bg: "#142338"
+  status-dark-oc-gerada-fg: "#8DB8F2"
+  status-dark-oc-gerada-dot: "#4C8FE0"
+  status-dark-oc-enviada-bg: "#241C3A"
+  status-dark-oc-enviada-fg: "#BFA8F5"
+  status-dark-oc-enviada-dot: "#9277E0"
+  status-dark-finalizada-bg: "#0F2E1F"
+  status-dark-finalizada-fg: "#A6EBC4"
+  status-dark-cancelada-bg: "#321A1A"
+  status-dark-cancelada-fg: "#FF9A91"
   cat-steel-bg: "#E2E8F0"
   cat-steel-fg: "#334155"
   cat-ink-bg: "#E7E4EE"
@@ -43,41 +108,77 @@ colors:
   cat-sage-fg: "#48553E"
   cat-brass-bg: "#EFE8D6"
   cat-brass-fg: "#6A562C"
-  chart-series-2: "#4E6986"
-  chart-series-3: "#9A6A3B"
-  chart-series-4: "#5E7A52"
-  chart-series-5: "#6E6594"
-  chart-series-6: "#C44612"
-  chart-series-7: "#3E4A5B"
-  chart-series-8: "#A6552F"
+  chart-1: "#FF5100"
+  chart-2: "#4E6986"
+  chart-3: "#9A6A3B"
+  chart-4: "#5E7A52"
+  chart-5: "#6E6594"
+  chart-6: "#C44612"
+  chart-7: "#3E4A5B"
+  chart-8: "#A6552F"
+  chart-ref: "#8A93A3"
+  chart-ok: "#2F7D4F"
+  chart-bad: "#C0362C"
+  chart-grid: "#E9ECF1"
+  chart-dark-2: "#7F9BB8"
+  chart-dark-3: "#C49A6B"
+  chart-dark-4: "#8FAE82"
+  chart-dark-5: "#A39BC6"
+  chart-dark-6: "#E07A4E"
+  chart-dark-7: "#9AA6B8"
+  chart-dark-8: "#D08A62"
+  chart-dark-ref: "#7A8394"
+  chart-dark-ok: "#5FBF86"
+  chart-dark-bad: "#F07167"
   cat-partner-dark-bg: "#2949C4"
   cat-partner-dark-border: "#3A5AD6"
-  canvas-dark: "#14171D"
-  surface-dark: "#1A1F28"
-  elevated-dark: "#232833"
-  border-dark: "rgba(255,255,255,0.08)"
+  login-canvas-dark: "#14171D"
+  login-surface-dark: "#1A1F28"
+  login-elevated-dark: "#232833"
   orange-tint: "#FFB37A"
-  glow-orange: "rgba(255,81,0,0.18)"
   portal-blue-tint: "#93B4FF"
-  glow-blue: "rgba(30,64,175,0.18)"
-  status-dark-em-emissao-fg: "#FFA366"
 typography:
-  display:
+  page:
     fontFamily: "Kanit, 'Wanted Sans', ui-sans-serif, system-ui, sans-serif"
     fontSize: "22px"
-    fontWeight: 600
-    lineHeight: 1.2
+    fontWeight: 500
+    lineHeight: "28px"
     letterSpacing: "-0.01em"
-  body:
-    fontFamily: "'Wanted Sans', Inter, ui-sans-serif, system-ui, sans-serif"
+  kpi:
+    fontFamily: "Kanit, 'Wanted Sans', ui-sans-serif, system-ui, sans-serif"
+    fontSize: "28px"
+    fontWeight: 500
+    lineHeight: "32px"
+  title:
+    fontFamily: "'Wanted Sans', ui-sans-serif, system-ui, sans-serif"
+    fontSize: "18px"
+    fontWeight: 600
+    lineHeight: "24px"
+  title-sm:
+    fontFamily: "'Wanted Sans', ui-sans-serif, system-ui, sans-serif"
+    fontSize: "15px"
+    fontWeight: 600
+    lineHeight: "20px"
+  body-lg:
+    fontFamily: "'Wanted Sans', ui-sans-serif, system-ui, sans-serif"
     fontSize: "14px"
     fontWeight: 400
-    lineHeight: 1.5
-  label:
+    lineHeight: "20px"
+  body:
+    fontFamily: "'Wanted Sans', Inter, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "13px"
+    fontWeight: 400
+    lineHeight: "20px"
+  body-sm:
+    fontFamily: "'Wanted Sans', ui-sans-serif, system-ui, sans-serif"
+    fontSize: "12px"
+    fontWeight: 400
+    lineHeight: "18px"
+  meta:
     fontFamily: "'Wanted Sans', ui-sans-serif, system-ui, sans-serif"
     fontSize: "11px"
     fontWeight: 500
-    letterSpacing: "0.5px"
+    lineHeight: "16px"
 rounded:
   control: "2px"
   surface: "4px"
@@ -87,12 +188,12 @@ spacing:
   lg: "24px"
 components:
   button-primary:
-    backgroundColor: "{colors.orange}"
+    backgroundColor: "{colors.orange-fill}"
     textColor: "{colors.surface}"
     rounded: "{rounded.control}"
     padding: "8px 12px"
   button-primary-hover:
-    backgroundColor: "{colors.orange-deep}"
+    backgroundColor: "{colors.orange-fill-hover}"
     textColor: "{colors.surface}"
   button-outline:
     backgroundColor: "{colors.surface}"
@@ -125,45 +226,62 @@ quente — o laranja LHG #FF5100 — usado com parcimônia para dizer "aqui, ago
 ardósia. A interface trabalha para o atendente que processa até 30 OCs por dia; cada
 pixel de espaço morto removido é tempo devolvido à operação.
 
-O sistema rejeita explicitamente o "look de IA / template SaaS": nada de gradientes
-diagonais chamativos, nada de chips pastel coloridos competindo entre si, nada de
-cards aninhados, nada de saudação consumer ("Boa tarde, fulano") numa tela de
-trabalho. A fonte não é Inter-para-tudo; o ícone não vive num quadradinho
-arredondado acima de cada título; não há eyebrow uppercase sobre cada seção. O
-extremo oposto também é proibido: a "planilha disfarçada" (grades de células sem
-fluxo) é justamente o que este sistema veio substituir.
+Referência de acabamento (2026-10-15): software corporativo de grande porte —
+Fluent 2, IBM Carbon, SAP Fiori Horizon. Sóbrio, previsível, denso, com a mesma
+gramática nos dois temas.
+
+O sistema rejeita explicitamente o "look de IA / template SaaS": nada de gradientes,
+glow ou vidro fosco em tela de trabalho, nada de chips pastel coloridos competindo
+entre si, nada de cards aninhados, nada de saudação consumer ("Boa tarde, fulano")
+numa tela de trabalho. A fonte não é Inter-para-tudo; o ícone não vive num
+quadradinho colorido acima de cada título; não há eyebrow uppercase sobre cada
+seção. O extremo oposto também é proibido: a "planilha disfarçada" (grades de
+células sem fluxo) é justamente o que este sistema veio substituir.
 
 **Key Characteristics:**
-- Estrutura grafite neutra; laranja como acento único (≤10% da tela).
-- Densidade alta a serviço da velocidade: padding 12–16px, corpo 13–14px.
-- Plano por padrão; separação por hairline, não por sombra.
-- Cantos retos (2–4px); institucional, não "fofo".
-- Tipografia industrial (Kanit display + Wanted Sans corpo).
-- Status nunca só por cor; sempre rótulo + tom.
+- Estrutura grafite FRIA (H≈215); laranja como acento único (≤10% da tela).
+- Densidade alta a serviço da velocidade: padding 12–16px, corpo 13px.
+- Plano por padrão; profundidade por CAMADAS de superfície + hairline, não sombra.
+- Cantos retos (2px controle, 4px superfície); institucional, não "fofo".
+- Tipografia industrial (Kanit em título de página e KPI + Wanted Sans no resto).
+- Status nunca só por cor; sempre rótulo + ponto + tom.
+- Tokens únicos (index.css + tailwind.config.js); contrato de uso em
+  `.omc/handoffs/tokens-contract.md`.
 
 ## 2. Colors
 
 Uma escala grafite fria carrega toda a estrutura; o laranja LHG é o único calor, e
-sua raridade é o ponto.
+sua raridade é o ponto. **Mesma semântica nos dois temas** — só os valores mudam.
+
+### Camadas (claro → escuro)
+| Papel | Token / classe | Claro | Escuro |
+|---|---|---|---|
+| Canvas (atrás de tudo, área da página) | `bg-canvas` | #EEF1F4 | #0E1115 |
+| Superfície (seção, input, barra) | `bg-card` / `bg-background` | #FFFFFF | #161A20 |
+| Elevado (popover, menu, diálogo) | `bg-popover` | #FFFFFF | #1E232B |
+| Realce neutro (cabeçalho de tabela, rodapé de diálogo) | `bg-muted` | #F3F5F8 | #1E232B |
+| Item ativo / hover em menu | `bg-accent` | #E8ECF1 | #262C35 |
+| Linha em hover | `bg-row-hover` | #F1F4F7 | #262C35 |
+| Hairline | `border-border` | #DCE1E8 | #343B45 |
+| Contorno de controle (≥3:1) | `border-input` | #7D8696 | #6A7280 |
+| Barra superior | `bg-header` | #1A1F28 | #0A0C0F |
+| Texto 1 / 2 / 3 | `text-foreground` / `text-muted-foreground` / `text-tertiary` | #1A1F28 / #5B6472 / #5F6777 | #E6E9EE / #A4ABB6 / #8A919C |
 
 ### Primary
-- **Laranja LHG** (#FF5100): a única cor quente do sistema. Reservada a ação
-  primária (botão primário), estado ativo de navegação, foco/ring e ao acento de
-  destaque pontual. Nunca preenche superfícies grandes.
-- **Laranja Queimado** (#D3641A): estado hover do laranja primário; também o tom de
-  status "em emissão".
+- **Laranja LHG** (#FF5100): marca e série 1 dos gráficos. O FOCO (`ring`) usa #D64400 no claro
+  (3.95:1 sobre o canvas; o #FF5100 dava 2.88) e #FF6A1F no escuro.
+- **Fill de acento** (claro #CC4100 c/ texto branco 4.86:1; escuro #FF6A1F c/ tinta
+  #1A0A02 6.74:1): botão primário, checkbox marcado, avatar. Hover escurece no claro
+  (#AD3700) e clareia no escuro (#FF8A4C).
+- **Acento como texto** (`text-primary-strong`: claro #B23C0B, escuro #FF8A4C).
+- Nunca preenche superfícies grandes.
 
-### Neutral
-- **Grafite Tinta** (#1A1F28): texto principal e títulos. Não é preto puro — tem um
-  leve toque frio (H220) para parecer intencional, não default.
-- **Grafite Barra** (#1D1E1B): a barra superior sólida do sistema interno (o preto
-  LHG, chapado — sem gradiente).
-- **Ardósia 500** (#6B7280): texto secundário, labels, ícones em repouso.
-- **Cinza Acento** (#EDEFF2): fundo de hover e realce neutro.
-- **Canvas** (#F5F7F9): fundo de descanso, headers de tabela, áreas atrás dos cards.
-- **Borda** (#E1E4EA): hairline de 1px que separa quase tudo. É o principal recurso
-  de separação, no lugar de sombra.
-- **Superfície** (#FFFFFF): fundo de cards, inputs e da área de conteúdo.
+### Semânticos (texto/ícone · fundo · borda)
+`success`, `warning`, `danger`, `info` — cada um com `DEFAULT` (texto, ≥4.5:1 sobre
+surface e sobre o próprio subtle), `-subtle` (fundo de faixa/badge) e `-border`.
+Uso: `bg-warning-subtle text-warning border-warning-border`. `destructive` é o
+FILL do botão de exclusão (claro #C8312B c/ branco; escuro #F2706A c/ tinta escura).
+Cores cruas do Tailwind (amber/red/emerald/slate-*) estão aposentadas.
 
 ### Portal (acento alternativo)
 - **Azul Portal** (#1E40AF / hover #1E3A8A): no portal de parceiros, o azul ocupa o
@@ -171,234 +289,206 @@ sua raridade é o ponto.
   que ele é fornecedor, não funcionário. Os dois apps nunca misturam os acentos.
 
 ### Status (progressão semântica, não decorativa)
-Cada status é um par fundo-claro / texto-escuro do mesmo tom, formando uma
-progressão cinza → laranja → verde: **recebida** (#475569 sobre #F1F5F9) →
-**em emissão** (#C44612 sobre #FFE8D6) → **instrução emitida** (#92400E sobre
-#FEF3C7) → **OC gerada** (#8F3700 sobre #F4D4BD) → **OC enviada** (#065F46 sobre
-#D1FAE5) → **finalizada** (#064E3B sobre #A7F3D0). **cancelada** sai da escala
-(#991B1B sobre #FEE2E2).
+Cada status é fundo / texto / ponto (tokens `--st-<status>-bg|fg|dot`, claro e
+escuro). Cada etapa tem um MATIZ próprio, para ser reconhecida de relance
+(decisão do Davi, 2026-10-15 — a progressão quente anterior confundia três tons
+laranja e dois verdes): **recebida** cinza → **em emissão** laranja LHG (ponto
+VAZADO) → **instrução emitida** amarelo → **OC gerada** azul → **OC enviada**
+violeta → **finalizada** verde. **cancelada** vermelho. Todos os pares texto/fundo passam AA nos dois temas (5.0–10.7:1).
 
 ### Categórica (taxonomias, não status)
 Para distinguir **categorias** que não são status nem ação — tipos de evento de
 auditoria/segurança, papéis de usuário, tipos de frete — existe uma família de tons
-**industriais foscos**, de baixa saturação, no lugar dos pastéis genéricos do
-Tailwind (azul/indigo/roxo/teal/sky). Cada um é um par fundo-claro/texto-escuro
-(classes `.cat-*` em `index.css`, com variante dark):
-- **steel** (#334155 sobre #E2E8F0) — azul-aço frio.
-- **ink** (#423B57 sobre #E7E4EE) — violeta-grafite.
-- **clay** (#6F4A2E sobre #F0E5DC) — terracota fosca.
-- **sage** (#48553E sobre #E7EDE3) — oliva fosca.
-- **brass** (#6A562C sobre #EFE8D6) — ocre/latão.
+**industriais foscos** (classes `.cat-*` em `index.css`, com variante dark):
+**steel** (#334155/#E2E8F0), **ink** (#423B57/#E7E4EE), **clay** (#6F4A2E/#F0E5DC),
+**sage** (#48553E/#E7EDE3), **brass** (#6A562C/#EFE8D6).
 
-**Exceção — origem parceiro** (`.cat-partner`): a marca de "solicitação criada pelo
-parceiro" é a única categórica que **não** é fosca. Ela usa o **azul do portal**
-preenchido (#FFFFFF sobre #1E40AF) para destacar à vista — a origem externa precisa
-saltar, e o azul referencia a identidade do próprio portal de onde ela veio.
+**Exceção — origem parceiro** (`.cat-partner`): azul do portal preenchido (#FFFFFF
+sobre #1E40AF) — a origem externa precisa saltar.
 
-Os **semânticos não migram**: verde (sucesso/criação), vermelho (erro/exclusão) e
-âmbar (aviso/cancelamento) continuam carregando significado e nunca viram cor
-categórica. Para **séries de gráfico** (multi-série), a paleta começa no laranja de
-marca e segue com os mesmos tons industriais um pouco mais saturados para legibilidade:
-`#FF5100, #4E6986, #9A6A3B, #5E7A52, #6E6594, #C44612, #3E4A5B, #A6552F`.
+### Gráficos
+Tokens `--chart-1..8`, `--chart-ref`, `--chart-ok/bad`, `--chart-grid`,
+`--chart-axis`, `--chart-tooltip-bg`, com valores claro e escuro (todas as séries
+≥3:1 sobre a superfície escura). Recharts recebe `var(--chart-n)` direto; tooltip
+via `<ChartTooltip>`. Etapas da fila em escala grafite; laranja só para o que exige
+ação (fora do SLA).
 
 ### Named Rules
 **A Regra da Voz Única.** O laranja (e, no portal, o azul) aparece em no máximo ~10%
-de qualquer tela. Sua raridade é o que o torna um sinal de ação. Se o acento está em
-toda parte, ele não significa mais nada.
+de qualquer tela. Sua raridade é o que o torna um sinal de ação.
 
-**A Regra do Tinte Frio.** Neutros levam um leve toque na direção H220 (frio), nunca
-para o quente "porque a marca é laranja". O calor vem do acento, da tipografia e do
-conteúdo — nunca do fundo.
+**A Regra do Tinte Frio.** Neutros levam um leve toque na direção H215 (frio), nunca
+para o quente "porque a marca é laranja". O calor vem do acento — nunca do fundo.
+(A antiga barra #1D1E1B, quente, foi aposentada.)
 
 ## 3. Typography
 
-**Display Font:** Kanit (com fallback Wanted Sans → system-ui)
-**Body / UI Font:** Wanted Sans (com fallback Inter → system-ui)
+**Display Font:** Kanit 500 (só título de página e número de KPI)
+**Body / UI Font:** Wanted Sans
 
-**Character:** Kanit é uma geométrica condensada com peso industrial — boa para
-títulos e números grandes; ecoa sinalização de pátio/logística. Wanted Sans é uma
-humanista limpa e neutra para corpo e UI. O par contrasta no eixo geométrico ×
-humanista, não duas sans quase iguais. Servidas via jsdelivr (Wanted Sans) e Google
-Fonts (Kanit) — Wanted Sans não está no Google Fonts.
+**Character:** Kanit é uma geométrica condensada com peso industrial — ecoa
+sinalização de pátio/logística. Wanted Sans é uma humanista neutra para corpo e UI.
+Servidas via jsdelivr (Wanted Sans) e Google Fonts (Kanit 400/500/600).
 
-### Hierarchy
-- **Display / Título de página** (Kanit ou Wanted Sans 600, 22px, tracking -0.01em):
-  títulos de tela (h1). Sentence case.
-- **Título de seção** (Wanted Sans 600, 18px): h2 dentro da página.
-- **Título de card** (Wanted Sans 500–600, 14px): cabeçalho de card/seção.
-- **Corpo** (Wanted Sans 400, 13–14px, line-height 1.5): conteúdo, formulários,
-  células de tabela. Em texto longo, limitar a 65–75ch.
-- **Label secundária** (Wanted Sans 500, 11px, letter-spacing 0.5px, UPPERCASE):
-  rótulos de KPI e seções de cadastro. É a ÚNICA situação de maiúsculas.
-- **Meta** (Wanted Sans 400, 10px): data/hora, contadores.
+### Escala fechada (tokens Tailwind — não usar `text-[Npx]`)
+| Classe | Tamanho/linha | Uso |
+|---|---|---|
+| `text-meta` | 11/16 | cabeçalho de tabela (500, sem maiúsculas), data/hora, contadores, badge |
+| `text-body-sm` | 12/18 | dica, descrição de diálogo, legenda, rótulo de seção do menu (600) |
+| `text-body` | 13/20 | corpo, célula, formulário, botão, item de menu |
+| `text-body-lg` | 14/20 | texto de destaque, título de estado vazio |
+| `text-title-sm` | 15/20 | título de diálogo / card (600) |
+| `text-title` | 18/24 | h2 de seção (600) |
+| `text-page` | 22/28 | h1 de página — `font-display font-medium` (via `<PageHeader>`) |
+| `text-kpi` | 28/32 | número de KPI — `font-display font-medium tabular-nums` (via `<KpiTile>`) |
+
+- **Maiúsculas:** só o rótulo de KPI (`.label-uppercase`, 11px). Cabeçalho de
+  tabela, rótulo de seção do menu e label de dropdown são sentence case.
+- Números de tabela/KPI sempre `tabular-nums` (a célula de tabela já aplica).
+- Formatação numérica via `@/lib/format` (pt-BR: "93,4%", "3 h 40 min").
 
 ### Named Rules
-**A Regra do Peso-Teto.** Nada acima de 600. O peso institucional vem do tracking
-apertado e da estrutura, não de 700/800. Números em tabela usam `tabular-nums` para
-alinhar coluna a coluna.
+**A Regra do Peso-Teto.** Nada acima de 600 (Kanit 700 removido do @import).
 
 ## 4. Elevation
 
-O sistema é **plano por padrão**. A separação entre superfícies vem de hairlines de
-1px (#E1E4EA) e do contraste entre canvas (#F5F7F9) e superfície (#FFFFFF), não de
-sombra. Cards não têm sombra em repouso nem no hover (o `hover:shadow` foi removido
-no reskin). Sombra existe apenas para elementos que flutuam de verdade sobre o
-conteúdo — modais e dropdowns.
+O sistema é **plano por padrão**. A profundidade vem das CAMADAS (canvas → superfície
+→ elevado) e de hairlines de 1px, não de sombra — nos dois temas.
 
-### Shadow Vocabulary
-- **Overlay** (`box-shadow: 0 4px 12px rgba(0,0,0,0.08)`): exclusivo de diálogos,
-  popovers e dropdowns. É a única sombra do sistema.
+- **Nível 0** — página no canvas.
+- **Nível 1** — seção: `bg-card` + `border` + `rounded-lg` (4px). Um nível só: nunca
+  card dentro de card. O AppLayout não tem mais o painel branco em volta da página.
+- **Nível 2** — sobreposto: diálogo, popover, dropdown, barra de ação flutuante —
+  `bg-popover` + `border` + `shadow-overlay` (`0 4px 12px rgba(0,0,0,0.08)`).
 
-### Named Rules
-**A Regra do Plano-Por-Padrão.** Superfícies são planas em repouso. Se algo tem
-sombra, é porque está literalmente sobreposto ao conteúdo (modal/dropdown). Sombra
-para "dar profundidade decorativa" a um card é proibida.
+Sem glow, sem `backdrop-blur`/vidro, sem sombra decorativa em card.
 
 ## 5. Components
 
+### Estados (todos os componentes)
+- **Hover:** cor (fundo/borda/texto), `duration-fast` (120ms). Cards clicáveis e
+  itens do menu lateral têm **elevação sutil**: sobem 2px (`hover:-translate-y-0.5`)
+  junto com o realce de borda/fundo. Hover é elevação de 2px, não zoom: sem scale,
+  sem translate-x, sem sombra colorida/glow. Sem guarda `motion-reduce`.
+- **Selecionado:** fundo `primary` 8% + barra de 2px do acento à esquerda.
+- **Foco:** anel 2px `ring` (laranja) com offset 2px sobre `ring-offset-background`.
+- **Desabilitado:** fundo `muted` + texto `tertiary`; nada de `opacity-50` (derrubava
+  o contraste do rótulo).
+- **Movimento:** transições curtas de cor/opacidade. Sem guardas `motion-reduce`
+  (decisão de produto, PR #74 — o Windows da operação tem "reduzir movimento" ligado).
+
 ### Buttons
-- **Shape:** cantos retos (2px, `rounded-control`); altura 36px (h-9), padding
-  8×12px, corpo 13px peso 500.
-- **Primary:** fundo Laranja LHG (#FF5100), texto branco; hover → Laranja Queimado
-  (#D3641A). É a única ação que usa o acento cheio.
-- **Outline / Ghost / Secondary:** outline = borda #E1E4EA sobre branco, hover fundo
-  cinza; ghost = sem borda, hover fundo cinza; secondary = grafite. Destructive
-  (vermelho) e success (verde) existem para ações específicas.
-- **Hover / Focus:** transição só de cor (200ms); foco = ring 2px laranja
-  (`ring-ring`) com offset 1px. Sem deslocamento/elevação.
+- 36px (h-9), raio 2px, 13px peso 500. Primary = fill de acento. Outline = borda
+  `input` sobre superfície, hover `accent`. Ghost = hover `accent`. Destructive e
+  success para ações específicas.
 
-### Status Badge (componente assinatura)
-- **Style:** pílula com par fundo-claro/texto-escuro do mesmo tom (ver Colors →
-  Status). Sempre acompanha rótulo textual; cor nunca é o único sinal.
-- **State:** a transição de status anima a cor do badge (200ms).
+### Status Badge (componente assinatura) — `<SolicitacaoStatusBadge>`
+- **Retângulo** raio 2px (não pílula), 11px peso 500, **ponto de 8px** + rótulo.
+  Em emissão = ponto vazado (em andamento na equipe). Cor nunca é o único sinal.
+- Faixa lateral de status em card (`.card-status`): **6px** (Davi, 2026-10-15: 3–4px ficava fino demais para sinalizar o status). Vale no interno e no portal.
 
-### Cards / Containers
-- **Corner Style:** 4px (`rounded-surface`).
-- **Background:** branco (#FFFFFF) sobre canvas (#F5F7F9).
-- **Shadow Strategy:** nenhuma (ver Elevation — plano por padrão).
-- **Border:** hairline 1px #E1E4EA.
-- **Internal Padding:** 12–16px. Nunca 24px+ (densidade é prioridade).
+### Cards / Seções
+- Raio 4px, `bg-card`, hairline, padding 12–16px, sem sombra. Card clicável: hover
+  = `transition-[transform,background-color,border-color] duration-fast ease-out
+  hover:-translate-y-0.5 hover:border-input hover:bg-row-hover` (elevação de 2px,
+  substitui o antigo `hover:scale`).
 
-### KPI Card (dashboard)
-- Label UPPERCASE 11px + número grande 28px `tabular-nums` + ícone **monocromático**
-  numa caixa neutra (fundo cinza-claro + borda). Variação vs. período via seta
-  verde/vermelha — esse é o único uso de verde/vermelho semântico no card. Proibido
-  chip de ícone pastel colorido.
+### KPI — `<KpiTile>`
+- Rótulo 11px maiúsculo + número `text-kpi` Kanit 500 tabular + ícone 16px SOLTO em
+  `text-tertiary` (sem caixa). Delta com seta + valor + **comparador escrito**
+  ("vs. ontem no mesmo horário"), verde/vermelho conforme "subir é bom". Estado de
+  alerta = só a borda `danger-border` e o número em `text-danger`.
 
-### Inputs / Fields
-- **Style:** borda #E1E4EA sobre branco, cantos 2px, altura 36px.
-- **Focus:** ring 2px laranja (`ring-ring`), offset 1px.
+### Page header — `<PageHeader>`
+- Breadcrumb opcional (12px), h1 `text-page` Kanit 500, descrição de uma linha,
+  ações à direita (primária por último).
+
+### Inputs / Fields — `<CadastroField>`
+- Borda `input` (≥3:1) sobre superfície, raio 2px, 36px. Erro: `aria-invalid` +
+  borda `destructive` + mensagem ligada por `aria-describedby`.
+
+### Tabelas
+- Cabeçalho `bg-muted`, 11px peso 500, texto 2, sem maiúsculas; linha 40px; hover
+  `row-hover`; selecionada = acento 8% + barra 2px.
+
+### Ícones e carregamento
+- Lucide 16px na UI, 20px na navegação, `strokeWidth` 1.75. Ícone de estado vazio
+  24px solto. Carregando = `<Spinner>` (não `Loader2 animate-spin`).
 
 ### Navigation
-- **Navegação (interno):** em **drawer** (`Sheet` 300px, teto de 85vw), aberto
-  pelo botão ☰ do header — não há mais sidebar fixa 220px/64px. Cada item é um
-  bloco de 46px de altura (raio 8px, padding lateral 16px, ícone Lucide 22px +
-  rótulo 13px peso 500). A caixa segue a escala do botão "Menu" que o abre; o
-  texto voltou a 13px a pedido da operação (15px ficou grande demais). **Item ativo** = fundo
-  `accent` (cinza neutro, NÃO a cor de marca) + texto `accent-foreground` + peso
-  500 + **barra vertical de 3px** à esquerda no laranja `primary` (indicador de
-  nav via pseudo-elemento `::before`, não stripe decorativo de card). Hover = fundo
-  `muted` sutil. Labels de seção UPPERCASE 11px `muted-foreground`. Rodapé do drawer:
-  versão do app + bloco avatar/nome/perfil do usuário. Ver `SPEC-FRONTEND.md` §3.2.
-- **Modo ERP (beta, opt-in — 0074):** admin e analista ligam em "Modo ERP (beta)" no
-  menu do usuário; a escolha fica em `perfis_usuarios.layout_preferido`. No desktop
-  (≥ lg) a navegação vira **barra de módulos fixa** à esquerda (o mesmo conteúdo do
-  drawer, recolhível para 64px) e o botão "Menu" e o logo do header somem; em tela
-  estreita segue o drawer. Rodapé com **barra de status** (usuário, ambiente,
-  conexão, atalhos F2/F3/Ctrl K, versão). O layout clássico é o padrão de todos.
-  **Fase 2:** em Solicitações a lista vira **grade densa** (Nº, status, cliente,
-  motorista, placa, origem, criada, SLA) e o clique abre o **detalhe no painel à
-  direita** (440px, ≥ xl) — o mesmo componente da página de detalhe em modo
-  embutido, coluna única. Linha ativa: fundo `primary` 6% + barra de 3px do acento à
-  esquerda (mesmo sinal do item ativo da navegação). ↑/↓ andam, Enter/duplo clique
-  abre em tela cheia. Abaixo de xl o clique abre a página, como no clássico.
-  **Fase 3:** faixa de **janelas em abas** abaixo do header — uma aba fixa de área de
-  trabalho (acompanha a tela de módulo, com filtros) + uma aba por solicitação aberta
-  em tela cheia (até 8; a mais antiga sai). Aba ativa: fundo `background`, peso 500 e
-  filete de 2px do acento no topo; fechar pelo X ou clique do meio. Abas abertas
-  ficam no navegador, por usuário.
-- **Header (interno):** full-width, 3 zonas — esquerda (botão **"Menu"**: ☰ 22px +
-  rótulo 15px, 46px de altura, em **outline branco** — borda e texto brancos sobre o header grafite,
-  fundo transparente — como entrada da navegação que substituiu a sidebar + logo),
-  centro (busca global), direita (status de rede + tema + notificações + menu do
-  usuário). Não repete o título da página (cada tela tem seu próprio `h1`). O botão
-  "Menu" segue a linguagem branca do header (não usa o acento), preservando a Voz
-  Única para ações primárias.
-- **Top nav (portal):** horizontal, item ativo = texto azul + sublinhado azul de 2px
-  (com leve glow do azul no tema escuro, ver §7). O portal tem alternador de tema
-  próprio no header.
+- **Navegação (interno):** drawer (`Sheet` 300px, teto 85vw) aberto pelo botão
+  "Menu" do header; no modo ERP vira barra fixa (recolhível para 64px). Quatro
+  seções — **Operação** (Painel, Solicitações, Agendamentos, Conferência de viagem),
+  **Cadastros** (Clientes, Materiais, Cargas de retorno, Motoristas, Veículos,
+  Carretas, Subcontratadas), **Análise** (Relatórios, Produtividade da equipe,
+  Atividade da equipe), **Administração** (Parceiros e acessos, Usuários, Auditoria,
+  Segurança, Privacidade). Rótulo de seção 12px semibold texto 2, sem maiúsculas.
+  Item 36px, ícone 20px + 13px, sem borda/fundo em repouso; hover = cor + sobe 2px; **ativo**
+  = fundo `accent` + barra de 2px do acento. Contador neutro (retângulo com borda,
+  não âmbar). Rodapé: versão + avatar/nome/perfil.
+- **Modo ERP (beta, opt-in — 0074):** barra de módulos fixa, barra de status no
+  rodapé, grade densa em Solicitações com detalhe à direita (≥ xl), janelas em abas
+  (aba ativa: `bg-card`, peso 500, filete de 2px do acento no topo).
+- **Header (interno):** 48px, `bg-header` frio nos dois temas, 3 zonas — botão
+  "Menu" leve (ícone 20px + 13px, ghost, sem contorno) + logo; busca global ao
+  centro; rede + tema + notificações + usuário à direita. Não repete o título da página.
+- **Top nav (portal):** horizontal, item ativo = texto azul + sublinhado azul de 2px.
 
 ## 6. Do's and Don'ts
 
 ### Do:
-- **Do** reservar o laranja #FF5100 (azul #1E40AF no portal) para ação primária,
-  estado ativo e foco — ≤10% da tela (A Regra da Voz Única).
-- **Do** separar superfícies com hairline 1px (#E1E4EA) e o contraste canvas×branco.
-- **Do** manter densidade alta: padding 12–16px, corpo 13–14px, sem espaço morto.
-- **Do** usar cantos retos (2px controles, 4px superfícies) e `tabular-nums` em
-  números de tabela/KPI.
-- **Do** acompanhar todo status de rótulo + ícone, nunca só de cor (WCAG AA, AA é o
-  piso; corpo ≥ 4.5:1).
-- **Do** dar alternativa `prefers-reduced-motion` a toda animação (crossfade/instantâneo).
+- **Do** reservar o laranja para ação primária, estado ativo e foco — ≤10% da tela.
+- **Do** separar camadas com canvas × superfície × hairline.
+- **Do** manter densidade alta: padding 12–16px, corpo 13px, linha de tabela 40px.
+- **Do** usar cantos retos (2px controles, 4px superfícies) e `tabular-nums`.
+- **Do** acompanhar todo status de rótulo + ponto, nunca só de cor (AA é o piso).
+- **Do** usar os tokens (`text-body`, `bg-warning-subtle`, `var(--chart-n)`) e os
+  componentes base (`PageHeader`, `KpiTile`, `ChartTooltip`, `Spinner`,
+  `EmptyState`, `CadastroField`).
 
 ### Don't:
-- **Don't** usar gradientes em superfícies grandes (headers, fundos de card, botões)
-  nem gradiente de duas cores diferentes. No modo claro, a barra superior segue
-  grafite sólido #1D1E1B, chapado. **Exceção única — modo escuro (§7):** gradiente é
-  permitido como device pontual (tom-claro→sólido do MESMO acento) em pontos
-  específicos (wordmark do login, número "hero" de KPI); nunca em tudo.
-- **Don't** usar chips de ícone pastel coloridos (esmeralda/âmbar/roxo) competindo —
-  ícones de KPI são monocromáticos.
+- **Don't** usar gradiente, glow, `backdrop-blur` ou texto em gradiente em tela de
+  trabalho — em nenhum dos temas. **Exceção única: a tela de login** (é marca; ver §7).
+- **Don't** usar scale, translate-x ou sombra colorida no hover (cards, itens de menu,
+  ícones). O único movimento aceito é a elevação de 2px (`-translate-y-0.5`).
+- **Don't** pôr ícone em caixa colorida (KPI, título, aviso) — ícone vai solto.
+- **Don't** usar pílula `rounded-full` em status/tag — retângulo 2px.
+- **Don't** usar cores cruas do Tailwind (amber/red/emerald/slate-*) nem hex soltos
+  em componente; use os tokens semânticos.
 - **Don't** aninhar card dentro de card, nem repetir grades de cards idênticos sem fim.
-- **Don't** colocar saudação consumer ("Boa tarde, fulano") em tela de operação.
-- **Don't** usar Inter (ou system default) para tudo, ícone em quadradinho
-  arredondado acima de cada título, ou eyebrow UPPERCASE sobre cada seção.
-- **Don't** usar `border-left`/`border-right` > 1px como stripe colorido em cards,
-  itens de lista ou callouts.
-- **Don't** dar sombra decorativa a cards (plano por padrão; sombra só em modal/dropdown).
-- **Don't** virar "planilha disfarçada": toda tela tem fluxo e foco, não só grade de células.
+- **Don't** colocar saudação consumer em tela de operação.
+- **Don't** usar Inter para tudo, eyebrow UPPERCASE sobre seção, ou `text-[Npx]`.
+- **Don't** usar `border-left`/`border-right` > 1px como stripe decorativo (a faixa de
+  status de 3px e a barra de 2px do item ativo são indicadores, não decoração).
+- **Don't** dar sombra a cards (sombra só no nível 2).
+- **Don't** virar "planilha disfarçada": toda tela tem fluxo e foco.
 
-## 7. Tema Escuro (extensão — SPEC-NOVA-UI v3)
+## 7. Tema Escuro
 
-O SisLog ganha uma versão **escura, com profundidade em camadas, gradiente e glow**,
-recolorida com os acentos do próprio sistema (laranja no interno, azul no portal) —
-referência de composição em `docs/SPEC-NOVA-UI.md`. Isso é uma **extensão do modo
-escuro** (já existente via `ThemeToggle`), não a substituição do modo claro: as
-seções 1–6 continuam valendo para o modo claro e para as regras que não mudam
-(Voz Única, densidade, cantos retos 2–4px, status sempre com rótulo, peso-teto 600).
+**Emenda de 2026-10-15 (decisão do Davi):** o tema escuro deixa de ser uma
+"extensão com gradiente e glow" (SPEC-NOVA-UI v3) e passa a ser o **mesmo sistema
+do claro com outros valores**: mesmas camadas, mesmos tokens, mesmas regras de
+plano-por-padrão. Gradiente, glow e vidro fosco **saíram de todas as telas de
+trabalho** (Painel, Relatórios, Detalhe da OC, barras de ação, barra de progresso);
+o `hover:scale` dos cards virou elevação de 2px + realce de borda/fundo. `docs/SPEC-NOVA-UI.md` está
+superada nas telas operacionais.
 
-**O que muda do modo claro:** a Regra do Plano-Por-Padrão (§4) é relaxada **só no
-escuro e só nos pontos abaixo** — gradiente e glow entram como recursos **escassos e
-posicionados**, na mesma lógica da Voz Única (se está em tudo, para de significar).
+### Superfícies escuras (frias, H≈215)
+canvas #0E1115 → superfície #161A20 → elevado #1E232B → hover #262C35; hairline
+#343B45; contorno de controle #6A7280 (3.60:1 na superfície, 3.26:1 no elevado); texto #E6E9EE / #A4ABB6 / #8A919C;
+barra superior #0A0C0F + hairline. A hierarquia do claro é preservada (canvas mais
+escuro atrás, superfície à frente) — antes o painel principal ficava mais claro que
+o card (1.08:1, hierarquia invertida).
 
-### Superfícies escuras (tokens fixos, não invertem por tema)
-- **canvas-dark** (#14171D): fundo raiz de superfície escura (papel do canvas claro).
-- **surface-dark** (#1A1F28): card/painel/input (reaproveita o hex de `ink`).
-- **elevated-dark** (#232833): popover, dropdown, tooltip, linha em hover.
-- **border-dark** (rgba(255,255,255,0.08)): hairline no escuro.
+### Acento e semânticos no escuro
+Fills claros com **tinta escura** (branco sobre laranja/verde/vermelho claros nunca
+passa AA): primary #FF6A1F/#1A0A02, destructive #F2706A/#1F0606, success
+#3DD68C/#06210F. Texto de acento #FF8A4C.
 
-### Acento no escuro
-- Sólido: laranja #FF5100 (interno) / azul #1E40AF (portal), como no claro.
-- Tom claro do acento (fim do gradiente): **orange-tint** #FFB37A / **portal-blue-tint**
-  #93B4FF. Gradiente é sempre *tom-claro → sólido do mesmo acento*, nunca duas cores.
-- Glow: **glow-orange** rgba(255,81,0,0.18) / **glow-blue** rgba(30,64,175,0.18) —
-  sombra difusa atrás de um elemento em destaque.
-
-### Badge de status no escuro
-Mesma fórmula do claro, translúcida: fundo = cor-do-texto a 12%, borda a 30%, texto =
-`status-dark-*-fg` (já no frontmatter; `status-dark-em-emissao-fg` #FFA366 acrescido
-aqui para completar a escala). A cor nunca é o único sinal — rótulo sempre presente.
-
-### Onde gradiente/glow ENTRAM (e só aqui)
-- **Orb de glow** atrás do card de login (um único, `blur`, ~15–18%, cor do acento).
-- **Wordmark do login** em gradiente tom-claro→sólido do acento.
-- **Número "hero"** dos 2 KPIs de estado do Dashboard (Pendentes/Atrasadas).
-- **Glow funcional** onde já há mudança de tom por regra de negócio (card "Atrasadas"
-  ativo, nó mais recente do TimelineCard) — reforço de atenção, não decoração.
-- **Caixa do ícone de KPI** com gradiente sutil do acento (acento/20→acento/5).
-- **Barra do ranking Top N** com preenchimento em gradiente sólido→70% do acento.
-
-### Onde NÃO entram (mantido plano/sólido)
-Fundo de cards de dado (tabelas, `SolicitacaoCard`, cadastros), botões, badges de
-status, e qualquer superfície normal. `backdrop-blur`/glass só em overlays que já
-flutuam (modal/dropdown/popover) — exatamente onde §4 já permite sombra.
+### Onde gradiente/glow AINDA entram (e só aqui)
+- **Tela de login** (marca): orb de glow atrás do card e wordmark em gradiente
+  tom-claro→sólido do acento (`--orange-tint` → #FF5100). Tokens fixos de login:
+  `--canvas-dark` #14171D, `--surface-dark` #1A1F28, `--elevated-dark` #232833,
+  `--glow-orange`, `--orange-tint` (e os equivalentes azuis no portal).
+- Nada mais. Número de KPI, caixa de ícone, barra de ranking, nó da linha do tempo
+  e card "Atrasadas" são planos (o alerta é borda + cor do número, não glow).

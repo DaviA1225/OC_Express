@@ -1,5 +1,6 @@
 import * as React from 'react'
-import { Loader2, Plus, Trash2, CalendarClock } from 'lucide-react'
+import { Plus, Trash2, CalendarClock } from 'lucide-react'
+import { Spinner } from '@/components/shared/Spinner'
 import {
   Dialog,
   DialogContent,
@@ -28,6 +29,7 @@ import {
   MAX_SLOTS_GRADE,
 } from '@/features/agendamentos/useTerminais'
 import type { Tables, TipoVeiculoSlot } from '@/types/database.types'
+import { CadastroField } from '@/components/forms/CadastroField'
 
 type Cliente = Tables<'clientes'>
 
@@ -151,10 +153,10 @@ function Conteudo({ row, onOpenChange, onSubmit }: { row: Cliente } & Omit<Props
         <div
           className={cn(
             'flex h-11 items-center justify-between rounded-md border px-3',
-            requer ? 'border-primary/40 bg-accent' : 'bg-card',
+            requer ? 'border-primary/40 bg-accent' : '',
           )}
         >
-          <span className="inline-flex items-center gap-2 text-[13px] font-medium text-foreground">
+          <span className="inline-flex items-center gap-2 text-body font-medium text-foreground">
             <CalendarClock className="h-4 w-4 text-muted-foreground" />
             Este cliente exige agendamento prévio
           </span>
@@ -162,7 +164,7 @@ function Conteudo({ row, onOpenChange, onSubmit }: { row: Cliente } & Omit<Props
         </div>
 
         {!requer && (
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-meta text-muted-foreground">
             Com o agendamento desligado, o botão não aparece no portal e a equipe não recebe
             pedidos deste cliente na fila.
           </p>
@@ -171,48 +173,38 @@ function Conteudo({ row, onOpenChange, onSubmit }: { row: Cliente } & Omit<Props
         {requer && (
           <>
             <div className="grid grid-cols-[1fr_160px] gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="terminal_nome">Nome do terminal</Label>
+              <CadastroField label="Nome do terminal" id="terminal_nome" hint={<>Como a equipe chama o destino. É o título do grupo na fila.</>}>
                 <Input
-                  id="terminal_nome"
                   value={nome}
                   onChange={(e) => setNome(e.target.value)}
                   placeholder="Ex.: CSN Pindamonhangaba"
                 />
-                <p className="text-[11px] text-muted-foreground">
-                  Como a equipe chama o destino. É o título do grupo na fila.
-                </p>
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="antecedencia">Antecedência (h)</Label>
+              </CadastroField>
+              <CadastroField label="Antecedência (h)" id="antecedencia" hint={<>Vazio = sem regra.</>}>
                 <Input
-                  id="antecedencia"
                   inputMode="numeric"
                   value={antecedencia}
                   onChange={(e) => setAntecedencia(e.target.value.replace(/\D/g, ''))}
                   placeholder="24"
                 />
-                <p className="text-[11px] text-muted-foreground">Vazio = sem regra.</p>
-              </div>
+              </CadastroField>
             </div>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="obs_agendamento">Observações do terminal</Label>
+            <CadastroField label="Observações do terminal" id="obs_agendamento">
               <Textarea
-                id="obs_agendamento"
                 rows={2}
                 value={observacoes}
                 onChange={(e) => setObservacoes(e.target.value)}
                 placeholder="Regras que a equipe precisa lembrar na hora de agendar."
               />
-            </div>
+            </CadastroField>
 
-            <div className="space-y-2 rounded-lg border bg-card p-3">
-              <Label className="text-[11px] uppercase tracking-[0.5px] text-muted-foreground">
+            <div className="space-y-2 rounded-md border p-3">
+              <p className="text-body-sm font-medium text-foreground">
                 Grade de horários
-              </Label>
+              </p>
 
-              <p className="text-[11px] leading-relaxed text-muted-foreground">
+              <p className="text-meta leading-relaxed text-muted-foreground">
                 Um horário por linha. A capacidade é referência da LHG: a vaga final depende do
                 sistema do terminal, que também atende outras transportadoras. Onde o terminal
                 descarrega cada tipo de veículo num horário diferente, marque o tipo em cada
@@ -220,12 +212,12 @@ function Conteudo({ row, onOpenChange, onSubmit }: { row: Cliente } & Omit<Props
               </p>
 
               <div className="space-y-2 rounded-md border border-dashed p-2.5">
-                <p className="text-[11px] font-medium text-foreground">
+                <p className="text-meta font-medium text-foreground">
                   Gerar a partir da faixa que o terminal informou
                 </p>
                 <div className="flex flex-wrap items-end gap-2">
                   <div className="space-y-1">
-                    <Label htmlFor="g_inicio" className="text-[11px]">Das</Label>
+                    <Label htmlFor="g_inicio" className="text-meta">Das</Label>
                     <Input
                       id="g_inicio"
                       type="time"
@@ -235,7 +227,7 @@ function Conteudo({ row, onOpenChange, onSubmit }: { row: Cliente } & Omit<Props
                     />
                   </div>
                   <div className="space-y-1">
-                    <Label htmlFor="g_fim" className="text-[11px]">Até</Label>
+                    <Label htmlFor="g_fim" className="text-meta">Até</Label>
                     <Input
                       id="g_fim"
                       type="time"
@@ -245,7 +237,7 @@ function Conteudo({ row, onOpenChange, onSubmit }: { row: Cliente } & Omit<Props
                     />
                   </div>
                   <div className="space-y-1">
-                    <Label htmlFor="g_duracao" className="text-[11px]">Janelas de (min)</Label>
+                    <Label htmlFor="g_duracao" className="text-meta">Janelas de (min)</Label>
                     <Input
                       id="g_duracao"
                       inputMode="numeric"
@@ -255,7 +247,7 @@ function Conteudo({ row, onOpenChange, onSubmit }: { row: Cliente } & Omit<Props
                     />
                   </div>
                   <div className="space-y-1">
-                    <Label htmlFor="g_capacidade" className="text-[11px]">Vagas</Label>
+                    <Label htmlFor="g_capacidade" className="text-meta">Vagas</Label>
                     <Input
                       id="g_capacidade"
                       inputMode="numeric"
@@ -265,7 +257,7 @@ function Conteudo({ row, onOpenChange, onSubmit }: { row: Cliente } & Omit<Props
                     />
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-[11px]">Veículo</Label>
+                    <Label className="text-meta">Veículo</Label>
                     <SeletorTipo value={gTipo} onChange={setGTipo} aria-label="Tipo de veículo da grade gerada" />
                   </div>
                   <Button
@@ -274,7 +266,7 @@ function Conteudo({ row, onOpenChange, onSubmit }: { row: Cliente } & Omit<Props
                     onClick={() => void gerar()}
                     disabled={ineditos.length === 0 || excedeu || gerarGrade.isPending}
                   >
-                    {gerarGrade.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                    {gerarGrade.isPending && <Spinner />}
                     Gerar
                   </Button>
                 </div>
@@ -282,13 +274,13 @@ function Conteudo({ row, onOpenChange, onSubmit }: { row: Cliente } & Omit<Props
                 {/* Prévia ao vivo: "das 7 às 18" pode ser lido como última janela
                     às 17:30 ou às 18:00. Em vez de escolher por quem cadastra, a
                     tela mostra o que vai criar antes do clique. */}
-                <p className="text-[11px] leading-relaxed text-muted-foreground">
+                <p className="text-meta leading-relaxed text-muted-foreground">
                   {excedeu ? (
-                    <span className="text-amber-700">
+                    <span className="text-warning">
                       Mais de {MAX_SLOTS_GRADE} janelas nessa faixa. Confira a duração.
                     </span>
                   ) : previa.length === 0 ? (
-                    <span className="text-amber-700">
+                    <span className="text-warning">
                       Faixa inválida: o fim precisa ser depois do início e caber ao menos uma janela.
                     </span>
                   ) : (
@@ -310,9 +302,9 @@ function Conteudo({ row, onOpenChange, onSubmit }: { row: Cliente } & Omit<Props
               </div>
 
               {janelas.isLoading ? (
-                <p className="py-3 text-[12px] text-muted-foreground">Carregando grade…</p>
+                <p className="py-3 text-body-sm text-muted-foreground">Carregando grade…</p>
               ) : lista.length === 0 ? (
-                <p className="py-3 text-[12px] text-muted-foreground">
+                <p className="py-3 text-body-sm text-muted-foreground">
                   Nenhum horário cadastrado. Use um dos padrões acima ou adicione manualmente —
                   sem grade, o portal aceita qualquer horário.
                 </p>
@@ -322,8 +314,8 @@ function Conteudo({ row, onOpenChange, onSubmit }: { row: Cliente } & Omit<Props
                     <li
                       key={j.id}
                       className={cn(
-                        'flex items-center gap-2 px-2.5 py-1.5 text-[12px]',
-                        !j.ativo && 'opacity-50',
+                        'flex items-center gap-2 px-2.5 py-1.5 text-body-sm',
+                        !j.ativo && 'text-tertiary',
                       )}
                     >
                       <span className="w-14 font-medium tabular-nums text-foreground">
@@ -356,7 +348,7 @@ function Conteudo({ row, onOpenChange, onSubmit }: { row: Cliente } & Omit<Props
                       <button
                         type="button"
                         onClick={() => void removerJanela.mutateAsync(j.id)}
-                        className="rounded-sm p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
+                        className="rounded-sm p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-destructive"
                         aria-label={`Remover horário ${horaCurta(j.hora)} (${TIPO_SLOT_LABELS[j.tipo_veiculo]})`}
                         title="Remover da grade"
                       >
@@ -369,7 +361,7 @@ function Conteudo({ row, onOpenChange, onSubmit }: { row: Cliente } & Omit<Props
 
               <div className="flex items-end gap-2">
                 <div className="space-y-1">
-                  <Label htmlFor="nova_hora" className="text-[11px]">Horário</Label>
+                  <Label htmlFor="nova_hora" className="text-meta">Horário</Label>
                   <Input
                     id="nova_hora"
                     type="time"
@@ -379,7 +371,7 @@ function Conteudo({ row, onOpenChange, onSubmit }: { row: Cliente } & Omit<Props
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label htmlFor="nova_duracao" className="text-[11px]">Duração (min)</Label>
+                  <Label htmlFor="nova_duracao" className="text-meta">Duração (min)</Label>
                   <Input
                     id="nova_duracao"
                     inputMode="numeric"
@@ -389,7 +381,7 @@ function Conteudo({ row, onOpenChange, onSubmit }: { row: Cliente } & Omit<Props
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label htmlFor="nova_capacidade" className="text-[11px]">Vagas</Label>
+                  <Label htmlFor="nova_capacidade" className="text-meta">Vagas</Label>
                   <Input
                     id="nova_capacidade"
                     inputMode="numeric"
@@ -399,7 +391,7 @@ function Conteudo({ row, onOpenChange, onSubmit }: { row: Cliente } & Omit<Props
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-[11px]">Veículo</Label>
+                  <Label className="text-meta">Veículo</Label>
                   <SeletorTipo value={novoTipo} onChange={setNovoTipo} aria-label="Tipo de veículo do horário" />
                 </div>
                 <Button
@@ -414,7 +406,7 @@ function Conteudo({ row, onOpenChange, onSubmit }: { row: Cliente } & Omit<Props
               </div>
 
               {ativos.length > 0 && (
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-meta text-muted-foreground">
                   {ativos.length} horário(s) ativo(s)
                   {totalDia > 0 && <> · {totalDia} veículos/dia na conta da LHG</>}
                 </p>
@@ -425,7 +417,7 @@ function Conteudo({ row, onOpenChange, onSubmit }: { row: Cliente } & Omit<Props
       </DialogBody>
 
       <DialogFooter>
-        <span className="text-[11px] text-muted-foreground/80">
+        <span className="text-meta text-muted-foreground">
           A grade é salva na hora; os campos acima, ao salvar.
         </span>
         <div className="flex items-center gap-2">
@@ -449,7 +441,7 @@ function Conteudo({ row, onOpenChange, onSubmit }: { row: Cliente } & Omit<Props
               }
             }}
           >
-            {salvando && <Loader2 className="h-4 w-4 animate-spin" />}
+            {salvando && <Spinner />}
             Salvar
           </Button>
         </div>

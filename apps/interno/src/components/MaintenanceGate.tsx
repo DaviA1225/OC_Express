@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { fetchSystemStatus } from '@sislog/shared/supabase'
 import { supabase } from '@/lib/supabase'
+import { Spinner } from '@/components/shared/Spinner'
 
 /**
  * Gate de manutenção do sistema interno.
@@ -43,8 +44,8 @@ export function MaintenanceGate({ children }: { children: ReactNode }) {
   // normal) — evita piscar o app antes de bloquear quando a manutenção está on.
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="h-7 w-7 animate-spin rounded-full border-2 border-muted-foreground/25 border-t-primary" />
+      <div className="flex min-h-screen items-center justify-center bg-canvas text-muted-foreground">
+        <Spinner size="md" label="Carregando" />
       </div>
     )
   }
@@ -58,9 +59,9 @@ export function MaintenanceGate({ children }: { children: ReactNode }) {
 
 function MaintenanceScreen() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4 py-12">
+    <div className="flex min-h-screen items-center justify-center bg-canvas px-4 py-12">
       <div className="w-full max-w-md text-center">
-        <h1 className="text-[22px] font-semibold tracking-tight text-foreground">
+        <h1 className="font-display text-page font-medium text-foreground">
           Sistema indisponível
         </h1>
       </div>

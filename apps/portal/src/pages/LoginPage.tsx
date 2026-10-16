@@ -3,7 +3,7 @@ import { useNavigate, Navigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { ArrowLeft, ArrowRight, Clock, Eye, EyeOff, Loader2, HeartHandshake } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Clock, Eye, EyeOff } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -14,37 +14,17 @@ import { useAuth } from '@/hooks/useAuth'
 import { emailLembrado, esquecerEmail, lembrarEmail } from '@sislog/shared/cookies'
 import { TermosLeitura } from '@/features/termos/TermosLeitura'
 import { lerMotivoSaida, limparMotivoSaida } from '@sislog/shared/sessao'
+import { Spinner } from '@/components/shared/Spinner'
+import { tremer } from '@/hooks/useMovimento'
+import { cn } from '@/lib/utils'
 
 // Chave pública do Turnstile. Quando ausente, o captcha fica desligado e o login
 // segue como antes — o gate real é habilitado no Dashboard do Supabase.
 const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined
 
-/**
- * Página pública de apresentação do SisLog. Ela vive no app INTERNO, que é
- * outro projeto Vercel com domínio próprio, então daqui é link externo e não
- * rota.
- *
- * Duplicar a página no portal seria a alternativa, e é pior: uma landing tem
- * texto, telas e pedido de apoio que mudam juntos, e duas cópias divergem no
- * primeiro ajuste. Uma página, uma URL.
- *
- * Sem a variável, o botão simplesmente não aparece. Link quebrado numa tela de
- * login de parceiro é pior do que botão nenhum, e o domínio do app já quebrou
- * integração aqui antes (a allowlist de CORS das Edge Functions).
- */
-const URL_APRESENTACAO =
-  (import.meta.env.VITE_URL_APRESENTACAO as string | undefined) ??
-  (import.meta.env.DEV ? 'http://localhost:5173/sobre' : 'https://sislog.vercel.app/sobre')
-
-/** `origem=portal` faz a página de apresentação devolver o visitante para O
- *  PORTAL, e não para o login interno, onde o parceiro não tem conta. A página
- *  usa esse valor para ESCOLHER entre destinos que ela já conhece; nenhuma URL
- *  viaja daqui para lá. */
-const URL_APRESENTACAO_PARCEIRO = `${URL_APRESENTACAO}?origem=portal`
-
 const loginSchema = z.object({
-  email: z.string().min(1, 'Informe seu e-mail').email('E-mail inválido'),
-  password: z.string().min(1, 'Informe sua senha'),
+  email: z.string().min(1, 'Informe o e-mail').email('E-mail inválido'),
+  password: z.string().min(1, 'Informe a senha'),
 })
 
 type LoginValues = z.infer<typeof loginSchema>
@@ -73,6 +53,24 @@ export default function LoginPage() {
   const turnstileRef = React.useRef<TurnstileHandle>(null)
   const captchaEnabled = Boolean(TURNSTILE_SITE_KEY)
 
+  // Movimento (hooks/useMovimento + index.css): entrada coreografada só na
+  // abertura; troca de etapa desliza; erro do submit faz o card tremer.
+  const cardRef = React.useRef<HTMLDivElement>(null)
+  const [entrada, setEntrada] = React.useState(true)
+  const [direcao, setDirecao] = React.useState<'avanca' | 'volta' | null>(null)
+  React.useEffect(() => {
+    const t = window.setTimeout(() => setEntrada(false), 700)
+    return () => window.clearTimeout(t)
+  }, [])
+  const irPara = (proxima: Step) => {
+    setEntrada(false)
+    setDirecao(proxima === 'credentials' ? 'avanca' : 'volta')
+    setStep(proxima)
+  }
+  // Ordem na coreografia: wordmark 0 · card 2 (80ms) · conteúdo a partir de 3.
+  const ent = entrada ? 'entrada-login' : undefined
+  const ordem = (n: number) => ({ '--ordem': n }) as React.CSSProperties
+
   const {
     register,
     handleSubmit,
@@ -88,7 +86,7 @@ export default function LoginPage() {
 
   const onSubmit = async (values: LoginValues) => {
     if (captchaEnabled && !captchaToken) {
-      toast.error('Confirme que você não é um robô.')
+      toast.error('Conclua a verificação de segurança.')
       return
     }
     setSubmitting(true)
@@ -98,6 +96,7 @@ export default function LoginPage() {
       // Token do Turnstile é de uso único: descarta e emite um novo desafio.
       turnstileRef.current?.reset()
       setCaptchaToken(null)
+      tremer(cardRef.current)
       toast.error(error)
       return
     }
@@ -110,30 +109,37 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="relative flex min-h-full items-center justify-center overflow-hidden bg-[#F5F7F9] px-4 py-10 dark:bg-[var(--canvas-dark)]">
-      {/* Glow orb azul atrás do card — "hero" da entrada do parceiro (SPEC-NOVA-UI §4). */}
+    <div className="relative flex min-h-full items-center justify-center overflow-hidden bg-canvas px-4 py-10">
+      {/* Glow orb azul atrás do card — "hero" da entrada do parceiro (SPEC-NOVA-UI §4).
+          Exceção de marca (DESIGN.md §7): gradiente e brilho só aqui no login. */}
       <div
         aria-hidden
-        className="pointer-events-none absolute left-1/2 top-1/2 h-[440px] w-[440px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[rgba(30,64,175,0.10)] blur-[130px] dark:bg-[var(--glow-blue)]"
+        className="pointer-events-none absolute inset-0 m-auto h-[440px] w-[440px] rounded-full bg-[rgba(30,64,175,0.10)] blur-[130px] dark:bg-[var(--glow-blue)]"
       />
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_100%_70%_at_50%_-10%,rgba(30,64,175,0.06),transparent_55%)]"
       />
       <div className="relative w-full max-w-[380px]">
-        <div className="relative overflow-hidden rounded-[4px] border border-border bg-white p-8 shadow-[0_18px_50px_-12px_rgba(0,0,0,0.18)] dark:border-[var(--border-dark)] dark:bg-[var(--surface-dark)] dark:shadow-[0_24px_60px_-12px_rgba(0,0,0,0.75)]">
+        <div ref={cardRef} className="relative isolate p-8">
+          {/* Superfície do card numa camada própria: entra depois do wordmark
+              (que mora dentro dela) sem esconder o que está por cima. */}
+          <div
+            aria-hidden
+            className={cn('absolute inset-0 -z-10 rounded-surface border bg-card shadow-overlay', ent)} style={ordem(2)}
+          />
           {/* Wordmark — destaque tipográfico único: gradiente tom-claro→sólido do azul. */}
-          <div className="mb-6 flex items-center gap-2.5">
-            <div className="inline-flex h-9 w-9 items-center justify-center rounded-[4px] bg-primary text-[13px] font-semibold text-primary-foreground">
+          <div className={cn('mb-6 flex items-center gap-2.5', ent)} style={ordem(0)}>
+            <div className="inline-flex h-9 w-9 items-center justify-center rounded-surface bg-primary text-body font-semibold text-primary-foreground">
               LHG
             </div>
-            <span className="bg-gradient-to-r from-[#1E40AF] to-[#1E3A8A] bg-clip-text font-display text-[16px] font-semibold leading-tight tracking-tight text-transparent dark:from-[var(--portal-blue-tint)] dark:to-[#1E40AF]">
+            <span className="bg-gradient-to-r from-[#1E40AF] to-[#1E3A8A] bg-clip-text font-display text-title-sm font-semibold leading-tight tracking-tight text-transparent dark:from-[var(--portal-blue-tint)] dark:to-[#1E40AF]">
               Portal Parceiros LHG
             </span>
           </div>
           {saiuPorInatividade && (
-            <div className="mb-5 flex items-start gap-2 rounded-[3px] border border-amber-300 bg-amber-50 px-3 py-2 text-[12px] leading-relaxed text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
-              <Clock className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <div role="status" className={cn('mb-5 flex items-start gap-2 rounded-[2px] border border-warning-border bg-warning-subtle px-3 py-2 text-body-sm leading-relaxed text-warning', ent)} style={ordem(3)}>
+              <Clock className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
               <span>
                 Entre novamente para continuar. Por inatividade, o acesso é encerrado para
                 proteger os dados do sistema.
@@ -142,42 +148,38 @@ export default function LoginPage() {
           )}
 
           {step === 'welcome' ? (
-            <div
-              key="welcome"
-              className="animate-in fade-in slide-in-from-bottom-1 duration-200 motion-reduce:animate-none"
-            >
-              <h1 className="font-display text-[22px] font-semibold tracking-tight text-foreground">
+            <div key="welcome" className={direcao === 'avanca' ? 'etapa-avanca' : direcao === 'volta' ? 'etapa-volta' : undefined}>
+              <h1 className={cn('font-display text-page font-medium text-foreground', ent)} style={ordem(4)}>
                 Acessar o portal
               </h1>
-              <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
+              <p className={cn('mt-1.5 text-body leading-relaxed text-muted-foreground', ent)} style={ordem(5)}>
                 Acesso para transportadoras parceiras da LHG.
               </p>
 
               <Button
                 type="button"
-                className="mt-6 h-10 w-full"
-                onClick={() => setStep('credentials')}
+                className={cn('mt-6 h-10 w-full', ent)}
+                style={ordem(6)}
+                onClick={() => irPara('credentials')}
               >
                 Login
                 <ArrowRight className="h-4 w-4" />
               </Button>
             </div>
           ) : (
-            <div
-              key="credentials"
-              className="animate-in fade-in slide-in-from-bottom-1 duration-200 motion-reduce:animate-none"
-            >
+            <div key="credentials" className={direcao === 'avanca' ? 'etapa-avanca' : direcao === 'volta' ? 'etapa-volta' : undefined}>
               <button
                 type="button"
-                onClick={() => setStep('welcome')}
-                className="mb-5 inline-flex items-center gap-1.5 text-[12px] font-medium text-muted-foreground transition-colors hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+                onClick={() => irPara('welcome')}
+                style={ordem(3)}
+                className={cn('mb-5 inline-flex items-center gap-1.5 text-body-sm font-medium text-muted-foreground transition-colors duration-fast hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1', ent)}
               >
                 <ArrowLeft className="h-3.5 w-3.5" />
                 Voltar
               </button>
 
-              <h1 className="font-display text-[22px] font-semibold tracking-tight text-foreground">
-                Suas credenciais
+              <h1 className={cn('font-display text-page font-medium text-foreground', ent)} style={ordem(4)}>
+                Entrar no Portal Parceiros
               </h1>
 
               {/* react-hooks/refs acusa `handleSubmit` porque o react-hook-form
@@ -186,23 +188,23 @@ export default function LoginPage() {
                   evento, que só toca nos refs quando o submit dispara. */}
               {/* eslint-disable-next-line react-hooks/refs */}
               <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-4" noValidate>
-                <div className="space-y-1.5">
+                <div className={cn('space-y-1.5', ent)} style={ordem(5)}>
                   <Label htmlFor="email">E-mail</Label>
                   <Input
                     id="email"
                     type="email"
                     autoComplete="email"
                     autoFocus
-                    placeholder="seu@email.com.br"
+                    placeholder="nome@empresa.com.br"
                     className="h-10"
                     {...register('email')}
                   />
                   {errors.email && (
-                    <p className="text-[11px] text-destructive">{errors.email.message}</p>
+                    <p role="alert" className="text-body-sm text-destructive">{errors.email.message}</p>
                   )}
                 </div>
 
-                <div className="space-y-1.5">
+                <div className={cn('space-y-1.5', ent)} style={ordem(6)}>
                   <Label htmlFor="password">Senha</Label>
                   <div className="relative">
                     <Input
@@ -218,95 +220,82 @@ export default function LoginPage() {
                     <button
                       type="button"
                       onClick={() => setShowPassword((v) => !v)}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground transition-colors duration-fast hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                       aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
                     >
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
                   </div>
                   {errors.password && (
-                    <p className="text-[11px] text-destructive">{errors.password.message}</p>
+                    <p role="alert" className="text-body-sm text-destructive">{errors.password.message}</p>
                   )}
                   {capsOn && !errors.password && (
-                    <p className="text-[11px] font-medium text-amber-600">Caps Lock está ativado</p>
+                    <p className="text-body-sm font-medium text-warning">Caps Lock está ativado</p>
                   )}
                 </div>
 
-                <div className="flex items-start gap-2">
+                <div className={cn('flex items-start gap-2', ent)} style={ordem(7)}>
                   <Checkbox
                     id="lembrar_email"
                     checked={lembrar}
                     onCheckedChange={(v) => setLembrar(v === true)}
                     className="mt-0.5"
                   />
-                  <Label htmlFor="lembrar_email" className="text-[12px] font-normal leading-relaxed text-muted-foreground">
+                  <Label htmlFor="lembrar_email" className="text-body-sm font-normal leading-relaxed text-muted-foreground">
                     Lembrar meu e-mail neste computador
                   </Label>
                 </div>
 
                 {captchaEnabled && (
-                  <TurnstileWidget
-                    ref={turnstileRef}
-                    siteKey={TURNSTILE_SITE_KEY!}
-                    onVerify={setCaptchaToken}
-                    onExpire={() => setCaptchaToken(null)}
-                    onError={() => setCaptchaToken(null)}
-                  />
+                  <div className={ent} style={ordem(8)}>
+                    <TurnstileWidget
+                      ref={turnstileRef}
+                      siteKey={TURNSTILE_SITE_KEY!}
+                      onVerify={setCaptchaToken}
+                      onExpire={() => setCaptchaToken(null)}
+                      onError={() => setCaptchaToken(null)}
+                    />
+                  </div>
                 )}
 
                 <Button
                   type="submit"
-                  className="h-10 w-full"
+                  className={cn('h-10 w-full', ent)}
+                  style={ordem(8)}
+                  aria-busy={submitting}
                   disabled={submitting || (captchaEnabled && !captchaToken)}
                 >
-                  {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {submitting && <Spinner />}
                   {submitting ? 'Entrando…' : 'Entrar'}
                 </Button>
               </form>
 
-              <p className="mt-5 text-[12px] leading-relaxed text-muted-foreground">
-                Esqueceu a senha? Procure o administrador da sua transportadora ou o suporte
-                da LHG, o portal não tem recuperação automática.
+              <p className={cn('mt-5 text-body-sm leading-relaxed text-muted-foreground', ent)} style={ordem(9)}>
+                Para redefinir a senha, contate o administrador da transportadora ou o
+                suporte da LHG. O portal não tem recuperação automática.
               </p>
             </div>
           )}
         </div>
 
-        <div className="mt-5 space-y-1 text-center">
-          <p className="text-[11px] text-muted-foreground">
+        <div className={cn('mt-5 space-y-1 text-center', ent)} style={ordem(9)}>
+          <p className="text-meta text-muted-foreground">
             Acesso restrito a transportadoras parceiras · sessões registradas
           </p>
-          <p className="text-[11px] text-muted-foreground/70">
+          <p className="text-meta text-tertiary">
             © {new Date().getFullYear()} LHG Logística, Portal de Parceiros ·{' '}
             <button
               type="button"
               onClick={() =>
-                toast.info('Procure o administrador da sua transportadora ou o suporte da LHG.')
+                toast.info('Em caso de problemas de acesso, contate o administrador da transportadora ou o suporte da LHG.')
               }
-              className="font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-[#F5F7F9] dark:focus-visible:ring-offset-[var(--canvas-dark)]"
+              className="font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
             >
               Suporte
             </button>
             {' · '}
             <TermosLeitura audiencia="parceiro" />
           </p>
-
-          {/* Abaixo da linha institucional e com peso próprio: é o convite para
-              ver como o sistema funciona do outro lado do portal e, quem quiser,
-              apoiar o projeto. Contornado, e não sólido, para não disputar com o
-              "Entrar" — a tela ainda é de login. */}
-          {URL_APRESENTACAO && (
-            <a
-              href={URL_APRESENTACAO_PARCEIRO}
-              target="_blank"
-              rel="noreferrer noopener"
-              className="mt-4 flex h-11 w-full items-center justify-center gap-2 rounded-[4px] border border-primary/40 bg-primary/[0.06] text-[13px] font-semibold text-primary transition-colors hover:border-primary/70 hover:bg-primary/[0.12] focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-[#F5F7F9] dark:focus-visible:ring-offset-[var(--canvas-dark)]"
-            >
-              <HeartHandshake className="h-4 w-4" />
-              Conheça o sistema e apoie o projeto
-              <ArrowRight className="h-4 w-4" />
-            </a>
-          )}
         </div>
       </div>
     </div>

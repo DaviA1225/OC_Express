@@ -20,15 +20,15 @@ const MAX_JANELAS = 8
 const ROTA_DOCUMENTO = /^\/solicitacoes\/([0-9a-f-]{36})$/i
 
 const MODULOS: [prefixo: string, nome: string][] = [
-  ['/dashboard', 'Dashboard'],
+  ['/dashboard', 'Painel'],
   ['/solicitacoes', 'Solicitações'],
   ['/agendamentos', 'Agendamentos'],
   ['/cargas-retorno', 'Cargas de retorno'],
   ['/conferencia-viagem', 'Conferência de viagem'],
   ['/cadastros/usuarios', 'Usuários'],
-  ['/cadastros/parceiros', 'Parceiros'],
+  ['/cadastros/parceiros', 'Parceiros e acessos'],
   ['/cadastros/', 'Cadastros'],
-  ['/relatorios-internos', 'Relatórios internos'],
+  ['/relatorios-internos', 'Produtividade da equipe'],
   ['/relatorios', 'Relatórios'],
   ['/atividade', 'Atividade da equipe'],
   ['/auditoria', 'Auditoria'],
@@ -125,7 +125,7 @@ export function JanelasErp() {
     <div
       role="tablist"
       aria-label="Janelas abertas"
-      className="flex shrink-0 items-end gap-0.5 overflow-x-auto border-b bg-muted/60 px-3 pt-1.5 print:hidden"
+      className="flex shrink-0 items-end gap-0.5 overflow-x-auto border-b bg-canvas px-3 pt-1.5 print:hidden"
     >
       <Aba
         ativa={!docAtual}
@@ -177,10 +177,10 @@ function Aba({ ativa, onAbrir, onFechar, icone, rotulo }: {
   return (
     <div
       className={cn(
-        'group flex h-9 shrink-0 items-center rounded-t-md border border-b-0 text-[13px]',
+        'group flex h-9 shrink-0 items-center rounded-t-md border border-b-0 text-body transition-colors duration-fast',
         ativa
-          ? '-mb-px h-[38px] border-border bg-background font-medium text-foreground shadow-[inset_0_2px_0_hsl(var(--primary))]'
-          : 'border-transparent text-muted-foreground hover:bg-background/60 hover:text-foreground',
+          ? '-mb-px h-[38px] border-border bg-card font-medium text-foreground shadow-[inset_0_2px_0_hsl(var(--primary))]'
+          : 'border-transparent text-muted-foreground hover:bg-row-hover hover:text-foreground',
       )}
     >
       <button
@@ -199,7 +199,7 @@ function Aba({ ativa, onAbrir, onFechar, icone, rotulo }: {
           type="button"
           onClick={onFechar}
           aria-label={`Fechar ${rotulo}`}
-          className="mr-1 flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="mr-1 flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <X className="h-3.5 w-3.5" />
         </button>

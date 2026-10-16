@@ -15,7 +15,7 @@ interface Props {
 }
 
 /**
- * Grade de horários do terminal: você toca no horário, não digita. Só aparecem
+ * Grade de horários do terminal: o parceiro toca no horário, não digita. Só aparecem
  * os horários que o terminal realmente atende — e, onde a grade é separada por
  * tipo de veículo, só os do tipo escolhido.
  *
@@ -29,12 +29,12 @@ export function GradeSlots({ slots: todos, value, onChange, tipo = null, isLoadi
   const slots = todos.filter((s) => s.tipo_veiculo === 'todos' || s.tipo_veiculo === tipo)
 
   if (isLoading) {
-    return <p className="py-2 text-[12px] text-muted-foreground">Carregando horários…</p>
+    return <p className="py-2 text-body-sm text-muted-foreground">Carregando horários…</p>
   }
 
   if (slots.length === 0) {
     return (
-      <p className="rounded-md border border-dashed px-3 py-2 text-[12px] text-muted-foreground">
+      <p className="rounded-md border border-dashed px-3 py-2 text-body-sm text-muted-foreground">
         Este terminal não tem horários fixos cadastrados. Deixe a data e a equipe escolhe o
         horário disponível.
       </p>
@@ -56,7 +56,7 @@ export function GradeSlots({ slots: todos, value, onChange, tipo = null, isLoadi
           />
         ))}
       </div>
-      <p className="text-[11px] leading-relaxed text-muted-foreground">
+      <p className="text-meta leading-relaxed text-muted-foreground">
         {legenda(slots)} A vaga final depende do terminal, que também atende outras
         transportadoras.
       </p>
@@ -90,21 +90,21 @@ function SlotButton({
       onClick={onClick}
       aria-pressed={selecionado}
       className={cn(
-        'flex min-w-[64px] flex-col items-center rounded-md border px-3 py-2 text-[13px] font-medium tabular-nums transition-colors',
+        'flex min-w-[64px] flex-col items-center rounded-md border px-3 py-2 text-body font-medium tabular-nums transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
         selecionado
           ? 'border-primary bg-primary text-primary-foreground'
-          : 'border-border bg-background text-foreground hover:border-primary/40 hover:bg-muted',
+          : 'border-input bg-background text-foreground hover:bg-accent',
       )}
     >
       <span>{titulo}</span>
       {rodape && (
         <span
           className={cn(
-            'text-[10px] font-normal',
+            'text-meta font-normal',
             selecionado
-              ? 'text-primary-foreground/80'
+              ? 'text-primary-foreground'
               : cheio
-                ? 'text-amber-700 dark:text-amber-400'
+                ? 'text-warning'
                 : 'text-muted-foreground',
           )}
         >

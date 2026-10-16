@@ -2,7 +2,6 @@ import * as React from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Loader2 } from 'lucide-react'
 import { CrudListPage, useCrudListState, type ColumnDef } from '@/components/shared/CrudListPage'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import {
@@ -22,12 +21,14 @@ import {
 } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Combobox, type ComboboxOption } from '@/components/shared/Combobox'
 import { isValidPlaca } from '@sislog/shared/validators'
 import { formatPlaca } from '@/lib/utils'
 import type { Tables } from '@sislog/shared/types'
+import { Spinner } from '@/components/shared/Spinner'
+import { CadastroField } from '@/components/forms/CadastroField'
+import { useDescartarAlteracoes } from '@/features/cadastros/useDescartarAlteracoes'
 
 type Row = Tables<'parceiro_veiculos'>
 
@@ -151,9 +152,9 @@ export default function VeiculosPage() {
         onOpenChange={(o) => !o && setConfirmRow(null)}
         title={confirmRow?.ativo ? 'Desativar veículo?' : 'Reativar veículo?'}
         description={confirmRow?.ativo
-          ? 'O veículo não aparecerá nas listas ativas. Você pode reativá-lo depois.'
+          ? 'O veículo não aparecerá nas listas ativas. É possível reativá-lo depois.'
           : 'O veículo voltará a aparecer nas listas ativas.'}
-        confirmLabel={confirmRow?.ativo ? 'Sim, desativar' : 'Sim, reativar'}
+        confirmLabel={confirmRow?.ativo ? 'Desativar' : 'Reativar'}
         destructive={confirmRow?.ativo}
         onConfirm={async () => {
           if (confirmRow) {
@@ -172,7 +173,7 @@ export default function VeiculosPage() {
             ? `O cadastro da placa "${deleteRow.placa}" será removido permanentemente. Se houver solicitações vinculadas, a exclusão será bloqueada.`
             : ''
         }
-        confirmLabel="Sim, excluir"
+        confirmLabel="Excluir"
         destructive
         onConfirm={async () => {
           if (deleteRow) {
@@ -197,7 +198,7 @@ interface FormProps {
 function VeiculoForm({ open, onOpenChange, editing, subOptions, subLoading, onSubmit }: FormProps) {
   const {
     register, handleSubmit, reset, setValue, watch,
-    formState: { errors, isSubmitting },
+    formState: { errors, isSubmitting, isDirty },
   } = useForm<FormValues>({ resolver: zodResolver(schema) })
 
   React.useEffect(() => {
@@ -220,83 +221,79 @@ function VeiculoForm({ open, onOpenChange, editing, subOptions, subLoading, onSu
     label: s.razao_social,
   }))
 
+  const guarda = useDescartarAlteracoes(isDirty, onOpenChange, isSubmitting)
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <form onSubmit={handleSubmit(onSubmit)} noValidate>
-          <DialogHeader>
-            <DialogTitle>{editing ? 'Editar veículo' : 'Novo veículo'}</DialogTitle>
-            <DialogDescription>
-              Cavalos da sua frota disponíveis para as solicitações de carregamento.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogBody className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="placa">Placa *</Label>
-                <Input
-                  id="placa"
-                  autoFocus
-                  value={placa}
-                  onChange={(e) => setValue('placa', formatPlaca(e.target.value), { shouldValidate: true })}
-                  placeholder="ABC1D23"
+    <>
+      <Dialog open={open} onOpenChange={guarda.onOpenChange}>
+        <DialogContent>
+          <form onSubmit={handleSubmit(onSubmit)} noValidate>
+            <DialogHeader>
+              <DialogTitle>{editing ? 'Editar veículo' : 'Novo veículo'}</DialogTitle>
+              <DialogDescription>
+                Cavalos da sua frota disponíveis para as solicitações de carregamento.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogBody className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <CadastroField label="Placa" required id="placa" error={errors.placa?.message}>
+                  <Input
+                    autoFocus
+                    value={placa}
+                    onChange={(e) => setValue('placa', formatPlaca(e.target.value), { shouldValidate: true, shouldDirty: true })}
+                    placeholder="ABC1D23"
+                  />
+                </CadastroField>
+                <CadastroField label="Tipo">
+                  {(a11y) => (
+                  <Select
+                    value={tipo || undefined}
+                    onValueChange={(v) => setValue('tipo', v, { shouldValidate: true, shouldDirty: true })}
+                  >
+                    <SelectTrigger {...a11y}>
+                      <SelectValue placeholder="Selecionar tipo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {TIPOS.map((t) => (
+                        <SelectItem key={t} value={t}>{t}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  )}
+                </CadastroField>
+              </div>
+
+              <CadastroField label="Subcontratada">
+                <Combobox
+                  options={options}
+                  value={subId}
+                  onChange={(v) => setValue('subcontratada_parceiro_id', v, { shouldValidate: true, shouldDirty: true })}
+                  placeholder="Selecionar subcontratada"
+                  searchPlaceholder="Buscar subcontratada"
+                  emptyMessage="Nenhuma subcontratada ativa."
+                  loading={subLoading}
                 />
-                {errors.placa && (
-                  <p className="text-[11px] text-destructive">{errors.placa.message}</p>
-                )}
-              </div>
-              <div className="space-y-1.5">
-                <Label>Tipo</Label>
-                <Select
-                  value={tipo || undefined}
-                  onValueChange={(v) => setValue('tipo', v, { shouldValidate: true })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecionar tipo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {TIPOS.map((t) => (
-                      <SelectItem key={t} value={t}>{t}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
+              </CadastroField>
 
-            <div className="space-y-1.5">
-              <Label>Subcontratada</Label>
-              <Combobox
-                options={options}
-                value={subId}
-                onChange={(v) => setValue('subcontratada_parceiro_id', v, { shouldValidate: true })}
-                placeholder="Selecionar subcontratada"
-                searchPlaceholder="Buscar subcontratada"
-                emptyMessage="Nenhuma subcontratada ativa."
-                loading={subLoading}
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="observacoes">Observações</Label>
-              <Textarea id="observacoes" rows={2} {...register('observacoes')} />
-            </div>
-          </DialogBody>
-          <DialogFooter>
-            <span className="text-[11px] text-muted-foreground/80">
-              Enter para salvar · Esc para cancelar
-            </span>
-            <div className="flex items-center gap-2">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
-                Salvar
-              </Button>
-            </div>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+              <CadastroField label="Observações" id="observacoes">
+                <Textarea rows={2} {...register('observacoes')} />
+              </CadastroField>
+            </DialogBody>
+            <DialogFooter className="justify-end">
+              <div className="flex items-center gap-2">
+                <Button type="button" variant="outline" onClick={() => guarda.onOpenChange(false)} disabled={isSubmitting}>
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting && <Spinner />}
+                  Salvar
+                </Button>
+              </div>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+      {guarda.dialog}
+    </>
   )
 }

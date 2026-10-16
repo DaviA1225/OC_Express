@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { registrarAcesso } from '@/lib/acesso'
 import { traduzirErroBanco } from '@/features/crud/useCrudQueries'
 import type { AgendamentoStatus, Tables, TipoVeiculo } from '@/types/database.types'
+import { fmtInt } from '@/lib/format'
 
 export const AGENDAMENTOS_BUCKET = 'agendamentos-docs'
 export const MAX_DOC_BYTES = 10 * 1024 * 1024
@@ -432,7 +433,7 @@ export function useUploadDocumento() {
   return useMutation<string, unknown, { agendamentoId: string; tipo: TipoDocumento; file: File }>({
     mutationFn: async ({ agendamentoId, tipo, file }) => {
       if (file.size > MAX_DOC_BYTES) {
-        throw new Error(`Arquivo excede o limite de ${(MAX_DOC_BYTES / 1024 / 1024).toFixed(0)}MB.`)
+        throw new Error(`Arquivo excede o limite de ${fmtInt(MAX_DOC_BYTES / 1024 / 1024)} MB.`)
       }
       const path = caminhoDocumento(agendamentoId, tipo, file)
       const { error: upErr } = await supabase.storage

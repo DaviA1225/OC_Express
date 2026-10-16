@@ -2,22 +2,42 @@ import * as React from 'react'
 import { MapContainer, TileLayer, Marker, Tooltip, Popup, useMap } from 'react-leaflet'
 import { LatLngBounds, divIcon, type DivIcon } from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { Loader2, MapPinned, Truck } from 'lucide-react'
-import { STATUS_LABELS } from '@/features/solicitacoes/status'
+import { MapPinned, Truck } from 'lucide-react'
 import { formatNumeroOC } from '@/lib/utils'
+import { SolicitacaoStatusBadge } from '@/components/shared/SolicitacaoStatusBadge'
 import { cn } from '@/lib/utils'
 import type { ClienteMapaPonto } from '@/features/clientes/useClientesMapa'
+import { Spinner } from '@/components/shared/Spinner'
+import { useTheme } from '@/hooks/useTheme'
 
 // Centro aproximado do Brasil e zoom inicial — usados como fallback quando não
 // há pontos suficientes para calcular um enquadramento.
 const BRASIL_CENTRO: [number, number] = [-14.5, -52]
 const BRASIL_ZOOM = 4
 
+// Tiles por tema: OSM padrão no claro; CARTO dark_all no escuro (o OSM claro
+// ofuscava o tema escuro). O img-src da CSP (apps/interno/vercel.json) libera
+// os dois domínios.
+const TILES = {
+  light: {
+    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    subdomains: 'abc',
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+  },
+  dark: {
+    url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    subdomains: 'abcd',
+    attribution:
+      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+  },
+} as const
+
 // Pin de localização (SVG inline). Cor muda pelo status de liberação para que
-// cada localidade comunique de imediato se está liberada (verde) ou bloqueada
-// (vermelho). Quando há veículos carregando, um badge mostra a quantidade.
-const FILL = { liberado: '#16a34a', bloqueado: '#ef4444' } as const
-const STROKE = { liberado: '#15803d', bloqueado: '#991b1b' } as const
+// cada localidade comunique de imediato se está liberada (ok) ou bloqueada
+// (bad). Quando há veículos carregando, um badge mostra a quantidade.
+// As cores são var() dos tokens de gráfico: o HTML do divIcon vive no DOM da
+// página, então o pin troca de tom junto com o tema sem recriar o ícone.
+const FILL = { liberado: 'var(--chart-ok)', bloqueado: 'var(--chart-bad)' } as const
 
 const iconCache = new Map<string, DivIcon>()
 
@@ -26,15 +46,15 @@ function pinIcon(liberado: boolean, carregando: number): DivIcon {
   const cached = iconCache.get(key)
   if (cached) return cached
   const fill = liberado ? FILL.liberado : FILL.bloqueado
-  const stroke = liberado ? STROKE.liberado : STROKE.bloqueado
+  // Badge neutro (texto 1 sobre superfície invertida), raio 2px — sem azul solto.
   const badge =
     carregando > 0
-      ? `<span style="position:absolute;top:-4px;right:-5px;display:flex;align-items:center;justify-content:center;min-width:14px;height:14px;padding:0 3px;border-radius:7px;background:#2563eb;color:#fff;font:700 9px/1 ui-sans-serif,system-ui;border:1.5px solid #fff;box-shadow:0 1px 2px rgba(0,0,0,.3);">${carregando}</span>`
+      ? `<span style="position:absolute;top:-4px;right:-6px;display:flex;align-items:center;justify-content:center;min-width:14px;height:14px;padding:0 3px;border-radius:2px;background:hsl(var(--foreground));color:hsl(var(--background));font:600 10px/1 ui-sans-serif,system-ui;font-variant-numeric:tabular-nums;border:1px solid hsl(var(--card));">${carregando}</span>`
       : ''
-  const html = `<div style="position:relative;width:21px;height:28px;filter:drop-shadow(0 1px 1.5px rgba(0,0,0,.35));">
+  const html = `<div style="position:relative;width:21px;height:28px;">
     <svg width="21" height="28" viewBox="0 0 24 32" xmlns="http://www.w3.org/2000/svg">
-      <path d="M12 0C5.37 0 0 5.37 0 12c0 8.4 12 20 12 20s12-11.6 12-20C24 5.37 18.63 0 12 0z" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/>
-      <circle cx="12" cy="12" r="4.6" fill="#fff"/>
+      <path d="M12 0C5.37 0 0 5.37 0 12c0 8.4 12 20 12 20s12-11.6 12-20C24 5.37 18.63 0 12 0z" fill="${fill}" stroke="hsl(var(--card))" stroke-width="1.5"/>
+      <circle cx="12" cy="12" r="4.6" fill="hsl(var(--card))"/>
     </svg>
     ${badge}
   </div>`
@@ -85,24 +105,26 @@ interface Props {
 }
 
 export function ClientesMapa({ pontos, isLoading, semCoordenadas }: Props) {
+  const { theme } = useTheme()
+  const tiles = TILES[theme]
   return (
     <div className="space-y-2">
-      <div className="flex flex-wrap items-center justify-between gap-2 text-[12px] text-muted-foreground">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-body-sm text-muted-foreground">
         <span className="inline-flex items-center gap-1.5">
           <MapPinned className="h-3.5 w-3.5" />
           {pontos.length} {pontos.length === 1 ? 'cliente no mapa' : 'clientes no mapa'}
         </span>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <LegendaItem cor="#16a34a" label="Liberado" />
-          <LegendaItem cor="#ef4444" label="Bloqueado" />
+          <LegendaItem cor={FILL.liberado} label="Liberado" />
+          <LegendaItem cor={FILL.bloqueado} label="Bloqueado" />
           <span className="inline-flex items-center gap-1.5">
-            <span className="flex h-4 min-w-4 items-center justify-center rounded-full border-2 border-white bg-blue-600 px-1 text-[9px] font-bold leading-none text-white shadow">
+            <span className="flex h-3.5 min-w-3.5 items-center justify-center rounded-[2px] bg-foreground px-1 text-meta font-semibold leading-none text-background">
               n
             </span>
             veículos carregando
           </span>
           {semCoordenadas > 0 && (
-            <span className="text-amber-700 dark:text-amber-400">
+            <span className="text-warning">
               {semCoordenadas} sem coordenadas (não aparecem)
             </span>
           )}
@@ -111,8 +133,8 @@ export function ClientesMapa({ pontos, isLoading, semCoordenadas }: Props) {
 
       <div className="relative h-[70vh] min-h-[420px] overflow-hidden rounded-lg border bg-card">
         {isLoading && (
-          <div className="absolute inset-0 z-[1000] flex items-center justify-center bg-background/60">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          <div className="absolute inset-0 z-[1000] flex items-center justify-center bg-card/60">
+            <Spinner size="md" label="Carregando mapa" className="text-muted-foreground" />
           </div>
         )}
         <MapContainer
@@ -120,12 +142,11 @@ export function ClientesMapa({ pontos, isLoading, semCoordenadas }: Props) {
           zoom={BRASIL_ZOOM}
           scrollWheelZoom
           className="h-full w-full"
-          style={{ background: '#aad3df' }}
+          style={{ background: theme === 'dark' ? 'hsl(var(--canvas))' : 'hsl(var(--muted))' }}
         >
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
+          {/* key = tema: remonta a camada ao trocar o tema (url, subdomínios e
+              atribuição mudam juntos), sem recarregar a página. */}
+          <TileLayer key={theme} attribution={tiles.attribution} url={tiles.url} subdomains={tiles.subdomains} />
           <FitBounds pontos={pontos} />
           {pontos.map((p) => (
             <Marker
@@ -137,7 +158,7 @@ export function ClientesMapa({ pontos, isLoading, semCoordenadas }: Props) {
               <Tooltip permanent direction="top" offset={[0, -28]} className="cliente-tooltip">
                 {p.razao_social}
               </Tooltip>
-              <Popup>
+              <Popup className="[&_.leaflet-popup-content-wrapper]:rounded-surface [&_.leaflet-popup-content-wrapper]:border [&_.leaflet-popup-content-wrapper]:bg-popover [&_.leaflet-popup-content-wrapper]:text-popover-foreground [&_.leaflet-popup-content-wrapper]:shadow-overlay [&_.leaflet-popup-tip]:bg-popover">
                 <PopupConteudo p={p} />
               </Popup>
             </Marker>
@@ -153,18 +174,18 @@ function PopupConteudo({ p }: { p: ClienteMapaPonto }) {
   return (
     <div className="min-w-[220px] space-y-2">
       <div>
-        <p className="text-[13px] font-semibold leading-tight text-foreground">{p.razao_social}</p>
-        {local && <p className="text-[11px] text-muted-foreground">{local}</p>}
+        <p className="text-body font-semibold leading-tight text-foreground">{p.razao_social}</p>
+        {local && <p className="text-meta text-muted-foreground">{local}</p>}
       </div>
 
       <div className="space-y-1">
         <span
           className={cn(
-            'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium',
-            p.liberado ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800',
+            'inline-flex items-center gap-1.5 rounded-[2px] px-1.5 py-0.5 text-meta font-medium',
+            p.liberado ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger',
           )}
         >
-          <span className={cn('h-1.5 w-1.5 rounded-full', p.liberado ? 'bg-emerald-500' : 'bg-red-500')} />
+          <span className={cn('h-1.5 w-1.5 rounded-full', p.liberado ? 'bg-chart-ok' : 'bg-chart-bad')} />
           {p.liberado ? 'Liberado' : 'Bloqueado'}
         </span>
       </div>
@@ -177,30 +198,28 @@ function PopupConteudo({ p }: { p: ClienteMapaPonto }) {
           <FreteLinha label="Graneleiro" value={p.frete_graneleiro} className="cat-steel" />
         )}
         {!p.aceita_cacamba && !p.aceita_graneleiro && (
-          <span className="text-[11px] text-muted-foreground">Sem frete configurado</span>
+          <span className="text-meta text-muted-foreground">Sem frete configurado</span>
         )}
       </div>
 
       <div className="border-t pt-2">
-        <p className="mb-1 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.5px] text-muted-foreground">
+        <p className="mb-1 flex items-center gap-1 text-meta font-semibold text-muted-foreground">
           <Truck className="h-3 w-3" />
           Carregando ({p.carregando.length})
         </p>
         {p.carregando.length === 0 ? (
-          <p className="text-[11px] text-muted-foreground">Nenhum veículo em carregamento.</p>
+          <p className="text-meta text-muted-foreground">Nenhum veículo em carregamento.</p>
         ) : (
           <ul className="space-y-1">
             {p.carregando.map((c) => {
               const placas = [c.veiculo, c.carreta].filter(Boolean).join(' / ')
               return (
-                <li key={c.id} className="text-[11px] leading-tight">
+                <li key={c.id} className="text-meta leading-tight">
                   <span className="font-medium text-primary-strong">{formatNumeroOC(c.numero_interno)}</span>
                   {' · '}
                   <span className="text-foreground">{placas || 'sem placa'}</span>
                   {c.motorista && <span className="text-muted-foreground"> · {c.motorista}</span>}
-                  <span className="ml-1 rounded bg-muted px-1 py-0.5 text-[10px] text-muted-foreground">
-                    {STATUS_LABELS[c.status]}
-                  </span>
+                  <SolicitacaoStatusBadge status={c.status} className="ml-1" />
                 </li>
               )
             })}
@@ -215,7 +234,7 @@ function LegendaItem({ cor, label }: { cor: string; label: string }) {
   return (
     <span className="inline-flex items-center gap-1.5">
       <span
-        className="inline-block h-3 w-3 rounded-full border border-black/20"
+        className="inline-block h-2.5 w-2.5 rounded-full"
         style={{ background: cor }}
       />
       {label}
@@ -235,7 +254,7 @@ function FreteLinha({
   return (
     <span
       className={cn(
-        'inline-flex items-center justify-between gap-2 rounded-md border px-2 py-0.5 text-[11px] font-medium leading-tight',
+        'inline-flex items-center justify-between gap-2 rounded-[2px] border px-1.5 py-0.5 text-meta font-medium leading-tight',
         className,
       )}
     >

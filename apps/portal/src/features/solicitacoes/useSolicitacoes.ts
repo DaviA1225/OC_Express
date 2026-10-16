@@ -313,7 +313,7 @@ export function useEditarSolicitacao() {
     onSuccess: (id) => {
       qc.invalidateQueries({ queryKey: ['portal-solicitacoes'] })
       void registrarEvento('portal_solicitacao_editada', { solicitacao_id: id })
-      toast.success('Solicitação atualizada')
+      toast.success('Solicitação atualizada.')
     },
     onError: (e: unknown) => toast.error(traduzirErroBanco(e)),
   })
@@ -343,7 +343,7 @@ function traduzErroOc(code: string | undefined): string {
     case 'oc_indisponivel':
       return 'A OC ainda não está disponível para esta solicitação.'
     case 'forbidden':
-      return 'Você não tem acesso a esta OC.'
+      return 'Sem acesso a esta OC.'
     case 'solicitacao_nao_encontrada':
       return 'Solicitação não encontrada.'
     case 'sessao_invalida':
@@ -371,7 +371,7 @@ export function useBaixarOC() {
       if (!data?.url) throw new Error('Resposta sem link da OC.')
       return data.url
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(traduzirErroBanco(e)),
   })
 }
 
@@ -390,7 +390,7 @@ export function useCancelarSolicitacao() {
       // Invalida a lista e o detalhe (a chave do detalhe tem este prefixo).
       qc.invalidateQueries({ queryKey: ['portal-solicitacoes'] })
       void registrarEvento('portal_solicitacao_cancelada', { solicitacao_id: id })
-      toast.success('Solicitação cancelada')
+      toast.success('Solicitação cancelada.')
     },
     onError: (e: unknown) => toast.error(traduzirErroBanco(e)),
   })

@@ -15,10 +15,45 @@ import {
   TableHead,
   TableCell,
 } from '@/components/ui/table'
+import { PageHeader } from '@/components/layout/PageHeader'
 import { EmptyState } from './EmptyState'
 import { ConfirmDialog } from './ConfirmDialog'
 import { useDebounce } from '@/hooks/useDebounce'
 import { cn } from '@/lib/utils'
+
+const ROTULO_TONS = {
+  neutro: 'bg-muted text-muted-foreground',
+  sucesso: 'bg-success-subtle text-success',
+  aviso: 'bg-warning-subtle text-warning',
+  perigo: 'bg-danger-subtle text-danger',
+  info: 'bg-info-subtle text-info',
+} as const
+
+/**
+ * Rótulo retangular de situação/tag dos cadastros (Ativo, Inativo, Liberado…).
+ * Retângulo 2px, texto 11px — nunca pílula colorida.
+ */
+export function RotuloSituacao({
+  tom = 'neutro',
+  className,
+  children,
+}: {
+  tom?: keyof typeof ROTULO_TONS
+  className?: string
+  children: React.ReactNode
+}) {
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center gap-1 whitespace-nowrap rounded-[2px] px-1.5 py-0.5 text-meta font-medium',
+        ROTULO_TONS[tom],
+        className,
+      )}
+    >
+      {children}
+    </span>
+  )
+}
 
 export interface ColumnDef<T> {
   header: string
@@ -28,6 +63,8 @@ export interface ColumnDef<T> {
 
 export interface CrudListPageProps<T extends { id: string; ativo: boolean }> {
   title: string
+  /** Uma linha de contexto sob o título (opcional). */
+  description?: string
   newButtonLabel?: string
   onNew?: () => void
   headerActions?: React.ReactNode
@@ -63,6 +100,7 @@ export interface CrudListPageProps<T extends { id: string; ativo: boolean }> {
 export function CrudListPage<T extends { id: string; ativo: boolean }>(props: CrudListPageProps<T>) {
   const {
     title,
+    description,
     newButtonLabel,
     onNew,
     headerActions,
@@ -83,7 +121,7 @@ export function CrudListPage<T extends { id: string; ativo: boolean }>(props: Cr
     rowActions,
     rowLabel,
     emptyTitle = 'Nada encontrado',
-    emptyDescription = 'Ajuste os filtros ou crie um novo registro.',
+    emptyDescription = 'Nenhum registro para os filtros aplicados.',
     page,
     pageSize,
     onPageChange,
@@ -137,27 +175,33 @@ export function CrudListPage<T extends { id: string; ativo: boolean }>(props: Cr
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-[22px] font-semibold tracking-tight text-foreground">{title}</h1>
-          <p className="text-[12px] text-muted-foreground">
+      <PageHeader
+        className="mb-0"
+        title={title}
+        description={description}
+        meta={
+          <span className="text-body-sm tabular-nums text-muted-foreground">
             {searchValue.trim()
               ? `${totalCount} ${totalCount === 1 ? 'resultado' : 'resultados'}`
               : `${totalActive} ${totalActive === 1 ? 'ativo' : 'ativos'}`}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {headerActions}
-          {onNew && newButtonLabel && (
-            <Button onClick={onNew}>
-              <Plus className="h-4 w-4" />
-              {newButtonLabel}
-            </Button>
-          )}
-        </div>
-      </div>
+          </span>
+        }
+        actions={
+          headerActions || (onNew && newButtonLabel) ? (
+            <>
+              {headerActions}
+              {onNew && newButtonLabel && (
+                <Button onClick={onNew}>
+                  <Plus className="h-4 w-4" />
+                  {newButtonLabel}
+                </Button>
+              )}
+            </>
+          ) : undefined
+        }
+      />
 
-      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-slate-400 bg-card p-3 dark:border-slate-700">
+      <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-card p-3">
         <div className="relative flex-1 min-w-[220px]" data-page-search>
           <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -173,18 +217,18 @@ export function CrudListPage<T extends { id: string; ativo: boolean }>(props: Cr
             checked={showInactive}
             onCheckedChange={onShowInactiveChange}
           />
-          <Label htmlFor="show-inactive" className="text-[12px] text-muted-foreground">
+          <Label htmlFor="show-inactive" className="text-body-sm text-muted-foreground">
             Mostrar inativos
           </Label>
         </div>
       </div>
 
       {selectable && selectedIds.size > 0 && (
-        <div className="sticky top-2 z-10 flex flex-wrap items-center gap-2 rounded-lg border border-primary/40 bg-primary/5 px-3 py-2 shadow-sm backdrop-blur">
-          <span className="text-[13px] font-medium text-foreground">
+        <div className="sticky top-2 z-10 flex flex-wrap items-center gap-2 rounded-lg border bg-popover px-3 py-2 shadow-overlay">
+          <span className="text-body font-medium text-foreground">
             {selectedIds.size} {selectedIds.size === 1 ? 'selecionado' : 'selecionados'}
           </span>
-          <span className="mx-1 h-4 w-px bg-border" />
+          <span className="mx-1 h-4 w-px bg-border" aria-hidden />
           {onBulkToggleActive && (
             <>
               <Button
@@ -224,7 +268,7 @@ export function CrudListPage<T extends { id: string; ativo: boolean }>(props: Cr
         </div>
       )}
 
-      <div className="overflow-hidden rounded-lg border border-slate-400 bg-card dark:border-slate-700">
+      <div className="overflow-hidden rounded-lg border bg-card">
         <Table>
           <TableHeader>
             <TableRow>
@@ -267,14 +311,14 @@ export function CrudListPage<T extends { id: string; ativo: boolean }>(props: Cr
                   className="py-0"
                 >
                   <div className="flex flex-col items-center justify-center gap-2 py-12 text-center">
-                    <AlertTriangle className="h-6 w-6 text-red-500" />
-                    <p className="text-[14px] font-semibold text-foreground">Não foi possível carregar</p>
-                    <p className="max-w-sm text-[13px] text-muted-foreground">
+                    <AlertTriangle className="h-6 w-6 text-destructive" aria-hidden />
+                    <p className="text-body-lg font-semibold text-foreground">Não foi possível carregar</p>
+                    <p className="max-w-sm text-body text-muted-foreground">
                       Houve um erro ao buscar os registros. Verifique a conexão e tente novamente.
                     </p>
                     {onRetry && (
                       <Button variant="outline" size="sm" onClick={onRetry} className="mt-1">
-                        <RotateCcw className="h-4 w-4" /> Tentar de novo
+                        <RotateCcw className="h-4 w-4" /> Tentar novamente
                       </Button>
                     )}
                   </div>
@@ -300,7 +344,8 @@ export function CrudListPage<T extends { id: string; ativo: boolean }>(props: Cr
             {!isLoading && !isError && rows?.map((row) => (
               <TableRow
                 key={row.id}
-                className={cn(!row.ativo && 'bg-muted/40 text-muted-foreground', selectedIds.has(row.id) && 'bg-primary/5')}
+                data-state={selectedIds.has(row.id) ? 'selected' : undefined}
+                className={cn(!row.ativo && 'text-muted-foreground')}
               >
                 {selectable && (
                   <TableCell>
@@ -314,7 +359,7 @@ export function CrudListPage<T extends { id: string; ativo: boolean }>(props: Cr
                 {columns.map((c, i) => (
                   <TableCell key={i} className={c.className}>
                     {i === 0 && !row.ativo && (
-                      <Lock className="mr-1 inline h-3 w-3 text-destructive" />
+                      <Lock className="mr-1 inline h-3 w-3 text-tertiary" aria-label="Inativo" />
                     )}
                     {c.accessor(row)}
                   </TableCell>
@@ -366,7 +411,7 @@ export function CrudListPage<T extends { id: string; ativo: boolean }>(props: Cr
       </div>
 
       {totalCount > pageSize && (
-        <div className="flex items-center justify-between text-[12px] text-muted-foreground">
+        <div className="flex items-center justify-between text-body-sm text-muted-foreground">
           <span>
             Página {page} de {totalPages} · {totalCount} registros
           </span>
@@ -398,7 +443,7 @@ export function CrudListPage<T extends { id: string; ativo: boolean }>(props: Cr
         onOpenChange={setConfirmBulkDelete}
         title={`Excluir ${selectedIds.size} ${selectedIds.size === 1 ? 'registro' : 'registros'}?`}
         description="Os cadastros selecionados serão removidos permanentemente. Essa ação não pode ser desfeita. Registros em uso por solicitações terão a exclusão bloqueada."
-        confirmLabel="Sim, excluir"
+        confirmLabel="Excluir"
         destructive
         onConfirm={async () => {
           if (onBulkDelete) {

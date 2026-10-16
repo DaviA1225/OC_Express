@@ -1,8 +1,6 @@
 {
   "detector": {
-    "ignoreRules": [
-      "gradient-text"
-    ],
+    "ignoreRules": [],
     "ignoreFiles": [
       "apps/interno/src/features/pdf-generator/OCDocument.tsx"
     ],

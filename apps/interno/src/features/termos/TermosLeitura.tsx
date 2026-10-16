@@ -36,7 +36,7 @@ export function TermosLeitura({ audiencia }: { audiencia: AudienciaTermos }) {
       <button
         type="button"
         onClick={() => setAberto(true)}
-        className="font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-[#F5F7F9] dark:focus-visible:ring-offset-[var(--canvas-dark)]"
+        className="font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
       >
         Termos de uso
       </button>
@@ -53,7 +53,7 @@ export function TermosLeitura({ audiencia }: { audiencia: AudienciaTermos }) {
           </DialogBody>
 
           <DialogFooter>
-            <span className="text-[11px] text-muted-foreground/80">
+            <span className="text-meta text-muted-foreground">
               SisLog v{SISLOG_VERSAO} · termo {TERMOS_VERSAO}
             </span>
             <Button type="button" variant="outline" onClick={() => setAberto(false)}>

@@ -2,7 +2,7 @@ import * as React from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Loader2 } from 'lucide-react'
+import { Spinner } from '@/components/shared/Spinner'
 import {
   Dialog,
   DialogContent,
@@ -392,11 +392,11 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, onCreated }: Props) 
                     onValueChange={(v) => setValue('tipo', v as SolicitacaoTipo, { shouldValidate: true })}
                     className="flex gap-4"
                   >
-                    <label className="flex items-center gap-2 text-[13px]">
+                    <label className="flex items-center gap-2 text-body">
                       <RadioGroupItem value="carregamento" />
                       Minério
                     </label>
-                    <label className="flex items-center gap-2 text-[13px]">
+                    <label className="flex items-center gap-2 text-body">
                       <RadioGroupItem value="retorno" />
                       Retorno
                     </label>
@@ -407,7 +407,7 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, onCreated }: Props) 
                     <Label htmlFor="solicitante_nome">Nome *</Label>
                     <Input id="solicitante_nome" autoFocus {...register('solicitante_nome')} />
                     {errors.solicitante_nome && (
-                      <p className="text-[11px] text-destructive">{errors.solicitante_nome.message}</p>
+                      <p className="text-meta text-destructive">{errors.solicitante_nome.message}</p>
                     )}
                   </div>
                   <div className="space-y-1.5">
@@ -421,7 +421,7 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, onCreated }: Props) 
                       placeholder="(00) 00000-0000"
                     />
                     {errors.solicitante_telefone && (
-                      <p className="text-[11px] text-destructive">{errors.solicitante_telefone.message}</p>
+                      <p className="text-meta text-destructive">{errors.solicitante_telefone.message}</p>
                     )}
                   </div>
                 </div>
@@ -443,7 +443,7 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, onCreated }: Props) 
                     createNewLabel="Cadastrar novo motorista"
                   />
                   {errors.motorista_id && (
-                    <p className="text-[11px] text-destructive">{errors.motorista_id.message}</p>
+                    <p className="text-meta text-destructive">{errors.motorista_id.message}</p>
                   )}
                 </div>
                 <div className="grid grid-cols-2 gap-3">
@@ -462,7 +462,7 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, onCreated }: Props) 
                       createNewLabel="Cadastrar novo veículo"
                     />
                     {errors.veiculo_id && (
-                      <p className="text-[11px] text-destructive">{errors.veiculo_id.message}</p>
+                      <p className="text-meta text-destructive">{errors.veiculo_id.message}</p>
                     )}
                   </div>
                   <div className="space-y-1.5">
@@ -480,7 +480,7 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, onCreated }: Props) 
                       createNewLabel="Cadastrar nova carreta"
                     />
                     {errors.carreta_id && (
-                      <p className="text-[11px] text-destructive">{errors.carreta_id.message}</p>
+                      <p className="text-meta text-destructive">{errors.carreta_id.message}</p>
                     )}
                   </div>
                 </div>
@@ -516,7 +516,7 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, onCreated }: Props) 
                     />
                   </div>
                 </div>
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-meta text-muted-foreground">
                   Preencha 1ª Carreta e Dolly apenas quando a composição tiver esses
                   implementos (ANTT). Em branco, a OC traz só cavalo e última carreta.
                 </p>
@@ -532,11 +532,11 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, onCreated }: Props) 
                     emptyMessage="Nenhuma subcontratada encontrada."
                     loading={subcontratadas.isLoading}
                   />
-                  <p className="text-[11px] text-muted-foreground">
+                  <p className="text-meta text-muted-foreground">
                     Por padrão usa a subcontratada do cavalo. Pode ser ajustada.
                   </p>
                   {errors.subcontratada_id && (
-                    <p className="text-[11px] text-destructive">{errors.subcontratada_id.message}</p>
+                    <p className="text-meta text-destructive">{errors.subcontratada_id.message}</p>
                   )}
                 </div>
               </Section>
@@ -558,7 +558,7 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, onCreated }: Props) 
                       createNewLabel="Cadastrar novo cliente"
                     />
                     {errors.cliente_id && (
-                      <p className="text-[11px] text-destructive">{errors.cliente_id.message}</p>
+                      <p className="text-meta text-destructive">{errors.cliente_id.message}</p>
                     )}
                   </div>
                   <div className="space-y-1.5">
@@ -577,11 +577,11 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, onCreated }: Props) 
                       </SelectContent>
                     </Select>
                     {errors.material_subtipo && (
-                      <p className="text-[11px] text-destructive">{errors.material_subtipo.message}</p>
+                      <p className="text-meta text-destructive">{errors.material_subtipo.message}</p>
                     )}
                     {!materialMinerio && (
-                      <p className="text-[11px] text-amber-700">
-                        Nenhum material "MINÉRIO" cadastrado, verifique o cadastro de materiais.
+                      <p className="text-meta text-warning">
+                        Nenhum material "MINÉRIO" cadastrado. Verifique o cadastro de materiais.
                       </p>
                     )}
                   </div>
@@ -601,7 +601,7 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, onCreated }: Props) 
                       </SelectContent>
                     </Select>
                     {errors.local_carregamento && (
-                      <p className="text-[11px] text-destructive">{errors.local_carregamento.message}</p>
+                      <p className="text-meta text-destructive">{errors.local_carregamento.message}</p>
                     )}
                   </div>
                 </Section>
@@ -624,9 +624,9 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, onCreated }: Props) 
                       loading={cargasRetorno.isLoading}
                     />
                     {errors.carga_retorno_id && (
-                      <p className="text-[11px] text-destructive">{errors.carga_retorno_id.message}</p>
+                      <p className="text-meta text-destructive">{errors.carga_retorno_id.message}</p>
                     )}
-                    <p className="text-[11px] text-muted-foreground">
+                    <p className="text-meta text-muted-foreground">
                       O cliente e o local de carregamento vêm da carga de retorno selecionada.
                     </p>
                   </div>
@@ -643,7 +643,7 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, onCreated }: Props) 
                       loading={materiais.isLoading}
                     />
                     {errors.material_id && (
-                      <p className="text-[11px] text-destructive">{errors.material_id.message}</p>
+                      <p className="text-meta text-destructive">{errors.material_id.message}</p>
                     )}
                   </div>
                 </Section>
@@ -653,16 +653,13 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, onCreated }: Props) 
                 <Textarea rows={2} {...register('observacoes')} placeholder="Opcional" />
               </Section>
             </DialogBody>
-            <DialogFooter>
-              <span className="text-[11px] text-muted-foreground/80">
-                Enter para salvar · Esc para cancelar
-              </span>
+            <DialogFooter className="justify-end">
               <div className="flex items-center gap-2">
                 <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
                   Cancelar
                 </Button>
                 <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {isSubmitting && <Spinner />}
                   Salvar solicitação
                 </Button>
               </div>
@@ -737,7 +734,7 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, onCreated }: Props) 
             `criada ${formatDistanceToNowStrict(new Date(pendingDup.dup.created_at), { addSuffix: true, locale: ptBR })}. ` +
             `Deseja criar uma nova solicitação mesmo assim?`
           }
-          confirmLabel="Sim, criar mesmo assim"
+          confirmLabel="Criar mesmo assim"
           cancelLabel="Voltar para revisar"
           onConfirm={proceedAnyway}
         />
@@ -749,7 +746,7 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, onCreated }: Props) 
 function Section({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="space-y-2">
-      <p className="text-[10px] uppercase tracking-[0.5px] text-muted-foreground">{label}</p>
+      <p className="text-body-sm font-semibold text-foreground">{label}</p>
       <div className="space-y-3">{children}</div>
     </div>
   )

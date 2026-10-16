@@ -2,7 +2,6 @@ import * as React from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Loader2 } from 'lucide-react'
 import { CrudListPage, useCrudListState, type ColumnDef } from '@/components/shared/CrudListPage'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import {
@@ -18,11 +17,13 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { isValidDocumento, tipoPessoa } from '@sislog/shared/validators'
 import { formatDocumento } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 import type { Tables } from '@sislog/shared/types'
+import { Spinner } from '@/components/shared/Spinner'
+import { CadastroField } from '@/components/forms/CadastroField'
+import { useDescartarAlteracoes } from '@/features/cadastros/useDescartarAlteracoes'
 
 type Row = Tables<'parceiro_subcontratadas'>
 
@@ -36,14 +37,12 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>
 
 function TipoBadge({ tipo }: { tipo: 'PF' | 'PJ' | null }) {
-  if (!tipo) return <span className="text-[12px] text-muted-foreground">—</span>
+  if (!tipo) return <span className="text-body-sm text-muted-foreground">—</span>
   return (
     <span
       className={cn(
-        'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium tracking-[0.5px]',
-        tipo === 'PJ'
-          ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950/50 dark:text-indigo-300'
-          : 'bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300',
+        'inline-flex items-center rounded-[2px] border px-1.5 py-0.5 text-meta font-medium',
+        tipo === 'PJ' ? 'cat-ink' : 'cat-brass',
       )}
     >
       {tipo}
@@ -100,7 +99,7 @@ export default function SubcontratadasPage() {
         onToggleActive={(r) => setConfirmRow(r)}
         onDelete={(r) => setDeleteRow(r)}
         emptyTitle="Nenhuma subcontratada cadastrada"
-        emptyDescription="Cadastre as transportadoras (PJ) ou autônomos (PF) que atuam para você."
+        emptyDescription="Cadastre as transportadoras (PJ) ou autônomos (PF) que atuam para a sua empresa."
         page={state.page}
         pageSize={state.pageSize}
         totalCount={list.data?.count ?? 0}
@@ -129,9 +128,9 @@ export default function SubcontratadasPage() {
         onOpenChange={(o) => !o && setConfirmRow(null)}
         title={confirmRow?.ativo ? 'Desativar subcontratada?' : 'Reativar subcontratada?'}
         description={confirmRow?.ativo
-          ? 'A subcontratada não aparecerá nas listas ativas. Você pode reativá-la depois.'
+          ? 'A subcontratada não aparecerá nas listas ativas. É possível reativá-la depois.'
           : 'A subcontratada voltará a aparecer nas listas ativas.'}
-        confirmLabel={confirmRow?.ativo ? 'Sim, desativar' : 'Sim, reativar'}
+        confirmLabel={confirmRow?.ativo ? 'Desativar' : 'Reativar'}
         destructive={confirmRow?.ativo}
         onConfirm={async () => {
           if (confirmRow) {
@@ -150,7 +149,7 @@ export default function SubcontratadasPage() {
             ? `O cadastro de "${deleteRow.razao_social}" será removido permanentemente. Se houver motoristas, veículos ou carretas vinculados, a exclusão será bloqueada.`
             : ''
         }
-        confirmLabel="Sim, excluir"
+        confirmLabel="Excluir"
         destructive
         onConfirm={async () => {
           if (deleteRow) {
@@ -173,7 +172,7 @@ interface FormProps {
 function SubcontratadaForm({ open, onOpenChange, editing, onSubmit }: FormProps) {
   const {
     register, handleSubmit, reset, setValue, watch,
-    formState: { errors, isSubmitting },
+    formState: { errors, isSubmitting, isDirty },
   } = useForm<FormValues>({ resolver: zodResolver(schema) })
 
   React.useEffect(() => {
@@ -188,58 +187,54 @@ function SubcontratadaForm({ open, onOpenChange, editing, onSubmit }: FormProps)
   const documento = watch('documento') ?? ''
   const tipoAtual = tipoPessoa(documento)
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <form onSubmit={handleSubmit(onSubmit)} noValidate>
-          <DialogHeader>
-            <DialogTitle>{editing ? 'Editar subcontratada' : 'Nova subcontratada'}</DialogTitle>
-            <DialogDescription>
-              Cadastre transportadoras (PJ) ou autônomos (PF). O tipo é detectado automaticamente pelo documento.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogBody className="space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="razao_social">Razão social ou nome *</Label>
-              <Input id="razao_social" autoFocus {...register('razao_social')} />
-              {errors.razao_social && (
-                <p className="text-[11px] text-destructive">{errors.razao_social.message}</p>
-              )}
-            </div>
+  const guarda = useDescartarAlteracoes(isDirty, onOpenChange, isSubmitting)
 
-            <div className="space-y-1.5">
-              <Label htmlFor="documento" className="flex items-center justify-between">
-                <span>CPF ou CNPJ *</span>
-                {tipoAtual && <TipoBadge tipo={tipoAtual} />}
-              </Label>
-              <Input
+  return (
+    <>
+      <Dialog open={open} onOpenChange={guarda.onOpenChange}>
+        <DialogContent>
+          <form onSubmit={handleSubmit(onSubmit)} noValidate>
+            <DialogHeader>
+              <DialogTitle>{editing ? 'Editar subcontratada' : 'Nova subcontratada'}</DialogTitle>
+              <DialogDescription>
+                Cadastre transportadoras (PJ) ou autônomos (PF). O tipo é detectado automaticamente pelo documento.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogBody className="space-y-4">
+              <CadastroField label="Razão social ou nome" required id="razao_social" error={errors.razao_social?.message}>
+                <Input autoFocus {...register('razao_social')} />
+              </CadastroField>
+
+              <CadastroField
+                label="CPF ou CNPJ"
+                required
                 id="documento"
-                value={documento}
-                onChange={(e) => setValue('documento', formatDocumento(e.target.value), { shouldValidate: true })}
-                placeholder="CPF ou CNPJ"
-                inputMode="numeric"
-              />
-              {errors.documento && (
-                <p className="text-[11px] text-destructive">{errors.documento.message}</p>
-              )}
-            </div>
-          </DialogBody>
-          <DialogFooter>
-            <span className="text-[11px] text-muted-foreground/80">
-              Enter para salvar · Esc para cancelar
-            </span>
-            <div className="flex items-center gap-2">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
-                Salvar
-              </Button>
-            </div>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+                error={errors.documento?.message}
+                hint={tipoAtual ? <>Tipo detectado: <TipoBadge tipo={tipoAtual} /></> : undefined}
+              >
+                <Input
+                  value={documento}
+                  onChange={(e) => setValue('documento', formatDocumento(e.target.value), { shouldValidate: true, shouldDirty: true })}
+                  placeholder="CPF ou CNPJ"
+                  inputMode="numeric"
+                />
+              </CadastroField>
+            </DialogBody>
+            <DialogFooter className="justify-end">
+              <div className="flex items-center gap-2">
+                <Button type="button" variant="outline" onClick={() => guarda.onOpenChange(false)} disabled={isSubmitting}>
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting && <Spinner />}
+                  Salvar
+                </Button>
+              </div>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+      {guarda.dialog}
+    </>
   )
 }

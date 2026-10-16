@@ -3,7 +3,7 @@
    oficial `wanted-sans` (OFL-1.1). O CSS split usa unicode-range, então o
    navegador baixa só os subsets que aparecem no DOM (latim na prática). */
 @import url('https://cdn.jsdelivr.net/npm/wanted-sans@1.0.3/fonts/webfonts/static/split/WantedSans.css');
-@import url('https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -11,103 +11,128 @@
 
 @layer base {
   :root {
-    /* Portal Parceiros LHG — identidade azul, distinta do sistema interno
-       (laranja). Primária: azul #1E40AF · acento: azul escuro #1E3A8A.
-       O azul sinaliza ao parceiro que ele é fornecedor, não funcionário. */
+    /* Portal Parceiros LHG — mesma estrutura GRAFITE FRIA do interno
+       (apps/interno/src/index.css), com o AZUL #1E40AF como acento único
+       (ação primária, item ativo, foco; ≤10% da tela). O azul sinaliza ao
+       parceiro que ele é fornecedor, não funcionário; nunca o laranja LHG.
+         canvas      → fundo atrás de tudo (área da página)
+         background  → superfície (input, barra, painel; = card)
+         card        → seção da página (um nível, borda hairline)
+         popover     → camada elevada (popover, dropdown, menu, diálogo)
+         muted       → realce neutro (cabeçalho de tabela, rodapé de diálogo)
+         row-hover   → linha de tabela/lista em hover
+         border      → hairline · input/border-strong → contorno de controle (≥3:1) */
 
-    --background: 0 0% 100%;
-    --foreground: 222 20% 12%;
-
+    --background: 0 0% 100%;                  /* #FFFFFF */
+    --foreground: 219 21.2% 12.9%;            /* #1A1F28 texto 1 */
+    --canvas: 210 21.4% 94.5%;                /* #EEF1F4 */
     --card: 0 0% 100%;
-    --card-foreground: 222 20% 12%;
-
+    --card-foreground: 219 21.2% 12.9%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222 20% 12%;
+    --popover-foreground: 219 21.2% 12.9%;
+    --muted: 216 26.3% 96.3%;                 /* #F3F5F8 */
+    --muted-foreground: 217 11.2% 40.2%;      /* #5B6472 texto 2 — 5.98 branco / 5.28 canvas */
+    --tertiary: 220 11.2% 42%;                /* #5F6777 texto 3 — 5.69 branco / 5.02 canvas */
+    --accent: 213 24.3% 92.7%;                /* #E8ECF1 realce neutro */
+    --accent-foreground: 219 21.2% 12.9%;
+    --row-hover: 210 27.3% 95.7%;             /* #F1F4F7 */
 
-    --primary: 226 71% 40%;              /* #1E40AF azul portal */
-    --primary-hover: 225 64% 33%;        /* #1E3A8A azul escuro */
+    /* Acento AZUL do portal. Fill #1E40AF + branco = 8.72; como texto
+       (primary-strong) 8.72 branco / 7.69 canvas; foco 7.69 canvas. */
+    --primary: 226 71% 40%;                   /* #1E40AF */
+    --primary-hover: 225 64% 33%;             /* #1E3A8A */
     --primary-foreground: 0 0% 100%;
+    --primary-strong: 226 71% 40%;            /* #1E40AF texto */
 
-    --secondary: 222 16% 22%;
+    --secondary: 219 16.8% 19.8%;             /* #2A303B */
     --secondary-foreground: 0 0% 100%;
 
-    --muted: 220 20% 97%;
-    --muted-foreground: 220 9% 46%;
-
-    --accent: 226 60% 95%;               /* azul bem clarinho p/ hover/realce */
-    --accent-foreground: 225 64% 33%;
-
-    --destructive: 0 84% 60%;
+    --destructive: 2 64.6% 47.6%;             /* #C8312B — fill c/ branco 5.34 */
     --destructive-foreground: 0 0% 100%;
 
-    --success: 160 84% 36%;
+    --success: 147 60.5% 29.8%;               /* #1E7A47 */
     --success-foreground: 0 0% 100%;
+    --success-subtle: 141 41.2% 93.3%;        /* #E7F5EC */
+    --success-border: 142 39.2% 75.5%;        /* #A8D9BA */
+    --warning: 36 100% 27.1%;                 /* #8A5300 */
+    --warning-foreground: 0 0% 100%;
+    --warning-subtle: 42 100% 92.9%;          /* #FFF4DB */
+    --warning-border: 40 81.7% 67.8%;         /* #F0C46A */
+    --danger: 4 76.5% 40%;                    /* #B42318 */
+    --danger-subtle: 6 82.6% 95.5%;           /* #FDECEA */
+    --danger-border: 6 71.1% 82.4%;           /* #F2B8B2 */
+    --info: 211 49.2% 36.3%;                  /* #2F5B8A */
+    --info-subtle: 210 50% 94.5%;             /* #EAF1F8 */
+    --info-border: 211 44% 80.4%;             /* #B7CCE3 */
 
-    --warning: 38 92% 50%;
-    --warning-foreground: 222 20% 12%;
+    --border: 215 20.7% 88.6%;                /* #DCE1E8 hairline */
+    --border-strong: 218 10.6% 53.9%;         /* #7D8696 — 3.67 branco / 3.24 canvas */
+    --input: 218 10.6% 53.9%;
+    --ring: 226 71% 40%;                      /* #1E40AF */
 
-    --border: 220 13% 90%;
-    --input: 220 13% 90%;
-    --ring: 226 71% 40%;
-
-    /* Radius sóbrio (institucional), alinhado ao sistema interno. */
     --radius: 0.25rem;
 
-    /* Tema escuro / superfícies "hero" (SPEC-NOVA-UI v3 / DESIGN.md §7) — valores
-       fixos usados em superfícies sempre-escuras (login) e como fim de gradiente/
-       glow. Acento do portal é o AZUL. */
+    /* Superfícies "marca" do LOGIN (gradiente/glow permitidos SÓ lá —
+       DESIGN.md §7). Não usar em tela de trabalho. */
     --canvas-dark: #14171D;
     --surface-dark: #1A1F28;
     --elevated-dark: #232833;
     --border-dark: rgba(255, 255, 255, 0.08);
-    --portal-blue-tint: #93B4FF;         /* fim claro do gradiente do acento azul */
+    --portal-blue-tint: #93B4FF;
     --glow-blue: rgba(30, 64, 175, 0.22);
+    /* Painel de marca do convite (sempre escuro): branco = 10.36:1. */
+    --brand-panel: #1E3A8A;
   }
 
   .dark {
-    /* Superfícies em camadas (DESIGN.md §7): canvas → surface → elevated. */
-    --background: 220 18% 10%;           /* #14171D canvas-dark */
-    --foreground: 220 16% 96%;
+    --background: 216 18.5% 10.6%;            /* #161A20 surface */
+    --foreground: 218 19% 91.8%;              /* #E6E9EE — 14.35 surface */
+    --canvas: 214 20% 6.9%;                   /* #0E1115 */
+    --card: 216 18.5% 10.6%;
+    --card-foreground: 218 19% 91.8%;
+    --popover: 217 17.8% 14.3%;               /* #1E232B raised */
+    --popover-foreground: 218 19% 91.8%;
+    --muted: 217 17.8% 14.3%;
+    --muted-foreground: 217 11% 67.8%;        /* #A4ABB6 — 7.55 surface */
+    --tertiary: 217 8.3% 57.6%;               /* #8A919C — 5.50 surface */
+    --accent: 216 16.5% 17.8%;                /* #262C35 */
+    --accent-foreground: 218 19% 91.8%;
+    --row-hover: 216 16.5% 17.8%;
 
-    --card: 219 21% 13%;                 /* #1A1F28 surface-dark */
-    --card-foreground: 220 16% 96%;
+    /* Azul no dark: fill claro + tinta navy (branco sobre azul claro não passa).
+       #0F1729 sobre #5D83E9 = 5.01 (hover #7897ED = 6.34). Como TEXTO o fill dá
+       só 4.43 sobre popover, então o texto de acento usa #93B5FF (8.49 surface,
+       7.68 popover). Foco #5D83E9: 4.90 surface / 4.43 popover / 5.31 canvas. */
+    --primary: 224 76% 64%;                   /* #5D83E9 */
+    --primary-hover: 224 76% 70%;             /* #7897ED */
+    --primary-foreground: 222 47% 11%;        /* #0F1729 */
+    --primary-strong: 221 100% 78.8%;         /* #93B5FF */
 
-    --popover: 221 19% 17%;              /* #232833 elevated-dark */
-    --popover-foreground: 220 16% 96%;
+    --secondary: 218 16% 19.6%;               /* #2A303A */
+    --secondary-foreground: 218 19% 91.8%;
 
-    /* Acento azul do dark: L=64% + FOREGROUND ESCURO no fill (WCAG AA total).
-       Nenhum azul unico com texto BRANCO fecha os dois usos do acento — o botao
-       (branco/azul) exige L<=58, o azul-como-texto-em-card exige L>=64. A saida e
-       inverter o botao no dark: fill azul claro (L=64) + tinta escura (navy). Assim
-       o MESMO azul serve de fill (tinta escura passa: 5.0:1) e de texto sobre card
-       (4.63:1) e canvas (5.03:1). O botao inverte so no dark; no claro segue
-       branco sobre #1E40AF. `--primary-foreground` escuro vale p/ todo fill de
-       acento (botao, avatar, logo, checkbox) — tinta consistente. */
-    --primary: 224 76% 64%;              /* azul claro p/ dark */
-    --primary-hover: 224 76% 70%;        /* hover CLAREIA (tinta escura pede + luz) */
-    --primary-foreground: 222 47% 11%;   /* navy — tinta do fill no dark */
+    --destructive: 3 84% 68.2%;               /* #F2706A */
+    --destructive-foreground: 0 67.6% 7.3%;   /* #1F0606 */
 
-    --secondary: 222 12% 30%;
-    --secondary-foreground: 220 16% 96%;
+    --success: 151 65.1% 53.9%;               /* #3DD68C */
+    --success-foreground: 140 69.2% 7.6%;     /* #06210F */
+    --success-subtle: 149 38.2% 10.8%;        /* #11261B */
+    --success-border: 146 37.3% 26.3%;        /* #2A5C40 */
+    --warning: 40 83.9% 68.4%;                /* #F2C46B */
+    --warning-foreground: 39 82.4% 6.7%;      /* #1F1503 */
+    --warning-subtle: 42 44.8% 11.4%;         /* #2A2210 */
+    --warning-border: 41 54% 27.3%;           /* #6B5320 */
+    --danger: 5 100% 75.1%;                   /* #FF8A80 */
+    --danger-subtle: 3 35.3% 13.3%;           /* #2E1716 */
+    --danger-border: 3 46.7% 29.4%;           /* #6E2B28 */
+    --info: 212 57.2% 71.6%;                  /* #8DB4E0 */
+    --info-subtle: 213 36.4% 12.9%;           /* #15202D */
+    --info-border: 212 36.1% 28.8%;           /* #2F4864 */
 
-    --muted: 222 14% 17%;
-    --muted-foreground: 220 10% 66%;
-
-    --accent: 226 40% 26%;
-    --accent-foreground: 220 16% 96%;
-
-    --destructive: 0 72% 55%;
-    --destructive-foreground: 0 0% 100%;
-
-    --success: 160 70% 45%;
-    --success-foreground: 0 0% 100%;
-
-    --warning: 38 92% 55%;
-    --warning-foreground: 222 20% 12%;
-
-    --border: 222 12% 22%;
-    --input: 222 12% 22%;
-    --ring: 224 76% 64%;
+    --border: 215 14% 23.7%;                  /* #343B45 hairline */
+    --border-strong: 218 9.4% 45.9%;          /* #6A7280 — 3.60 surface / 3.26 popover / 3.90 canvas */
+    --input: 218 9.4% 45.9%;
+    --ring: 224 76% 64%;                      /* #5D83E9 */
   }
 }
 
@@ -119,7 +144,7 @@
     @apply h-full;
   }
   body {
-    @apply bg-background text-foreground font-sans antialiased;
+    @apply bg-canvas text-foreground font-sans antialiased;
     font-size: 14px;
     line-height: 1.5;
   }
@@ -132,7 +157,102 @@
 }
 
 @layer components {
+  /* Rótulo de KPI — ÚNICO uso aceito de maiúsculas (DESIGN.md §3). */
   .label-uppercase {
-    @apply text-[10px] font-medium uppercase tracking-[0.5px] text-muted-foreground;
+    @apply text-meta font-medium uppercase tracking-[0.5px] text-muted-foreground;
   }
+
+  /* Status do parceiro — mesmos matizes do interno (apps/interno/src/index.css
+     --st-*), um por etapa: Enviada cinza · Em processamento amarelo · OC pronta
+     azul · Concluída verde · Cancelada vermelho. Fundo / texto / ponto. */
+  .pst-enviada          { --pst-bg: #EEF1F5; --pst-fg: #3F4A5A; --pst-dot: #6E7686; }
+  .pst-em_processamento { --pst-bg: #FBF1C7; --pst-fg: #634C00; --pst-dot: #9A7A00; }
+  .pst-oc_pronta        { --pst-bg: #E3EDFB; --pst-fg: #1D4E8F; --pst-dot: #2F6FC4; }
+  .pst-concluida        { --pst-bg: #D3EEDD; --pst-fg: #0F5131; --pst-dot: #1E7A47; }
+  .pst-cancelada        { --pst-bg: #FDECEA; --pst-fg: #A1261E; --pst-dot: #C8312B; }
+  .dark .pst-enviada          { --pst-bg: #232933; --pst-fg: #C3CAD5; --pst-dot: #8A919C; }
+  .dark .pst-em_processamento { --pst-bg: #2E2A10; --pst-fg: #F0D36A; --pst-dot: #D9B92E; }
+  .dark .pst-oc_pronta        { --pst-bg: #142338; --pst-fg: #8DB8F2; --pst-dot: #4C8FE0; }
+  .dark .pst-concluida        { --pst-bg: #0F2E1F; --pst-fg: #A6EBC4; --pst-dot: #3DD68C; }
+  .dark .pst-cancelada        { --pst-bg: #321A1A; --pst-fg: #FF9A91; --pst-dot: #F2706A; }
+
+  /* Categóricas foscas (iguais às do interno) — taxonomia, não status:
+     PJ = cat-ink, PF = cat-brass. */
+  .cat-ink   { background-color: #E7E4EE; color: #423B57; border-color: #D5CFE0; }
+  .cat-brass { background-color: #EFE8D6; color: #6A562C; border-color: #E2D8BE; }
+  .dark .cat-ink   { background-color: rgba(120,110,150,0.22); color: #cabfe0; border-color: rgba(120,110,150,0.30); }
+  .dark .cat-brass { background-color: rgba(180,150,80,0.18);  color: #ddc99a; border-color: rgba(180,150,80,0.30); }
+
+  .status-badge { background-color: var(--pst-bg); color: var(--pst-fg); }
+
+  /* Faixa lateral de status do card (6px), igual à do interno. */
+  .card-status::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 6px;
+    border-top-left-radius: inherit;
+    border-bottom-left-radius: inherit;
+    background-color: var(--pst-dot);
+    pointer-events: none;
+    /* Mudança de status: a faixa troca de cor em 200ms, junto com o badge. */
+    transition: background-color 200ms ease-out;
+  }
+}
+
+/* ── Movimento ─────────────────────────────────────────────────────────────
+   Bloco IDÊNTICO em apps/interno e apps/portal (+ hooks/useMovimento.ts).
+   Só transform/opacity; fill-mode `backwards` (nunca `both`/`forwards`) para a
+   animação não prender o transform e não brigar com o hover de elevação 2px.
+   Sem guarda de "reduzir movimento" — decisão do dono (ver MEMORY/DESIGN.md). */
+:root {
+  --ease-firme: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes entrada {
+  from { opacity: 0; transform: translateY(8px); }
+}
+@keyframes entrada-sutil {
+  from { opacity: 0; transform: translateY(4px); }
+}
+@keyframes surgir {
+  from { opacity: 0; }
+}
+@keyframes etapa-da-direita {
+  from { opacity: 0; transform: translateX(16px); }
+}
+@keyframes etapa-da-esquerda {
+  from { opacity: 0; transform: translateX(-16px); }
+}
+
+@layer components {
+  /* Login: entrada coreografada. Atraso por `--ordem` × 40ms (inline style). */
+  .entrada-login {
+    animation: entrada 240ms var(--ease-firme) backwards;
+    animation-delay: calc(var(--ordem, 0) * 40ms);
+  }
+  /* Login: troca de etapa (1 → 2 entra da direita; voltar entra da esquerda). */
+  .etapa-avanca { animation: etapa-da-direita 200ms var(--ease-firme) backwards; }
+  .etapa-volta  { animation: etapa-da-esquerda 200ms var(--ease-firme) backwards; }
+
+  /* Valor não numérico do KPI ("3 h 40 min", "—"): só fade. */
+  .surgir { animation: surgir 200ms ease-out backwards; }
+
+  /* Cascata da 1ª renderização de cards (useCascataInicial): 25ms por índice,
+     teto de 300ms a partir do 13º. */
+  .cascata > * { animation: entrada-sutil 200ms var(--ease-firme) backwards; }
+  .cascata > :nth-child(2)  { animation-delay: 25ms; }
+  .cascata > :nth-child(3)  { animation-delay: 50ms; }
+  .cascata > :nth-child(4)  { animation-delay: 75ms; }
+  .cascata > :nth-child(5)  { animation-delay: 100ms; }
+  .cascata > :nth-child(6)  { animation-delay: 125ms; }
+  .cascata > :nth-child(7)  { animation-delay: 150ms; }
+  .cascata > :nth-child(8)  { animation-delay: 175ms; }
+  .cascata > :nth-child(9)  { animation-delay: 200ms; }
+  .cascata > :nth-child(10) { animation-delay: 225ms; }
+  .cascata > :nth-child(11) { animation-delay: 250ms; }
+  .cascata > :nth-child(12) { animation-delay: 275ms; }
+  .cascata > :nth-child(n+13) { animation-delay: 300ms; }
 }

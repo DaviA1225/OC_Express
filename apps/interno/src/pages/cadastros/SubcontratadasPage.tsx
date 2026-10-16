@@ -2,7 +2,8 @@ import * as React from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Loader2, Download } from 'lucide-react'
+import { Download } from 'lucide-react'
+import { Spinner } from '@/components/shared/Spinner'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { buildCsv, downloadCsv, type CsvColumn } from '@/lib/csv'
@@ -22,10 +23,11 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { isValidDocumento, tipoPessoa } from '@/lib/validators'
 import { formatDocumento, cn } from '@/lib/utils'
 import type { Tables } from '@/types/database.types'
+import { CadastroField } from '@/components/forms/CadastroField'
+import { useDescartarAlteracoes } from '@/features/crud/useDescartarAlteracoes'
 
 type Row = Tables<'subcontratadas'>
 type ExportRow = Pick<Row, 'razao_social' | 'tipo_pessoa' | 'documento' | 'ativo'>
@@ -40,11 +42,11 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>
 
 function TipoBadge({ tipo }: { tipo: 'PF' | 'PJ' | null }) {
-  if (!tipo) return <span className="text-[12px] text-muted-foreground">—</span>
+  if (!tipo) return <span className="text-body-sm text-muted-foreground">—</span>
   return (
     <span
       className={cn(
-        'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium tracking-[0.5px]',
+        'inline-flex items-center rounded-[2px] border px-1.5 py-0.5 text-meta font-medium',
         tipo === 'PJ' ? 'cat-ink' : 'cat-brass',
       )}
     >
@@ -68,11 +70,11 @@ export default function SubcontratadasPage() {
     ascending: true,
   })
   const totalActive = useActiveCount('subcontratadas')
-  const upsert = useUpsertRow('subcontratadas', 'Subcontratada')
-  const toggle = useToggleActive('subcontratadas', 'Subcontratada')
-  const remove = useDeleteRow('subcontratadas', 'Subcontratada')
-  const bulkToggle = useBulkToggleActive('subcontratadas', 'Subcontratada')
-  const bulkDelete = useBulkDeleteRows('subcontratadas', 'Subcontratada')
+  const upsert = useUpsertRow('subcontratadas', { singular: 'Subcontratada', plural: 'Subcontratadas', genero: 'f' })
+  const toggle = useToggleActive('subcontratadas', { singular: 'Subcontratada', plural: 'Subcontratadas', genero: 'f' })
+  const remove = useDeleteRow('subcontratadas', { singular: 'Subcontratada', plural: 'Subcontratadas', genero: 'f' })
+  const bulkToggle = useBulkToggleActive('subcontratadas', { singular: 'Subcontratada', plural: 'Subcontratadas', genero: 'f' })
+  const bulkDelete = useBulkDeleteRows('subcontratadas', { singular: 'Subcontratada', plural: 'Subcontratadas', genero: 'f' })
 
   const [editing, setEditing] = React.useState<Row | null>(null)
   const [open, setOpen] = React.useState(false)
@@ -100,9 +102,9 @@ export default function SubcontratadasPage() {
         return
       }
       const cols: CsvColumn<ExportRow>[] = [
-        { header: 'Razão Social / Nome', accessor: (r) => r.razao_social },
+        { header: 'Razão social ou nome', accessor: (r) => r.razao_social },
         { header: 'Tipo', accessor: (r) => r.tipo_pessoa },
-        { header: 'CPF / CNPJ', accessor: (r) => r.documento },
+        { header: 'CPF/CNPJ', accessor: (r) => r.documento },
         { header: 'Situação', accessor: (r) => (r.ativo ? 'Ativa' : 'Inativa') },
       ]
       const ts = new Date()
@@ -117,9 +119,9 @@ export default function SubcontratadasPage() {
   }
 
   const columns: ColumnDef<Row>[] = [
-    { header: 'Razão Social / Nome', accessor: (r) => r.razao_social },
+    { header: 'Razão social ou nome', accessor: (r) => r.razao_social },
     { header: 'Tipo', accessor: (r) => <TipoBadge tipo={r.tipo_pessoa} /> },
-    { header: 'CPF / CNPJ', accessor: (r) => r.documento ?? '—', className: 'text-muted-foreground' },
+    { header: 'CPF/CNPJ', accessor: (r) => r.documento ?? '—', className: 'text-muted-foreground' },
   ]
 
   return (
@@ -135,7 +137,7 @@ export default function SubcontratadasPage() {
             disabled={exporting || list.isLoading}
             title="Exportar resultados filtrados em CSV"
           >
-            {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            {exporting ? <Spinner /> : <Download className="h-4 w-4" />}
             <span className="hidden sm:inline">Exportar CSV</span>
           </Button>
         }
@@ -155,7 +157,7 @@ export default function SubcontratadasPage() {
         onToggleActive={canEdit ? (r) => setConfirmRow(r) : undefined}
         onDelete={canEdit ? (r) => setDeleteRow(r) : undefined}
         emptyTitle="Nenhuma subcontratada cadastrada"
-        emptyDescription="Cadastre as transportadoras (PJ) ou autônomos (PF) que atuam para você."
+        emptyDescription="Transportadoras (PJ) e autônomos (PF) que prestam serviço à LHG."
         page={state.page}
         pageSize={state.pageSize}
         totalCount={list.data?.count ?? 0}
@@ -187,9 +189,9 @@ export default function SubcontratadasPage() {
         onOpenChange={(o) => !o && setConfirmRow(null)}
         title={confirmRow?.ativo ? 'Desativar subcontratada?' : 'Reativar subcontratada?'}
         description={confirmRow?.ativo
-          ? 'A subcontratada não aparecerá nas listas ativas. Você pode reativá-la depois.'
+          ? 'A subcontratada não aparecerá nas listas ativas. É possível reativá-la depois.'
           : 'A subcontratada voltará a aparecer nas listas ativas.'}
-        confirmLabel={confirmRow?.ativo ? 'Sim, desativar' : 'Sim, reativar'}
+        confirmLabel={confirmRow?.ativo ? 'Desativar' : 'Reativar'}
         destructive={confirmRow?.ativo}
         onConfirm={async () => {
           if (confirmRow) {
@@ -208,7 +210,7 @@ export default function SubcontratadasPage() {
             ? `O cadastro de "${deleteRow.razao_social}" será removido permanentemente. Essa ação não pode ser desfeita. Se houver veículos, carretas ou solicitações vinculadas, a exclusão será bloqueada.`
             : ''
         }
-        confirmLabel="Sim, excluir"
+        confirmLabel="Excluir"
         destructive
         onConfirm={async () => {
           if (deleteRow) {
@@ -235,7 +237,7 @@ function SubcontratadaForm({ open, onOpenChange, editing, onSubmit }: FormProps)
     reset,
     setValue,
     watch,
-    formState: { errors, isSubmitting },
+    formState: { errors, isSubmitting, isDirty },
   } = useForm<FormValues>({ resolver: zodResolver(schema) })
 
   React.useEffect(() => {
@@ -250,52 +252,46 @@ function SubcontratadaForm({ open, onOpenChange, editing, onSubmit }: FormProps)
   const documento = watch('documento') ?? ''
   const tipoAtual = tipoPessoa(documento)
 
+  const guarda = useDescartarAlteracoes(isDirty, onOpenChange, isSubmitting)
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <>
+    <Dialog open={open} onOpenChange={guarda.onOpenChange}>
       <DialogContent>
         <form onSubmit={handleSubmit(onSubmit)} noValidate>
           <DialogHeader>
             <DialogTitle>{editing ? 'Editar subcontratada' : 'Nova subcontratada'}</DialogTitle>
             <DialogDescription>
-              Cadastre transportadoras (PJ) ou autônomos (PF). O tipo é detectado automaticamente pelo documento.
+              O tipo (PJ ou PF) é detectado pelo documento.
             </DialogDescription>
           </DialogHeader>
           <DialogBody className="space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="razao_social">Razão social ou nome *</Label>
-              <Input id="razao_social" autoFocus {...register('razao_social')} />
-              {errors.razao_social && (
-                <p className="text-[11px] text-destructive">{errors.razao_social.message}</p>
-              )}
-            </div>
+            <CadastroField label="Razão social ou nome" required id="razao_social" error={errors.razao_social?.message}>
+              <Input autoFocus {...register('razao_social')} />
+            </CadastroField>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="documento" className="flex items-center justify-between">
-                <span>CPF ou CNPJ *</span>
-                {tipoAtual && <TipoBadge tipo={tipoAtual} />}
-              </Label>
+            <CadastroField
+              label="CPF/CNPJ"
+              required
+              id="documento"
+              error={errors.documento?.message}
+              hint={tipoAtual ? <>Tipo detectado: <TipoBadge tipo={tipoAtual} /></> : undefined}
+            >
               <Input
-                id="documento"
                 value={documento}
-                onChange={(e) => setValue('documento', formatDocumento(e.target.value), { shouldValidate: true })}
+                onChange={(e) => setValue('documento', formatDocumento(e.target.value), { shouldValidate: true, shouldDirty: true })}
                 placeholder="CPF ou CNPJ"
                 inputMode="numeric"
               />
-              {errors.documento && (
-                <p className="text-[11px] text-destructive">{errors.documento.message}</p>
-              )}
-            </div>
+            </CadastroField>
           </DialogBody>
-          <DialogFooter>
-            <span className="text-[11px] text-muted-foreground/80">
-              Enter para salvar · Esc para cancelar
-            </span>
+          <DialogFooter className="justify-end">
             <div className="flex items-center gap-2">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
+              <Button type="button" variant="outline" onClick={() => guarda.onOpenChange(false)} disabled={isSubmitting}>
                 Cancelar
               </Button>
               <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                {isSubmitting && <Spinner />}
                 Salvar
               </Button>
             </div>
@@ -303,5 +299,7 @@ function SubcontratadaForm({ open, onOpenChange, editing, onSubmit }: FormProps)
         </form>
       </DialogContent>
     </Dialog>
+    {guarda.dialog}
+    </>
   )
 }

@@ -2,7 +2,7 @@ import * as React from 'react'
 import { Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Loader2, Send } from 'lucide-react'
+import { Send } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -28,6 +28,8 @@ import { formatarPamcardParaExibicao } from '@sislog/shared/formatters'
 import type { PamcardStatus, SolicitacaoTipo } from '@sislog/shared/types'
 
 import { solicitacaoSchema, type SolicitacaoFormValues } from './solicitacaoForm.schema'
+import { Spinner } from '@/components/shared/Spinner'
+import { CadastroField } from '@/components/forms/CadastroField'
 
 // Reexportado por conveniência para quem já importa o tipo daqui. Reexport de
 // *tipo* não viola a regra react-refresh/only-export-components (só valores).
@@ -280,7 +282,7 @@ export function SolicitacaoForm({
             createNewLabel="Cadastrar novo dolly"
           />
         </div>
-        <p className="text-[12px] text-muted-foreground">
+        <p className="text-body-sm text-muted-foreground">
           Preencha 1ª Carreta e Dolly apenas quando a composição tiver esses
           implementos (exigência ANTT). Em branco, a OC traz só cavalo e última carreta.
         </p>
@@ -299,17 +301,20 @@ export function SolicitacaoForm({
 
       <Section title="Destino" description="O cliente é escolhido entre os atendidos pela LHG.">
         <div className="space-y-1.5">
-          <Label>Tipo *</Label>
+          <Label id="solicitacao-tipo-rotulo">
+            Tipo<span className="ml-1 font-normal text-tertiary">(obrigatório)</span>
+          </Label>
           <RadioGroup
             value={tipo}
             onValueChange={(v) => trocarTipo(v as SolicitacaoTipo)}
             className="flex gap-4 pt-1"
+            aria-labelledby="solicitacao-tipo-rotulo"
           >
-            <label className="flex items-center gap-2 text-[13px]">
+            <label className="flex items-center gap-2 text-body">
               <RadioGroupItem value="carregamento" />
               Minério
             </label>
-            <label className="flex items-center gap-2 text-[13px]">
+            <label className="flex items-center gap-2 text-body">
               <RadioGroupItem value="retorno" />
               Retorno
             </label>
@@ -345,8 +350,11 @@ export function SolicitacaoForm({
       >
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
-            <Label>Cartão *</Label>
+            <Label id="solicitacao-cartao-rotulo">
+              Cartão<span className="ml-1 font-normal text-tertiary">(obrigatório)</span>
+            </Label>
             <RadioGroup
+              aria-labelledby="solicitacao-cartao-rotulo"
               value={pamcardStatus}
               onValueChange={(v) => {
                 const next = v as PamcardStatus
@@ -357,24 +365,22 @@ export function SolicitacaoForm({
               }}
               className="flex flex-col gap-2 pt-1"
             >
-              <label className="flex items-center gap-2 text-[13px]">
+              <label className="flex items-center gap-2 text-body">
                 <RadioGroupItem value="tem_cartao" />
                 Tem cartão
               </label>
-              <label className="flex items-center gap-2 text-[13px]">
+              <label className="flex items-center gap-2 text-body">
                 <RadioGroupItem value="nao_tem_cartao" />
                 Não tem cartão (solicitar)
               </label>
-              <label className="flex items-center gap-2 text-[13px]">
+              <label className="flex items-center gap-2 text-body">
                 <RadioGroupItem value="nao_necessario" />
                 Não necessário (pagamento por outro meio)
               </label>
             </RadioGroup>
           </div>
-          <div className="space-y-1.5">
-            <Label>Número do cartão</Label>
-            {pamcardStatus === 'tem_cartao' ? (
-              <>
+          {pamcardStatus === 'tem_cartao' ? (
+            <CadastroField label="Número do cartão" required error={errors.pamcard_numero?.message}>
                 <Combobox
                   options={pamcardOptions}
                   value={pamcardNumero || null}
@@ -387,16 +393,15 @@ export function SolicitacaoForm({
                   createNewLabel="Cadastrar novo cartão"
                   emptyMessage="Nenhum cartão na sua base."
                 />
-                {errors.pamcard_numero && (
-                  <p className="text-[11px] text-destructive">{errors.pamcard_numero.message}</p>
-                )}
-              </>
-            ) : (
-              <p className="pt-2 text-[12px] text-muted-foreground">
+            </CadastroField>
+          ) : (
+            <div className="space-y-1.5">
+              <Label>Número do cartão</Label>
+              <p className="pt-2 text-body-sm text-muted-foreground">
                 Não se aplica a esta opção.
               </p>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </Section>
 
@@ -406,6 +411,7 @@ export function SolicitacaoForm({
       >
         <Textarea
           rows={3}
+          aria-label="Observações"
           value={watch('observacoes') ?? ''}
           onChange={(e) => setValue('observacoes', e.target.value)}
           placeholder="Ex.: motorista chega na mina às 14h; carreta nova, primeira viagem…"
@@ -419,7 +425,7 @@ export function SolicitacaoForm({
           <Link to={cancelTo}>Cancelar</Link>
         </Button>
         <Button type="submit" size="lg" disabled={submitting}>
-          {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+          {submitting ? <Spinner /> : <Send className="h-4 w-4" />}
           {submitting && submittingLabel ? submittingLabel : submitLabel}
         </Button>
       </div>
@@ -509,9 +515,9 @@ function Section({
   children: React.ReactNode
 }) {
   return (
-    <section className="rounded-lg border bg-background p-5">
-      <h2 className="text-[15px] font-semibold text-foreground">{title}</h2>
-      <p className="mt-0.5 text-[12px] text-muted-foreground">{description}</p>
+    <section className="rounded-lg border bg-card p-5">
+      <h2 className="text-title-sm font-semibold text-foreground">{title}</h2>
+      <p className="mt-0.5 text-body-sm text-muted-foreground">{description}</p>
       <div className="mt-4 space-y-4">{children}</div>
     </section>
   )
@@ -540,9 +546,10 @@ function ComboField({
   error?: string
   emptyMessage?: string
 }) {
+  // "Motorista *" → rótulo "Motorista" + (obrigatório) e aria-required.
+  const required = label.endsWith('*')
   return (
-    <div className="space-y-1.5">
-      <Label>{label}</Label>
+    <CadastroField label={label.replace(/\s*\*$/, '')} required={required} error={error}>
       <Combobox
         options={options}
         value={value || null}
@@ -553,7 +560,6 @@ function ComboField({
         createNewLabel={createNewLabel}
         emptyMessage={emptyMessage}
       />
-      {error && <p className="text-[11px] text-destructive">{error}</p>}
-    </div>
+    </CadastroField>
   )
 }

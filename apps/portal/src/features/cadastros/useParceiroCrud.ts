@@ -16,6 +16,15 @@ export type ParceiroCrudTable = keyof Pick<
   | 'parceiro_pamcards'
 >
 
+/** Gênero gramatical de cada cadastro, para os toasts ("Carreta cadastrada."). */
+const SUFIXO: Record<ParceiroCrudTable, 'o' | 'a'> = {
+  parceiro_motoristas: 'o',
+  parceiro_veiculos: 'o',
+  parceiro_carretas: 'a',
+  parceiro_subcontratadas: 'a',
+  parceiro_pamcards: 'o',
+}
+
 interface ListParams {
   search: string
   showInactive: boolean
@@ -108,7 +117,7 @@ export function useUpsertParceiroRow<TName extends ParceiroCrudTable>(
       qc.invalidateQueries({ queryKey: ['parceiro-crud', table] })
       qc.invalidateQueries({ queryKey: ['parceiro-crud-count', table] })
       qc.invalidateQueries({ queryKey: ['parceiro-options', table] })
-      toast.success(vars.id ? `${friendlyName} atualizado` : `${friendlyName} criado`)
+      toast.success(`${friendlyName} ${vars.id ? 'atualizad' : 'cadastrad'}${SUFIXO[table]}.`)
     },
     onError: (error: unknown) => toast.error(traduzirErroBanco(error)),
   })
@@ -131,7 +140,7 @@ export function useToggleParceiroActive<TName extends ParceiroCrudTable>(
       qc.invalidateQueries({ queryKey: ['parceiro-crud', table] })
       qc.invalidateQueries({ queryKey: ['parceiro-crud-count', table] })
       qc.invalidateQueries({ queryKey: ['parceiro-options', table] })
-      toast.success(vars.ativo ? `${friendlyName} reativado` : `${friendlyName} desativado`)
+      toast.success(`${friendlyName} ${vars.ativo ? 'reativad' : 'desativad'}${SUFIXO[table]}.`)
     },
     onError: (error: unknown) => toast.error(traduzirErroBanco(error)),
   })
@@ -151,34 +160,58 @@ export function useDeleteParceiroRow<TName extends ParceiroCrudTable>(
       qc.invalidateQueries({ queryKey: ['parceiro-crud', table] })
       qc.invalidateQueries({ queryKey: ['parceiro-crud-count', table] })
       qc.invalidateQueries({ queryKey: ['parceiro-options', table] })
-      toast.success(`${friendlyName} excluído`)
+      toast.success(`${friendlyName} excluíd${SUFIXO[table]}.`)
     },
-    onError: (error: unknown) => toast.error(traduzirErroBanco(error)),
+    onError: (error: unknown) => toast.error(traduzirErroBanco(error, { exclusao: true })),
   })
 }
 
-export function traduzirErroBanco(error: unknown): string {
+const MSG_FALHA = 'Não foi possível concluir a operação. Tente novamente.'
+
+// SQLSTATEs que as funções do banco usam para regra de negócio (RAISE ... USING
+// ERRCODE): a mensagem já foi escrita para o usuário. Mesma lógica do interno
+// (apps/interno/src/features/crud/useCrudQueries.ts).
+const CODIGOS_REGRA = new Set(['P0001', '22023', '22004', '23514'])
+
+export function traduzirErroBanco(error: unknown, opts?: { exclusao?: boolean }): string {
   const e = error as { code?: string; message?: string } | undefined
-  if (!e) return 'Algo deu errado. Tente novamente em instantes.'
+  if (!e) return MSG_FALHA
+  const code = e.code || undefined
+  const message = e.message?.trim() || undefined
   // Rate limit diário do portal (trigger da migration 0022).
-  if (e.code === 'PT429') {
-    return 'Você atingiu o limite de 50 solicitações por dia. Tente novamente amanhã.'
+  if (code === 'PT429') {
+    return 'Limite de 50 solicitações por dia atingido. Tente novamente amanhã.'
   }
   // Bloqueio de novas solicitações por parceiro (trigger da migration 0033).
-  if (e.code === 'PT423') {
+  if (code === 'PT423') {
     return 'Novas solicitações estão temporariamente indisponíveis. Fale com a equipe da LHG.'
   }
-  if (e.code === '23505') {
-    if (e.message?.includes('cpf')) return 'Esse CPF já está cadastrado.'
-    if (e.message?.includes('cnpj')) return 'Esse CNPJ já está cadastrado.'
-    if (e.message?.includes('documento')) return 'Esse CPF/CNPJ já está cadastrado.'
-    if (e.message?.includes('numero')) return 'Esse número de Pamcard já está cadastrado.'
-    if (e.message?.includes('placa')) return 'Essa placa já está cadastrada.'
+  if (code === '23505') {
+    if (message?.includes('cpf')) return 'Esse CPF já está cadastrado.'
+    if (message?.includes('cnpj')) return 'Esse CNPJ já está cadastrado.'
+    if (message?.includes('documento')) return 'Esse CPF/CNPJ já está cadastrado.'
+    if (message?.includes('numero')) return 'Esse número de Pamcard já está cadastrado.'
+    if (message?.includes('placa')) return 'Essa placa já está cadastrada.'
     return 'Já existe um registro com esses dados.'
   }
-  if (e.code === '23503') return 'Esse registro está em uso e não pode ser removido.'
-  if (e.message?.toLowerCase().includes('failed to fetch')) {
+  if (code === '23503') {
+    return opts?.exclusao
+      ? 'Registro vinculado a solicitações. Desative em vez de excluir.'
+      : 'Registro em uso por outros cadastros.'
+  }
+  if (message?.toLowerCase().includes('failed to fetch')) {
     return 'Não foi possível conectar ao servidor. Tente novamente.'
   }
-  return e.message ?? 'Algo deu errado. Tente novamente em instantes.'
+  if (code === '42501') {
+    // Mensagem nativa do Postgres (RLS/privilégio) não serve ao usuário; a custom das RPCs serve.
+    if (!message || /row-level security|permission denied|violates/i.test(message)) {
+      return 'Sem permissão para esta ação.'
+    }
+    return message
+  }
+  if (code && (CODIGOS_REGRA.has(code) || /^PT\d{3}$/.test(code))) return message ?? MSG_FALHA
+  // Sem code: erro JS/StorageError/Edge Function — a mensagem é nossa.
+  if (!code) return message ?? MSG_FALHA
+  // SQLSTATE técnico (08*, 42P*, XX*, 57*, 53*…) ou desconhecido: não expor o texto cru.
+  return `${MSG_FALHA} Código: ${code}.`
 }

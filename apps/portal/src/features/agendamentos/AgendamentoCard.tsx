@@ -2,7 +2,6 @@ import * as React from 'react'
 import { toast } from 'sonner'
 import {
   CalendarClock,
-  Loader2,
   Download,
   RotateCcw,
   X,
@@ -24,6 +23,7 @@ import {
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { cn } from '@/lib/utils'
 import { GradeSlots } from './GradeSlots'
+import { Spinner } from '@/components/shared/Spinner'
 import {
   getDocumentoUrl,
   useAgendamentosDaSolicitacao,
@@ -95,10 +95,10 @@ export function AgendamentoCard({ solicitacaoId, status, cliente }: Props) {
   const terminal = cliente?.terminal_nome?.trim() || cliente?.razao_social || 'terminal'
 
   return (
-    <section className="rounded-lg border bg-background">
+    <section className="rounded-lg border bg-card">
       <header className="flex flex-wrap items-center justify-between gap-2 border-b px-5 py-3">
-        <h2 className="flex items-center gap-2 text-[15px] font-semibold text-foreground">
-          <CalendarClock className="h-4 w-4 text-muted-foreground" />
+        <h2 className="flex items-center gap-2 text-title-sm font-semibold text-foreground">
+          <CalendarClock className="h-4 w-4 text-tertiary" aria-hidden />
           Agendamento de descarga
         </h2>
         {!ativo && cargaNaRua && (
@@ -107,7 +107,7 @@ export function AgendamentoCard({ solicitacaoId, status, cliente }: Props) {
       </header>
 
       <div className="space-y-3 px-5 py-4">
-        <p className="text-[12px] text-muted-foreground">
+        <p className="text-body-sm text-muted-foreground">
           A descarga em {terminal} exige agendamento prévio.
           {cliente?.antecedencia_minima_horas != null && (
             <> Este terminal exige {cliente.antecedencia_minima_horas}h de antecedência.</>
@@ -115,9 +115,9 @@ export function AgendamentoCard({ solicitacaoId, status, cliente }: Props) {
         </p>
 
         {lista.isLoading ? (
-          <p className="text-[13px] text-muted-foreground">Carregando…</p>
+          <p className="text-body text-muted-foreground">Carregando…</p>
         ) : itens.length === 0 ? (
-          <p className="text-[13px] leading-relaxed text-muted-foreground">
+          <p className="text-body leading-relaxed text-muted-foreground">
             {cargaNaRua
               ? 'Nenhum agendamento pedido ainda. Informe a data desejada e a equipe da LHG agenda no terminal.'
               : 'O pedido é liberado assim que a OC for enviada — a nota fiscal só existe depois do carregamento.'}
@@ -125,23 +125,23 @@ export function AgendamentoCard({ solicitacaoId, status, cliente }: Props) {
         ) : (
           <ul className="space-y-2.5">
             {itens.map((a) => (
-              <li key={a.id} className="rounded-lg border bg-muted/30 p-3">
+              <li key={a.id} className="rounded-md border p-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <span
                     className={cn(
-                      'rounded-full px-2 py-0.5 text-[11px] font-medium',
+                      'rounded-[2px] px-1.5 py-0.5 text-meta font-medium',
                       AGENDAMENTO_STATUS_CLASSES[a.status],
                     )}
                   >
                     {AGENDAMENTO_STATUS_LABELS[a.status]}
                   </span>
-                  <span className="font-mono text-[11px] text-muted-foreground">
+                  <span className="font-mono text-meta text-muted-foreground">
                     {numeroAgendamento(a.numero_interno)}
                   </span>
                 </div>
 
                 {a.status === 'agendado' ? (
-                  <div className="mt-2 space-y-1 text-[13px]">
+                  <div className="mt-2 space-y-1 text-body">
                     <div className="flex gap-3">
                       <span className="w-[72px] shrink-0 text-muted-foreground">Pediu</span>
                       <span className="tabular-nums text-muted-foreground">
@@ -154,20 +154,20 @@ export function AgendamentoCard({ solicitacaoId, status, cliente }: Props) {
                       <span
                         className={cn(
                           'font-medium tabular-nums',
-                          divergiu(a) ? 'text-primary' : 'text-foreground',
+                          divergiu(a) ? 'text-primary-strong' : 'text-foreground',
                         )}
                       >
                         {dataCompleta(a.data_agendada)} · {horaCurta(a.hora_agendada)}
                       </span>
                     </div>
                     {divergiu(a) && (
-                      <p className="text-[12px] text-muted-foreground">
+                      <p className="text-body-sm text-muted-foreground">
                         Não havia vaga na data pedida; ficou para a mais próxima disponível.
                       </p>
                     )}
                   </div>
                 ) : (
-                  <p className="mt-2 text-[13px] tabular-nums text-foreground">
+                  <p className="mt-2 text-body tabular-nums text-foreground">
                     Pedido para {dataCompleta(a.data_preferida)}
                     {a.hora_preferida ? ` às ${horaCurta(a.hora_preferida)}` : ' (qualquer horário)'}
                   </p>
@@ -176,23 +176,23 @@ export function AgendamentoCard({ solicitacaoId, status, cliente }: Props) {
                 {/* O tipo decide a grade: no terminal que separa, 13:00 de
                     caçamba e 13:00 de graneleiro são filas diferentes. */}
                 {tipoVeiculoLabel(a.tipo_veiculo) && (
-                  <p className="mt-1.5 text-[12px] text-muted-foreground">
+                  <p className="mt-1.5 text-body-sm text-muted-foreground">
                     <span className="font-medium text-foreground">Veículo: </span>
                     {tipoVeiculoLabel(a.tipo_veiculo)}
                   </p>
                 )}
 
                 {a.nota_fiscal && (
-                  <p className="mt-1.5 text-[12px] text-muted-foreground">
+                  <p className="mt-1.5 text-body-sm text-muted-foreground">
                     <span className="font-medium text-foreground">Nota fiscal: </span>
                     <span className="tabular-nums">{a.nota_fiscal}</span>
                   </p>
                 )}
                 {a.observacoes && (
-                  <p className="mt-1.5 text-[12px] text-muted-foreground">{a.observacoes}</p>
+                  <p className="mt-1.5 text-body-sm text-muted-foreground">{a.observacoes}</p>
                 )}
                 {a.motivo_reagendamento && (
-                  <p className="mt-1.5 text-[12px] text-muted-foreground">
+                  <p className="mt-1.5 text-body-sm text-muted-foreground">
                     <span className="font-medium text-foreground">Motivo: </span>
                     {a.motivo_reagendamento}
                   </p>
@@ -203,7 +203,7 @@ export function AgendamentoCard({ solicitacaoId, status, cliente }: Props) {
                     chega inteiro. Vem destacado porque costuma ser condição da
                     descarga — horário de portaria, via impressa, portão. */}
                 {a.status === 'agendado' && a.observacoes_para_parceiro && (
-                  <p className="mt-2 rounded-md border border-primary/30 bg-background px-2.5 py-2 text-[12px] leading-relaxed text-foreground">
+                  <p className="mt-2 rounded-md border border-info-border bg-info-subtle px-2.5 py-2 text-body-sm text-foreground">
                     <span className="font-medium">Observação da LHG: </span>
                     {a.observacoes_para_parceiro}
                   </p>
@@ -263,7 +263,7 @@ export function AgendamentoCard({ solicitacaoId, status, cliente }: Props) {
         onOpenChange={(o) => !o && setConfirmCancel(null)}
         title="Cancelar o agendamento?"
         description={confirmCancel ? textoCancelamento(confirmCancel) : ''}
-        confirmLabel="Sim, cancelar"
+        confirmLabel="Cancelar agendamento"
         cancelLabel="Voltar"
         destructive
         onConfirm={async () => {
@@ -289,9 +289,9 @@ function textoCancelamento(a: Agendamento): string {
     )
   }
   if (a.status === 'em_andamento') {
-    return 'A equipe da LHG já está agendando este pedido no terminal. Ao cancelar, ela para o que está fazendo. Você pode pedir de novo depois.'
+    return 'A equipe da LHG já está agendando este pedido no terminal. Ao cancelar, ela para o que está fazendo. É possível pedir de novo depois.'
   }
-  return 'O pedido sai da fila da equipe. Você pode pedir de novo depois.'
+  return 'O pedido sai da fila da equipe. É possível pedir de novo depois.'
 }
 
 function BotaoDocumento({ path, rotulo }: { path: string; rotulo: string }) {
@@ -318,7 +318,7 @@ function BotaoDocumento({ path, rotulo }: { path: string; rotulo: string }) {
         }
       }}
     >
-      {abrindo ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+      {abrindo ? <Spinner className="h-3.5 w-3.5" /> : <Download className="h-3.5 w-3.5" />}
       {rotulo}
     </Button>
   )
@@ -445,8 +445,8 @@ function Formulario({
             onChange={(e) => setData(e.target.value)}
           />
           {antecedencia != null && (
-            <p className="inline-flex items-center gap-1.5 text-[12px] text-muted-foreground">
-              <AlertTriangle className="h-3 w-3" />
+            <p className="inline-flex items-center gap-1.5 text-body-sm text-muted-foreground">
+              <AlertTriangle className="h-3 w-3 text-warning" aria-hidden />
               Este terminal exige {antecedencia}h de antecedência.
             </p>
           )}
@@ -456,9 +456,9 @@ function Formulario({
           <div className="space-y-1.5">
             <Label>Tipo de veículo *</Label>
             {reagendarDe ? (
-              <p className="rounded-md border bg-muted/40 px-3 py-2 text-[13px] text-foreground">
+              <p className="rounded-md border bg-muted px-3 py-2 text-body text-foreground">
                 {tipoVeiculoLabel(tipoFixo) ?? 'Não informado'}
-                <span className="ml-1.5 text-[12px] text-muted-foreground">
+                <span className="ml-1.5 text-body-sm text-muted-foreground">
                   — o mesmo do agendamento atual.
                 </span>
               </p>
@@ -472,17 +472,17 @@ function Formulario({
                       onClick={() => escolherTipo(t)}
                       aria-pressed={tipo === t}
                       className={cn(
-                        'rounded-md border px-3 py-2 text-[13px] font-medium transition-colors',
+                        'rounded-md border px-3 py-2 text-body font-medium transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                         tipo === t
                           ? 'border-primary bg-primary text-primary-foreground'
-                          : 'border-border bg-background text-foreground hover:border-primary/40 hover:bg-muted',
+                          : 'border-input bg-background text-foreground hover:bg-accent',
                       )}
                     >
                       {TIPO_VEICULO_ESCOLHA[t]}
                     </button>
                   ))}
                 </div>
-                <p className="text-[12px] text-muted-foreground">
+                <p className="text-body-sm text-muted-foreground">
                   Este terminal descarrega cada tipo em horários diferentes.
                 </p>
               </>
@@ -493,7 +493,7 @@ function Formulario({
         <div className="space-y-1.5">
           <Label>Horário</Label>
           {faltaTipo ? (
-            <p className="rounded-md border border-dashed px-3 py-2 text-[12px] text-muted-foreground">
+            <p className="rounded-md border border-dashed px-3 py-2 text-body-sm text-muted-foreground">
               Escolha o tipo de veículo para ver os horários deste terminal.
             </p>
           ) : (
@@ -518,8 +518,8 @@ function Formulario({
               maxLength={40}
               className="w-[220px]"
             />
-            <p className="text-[12px] text-muted-foreground">
-              Opcional. Se você já tem a nota em mãos, informar o número aqui poupa a equipe
+            <p className="text-body-sm text-muted-foreground">
+              Opcional. Com a nota em mãos, informar o número aqui poupa a equipe
               de procurá-la no Corporate.
             </p>
           </div>
@@ -538,7 +538,7 @@ function Formulario({
           </div>
         )}
 
-        <p className="rounded-md border bg-muted/40 px-3 py-2 text-[12px] leading-relaxed text-muted-foreground">
+        <p className="rounded-md border bg-muted px-3 py-2 text-body-sm text-muted-foreground">
           Se não houver vaga na data desejada, agendamos para a data disponível mais próxima e
           avisamos aqui.
         </p>
@@ -578,7 +578,7 @@ function Formulario({
               onOpenChange(false)
             }}
           >
-            {enviando && <Loader2 className="h-4 w-4 animate-spin" />}
+            {enviando && <Spinner />}
             {reagendarDe ? 'Pedir reagendamento' : 'Enviar pedido'}
           </Button>
         </div>

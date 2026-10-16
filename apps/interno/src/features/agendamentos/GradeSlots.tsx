@@ -43,12 +43,12 @@ export function GradeSlots({
   const etiquetar = tipo == null && todos.some((s) => s.tipo_veiculo !== 'todos')
 
   if (isLoading) {
-    return <p className="py-2 text-[12px] text-muted-foreground">Carregando horários…</p>
+    return <p className="py-2 text-body-sm text-muted-foreground">Carregando horários…</p>
   }
 
   if (slots.length === 0) {
     return (
-      <p className="rounded-md border border-dashed px-3 py-2 text-[12px] text-muted-foreground">
+      <p className="rounded-md border border-dashed px-3 py-2 text-body-sm text-muted-foreground">
         Este terminal ainda não tem grade cadastrada. Qualquer horário é aceito até que
         a grade seja preenchida em Cadastros → Clientes.
       </p>
@@ -80,7 +80,7 @@ export function GradeSlots({
       </div>
 
       {mostrarOcupacao && (
-        <p className="text-[11px] leading-relaxed text-muted-foreground">
+        <p className="text-meta leading-relaxed text-muted-foreground">
           Os números são veículos <strong className="font-medium">nossos</strong> já
           agendados no horário. A vaga final depende do terminal, que também atende
           outras transportadoras.
@@ -127,8 +127,8 @@ function SlotButton({
       disabled={disabled}
       aria-pressed={selecionado}
       className={cn(
-        'flex min-w-[62px] flex-col items-center rounded-md border px-2.5 py-1.5 text-[12px] font-medium tabular-nums transition-colors',
-        'disabled:pointer-events-none disabled:opacity-50',
+        'flex min-w-[62px] flex-col items-center rounded-control border px-2.5 py-1.5 text-body-sm font-medium tabular-nums transition-colors',
+        'disabled:pointer-events-none disabled:bg-muted disabled:text-tertiary',
         selecionado
           ? 'border-primary bg-primary text-primary-foreground'
           : 'border-border bg-card text-foreground hover:border-primary/40 hover:bg-accent',
@@ -138,8 +138,8 @@ function SlotButton({
       {rodape && (
         <span
           className={cn(
-            'text-[10px] font-normal',
-            selecionado ? 'text-primary-foreground/80' : cheio ? 'text-amber-700' : 'text-muted-foreground',
+            'text-meta font-normal',
+            selecionado ? 'text-primary-foreground/80' : cheio ? 'text-warning' : 'text-muted-foreground',
           )}
         >
           {rodape}
