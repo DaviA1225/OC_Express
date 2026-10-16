@@ -58,7 +58,7 @@ export function lerRecorte(params: URLSearchParams): RecorteLista | null {
     ate: v('ate') && DIA.test(v('ate')!) ? v('ate') : null,
     hora: hora !== null && /^\d{1,2}$/.test(hora) && Number(hora) < 24 ? Number(hora) : null,
     validade: v('validade') === 'vencendo' || v('validade') === 'vencida' ? (v('validade') as 'vencendo' | 'vencida') : null,
-    idade: v('idade') && v('idade')! in FAIXAS ? (v('idade') as FaixaIdade) : null,
+    idade: v('idade') && Object.prototype.hasOwnProperty.call(FAIXAS, v('idade')!) ? (v('idade') as FaixaIdade) : null,
     pendencia: v('pendencia') === 'aberta',
     cliente: v('cliente'),
     local: v('local'),
@@ -68,6 +68,9 @@ export function lerRecorte(params: URLSearchParams): RecorteLista | null {
     drill: data === 'cancelada' ? 'cancelada'
       : drillParam === 'conclusao48' || drillParam === 'sla_estourou' ? drillParam : null,
   }
+  // Drill por id sem período não tem como ser calculado: descarta (senão a
+  // faixa diria "Concluídas em 48 h" sobre a tabela inteira).
+  if (r.drill && !(r.de && r.ate)) r.drill = null
   const ativo = r.sla || r.data || r.validade || r.idade || r.pendencia || r.cliente || r.local || r.parceiro || r.naoParceiro || r.drill
   return ativo ? r : null
 }
@@ -103,9 +106,14 @@ export function descreverRecorte(r: RecorteLista): string[] {
   return out
 }
 
-/** Etapas implícitas no recorte (para não brigar com a "Fila de trabalho"). */
+/**
+ * O recorte já diz quais etapas entram, então a "Fila de trabalho" não se
+ * aplica por cima. Entradas (data=criada) contam qualquer status, como as RPCs;
+ * pendências com o parceiro também. Só local/cliente/parceiro/origem sozinhos
+ * (Por local do Painel, que conta a fila) mantêm a fila padrão.
+ */
 export function recorteDefineEtapas(r: RecorteLista): boolean {
-  return !!(r.sla || r.idade || r.validade || r.data === 'finalizada' || r.drill)
+  return !!(r.sla || r.idade || r.validade || r.data || r.drill || r.pendencia)
 }
 
 // O builder do PostgREST muda de tipo a cada filtro; aqui só encadeamos.

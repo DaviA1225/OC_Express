@@ -292,7 +292,13 @@ async function montarConsulta(filters: Omit<ListFilters, 'page' | 'pageSize'>, c
   let query: any = r?.drill && r.de && r.ate
     ? (supabase.rpc as unknown as (fn: string, a: Record<string, unknown>, o?: { count: 'exact' }) => { select: (s: string) => unknown })(
         'solicitacoes_drill',
-        { p_tipo: r.drill, p_de: r.de, p_ate: r.ate, p_origem: 'todas', p_cliente_id: null, p_local: null },
+        // Filtros DENTRO da RPC: ids_para_drill corta em 1000 — filtrar depois
+        // perderia linhas que o tile conta.
+        {
+          p_tipo: r.drill, p_de: r.de, p_ate: r.ate,
+          p_origem: r.naoParceiro ? 'interno' : filters.origem === 'parceiro' ? 'parceiro' : 'todas',
+          p_cliente_id: r.cliente, p_local: r.local,
+        },
         opts,
       ).select(SELECT_WITH_JOINS)
     : supabase.from('solicitacoes').select(SELECT_WITH_JOINS, opts)
@@ -320,6 +326,7 @@ async function montarConsulta(filters: Omit<ListFilters, 'page' | 'pageSize'>, c
         .select('solicitacao_id')
         .eq('status', 'aberta')
         .not('parceiro_id', 'is', null)
+        .order('created_at', { ascending: true })
         .range(0, 119)
       if (error) throw error
       const ids = Array.from(new Set(((data ?? []) as { solicitacao_id: string }[]).map((p) => p.solicitacao_id)))

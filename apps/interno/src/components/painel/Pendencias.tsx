@@ -20,7 +20,8 @@ export function Pendencias({ estado, filtros, tv }: { estado: PainelEstadoAtual;
       rotulo: 'Pamcard a providenciar',
       ajuda: 'De parceiro, abertas, sem cartão e não providenciadas',
       qtd: estado.pamcard_pendente,
-      to: linkSolicitacoes({ origem: 'parceiro', pamcard: 'pendente' }, filtros),
+      // Mesmo recorte do tile (0080): abertas, inclusive OC enviada.
+      to: linkSolicitacoes({ origem: 'parceiro', pamcard: 'pendente', status: 'recebida,em_cadastro,instrucao_emitida,oc_gerada,oc_enviada' }, filtros),
     },
     {
       rotulo: 'Pendências com parceiro',

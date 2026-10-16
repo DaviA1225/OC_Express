@@ -245,7 +245,9 @@ export function SolicitacoesListPage() {
     atendenteId: null,
     apenasAtrasadas,
     recorte,
-    recorteCtx,
+    // Só entra na chave quando pesa: sem isso a lista refazia a busca (e
+    // piscava o esqueleto) quando a config de SLA chegava.
+    recorteCtx: recorte || apenasAtrasadas ? recorteCtx : undefined,
     page,
     pageSize,
   }
@@ -253,7 +255,11 @@ export function SolicitacoesListPage() {
   const list = useSolicitacoesList(filters)
   // Só os filtros que valem para a contagem: busca, etapa e página ficam de
   // fora (senão cada página nova refaria a contagem).
-  const contagemFila = useContagemFila({ periodo, materialId, tipo, origem, pamcard, apenasAtrasadas, recorteCtx }, emFila)
+  // Com recorte do painel, as contagens por etapa (que não o aplicam) somem.
+  const contagemFila = useContagemFila(
+    { periodo, materialId, tipo, origem, pamcard, apenasAtrasadas, recorteCtx: apenasAtrasadas ? recorteCtx : undefined },
+    emFila && !recorte,
+  )
   const pendenciaSinais = usePendenciasSinais()
   // Cascata só no 1º paint com dados; refetch/realtime/filtro não re-animam.
   const cascata = useCascataInicial(!list.isLoading && !list.isError && (list.data?.data.length ?? 0) > 0)

@@ -64,10 +64,8 @@ export default function App() {
             <Route path="/login" element={<LoginPage />} />
 
             <Route element={<ProtectedRoute />}>
-              {/* Modo TV: fora do AppLayout (sem menu, sem Realtime; só polling).
-                  Por ora usa a guarda comum de interno. No PR-B1 entra o perfil
-                  `painel_tv`: o ProtectedRoute manda esse perfil para cá e
-                  bloqueia qualquer outra rota (plano §2.4). */}
+{/* Modo TV: fora do AppLayout (sem menu, sem Realtime; só polling). A conta
+                  `painel_tv` só chega aqui — o ProtectedRoute a manda para cá. */}
               <Route path="/operacao/tv" element={<TvPage />} />
               <Route element={<AppLayout />}>
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />

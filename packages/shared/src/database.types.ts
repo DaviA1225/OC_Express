@@ -12,8 +12,7 @@ export type Json =
   | Json[]
 
 /** `painel_tv` (0079): conta da TV da sala, que só lê o Painel. */
-/** `painel_tv` (0079): conta da TV da sala, que só lê o Painel. */
-export type PerfilUsuario = 'admin' | 'gerente' | 'supervisor' | 'analista' | 'assistente' | 'painel_tv' | 'painel_tv'
+export type PerfilUsuario = 'admin' | 'gerente' | 'supervisor' | 'analista' | 'assistente' | 'painel_tv'
 
 /** 0074 — layout do sistema interno escolhido pelo usuário (modo ERP opt-in). */
 export type LayoutPreferido = 'classico' | 'erp'

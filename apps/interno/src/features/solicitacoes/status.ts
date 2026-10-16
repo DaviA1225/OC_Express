@@ -82,6 +82,9 @@ export function getSlaInfo(
   cfg?: Record<EtapaSla, SlaCfg> | null,
 ): SlaInfo | null {
   if (!statusDesde) return null
+  // Só a fila tem SLA (OC enviada fica fora, mesmo que alguém ative em Metas):
+  // selo, chip "Atrasadas", notificação e Painel contam as mesmas etapas.
+  if (!SLA_PENDING_STATUSES.includes(status)) return null
   const c = (cfg ?? SLA_FALLBACK)[status as EtapaSla]
   const classe = classificarSla(status, statusDesde, Date.now(), c ?? null)
   if (classe !== 'aviso' && classe !== 'fora') return null
