@@ -240,33 +240,38 @@ function applyOrigemPamcardFilters<T>(
 }
 
 /**
- * Início (00:00) do dia `yyyy-mm-dd` em America/Sao_Paulo, como ISO em UTC.
- * O Brasil não tem horário de verão desde 2019, então o offset é fixo (-03:00).
+ * A operação central fica em Mato Grosso do Sul (America/Campo_Grande, UTC-4).
+ * O Brasil não tem horário de verão desde 2019, então o offset é fixo.
+ */
+const OFFSET_OPERACAO_H = 4
+
+/**
+ * Início (00:00) do dia `yyyy-mm-dd` no fuso da operação, como ISO em UTC.
  * Independe do fuso do navegador. Retorna null se a data for inválida.
  */
-export function inicioDoDiaSP(dia: string, somarDias = 0): string | null {
+export function inicioDoDiaOperacao(dia: string, somarDias = 0): string | null {
   const [y, m, d] = dia.split('-').map(Number)
   if (!y || !m || !d || m > 12) return null
   // Rejeita dia inexistente (ex.: 2026-02-30) antes de somar dias.
   const base = new Date(Date.UTC(y, m - 1, d))
   if (base.getUTCMonth() !== m - 1 || base.getUTCDate() !== d) return null
-  // 00:00 em SP = 03:00 UTC; Date.UTC normaliza a virada de mês/ano.
-  return new Date(Date.UTC(y, m - 1, d + somarDias, 3, 0, 0, 0)).toISOString()
+  // 00:00 em MS = 04:00 UTC; Date.UTC normaliza a virada de mês/ano.
+  return new Date(Date.UTC(y, m - 1, d + somarDias, OFFSET_OPERACAO_H, 0, 0, 0)).toISOString()
 }
 
-/** "Hoje" (yyyy-mm-dd) em America/Sao_Paulo, independente do fuso do navegador. */
-export function hojeSP(agora: Date = new Date()): string {
-  return new Date(agora.getTime() - 3 * 3_600_000).toISOString().slice(0, 10)
+/** "Hoje" (yyyy-mm-dd) no fuso da operação, independente do fuso do navegador. */
+export function hojeOperacao(agora: Date = new Date()): string {
+  return new Date(agora.getTime() - OFFSET_OPERACAO_H * 3_600_000).toISOString().slice(0, 10)
 }
 
-/** Aplica o intervalo De/Até (dias em SP): gte no início de `de`, lt no dia seguinte a `ate`. */
+/** Aplica o intervalo De/Até (dias no fuso da operação): gte no início de `de`, lt no dia seguinte a `ate`. */
 function aplicarIntervaloDias<T extends { gte: (c: string, v: string) => T; lt: (c: string, v: string) => T }>(
   query: T,
   de?: string | null,
   ate?: string | null,
 ): T {
-  const ini = de ? inicioDoDiaSP(de) : null
-  const fim = ate ? inicioDoDiaSP(ate, 1) : null
+  const ini = de ? inicioDoDiaOperacao(de) : null
+  const fim = ate ? inicioDoDiaOperacao(ate, 1) : null
   if (ini) query = query.gte('created_at', ini)
   if (fim) query = query.lt('created_at', fim)
   return query

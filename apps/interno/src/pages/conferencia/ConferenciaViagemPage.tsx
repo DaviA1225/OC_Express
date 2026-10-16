@@ -76,7 +76,7 @@ export function ConferenciaViagemPage() {
   const debouncedSearch = useDebounce(search, 300)
 
   // O yyyy-mm-dd do <input type="date"> segue direto: a lista converte em
-  // limites de dia no fuso de São Paulo (fim inclusivo).
+  // limites de dia no fuso da operação (MS) (fim inclusivo).
   const dataInicio = dataDe || null
   const dataFim = dataAte || null
 
