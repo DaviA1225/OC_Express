@@ -1,256 +1,149 @@
 import * as React from 'react'
-import { useSearchParams } from 'react-router-dom'
-import {
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  PieChart,
-  Pie,
-  Cell,
-  ComposedChart,
-  Area,
-} from 'recharts'
-import { ClipboardCheck, ClipboardList, Hourglass, Percent, Download, AlertTriangle, RotateCcw, Handshake, Timer } from 'lucide-react'
-import { format } from 'date-fns'
-import { ptBR } from 'date-fns/locale'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
+import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { Ban, CheckCheck, ChevronDown, Download, Inbox, PackageCheck, RefreshCw, ShieldCheck, Timer } from 'lucide-react'
 import { toast } from 'sonner'
-import { useAuth } from '@/hooks/useAuth'
-import { canViewAuditoria } from '@/features/auth/permissions'
 import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Skeleton } from '@/components/ui/skeleton'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { KpiTile } from '@/components/shared/KpiTile'
 import { Spinner } from '@/components/shared/Spinner'
 import { ChartTooltip } from '@/components/charts/ChartTooltip'
-import { CHART_VARS, axisProps, gridProps, seriesColor } from '@/components/charts/chartTheme'
-import {
-  useRelatorioDataset,
-  useStatusTransitions,
-  calcKPIs,
-  calcPorDia,
-  topClientes,
-  topMotoristas,
-  topVeiculos,
-  topSubcontratadas,
-  topAtendentes,
-  porMaterial,
-  tmaPorStatus,
-  filtrarPorOrigem,
-  topParceiros,
-  tmaEmissaoFinalizacao,
-  tmaEmissaoFinalizacaoPorParceiro,
-  parseDayKey,
-  periodoDeIntervalo,
-  intervaloPadrao,
-  type PeriodoRelatorio,
-  type OrigemFiltro,
-  type TopItem,
-  type TmaStatusEntry,
-  type ParceiroStat,
-  type ParceiroTma,
-  type TmaResumo,
-} from '@/features/relatorios/useRelatorios'
+import { TempoEtapaChart } from '@/components/charts/TempoEtapaChart'
+import { axisProps, gridProps } from '@/components/charts/chartTheme'
+import { Bloco, Vazio } from '@/components/painel/Bloco'
+import { FiltrosAnalise } from '@/components/painel/FiltrosAnalise'
 import { IntervaloDatas } from '@/features/relatorios/IntervaloDatas'
 import { useIntervaloPersistido } from '@/features/relatorios/useIntervaloPersistido'
-import { formatHoras, formatHorasCsv } from '@/features/relatorios/useRelatoriosInternos'
-import { STATUS_LABELS } from '@/features/solicitacoes/status'
-import { buildCsv, downloadCsv, type CsvColumn } from '@/lib/csv'
+import { intervaloPadrao, rotuloIntervalo } from '@/features/relatorios/intervalo'
+import { exportarDados, exportarResumo, exportarSerie } from '@/features/relatorios/exportacao'
+import { SeloSimulado } from '@/features/metricas/SeloSimulado'
+import {
+  buscarRelatorioRanking,
+  buscarRelatorioResumo,
+  buscarRelatorioSerie,
+  buscarRelatorioTempoEtapas,
+} from '@/features/metricas/fonte'
+import { linkSolicitacoes } from '@/features/metricas/links'
+import { granularidadePara, textoComparador } from '@/features/metricas/periodo'
+import { mapaSla } from '@/features/metricas/sla'
+import { useFiltrosAnalise } from '@/features/metricas/useFiltrosAnalise'
+import { useMetasSla } from '@/features/metricas/useMetasSla'
+import {
+  useMapaCalor,
+  useOpcoesClientes,
+  useRelatorioRanking,
+  useRelatorioResumo,
+  useRelatorioSerie,
+  useRelatorioTempoEtapas,
+} from '@/features/metricas/useRelatorioMetricas'
+import type {
+  DimensaoRanking,
+  FiltrosPeriodo,
+  Granularidade,
+  MapaCalorCelula,
+  RankingLinha,
+  ResumoBloco,
+  SerieLinha,
+} from '@/features/metricas/tipos'
+import { fmtDec, fmtDelta, fmtDur, fmtInt, fmtPct } from '@/lib/format'
 import { cn } from '@/lib/utils'
-import { fmtDurHoras, fmtInt, fmtPct } from '@/lib/format'
+import { TabelaOrdenavel, type Coluna } from './TabelaOrdenavel'
 
-// Intervalo inicial: os últimos 30 dias, recorte equivalente ao preset padrão
-// anterior ("Mês corrente"). "Limpar" volta para cá.
+// Intervalo inicial: os últimos 30 dias. "Limpar" volta para cá.
 const INTERVALO_PADRAO = intervaloPadrao(30)
 
-const ORIGENS: { value: OrigemFiltro; label: string }[] = [
-  { value: 'todas', label: 'Todas' },
-  { value: 'interno', label: 'Internas' },
-  { value: 'parceiro', label: 'Parceiros' },
+type Aba = 'geral' | 'fluxo' | 'clientes' | 'parceiros'
+const ABAS: { id: Aba; rotulo: string }[] = [
+  { id: 'geral', rotulo: 'Visão geral' },
+  { id: 'fluxo', rotulo: 'Fluxo e SLA' },
+  { id: 'clientes', rotulo: 'Clientes e cadastros' },
+  { id: 'parceiros', rotulo: 'Parceiros' },
 ]
-const VALID_ORIGENS = ORIGENS.map((o) => o.value)
-const CHAVE_ORIGEM = 'relatorios:origem'
 
-// Séries do volume diário: criadas no acento (chart-1), finalizadas em aço (chart-2).
-const COR_CRIADAS = seriesColor(0)
-const COR_FINALIZADAS = seriesColor(1)
+const DIMENSOES: { id: DimensaoRanking; rotulo: string; param?: string }[] = [
+  { id: 'cliente', rotulo: 'Clientes', param: 'cliente' },
+  { id: 'material', rotulo: 'Materiais', param: 'material' },
+  { id: 'local', rotulo: 'Locais', param: 'local' },
+  { id: 'motorista', rotulo: 'Motoristas' },
+  { id: 'veiculo', rotulo: 'Veículos' },
+  { id: 'subcontratada', rotulo: 'Subcontratadas' },
+]
 
+/**
+ * Relatórios (§3.2): análise de um período, com as métricas do dicionário
+ * (§1.2). Abas na URL (`?aba=`), filtros comuns (`o`, `cliente`, `local`) e
+ * comparação com o período anterior até o mesmo horário.
+ */
 export default function RelatoriosPage() {
   const [params, setParams] = useSearchParams()
-  const { de, ate, deCampo, ateCampo, setIntervalo, limpar, noPadrao } = useIntervaloPersistido(
-    'relatorios',
-    INTERVALO_PADRAO,
-  )
-  const periodo = React.useMemo<PeriodoRelatorio>(() => periodoDeIntervalo(de, ate), [de, ate])
+  const qc = useQueryClient()
+  const intervalo = useIntervaloPersistido('relatorios', INTERVALO_PADRAO)
+  const f = useFiltrosAnalise('relatorios')
+  const p = React.useMemo<FiltrosPeriodo>(() => ({ de: intervalo.de, ate: intervalo.ate, ...f.filtros }), [intervalo.de, intervalo.ate, f.filtros])
+  const gran = granularidadePara(p)
+  const clientes = useOpcoesClientes()
 
-  // Origem persiste pelo mesmo motivo do intervalo: sair da página e voltar não
-  // deveria desfazer o recorte. URL preenchida vence (link compartilhado).
-  const [origem, setOrigemEstado] = React.useState<OrigemFiltro>(() => {
-    const daUrl = params.get('o')
-    if ((VALID_ORIGENS as string[]).includes(daUrl ?? '')) return daUrl as OrigemFiltro
+  const mostrarParceiros = p.origem !== 'interno'
+  const abaUrl = params.get('aba') as Aba | null
+  const aba: Aba = ABAS.some((a) => a.id === abaUrl) && !(abaUrl === 'parceiros' && !mostrarParceiros) ? (abaUrl as Aba) : 'geral'
+  const setAba = (a: Aba) =>
+    setParams((prev) => {
+      const next = new URLSearchParams(prev)
+      next.set('aba', a)
+      return next
+    }, { replace: true })
+
+  const resumo = useRelatorioResumo(p)
+  const [exportando, setExportando] = React.useState(false)
+
+  const rotuloCliente = p.clienteId ? clientes.data?.find((c) => c.id === p.clienteId)?.nome ?? null : null
+
+  const exportar = async (tipo: 'resumo' | 'dados' | 'serie') => {
+    setExportando(true)
     try {
-      const salvo = sessionStorage.getItem(CHAVE_ORIGEM)
-      if ((VALID_ORIGENS as string[]).includes(salvo ?? '')) return salvo as OrigemFiltro
-    } catch {
-      /* storage indisponível — cai no padrão */
-    }
-    return 'todas'
-  })
-  const setOrigem = (o: OrigemFiltro) => {
-    setOrigemEstado(o)
-    try {
-      sessionStorage.setItem(CHAVE_ORIGEM, o)
-    } catch {
-      /* storage indisponível — o filtro só não persiste */
-    }
-    setParams(
-      (prev) => {
-        const next = new URLSearchParams(prev)
-        next.set('o', o)
-        return next
-      },
-      { replace: true },
-    )
-  }
-
-  const ds = useRelatorioDataset(periodo)
-
-  const solicitacaoIds = React.useMemo(() => (ds.data?.rows ?? []).map((r) => r.id), [ds.data])
-  // O TMA vem do log_auditoria, cuja leitura a RLS (0025) restringe a
-  // admin/gerente/supervisor. `analista` tem acesso a esta pagina mas nao a
-  // essa tabela, e a RLS nega devolvendo ZERO LINHAS, sem erro — entao sem
-  // esta guarda o painel aparecia vazio para ele, indistinguivel de "nao ha
-  // dados no periodo".
-  const { profile } = useAuth()
-  const podeVerTma = canViewAuditoria(profile)
-  const transitions = useStatusTransitions(periodo, solicitacaoIds, podeVerTma)
-
-  // Dataset recortado pela origem selecionada — alimenta todos os agregados gerais.
-  const dsFiltrado = React.useMemo(() => {
-    if (!ds.data) return null
-    return { ...ds.data, rows: filtrarPorOrigem(ds.data.rows, origem) }
-  }, [ds.data, origem])
-
-  const mostrarParceiros = origem !== 'interno'
-
-  const kpis = dsFiltrado ? calcKPIs(dsFiltrado.rows) : null
-  const porDia = dsFiltrado ? calcPorDia(dsFiltrado.rows, periodo) : []
-  const top10Clientes = dsFiltrado ? topClientes(dsFiltrado, 10) : []
-  const top10Motoristas = dsFiltrado ? topMotoristas(dsFiltrado, 10) : []
-  const top10Veiculos = dsFiltrado ? topVeiculos(dsFiltrado, 10) : []
-  const top10Subcontratadas = dsFiltrado ? topSubcontratadas(dsFiltrado, 10) : []
-  const top10Atendentes = dsFiltrado ? topAtendentes(dsFiltrado, 10) : []
-  const distribMaterial = dsFiltrado ? porMaterial(dsFiltrado) : []
-  const tmaEntries = dsFiltrado && transitions.data ? tmaPorStatus(dsFiltrado.rows, transitions.data) : []
-
-  // Recortes de parceiro — sempre sobre as linhas de parceiro (independem do segmento).
-  const rankingParceiros = ds.data ? topParceiros(ds.data, 12) : []
-  const totalParceiros = rankingParceiros.reduce((acc, p) => acc + p.total, 0)
-  const tmaParceirosGeral: TmaResumo | null =
-    ds.data && transitions.data
-      ? tmaEmissaoFinalizacao(filtrarPorOrigem(ds.data.rows, 'parceiro'), transitions.data)
-      : null
-  const tmaPorParceiro: ParceiroTma[] =
-    ds.data && transitions.data ? tmaEmissaoFinalizacaoPorParceiro(ds.data, transitions.data, 12) : []
-
-  const [exporting, setExporting] = React.useState(false)
-  const exportCsv = () => {
-    if (!ds.data) return
-    setExporting(true)
-    try {
-      const cols: CsvColumn<{ secao: string; titulo: string; valor: string }>[] = [
-        { header: 'Seção', accessor: (r) => r.secao },
-        { header: 'Item', accessor: (r) => r.titulo },
-        { header: 'Valor', accessor: (r) => r.valor },
-      ]
-      const linhas: { secao: string; titulo: string; valor: string }[] = []
-      linhas.push({ secao: 'Recorte', titulo: 'Origem', valor: ORIGENS.find((o) => o.value === origem)?.label ?? 'Todas' })
-      linhas.push({ secao: 'Recorte', titulo: 'Período', valor: periodo.label })
-      if (kpis) {
-        linhas.push({ secao: 'KPIs', titulo: 'Total de OCs', valor: String(kpis.total) })
-        linhas.push({ secao: 'KPIs', titulo: 'Finalizadas', valor: String(kpis.finalizadas) })
-        linhas.push({ secao: 'KPIs', titulo: 'Em envio', valor: String(kpis.emEnvio) })
-        linhas.push({ secao: 'KPIs', titulo: 'Canceladas', valor: String(kpis.canceladas) })
-        linhas.push({ secao: 'KPIs', titulo: 'Taxa de finalização', valor: `${(kpis.taxaFinalizacao * 100).toFixed(1)}%` })
-        linhas.push({
-          secao: 'KPIs',
-          titulo: 'Tempo médio (criada → finalizada)',
-          valor: kpis.tempoMedioHoras != null ? `${kpis.tempoMedioHoras.toFixed(1)} h` : '—',
+      const busca = <T,>(key: unknown[], fn: () => Promise<T>) => qc.fetchQuery({ queryKey: key, queryFn: fn, staleTime: 5 * 60_000 })
+      const k = [p.de, p.ate, p.origem, p.clienteId, p.local]
+      if (tipo === 'serie') {
+        const serie = await busca(['metricas', 'serie', gran, ...k], () => buscarRelatorioSerie(p, gran))
+        exportarSerie(p, gran, serie)
+      } else if (tipo === 'dados') {
+        const n = await exportarDados(p)
+        toast.success(`${fmtInt(n)} solicitações exportadas`)
+        return
+      } else {
+        const dims: DimensaoRanking[] = ['cliente', 'motorista', 'veiculo', 'subcontratada', 'material']
+        const [res, serie, etapas, parceiros, ...rankings] = await Promise.all([
+          busca(['metricas', 'resumo', ...k], () => buscarRelatorioResumo(p)),
+          busca(['metricas', 'serie', gran, ...k], () => buscarRelatorioSerie(p, gran)),
+          busca(['metricas', 'tempo-etapas', ...k], () => buscarRelatorioTempoEtapas(p)),
+          mostrarParceiros ? busca(['metricas', 'ranking', 'parceiro', ...k], () => buscarRelatorioRanking(p, 'parceiro')) : Promise.resolve(null),
+          ...dims.map((d) => busca(['metricas', 'ranking', d, ...k], () => buscarRelatorioRanking(p, d))),
+        ])
+        exportarResumo({
+          filtros: p,
+          rotuloCliente,
+          resumo: res,
+          serie,
+          granularidade: gran,
+          etapas,
+          parceiros,
+          rankings: dims.map((d, i) => ({ titulo: `Top ${DIMENSOES.find((x) => x.id === d)?.rotulo.toLowerCase()}`, linhas: rankings[i] })),
         })
       }
-      for (const d of porDia) {
-        linhas.push({ secao: 'Volume diário', titulo: d.dia, valor: `${d.total} OCs (${d.finalizadas} finalizadas)` })
-      }
-      for (const c of top10Clientes) {
-        linhas.push({ secao: 'Top clientes', titulo: c.label, valor: String(c.total) })
-      }
-      for (const m of top10Motoristas) {
-        linhas.push({ secao: 'Top motoristas', titulo: m.label, valor: String(m.total) })
-      }
-      for (const v of top10Veiculos) {
-        linhas.push({ secao: 'Top veículos', titulo: v.label, valor: String(v.total) })
-      }
-      for (const s of top10Subcontratadas) {
-        linhas.push({ secao: 'Top subcontratadas', titulo: s.label, valor: String(s.total) })
-      }
-      for (const a of top10Atendentes) {
-        linhas.push({ secao: 'Top atendentes', titulo: a.label, valor: String(a.total) })
-      }
-      for (const m of distribMaterial) {
-        linhas.push({ secao: 'Por material', titulo: m.label, valor: String(m.total) })
-      }
-      for (const t of tmaEntries) {
-        linhas.push({
-          secao: 'TMA por status',
-          titulo: STATUS_LABELS[t.status as keyof typeof STATUS_LABELS] ?? t.status,
-          valor: `média ${t.avgHours.toFixed(1)}h · mediana ${t.medianHours.toFixed(1)}h · n=${t.count}`,
-        })
-      }
-      if (mostrarParceiros) {
-        if (tmaParceirosGeral) {
-          linhas.push({
-            secao: 'Parceiros',
-            titulo: 'TMA emissão→finalização (geral)',
-            valor:
-              tmaParceirosGeral.avgHours != null
-                ? `média ${formatHorasCsv(tmaParceirosGeral.avgHours)} · mediana ${formatHorasCsv(tmaParceirosGeral.medianHours)} · n=${tmaParceirosGeral.count}`
-                : '—',
-          })
-        }
-        for (const p of rankingParceiros) {
-          const share = totalParceiros > 0 ? Math.round((p.total / totalParceiros) * 100) : 0
-          linhas.push({
-            secao: 'Ranking de parceiros',
-            titulo: p.label,
-            valor: `${p.total} solicitações (${share}%) · ${p.finalizadas} finalizadas`,
-          })
-        }
-        for (const p of tmaPorParceiro) {
-          linhas.push({
-            secao: 'TMA emissão→finalização por parceiro',
-            titulo: p.label,
-            valor:
-              p.resumo.avgHours != null
-                ? `média ${formatHorasCsv(p.resumo.avgHours)} · mediana ${formatHorasCsv(p.resumo.medianHours)} · n=${p.resumo.count}`
-                : '—',
-          })
-        }
-      }
-      const csv = buildCsv(linhas, cols)
-      const ts = new Date()
-      const stamp = `${ts.getFullYear()}${String(ts.getMonth() + 1).padStart(2, '0')}${String(ts.getDate()).padStart(2, '0')}_${String(ts.getHours()).padStart(2, '0')}${String(ts.getMinutes()).padStart(2, '0')}`
-      // O nome do arquivo carrega o intervalo exportado: com data livre, "mes"
-      // ou "30d" não diriam mais a que recorte o CSV se refere.
-      downloadCsv(`relatorio_${de}_a_${ate}_${stamp}.csv`, csv)
       toast.success('Relatório exportado')
     } catch (err) {
       toast.error('Falha ao exportar')
       console.error(err)
     } finally {
-      setExporting(false)
+      setExportando(false)
     }
   }
 
@@ -258,557 +151,572 @@ export default function RelatoriosPage() {
     <div className="space-y-4">
       <PageHeader
         title="Relatórios"
-        description={periodo.label}
-        meta={<OrigemTabs value={origem} onChange={setOrigem} />}
+        meta={<SeloSimulado />}
+        description={rotuloIntervalo(intervalo.de, intervalo.ate)}
         actions={
           <>
-          <IntervaloDatas
-            idPrefix="rel"
-            de={deCampo}
-            ate={ateCampo}
-            onChange={setIntervalo}
-            mostrarLimpar={!noPadrao}
-            onLimpar={limpar}
-          />
-          <Button
-            type="button"
-            variant="outline"
-            onClick={exportCsv}
-            disabled={exporting || ds.isLoading}
-            title="Exportar relatório em CSV"
-          >
-            {exporting ? <Spinner /> : <Download className="h-4 w-4" />}
-            <span className="hidden sm:inline">Exportar</span>
-          </Button>
+            <IntervaloDatas
+              idPrefix="rel"
+              de={intervalo.deCampo}
+              ate={intervalo.ateCampo}
+              onChange={intervalo.setIntervalo}
+              mostrarLimpar={!intervalo.noPadrao}
+              onLimpar={intervalo.limpar}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={() => void qc.invalidateQueries({ queryKey: ['metricas'] })}
+              title="Atualizar os números"
+              aria-label="Atualizar os números"
+            >
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button type="button" variant="outline" disabled={exportando}>
+                  {exportando ? <Spinner /> : <Download className="h-4 w-4" />}
+                  <span className="hidden sm:inline">Exportar</span>
+                  <ChevronDown className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64">
+                <DropdownMenuItem onSelect={() => void exportar('resumo')}>
+                  <div>
+                    <p className="text-body text-foreground">Resumo (CSV)</p>
+                    <p className="text-meta text-muted-foreground">Indicadores, série, etapas e rankings</p>
+                  </div>
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => void exportar('dados')}>
+                  <div>
+                    <p className="text-body text-foreground">Dados por solicitação (CSV)</p>
+                    <p className="text-meta text-muted-foreground">Uma linha por solicitação, com minutos por etapa</p>
+                  </div>
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => void exportar('serie')}>
+                  <div>
+                    <p className="text-body text-foreground">Série (CSV)</p>
+                    <p className="text-meta text-muted-foreground">Entradas e finalizadas por {gran}</p>
+                  </div>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </>
         }
+        className="mb-2"
       />
 
-      {ds.isError && (
-        <div className="flex flex-col items-center justify-center gap-2 rounded-lg border bg-card py-16 text-center">
-          <AlertTriangle className="h-6 w-6 text-danger" />
-          <p className="text-body-lg font-semibold text-foreground">Não foi possível carregar os relatórios</p>
-          <p className="max-w-sm text-body text-muted-foreground">Verifique a conexão e tente novamente.</p>
-          <Button variant="outline" size="sm" onClick={() => { void ds.refetch() }} className="mt-1">
-            <RotateCcw className="h-4 w-4" /> Tentar novamente
-          </Button>
-        </div>
-      )}
+      <FiltrosAnalise {...f} />
 
-      {!ds.isError && (
-      <>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <KpiTile
-          label="Total de OCs"
-          value={ds.isLoading ? <KpiSkeleton /> : fmtInt(kpis?.total ?? 0)}
-          icon={ClipboardList}
-        />
-        <KpiTile
-          label="Finalizadas"
-          value={ds.isLoading ? <KpiSkeleton /> : fmtInt(kpis?.finalizadas ?? 0)}
-          icon={ClipboardCheck}
-        />
-        <KpiTile
-          label="Taxa de finalização"
-          value={ds.isLoading ? <KpiSkeleton /> : kpis ? fmtPct(kpis.taxaFinalizacao) : '—'}
-          icon={Percent}
-        />
-        <KpiTile
-          label="Tempo médio"
-          value={ds.isLoading ? <KpiSkeleton /> : fmtDurHoras(kpis?.tempoMedioHoras)}
-          hint="Criada → finalizada"
-          icon={Hourglass}
-        />
-      </div>
-
-      <Card title="Volume diário" subtitle="Solicitações criadas por dia">
-        <VolumeChart data={porDia} isLoading={ds.isLoading} />
-      </Card>
-
-      {mostrarParceiros && (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <Card
-            title="Ranking de parceiros"
-            subtitle="Solicitações enviadas por cada parceiro no período"
-          >
-            <ParceiroRanking items={rankingParceiros} total={totalParceiros} isLoading={ds.isLoading} />
-          </Card>
-          <Card
-            title="TMA emissão → finalização"
-            subtitle="Tempo de “Em emissão” até “Finalizada” nas solicitações de parceiro"
-          >
-            {podeVerTma ? (
-              <TmaEmissaoFinal
-                geral={tmaParceirosGeral}
-                porParceiro={tmaPorParceiro}
-                isLoading={ds.isLoading || transitions.isLoading}
-              />
-            ) : (
-              <TmaSemAcesso />
+      <div role="tablist" aria-label="Seções do relatório" className="flex gap-1 overflow-x-auto border-b">
+        {ABAS.filter((a) => a.id !== 'parceiros' || mostrarParceiros).map((a) => (
+          <button
+            key={a.id}
+            type="button"
+            role="tab"
+            aria-selected={aba === a.id}
+            onClick={() => setAba(a.id)}
+            className={cn(
+              'relative -mb-px whitespace-nowrap border-b-2 px-3 py-2 text-body font-medium transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring',
+              aba === a.id ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground',
             )}
-          </Card>
-        </div>
-      )}
-
-      <Card
-        title="TMA por status"
-        subtitle="Tempo médio até sair de cada etapa (intervalos concluídos)"
-      >
-        {podeVerTma ? (
-          <TmaChart entries={tmaEntries} isLoading={ds.isLoading || transitions.isLoading} />
-        ) : (
-          <TmaSemAcesso />
-        )}
-      </Card>
-
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Card title="Top 10 clientes" subtitle="Por número de OCs no período">
-          <TopList items={top10Clientes} isLoading={ds.isLoading} emptyText="Nenhum cliente no período." />
-        </Card>
-        <Card title="Top 10 motoristas" subtitle="Por número de OCs no período">
-          <TopList items={top10Motoristas} isLoading={ds.isLoading} emptyText="Nenhum motorista no período." />
-        </Card>
-        <Card title="Top 10 subcontratadas" subtitle="Por número de OCs no período">
-          <TopList items={top10Subcontratadas} isLoading={ds.isLoading} emptyText="Nenhuma subcontratada no período." />
-        </Card>
-        <Card title="Top 10 veículos" subtitle="Por número de OCs no período">
-          <TopList items={top10Veiculos} isLoading={ds.isLoading} emptyText="Nenhum veículo no período." />
-        </Card>
-        <Card title="Ranking de atendentes" subtitle="Por número de OCs no período">
-          <TopList items={top10Atendentes} isLoading={ds.isLoading} emptyText="Nenhum atendente atribuído no período." />
-        </Card>
-      </div>
-
-      <Card title="Distribuição por material" subtitle="Participação de cada material no volume total">
-        <MaterialDonut data={distribMaterial} isLoading={ds.isLoading} />
-      </Card>
-      </>
-      )}
-    </div>
-  )
-}
-
-function OrigemTabs({ value, onChange }: { value: OrigemFiltro; onChange: (v: OrigemFiltro) => void }) {
-  return (
-    <div className="inline-flex rounded-surface border bg-card p-0.5" role="tablist" aria-label="Recorte por origem">
-      {ORIGENS.map((o) => (
-        <button
-          key={o.value}
-          type="button"
-          role="tab"
-          aria-selected={value === o.value}
-          onClick={() => onChange(o.value)}
-          title={o.value === 'interno' ? 'Solicitações que não vieram do portal de parceiros' : undefined}
-          className={cn(
-            'rounded-control px-2.5 py-1 text-body-sm font-medium transition-colors duration-fast',
-            value === o.value
-              ? 'bg-primary/[0.08] text-primary-strong'
-              : 'text-muted-foreground hover:bg-row-hover hover:text-foreground',
-          )}
-        >
-          {o.label}
-        </button>
-      ))}
-    </div>
-  )
-}
-
-// Valor do <KpiTile> enquanto carrega (mesmo KPI do Painel — as duas telas
-// mostram os mesmos indicadores e não podem parecer de sistemas diferentes).
-function KpiSkeleton() {
-  return <Skeleton className="inline-block h-8 w-24 align-middle" />
-}
-
-interface CardProps {
-  title: string
-  subtitle?: string
-  children: React.ReactNode
-}
-
-function Card({ title, subtitle, children }: CardProps) {
-  return (
-    <section className="rounded-lg border bg-card">
-      <header className="border-b px-4 py-3">
-        <h2 className="text-body-lg font-medium text-foreground">{title}</h2>
-        {subtitle && <p className="text-meta text-muted-foreground">{subtitle}</p>}
-      </header>
-      <div className="p-4">{children}</div>
-    </section>
-  )
-}
-
-interface VolumeChartProps {
-  data: { dia: string; total: number; finalizadas: number }[]
-  isLoading: boolean
-}
-
-function VolumeChart({ data, isLoading }: VolumeChartProps) {
-  if (isLoading) return <Skeleton className="h-[260px] w-full" />
-  if (data.length === 0) {
-    return (
-      <div className="flex h-[260px] items-center justify-center text-body text-muted-foreground">
-        Sem dados no período.
-      </div>
-    )
-  }
-  const formatted = data.map((d) => ({
-    ...d,
-    label: format(parseDayKey(d.dia), 'dd/MM', { locale: ptBR }),
-  }))
-  return (
-    <div className="h-[260px] w-full" role="group" aria-label="Volume diário de OCs criadas e finalizadas no período">
-      <ResponsiveContainer>
-        <LineChart accessibilityLayer data={formatted} margin={{ top: 8, right: 16, left: -10, bottom: 0 }}>
-          <CartesianGrid {...gridProps} />
-          <XAxis dataKey="label" {...axisProps} />
-          <YAxis {...axisProps} allowDecimals={false} />
-          <Tooltip
-            cursor={{ stroke: 'var(--chart-grid)' }}
-            content={(p) => (
-              <ChartTooltip
-                {...p}
-                formatLabel={() => {
-                  const item = p.payload?.[0]?.payload as { dia: string } | undefined
-                  return item?.dia ? format(parseDayKey(item.dia), "dd 'de' MMMM", { locale: ptBR }) : ''
-                }}
-              />
-            )}
-          />
-          <Line
-            type="monotone"
-            dataKey="total"
-            name="Total criadas"
-            stroke={COR_CRIADAS}
-            strokeWidth={2}
-            dot={{ r: 2 }}
-            activeDot={{ r: 4 }}
-          />
-          <Line
-            type="monotone"
-            dataKey="finalizadas"
-            name="Finalizadas"
-            stroke={COR_FINALIZADAS}
-            strokeWidth={2}
-            dot={{ r: 2 }}
-            activeDot={{ r: 4 }}
-          />
-        </LineChart>
-      </ResponsiveContainer>
-      <div className="mt-2 flex items-center justify-center gap-4 text-meta text-muted-foreground">
-        <span className="flex items-center gap-1.5">
-          <span className="h-0.5 w-3" style={{ backgroundColor: COR_CRIADAS }} /> Total criadas
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="h-0.5 w-3" style={{ backgroundColor: COR_FINALIZADAS }} /> Finalizadas
-        </span>
-      </div>
-    </div>
-  )
-}
-
-interface TopListProps {
-  items: TopItem[]
-  isLoading: boolean
-  emptyText: string
-}
-
-function TopList({ items, isLoading, emptyText }: TopListProps) {
-  if (isLoading) {
-    return (
-      <div className="space-y-2">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <Skeleton key={i} className="h-7 w-full" />
+          >
+            {a.rotulo}
+          </button>
         ))}
       </div>
-    )
-  }
-  if (items.length === 0) {
-    return (
-      <div className="flex h-[150px] items-center justify-center text-body text-muted-foreground">
-        {emptyText}
+
+      <div role="tabpanel">
+        {aba === 'geral' && <VisaoGeral p={p} gran={gran} resumo={resumo} onIrFluxo={() => setAba('fluxo')} />}
+        {aba === 'fluxo' && <FluxoSla p={p} resumo={resumo} />}
+        {aba === 'clientes' && <Cadastros p={p} />}
+        {aba === 'parceiros' && <Parceiros p={p} />}
       </div>
-    )
-  }
-  const max = items[0]?.total ?? 1
-  return (
-    <ul className="space-y-2">
-      {items.map((it, i) => (
-        <RankRow key={it.id} posicao={i + 1} label={it.label} valor={fmtInt(it.total)} pct={(it.total / max) * 100} />
-      ))}
-    </ul>
+    </div>
   )
 }
 
-function ParceiroRanking({
-  items,
-  total,
-  isLoading,
-}: {
-  items: ParceiroStat[]
-  total: number
-  isLoading: boolean
-}) {
-  if (isLoading) {
-    return (
-      <div className="space-y-2">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <Skeleton key={i} className="h-7 w-full" />
-        ))}
-      </div>
-    )
+// ── Visão geral ─────────────────────────────────────────────────────────────
+
+type ResumoQuery = ReturnType<typeof useRelatorioResumo>
+
+function deltaNum(atual: number, ant: number, comparador: string, subirEhBom: boolean) {
+  const pct = ant === 0 ? (atual === 0 ? 0 : 1) : (atual - ant) / ant
+  const flat = Math.abs(pct) < 0.005
+  return { valor: flat ? 'Sem variação' : fmtDelta(pct), comparador, direcao: flat ? ('flat' as const) : pct > 0 ? ('up' as const) : ('down' as const), subirEhBom }
+}
+
+/** Variação de uma fração em pontos percentuais: 0,82 → 0,85 = "+3,0 p.p.". */
+function deltaPp(atual: number | null, ant: number | null, comparador: string, subirEhBom: boolean) {
+  if (atual == null || ant == null) return undefined
+  const pp = (atual - ant) * 100
+  const flat = Math.abs(pp) < 0.05
+  const sinal = pp > 0 ? '+' : pp < 0 ? '−' : ''
+  return {
+    valor: flat ? 'Sem variação' : `${sinal}${fmtDec(Math.abs(pp), 1)} p.p.`,
+    comparador,
+    direcao: flat ? ('flat' as const) : pp > 0 ? ('up' as const) : ('down' as const),
+    subirEhBom,
   }
-  if (items.length === 0) {
-    return (
-      <div className="flex h-[150px] flex-col items-center justify-center gap-1 text-center text-body text-muted-foreground">
-        <Handshake className="h-5 w-5 text-tertiary" />
-        Nenhuma solicitação de parceiro no período.
-      </div>
-    )
-  }
-  const max = items[0]?.total ?? 1
+}
+
+function Kpis({ p, resumo, onIrFluxo }: { p: FiltrosPeriodo; resumo: ResumoQuery; onIrFluxo: () => void }) {
+  const [agora] = React.useState(() => new Date())
+  const comp = textoComparador(p, agora)
+  const a = resumo.data?.atual
+  const b = resumo.data?.anterior
+  const esq = <Skeleton className="inline-block h-8 w-20 align-middle" />
+  const v = (fn: (x: ResumoBloco) => React.ReactNode) => (resumo.isLoading ? esq : a ? fn(a) : '—')
+  const per = { de: p.de, ate: p.ate }
+  const leadOk = !!a && a.lead.n >= 5 && a.lead.p50 != null
   return (
-    <ul className="space-y-2">
-      {items.map((p, i) => (
-        <RankRow
-          key={p.id}
-          posicao={i + 1}
-          label={p.label}
-          pct={(p.total / max) * 100}
-          valor={
-            <>
-              <span className="mr-3 font-normal text-muted-foreground">
-                {fmtInt(p.finalizadas)}/{fmtInt(p.total)} fin.
-              </span>
-              {fmtInt(p.total)}{' '}
-              <span className="font-normal text-muted-foreground">
-                ({fmtPct(total > 0 ? p.total / total : 0, { casas: 0 })})
-              </span>
-            </>
-          }
+    <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+      <KpiTile
+        label="Entradas"
+        icon={Inbox}
+        value={v((x) => fmtInt(x.entradas))}
+        delta={a && b ? deltaNum(a.entradas, b.entradas, comp, true) : undefined}
+        to={linkSolicitacoes({ data: 'criada', ...per }, p)}
+      />
+      <KpiTile
+        label="Finalizadas"
+        icon={PackageCheck}
+        value={v((x) => fmtInt(x.finalizadas))}
+        delta={a && b ? deltaNum(a.finalizadas, b.finalizadas, comp, true) : undefined}
+        hint="Finalizadas no período, qualquer que seja a data de entrada"
+        to={linkSolicitacoes({ status: 'finalizada', data: 'finalizada', ...per }, p)}
+      />
+      <KpiTile
+        label="Canceladas"
+        icon={Ban}
+        value={v((x) => fmtInt(x.canceladas))}
+        delta={a && b ? deltaNum(a.canceladas, b.canceladas, comp, false) : undefined}
+        hint={a && <span className="tabular-nums">{fmtPct(a.cancelamento_pct)} das entradas</span>}
+        to={linkSolicitacoes({ data: 'cancelada', ...per }, p)}
+      />
+      <div title="Entradas com pelo menos 48 h de idade; finalizada em até 48 h após a entrada; canceladas fora do cálculo">
+        <KpiTile
+          label="Concluídas em 48 h"
+          icon={CheckCheck}
+          className="h-full"
+          value={v((x) => (x.conclusao48_n > 0 ? fmtPct(x.conclusao48_pct) : '—'))}
+          delta={a && b ? deltaPp(a.conclusao48_pct, b.conclusao48_pct, comp, true) : undefined}
+          hint={a && (a.conclusao48_n > 0 ? <span className="tabular-nums">de {fmtInt(a.conclusao48_n)} entradas com 48 h+</span> : 'Nenhuma entrada com 48 h ainda')}
+          to={linkSolicitacoes({ drill: 'conclusao48', ...per }, p)}
         />
-      ))}
-    </ul>
+      </div>
+      <KpiTile
+        label="Lead time"
+        icon={Timer}
+        value={resumo.isLoading ? esq : leadOk ? <span><span className="mr-1.5 text-body font-normal text-muted-foreground">P50</span>{fmtDur(a?.lead.p50)}</span> : '—'}
+        delta={leadOk && b && b.lead.n >= 5 && b.lead.p50 != null ? deltaNum(a.lead.p50 as number, b.lead.p50, comp, false) : undefined}
+        hint={a && (leadOk ? <span className="tabular-nums">P90 {fmtDur(a.lead.p90)} · n={fmtInt(a.lead.n)}</span> : 'amostra pequena')}
+        onClick={onIrFluxo}
+      />
+      <KpiTile
+        label="Dentro do SLA"
+        icon={ShieldCheck}
+        value={v((x) => fmtPct(x.dentro_sla_pct))}
+        delta={a && b ? deltaPp(a.dentro_sla_pct, b.dentro_sla_pct, comp, true) : undefined}
+        hint="Finalizadas sem nenhuma etapa acima do alerta"
+        to={linkSolicitacoes({ drill: 'sla_estourou', ...per }, p)}
+      />
+    </div>
   )
 }
 
-function TmaEmissaoFinal({
-  geral,
-  porParceiro,
-  isLoading,
-}: {
-  geral: TmaResumo | null
-  porParceiro: ParceiroTma[]
-  isLoading: boolean
-}) {
-  if (isLoading) return <Skeleton className="h-[200px] w-full" />
-  if (!geral || geral.count === 0) {
-    return (
-      <div className="flex h-[180px] flex-col items-center justify-center gap-1 text-center text-body text-muted-foreground">
-        <Timer className="h-5 w-5 text-tertiary" />
-        Sem solicitações de parceiro finalizadas no período.
-      </div>
-    )
-  }
+function VisaoGeral({ p, gran, resumo, onIrFluxo }: { p: FiltrosPeriodo; gran: Granularidade; resumo: ResumoQuery; onIrFluxo: () => void }) {
+  const serie = useRelatorioSerie(p, gran)
+  const origens = useRelatorioRanking(p, 'origem')
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-end gap-x-8 gap-y-2 border-b pb-3">
-        <div>
-          <p className="label-uppercase">Tempo médio</p>
-          <p className="font-display text-kpi font-medium text-foreground tabular-nums">
-            {formatHoras(geral.avgHours)}
-          </p>
-        </div>
-        <div>
-          <p className="label-uppercase">Mediana</p>
-          <p className="text-title font-medium text-foreground tabular-nums">
-            {formatHoras(geral.medianHours)}
-          </p>
-        </div>
-        <div>
-          <p className="label-uppercase">Finalizadas</p>
-          <p className="text-title font-medium text-foreground tabular-nums">{fmtInt(geral.count)}</p>
-        </div>
-      </div>
-
-      {porParceiro.length > 0 && (
-        <div>
-          <p className="mb-1.5 text-body-sm font-medium text-muted-foreground">
-            Por parceiro, do mais rápido ao mais lento
-          </p>
-          <ul className="divide-y">
-            {porParceiro.map((p) => (
-              <li key={p.id} className="flex items-center gap-2 py-1.5 text-body-sm">
-                <span className="min-w-0 flex-1 truncate text-foreground">{p.label}</span>
-                <span className="shrink-0 text-meta text-muted-foreground tabular-nums">n={p.resumo.count}</span>
-                <span className="w-16 shrink-0 text-right font-medium text-foreground tabular-nums">
-                  {formatHoras(p.resumo.avgHours)}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
+      {resumo.isError ? (
+        <Bloco titulo="Indicadores" erro onRetry={() => void resumo.refetch()}>{null}</Bloco>
+      ) : (
+        <Kpis p={p} resumo={resumo} onIrFluxo={onIrFluxo} />
       )}
-    </div>
-  )
-}
-
-interface TmaChartProps {
-  entries: TmaStatusEntry[]
-  isLoading: boolean
-}
-
-// Estado explícito para quem não pode ler o log de auditoria (analista). Sem
-// isto o painel ficava vazio, indistinguível de "não há dados no período".
-function TmaSemAcesso() {
-  return (
-    <div className="flex h-[200px] items-center justify-center px-6 text-center text-body text-muted-foreground">
-      O TMA é calculado a partir do log de auditoria, restrito aos perfis de
-      gestão. Os demais números desta página não dependem dele.
-    </div>
-  )
-}
-
-function TmaChart({ entries, isLoading }: TmaChartProps) {
-  if (isLoading) return <Skeleton className="h-[260px] w-full" />
-  if (entries.length === 0) {
-    return (
-      <div className="flex h-[200px] items-center justify-center text-body text-muted-foreground">
-        Sem transições suficientes para calcular TMA. Aumente o período.
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+        <Bloco
+          titulo="Entradas × finalizadas"
+          subtitulo={`Por ${gran}; tracejado = período anterior. Clique num ponto para ver a lista.`}
+          className="xl:col-span-2"
+          carregando={serie.isLoading}
+          erro={serie.isError}
+          onRetry={() => void serie.refetch()}
+          alturaEsqueleto={280}
+        >
+          {serie.data && <GraficoSerie serie={serie.data} gran={gran} p={p} />}
+        </Bloco>
+        <Bloco
+          titulo="Interno × parceiro"
+          subtitulo="Entradas e finalizadas por origem"
+          carregando={origens.isLoading}
+          erro={origens.isError}
+          onRetry={() => void origens.refetch()}
+        >
+          {origens.data && <PorOrigem linhas={origens.data} p={p} />}
+        </Bloco>
       </div>
-    )
+    </div>
+  )
+}
+
+function rotuloEixo(iso: string, gran: Granularidade): string {
+  const d = new Date(iso)
+  if (gran === 'hora') return `${d.getHours()}h`
+  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+function GraficoSerie({ serie, gran, p }: { serie: SerieLinha[]; gran: Granularidade; p: FiltrosPeriodo }) {
+  const navigate = useNavigate()
+  if (serie.every((s) => s.entradas === 0 && s.finalizadas === 0 && s.entradas_ant === 0)) {
+    return <Vazio altura={260}>Sem movimento no período.</Vazio>
   }
-  const data = entries.map((e) => ({
-    label: STATUS_LABELS[e.status as keyof typeof STATUS_LABELS] ?? e.status,
-    media: Math.round(e.avgHours * 100) / 100,
-    mediana: Math.round(e.medianHours * 100) / 100,
-    count: e.count,
-  }))
+  const dados = serie.map((s) => ({ ...s, rotulo: rotuloEixo(s.balde, gran) }))
+  const abrir = (i: number) => {
+    const s = serie[i]
+    if (!s) return
+    const d = new Date(s.balde)
+    const dia = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    if (gran === 'semana') {
+      const fim = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 6)
+      const ate = `${fim.getFullYear()}-${String(fim.getMonth() + 1).padStart(2, '0')}-${String(fim.getDate()).padStart(2, '0')}`
+      navigate(linkSolicitacoes({ data: 'criada', de: dia < p.de ? p.de : dia, ate: ate > p.ate ? p.ate : ate }, p))
+    } else {
+      navigate(linkSolicitacoes({ data: 'criada', de: dia, ate: dia, hora: gran === 'hora' ? d.getHours() : undefined }, p))
+    }
+  }
   return (
-    <div className="space-y-3">
-      <div className="h-[240px] w-full" role="group" aria-label="Tempo médio até sair de cada status (média e mediana, em horas)">
+    <div>
+      <p className="sr-only">
+        Série de entradas e finalizadas por {gran}. Totais: {fmtInt(serie.reduce((a, s) => a + s.entradas, 0))} entradas e{' '}
+        {fmtInt(serie.reduce((a, s) => a + s.finalizadas, 0))} finalizadas.
+      </p>
+      <div className="h-[280px]" aria-hidden>
         <ResponsiveContainer>
-          <ComposedChart accessibilityLayer data={data} margin={{ top: 8, right: 16, left: -10, bottom: 0 }}>
+          <LineChart
+            data={dados}
+            margin={{ top: 8, right: 12, left: -16, bottom: 0 }}
+            onClick={(e) => {
+              const i = Number((e as { activeIndex?: number | string | null } | null)?.activeIndex)
+              if (Number.isInteger(i)) abrir(i)
+            }}
+            className="cursor-pointer"
+          >
             <CartesianGrid {...gridProps} />
-            <XAxis dataKey="label" {...axisProps} interval={0} />
-            <YAxis
-              {...axisProps}
-              label={{ value: 'horas', angle: -90, position: 'insideLeft', fontSize: 11, fill: CHART_VARS.axis }}
-            />
-            <Tooltip
-              cursor={{ stroke: 'var(--chart-grid)' }}
-              content={<ChartTooltip formatValue={(v) => fmtDurHoras(v)} />}
-            />
-            <Area
-              type="monotone"
-              dataKey="media"
-              name="Média"
-              stroke={seriesColor(0)}
-              strokeWidth={2}
-              fill={seriesColor(0)}
-              fillOpacity={0.1}
-              dot={{ r: 2, fill: seriesColor(0) }}
-              activeDot={{ r: 4 }}
-            />
-            <Line
-              type="monotone"
-              dataKey="mediana"
-              name="Mediana"
-              stroke={CHART_VARS.ref}
-              strokeWidth={2}
-              strokeDasharray="4 3"
-              dot={{ r: 2 }}
-              activeDot={{ r: 4 }}
-            />
-          </ComposedChart>
+            <XAxis dataKey="rotulo" {...axisProps} interval="preserveStartEnd" minTickGap={16} />
+            <YAxis {...axisProps} allowDecimals={false} />
+            <Tooltip cursor={{ stroke: 'var(--chart-grid)' }} content={<ChartTooltip />} />
+            <Line dataKey="entradas" name="Entradas" stroke="var(--chart-2)" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+            <Line dataKey="finalizadas" name="Finalizadas" stroke="var(--chart-7)" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+            <Line dataKey="entradas_ant" name="Entradas (anterior)" stroke="var(--chart-2)" strokeOpacity={0.55} strokeWidth={1.5} strokeDasharray="4 3" dot={false} />
+            <Line dataKey="finalizadas_ant" name="Finalizadas (anterior)" stroke="var(--chart-ref)" strokeWidth={1.5} strokeDasharray="4 3" dot={false} />
+          </LineChart>
         </ResponsiveContainer>
       </div>
-      <div className="flex items-center justify-center gap-4 text-meta text-muted-foreground">
-        <span className="flex items-center gap-1.5">
-          <span className="h-0.5 w-3" style={{ backgroundColor: seriesColor(0) }} /> Média
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="h-0.5 w-3" style={{ backgroundColor: CHART_VARS.ref }} /> Mediana
-        </span>
+      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-meta text-muted-foreground">
+        <Legenda cor="var(--chart-2)" rotulo="Entradas" />
+        <Legenda cor="var(--chart-7)" rotulo="Finalizadas" />
+        <Legenda cor="var(--chart-ref)" rotulo="Período anterior" tracejado />
       </div>
-      <ul className="grid grid-cols-1 gap-1 text-meta text-muted-foreground sm:grid-cols-2 md:grid-cols-3">
-        {entries.map((e) => (
-          <li key={e.status} className="truncate">
-            <span className="text-foreground">
-              {STATUS_LABELS[e.status as keyof typeof STATUS_LABELS] ?? e.status}
-            </span>
-            {' · '}
-            {e.count} {e.count === 1 ? 'transição' : 'transições'}
-          </li>
-        ))}
-      </ul>
     </div>
   )
 }
 
-interface MaterialDonutProps {
-  data: TopItem[]
-  isLoading: boolean
+function Legenda({ cor, rotulo, tracejado }: { cor: string; rotulo: string; tracejado?: boolean }) {
+  return (
+    <span className="flex items-center gap-1.5">
+      <span aria-hidden className={cn('w-3', tracejado ? 'h-0 border-t-2 border-dashed' : 'h-0.5')} style={tracejado ? { borderColor: cor } : { backgroundColor: cor }} />
+      {rotulo}
+    </span>
+  )
 }
 
-function MaterialDonut({ data, isLoading }: MaterialDonutProps) {
-  if (isLoading) return <Skeleton className="h-[220px] w-full" />
-  if (data.length === 0) {
-    return (
-      <div className="flex h-[220px] items-center justify-center text-body text-muted-foreground">
-        Sem dados de material no período.
-      </div>
-    )
-  }
-  const total = data.reduce((acc, d) => acc + d.total, 0)
-  const chartData = data.map((d) => ({ name: d.label, value: d.total }))
+function PorOrigem({ linhas, p }: { linhas: RankingLinha[]; p: FiltrosPeriodo }) {
+  const total = linhas.reduce((a, l) => a + l.entradas, 0)
+  if (total === 0) return <Vazio>Sem entradas no período.</Vazio>
   return (
-    <div className="grid grid-cols-1 items-center gap-4 sm:grid-cols-[200px_1fr]">
-      <div className="relative h-[200px]" role="img" aria-label="Distribuição de OCs por material; detalhada na legenda ao lado">
-        <ResponsiveContainer>
-          <PieChart>
-            <Pie data={chartData} dataKey="value" nameKey="name" innerRadius={55} outerRadius={85} paddingAngle={1} stroke="hsl(var(--card))">
-              {chartData.map((_e, i) => (
-                <Cell key={i} fill={seriesColor(i)} />
-              ))}
-            </Pie>
-            <Tooltip content={<ChartTooltip />} />
-          </PieChart>
-        </ResponsiveContainer>
-        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-meta text-muted-foreground">Total</span>
-          <span className="font-display text-title font-medium tabular-nums text-foreground">{fmtInt(total)}</span>
-        </div>
-      </div>
-      <ul className="space-y-1.5">
-        {chartData.map((d, i) => {
-          return (
-            <li key={d.name} className="flex items-center justify-between text-body-sm">
-              <div className="flex min-w-0 items-center gap-2">
-                <span className="h-2 w-2 shrink-0 rounded-[1px]" style={{ backgroundColor: seriesColor(i) }} />
-                <span className="truncate text-foreground">{d.name}</span>
-              </div>
-              <span className="ml-2 shrink-0 text-muted-foreground tabular-nums">
-                {fmtInt(d.value)} <span className="text-meta">({fmtPct(total > 0 ? d.value / total : 0, { casas: 0 })})</span>
+    <ul className="space-y-4">
+      {linhas.map((l) => (
+        <li key={l.chave}>
+          <Link
+            to={linkSolicitacoes({ origem: l.chave, data: 'criada', de: p.de, ate: p.ate }, { ...p, origem: 'todas' })}
+            className="-mx-2 block rounded-md px-2 py-1 transition-[transform,background-color] duration-fast ease-out hover:-translate-y-0.5 hover:bg-row-hover"
+          >
+            <div className="flex items-baseline justify-between text-body">
+              <span className="text-foreground">{l.rotulo}</span>
+              <span className="tabular-nums">
+                <span className="font-medium text-foreground">{fmtInt(l.entradas)}</span>
+                <span className="ml-1 text-meta text-muted-foreground">({fmtPct(l.entradas / total, { casas: 0 })})</span>
               </span>
-            </li>
-          )
-        })}
-      </ul>
+            </div>
+            <div className="mt-1 h-1.5 rounded-[2px] bg-muted" aria-hidden>
+              <div className="h-full rounded-[2px] bg-chart-7" style={{ width: `${(l.entradas / total) * 100}%` }} />
+            </div>
+            <p className="mt-1 text-meta text-muted-foreground tabular-nums">
+              {fmtInt(l.finalizadas)} finalizadas · lead P50 {fmtDur(l.lead_p50_min)}
+            </p>
+          </Link>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+// ── Fluxo e SLA ─────────────────────────────────────────────────────────────
+
+function FluxoSla({ p, resumo }: { p: FiltrosPeriodo; resumo: ResumoQuery }) {
+  const etapas = useRelatorioTempoEtapas(p)
+  const mapa = useMapaCalor(p)
+  const metas = useMetasSla()
+  const sla = metas.data ? mapaSla(metas.data.etapas) : undefined
+  const a = resumo.data?.atual
+  const alvoP90 = metas.data?.metas.meta_lead_time_p90_min ?? null
+  return (
+    <div className="space-y-4">
+      <Bloco
+        titulo="Tempo por etapa"
+        subtitulo="P50 e P90 das passagens que saíram de cada etapa no período (reaberturas contam separado). O detalhe por solicitação está no CSV de dados."
+        carregando={etapas.isLoading}
+        erro={etapas.isError}
+        onRetry={() => void etapas.refetch()}
+        alturaEsqueleto={220}
+      >
+        {etapas.data && <TempoEtapaChart linhas={etapas.data} sla={sla} />}
+      </Bloco>
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+        <Bloco titulo="Lead time" subtitulo="Da entrada à finalização, nas finalizadas do período" carregando={resumo.isLoading} erro={resumo.isError} onRetry={() => void resumo.refetch()} alturaEsqueleto={140}>
+          {a && (a.lead.n < 5 || a.lead.p50 == null ? (
+            <Vazio>Amostra pequena (n={fmtInt(a.lead.n)}).</Vazio>
+          ) : (
+            <dl className="grid grid-cols-2 gap-4">
+              <div>
+                <dt className="label-uppercase">P50</dt>
+                <dd className="font-display text-kpi font-medium tabular-nums text-foreground">{fmtDur(a.lead.p50)}</dd>
+              </div>
+              <div>
+                <dt className="label-uppercase">P90</dt>
+                <dd className={cn('font-display text-kpi font-medium tabular-nums', alvoP90 != null && (a.lead.p90 ?? 0) > alvoP90 ? 'text-primary-strong' : 'text-foreground')}>
+                  {fmtDur(a.lead.p90)}
+                </dd>
+              </div>
+              <div className="col-span-2 text-body-sm text-muted-foreground tabular-nums">
+                n={fmtInt(a.lead.n)}
+                {alvoP90 != null && ` · alvo do P90: ${fmtDur(alvoP90)}`}
+                {resumo.data?.anterior.lead.p50 != null && ` · período anterior: P50 ${fmtDur(resumo.data.anterior.lead.p50)}`}
+              </div>
+            </dl>
+          ))}
+        </Bloco>
+        <Bloco
+          titulo="Entradas por dia da semana e hora"
+          subtitulo="Onde a demanda se concentra"
+          className="xl:col-span-2"
+          carregando={mapa.isLoading}
+          erro={mapa.isError}
+          onRetry={() => void mapa.refetch()}
+          alturaEsqueleto={200}
+        >
+          {mapa.data && <MapaCalor celulas={mapa.data} />}
+        </Bloco>
+      </div>
     </div>
   )
 }
 
-// Linha de ranking: posição tabular, rótulo, valor e barra sólida fina (chart-1,
-// cantos 2px) — sem gradiente, sem troféu.
-function RankRow({ posicao, label, valor, pct }: { posicao: number; label: string; valor: React.ReactNode; pct: number }) {
+const DIAS_SEMANA = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
+
+function MapaCalor({ celulas }: { celulas: MapaCalorCelula[] }) {
+  const max = Math.max(0, ...celulas.map((c) => c.entradas))
+  if (max === 0) return <Vazio>Sem entradas no período.</Vazio>
+  const horas = Array.from({ length: 17 }, (_v, i) => i + 5) // 5h–21h
+  const valor = (dow: number, hora: number) => celulas.find((c) => c.dow === dow && c.hora === hora)?.entradas ?? 0
+  const ordem = [1, 2, 3, 4, 5, 6, 0]
   return (
-    <li className="grid grid-cols-[1.25rem_minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1 text-body-sm">
-      <span className="text-right tabular-nums text-muted-foreground">{posicao}</span>
-      <span className="truncate text-foreground">{label}</span>
-      <span className="text-right font-medium tabular-nums text-foreground">{valor}</span>
-      <div className="col-start-2 h-1.5 rounded-[2px] bg-muted">
-        <div className="h-full rounded-[2px] bg-chart-1" style={{ width: `${pct}%` }} />
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[560px] border-separate border-spacing-[2px] text-meta" aria-label="Entradas por dia da semana e hora">
+        <thead>
+          <tr>
+            <th scope="col" className="w-10" />
+            {horas.map((h) => (
+              <th key={h} scope="col" className="font-normal text-muted-foreground tabular-nums">{h}h</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {ordem.map((dow) => (
+            <tr key={dow}>
+              <th scope="row" className="pr-1 text-left font-normal text-muted-foreground">{DIAS_SEMANA[dow]}</th>
+              {horas.map((h) => {
+                const v = valor(dow, h)
+                return (
+                  <td key={h} className="h-6 rounded-[2px] bg-muted p-0" title={`${DIAS_SEMANA[dow]} ${h}h: ${fmtInt(v)} entradas`}>
+                    <div className="h-full w-full rounded-[2px] bg-chart-2" style={{ opacity: v === 0 ? 0 : 0.12 + 0.88 * (v / max) }} />
+                    <span className="sr-only">{fmtInt(v)}</span>
+                  </td>
+                )
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="mt-2 text-meta text-muted-foreground">Mais escuro = mais entradas (máximo {fmtInt(max)} numa célula).</p>
+    </div>
+  )
+}
+
+// ── Clientes e cadastros ────────────────────────────────────────────────────
+
+function Cadastros({ p }: { p: FiltrosPeriodo }) {
+  const [dim, setDim] = React.useState<DimensaoRanking>('cliente')
+  const q = useRelatorioRanking(p, dim)
+  const def = DIMENSOES.find((d) => d.id === dim) ?? DIMENSOES[0]
+  const total = (q.data ?? []).reduce((a, l) => a + l.entradas, 0)
+  const colunas: Coluna<RankingLinha>[] = [
+    {
+      chave: 'rotulo',
+      rotulo: def.rotulo.replace(/s$/, ''),
+      valor: (l) => l.rotulo,
+      render: (l) =>
+        def.param ? (
+          <Link
+            to={linkSolicitacoes({ [def.param]: l.chave, data: 'criada', de: p.de, ate: p.ate }, p)}
+            className="text-foreground hover:text-primary-strong hover:underline"
+          >
+            {l.rotulo}
+          </Link>
+        ) : (
+          <span className="text-foreground">{l.rotulo}</span>
+        ),
+    },
+    { chave: 'entradas', rotulo: 'Entradas', alinhar: 'direita', valor: (l) => l.entradas, render: (l) => fmtInt(l.entradas) },
+    {
+      chave: 'participacao',
+      rotulo: 'Participação',
+      alinhar: 'direita',
+      valor: (l) => (total > 0 ? l.entradas / total : 0),
+      render: (l) => <span className="text-muted-foreground">{fmtPct(total > 0 ? l.entradas / total : null)}</span>,
+    },
+    { chave: 'finalizadas', rotulo: 'Finalizadas', alinhar: 'direita', valor: (l) => l.finalizadas, render: (l) => fmtInt(l.finalizadas) },
+    { chave: 'lead', rotulo: 'Lead time P50', titulo: 'Mediana da entrada à finalização', alinhar: 'direita', valor: (l) => l.lead_p50_min, render: (l) => fmtDur(l.lead_p50_min) },
+  ]
+  return (
+    <Bloco
+      titulo="Rankings"
+      subtitulo="Entradas, finalizadas e lead time por cadastro. Clique no cabeçalho para ordenar."
+      acao={
+        <div role="radiogroup" aria-label="Dimensão" className="hidden flex-wrap gap-1 md:flex">
+          {DIMENSOES.map((d) => (
+            <BotaoDim key={d.id} ativo={dim === d.id} onClick={() => setDim(d.id)}>{d.rotulo}</BotaoDim>
+          ))}
+        </div>
+      }
+      carregando={q.isLoading}
+      erro={q.isError}
+      onRetry={() => void q.refetch()}
+      alturaEsqueleto={320}
+    >
+      <div role="radiogroup" aria-label="Dimensão" className="mb-3 flex flex-wrap gap-1 md:hidden">
+        {DIMENSOES.map((d) => (
+          <BotaoDim key={d.id} ativo={dim === d.id} onClick={() => setDim(d.id)}>{d.rotulo}</BotaoDim>
+        ))}
       </div>
-    </li>
+      {q.data && q.data.length === 0 ? (
+        <Vazio>Nada no período.</Vazio>
+      ) : (
+        q.data && (
+          <TabelaOrdenavel
+            key={dim}
+            rotulo={`Ranking de ${def.rotulo.toLowerCase()}`}
+            colunas={colunas}
+            linhas={q.data}
+            chaveLinha={(l) => l.chave}
+            ordemInicial={{ coluna: 'entradas', dir: 'desc' }}
+          />
+        )
+      )}
+    </Bloco>
+  )
+}
+
+function BotaoDim({ ativo, onClick, children }: { ativo: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={ativo}
+      onClick={onClick}
+      className={cn(
+        'rounded-control border px-2.5 py-1 text-body-sm font-medium transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+        ativo ? 'border-primary/40 bg-primary/[0.08] text-primary-strong' : 'border-border text-muted-foreground hover:bg-row-hover hover:text-foreground',
+      )}
+    >
+      {children}
+    </button>
+  )
+}
+
+// ── Parceiros ───────────────────────────────────────────────────────────────
+
+function Parceiros({ p }: { p: FiltrosPeriodo }) {
+  const q = useRelatorioRanking(p, 'parceiro')
+  const total = (q.data ?? []).reduce((a, l) => a + l.entradas, 0)
+  const colunas: Coluna<RankingLinha>[] = [
+    {
+      chave: 'rotulo',
+      rotulo: 'Parceiro',
+      valor: (l) => l.rotulo,
+      render: (l) => (
+        <Link
+          to={linkSolicitacoes({ origem: 'parceiro', parceiro: l.chave, data: 'criada', de: p.de, ate: p.ate }, { ...p, origem: 'todas' })}
+          className="text-foreground hover:text-primary-strong hover:underline"
+        >
+          {l.rotulo}
+        </Link>
+      ),
+    },
+    { chave: 'entradas', rotulo: 'Enviadas', alinhar: 'direita', valor: (l) => l.entradas, render: (l) => fmtInt(l.entradas) },
+    {
+      chave: 'participacao',
+      rotulo: 'Participação',
+      alinhar: 'direita',
+      valor: (l) => (total > 0 ? l.entradas / total : 0),
+      render: (l) => <span className="text-muted-foreground">{fmtPct(total > 0 ? l.entradas / total : null)}</span>,
+    },
+    { chave: 'finalizadas', rotulo: 'Finalizadas', alinhar: 'direita', valor: (l) => l.finalizadas, render: (l) => fmtInt(l.finalizadas) },
+    {
+      chave: 'emissao_p50',
+      rotulo: 'Emissão P50',
+      titulo: 'Da 1ª entrada em "Em emissão" até a finalização (mediana)',
+      alinhar: 'direita',
+      valor: (l) => l.emissao_p50_min,
+      render: (l) => fmtDur(l.emissao_p50_min),
+    },
+    { chave: 'emissao_p90', rotulo: 'Emissão P90', alinhar: 'direita', valor: (l) => l.emissao_p90_min, render: (l) => fmtDur(l.emissao_p90_min) },
+  ]
+  return (
+    <Bloco
+      titulo="Parceiros"
+      subtitulo="Solicitações enviadas por parceiro e o tempo de emissão (da 1ª entrada em “Em emissão” até a finalização)"
+      carregando={q.isLoading}
+      erro={q.isError}
+      onRetry={() => void q.refetch()}
+      alturaEsqueleto={240}
+    >
+      {q.data && q.data.length === 0 ? (
+        <Vazio>Nenhuma solicitação de parceiro no período.</Vazio>
+      ) : (
+        q.data && (
+          <TabelaOrdenavel
+            rotulo="Ranking de parceiros"
+            colunas={colunas}
+            linhas={q.data}
+            chaveLinha={(l) => l.chave}
+            ordemInicial={{ coluna: 'entradas', dir: 'desc' }}
+          />
+        )
+      )}
+    </Bloco>
   )
 }
