@@ -28,6 +28,14 @@
 -- Isso gera eventos de Realtime para quem estiver com o sistema aberto —
 -- aplicar fora do expediente.
 
+-- Sem fila de espera infinita por lock em solicitacoes (o backfill e os índices
+-- pedem lock forte): se a tabela estiver ocupada, falha rápido e se tenta de novo.
+SET lock_timeout = '5s';
+
+-- ═════════════════════════════════════════════════════════════════════════════
+-- PARTE A — estrutura e policies (no cumulative-schema: ANTES da seção 0051)
+-- ═════════════════════════════════════════════════════════════════════════════
+
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 1. Perfil painel_tv
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -76,6 +84,19 @@ AS $$
 $$;
 REVOKE ALL ON FUNCTION public.usuario_e_painel_tv(uuid) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.usuario_e_painel_tv(uuid) TO supabase_auth_admin;
+
+-- Cada usuário lê o PRÓPRIO perfil. A TV não é is_interno() e sem isto o app
+-- não sabe que ela é a TV (ficaria em "Aguardando liberação"). Só a própria linha.
+DROP POLICY IF EXISTS perfis_usuarios_select_proprio ON public.perfis_usuarios;
+CREATE POLICY perfis_usuarios_select_proprio ON public.perfis_usuarios FOR SELECT TO authenticated
+  USING (user_id = (SELECT auth.uid()));
+
+-- log_auditoria: ninguém insere direto pela API. Quem grava é o audit_trigger
+-- (SECURITY DEFINER desde a 0049); a policy WITH CHECK (true) da 0025 deixava
+-- qualquer autenticado — parceiro inclusive — forjar linhas, e o backfill
+-- abaixo transforma esse log em histórico de etapas. Fechar ANTES do backfill.
+DROP POLICY IF EXISTS log_auditoria_insert ON public.log_auditoria;
+REVOKE INSERT ON public.log_auditoria FROM PUBLIC, anon, authenticated;
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 2. Configuração: SLA por etapa e metas da operação
@@ -158,8 +179,12 @@ CREATE TRIGGER aud_metas_operacao AFTER INSERT OR UPDATE OR DELETE ON public.met
 
 ALTER TABLE public.sla_etapas ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.metas_operacao ENABLE ROW LEVEL SECURITY;
-REVOKE ALL ON public.sla_etapas, public.metas_operacao FROM PUBLIC, anon;
-GRANT SELECT, UPDATE ON public.sla_etapas, public.metas_operacao TO authenticated;
+REVOKE ALL ON public.sla_etapas, public.metas_operacao FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.sla_etapas, public.metas_operacao TO authenticated;
+-- Só as colunas de valor: etapa, id e carimbos não se editam pela API.
+GRANT UPDATE (aviso_min, alerta_min, ativo) ON public.sla_etapas TO authenticated;
+GRANT UPDATE (meta_finalizadas_dia, meta_lead_time_p90_min, alerta_validade_h, expediente_inicio, expediente_fim)
+  ON public.metas_operacao TO authenticated;
 
 -- Leitura: equipe interna e a TV (sem dado pessoal). Escrita: só admin. Sem
 -- INSERT/DELETE — as linhas são fixas (seed acima).
@@ -179,17 +204,6 @@ CREATE POLICY metas_operacao_update ON public.metas_operacao FOR UPDATE TO authe
   USING ((SELECT public.meu_perfil_interno()) = 'admin')
   WITH CHECK ((SELECT public.meu_perfil_interno()) = 'admin');
 
--- Qual login é o agente de WhatsApp (0078). Só existe se a 0078 já rodou.
-DO $$
-BEGIN
-  IF to_regclass('public.agente_config') IS NOT NULL THEN
-    ALTER TABLE public.agente_config
-      ADD COLUMN IF NOT EXISTS usuario_id uuid REFERENCES auth.users(id) ON DELETE SET NULL;
-    COMMENT ON COLUMN public.agente_config.usuario_id IS
-      'Login (auth.users) que o agente usa (0079). A Produtividade mostra esse usuário '
-      'numa linha separada, fora dos totais da equipe. Preencher uma vez (admin).';
-  END IF;
-END $$;
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 3. Função pura do SLA (espelhada em apps/interno/src/features/metricas/sla.ts)
@@ -256,6 +270,23 @@ GRANT SELECT (id, solicitacao_id, de_status, para_status, em, fonte)
 DROP POLICY IF EXISTS solicitacao_transicoes_select ON public.solicitacao_transicoes;
 CREATE POLICY solicitacao_transicoes_select ON public.solicitacao_transicoes FOR SELECT TO authenticated
   USING ((SELECT public.is_interno()));
+
+-- ═════════════════════════════════════════════════════════════════════════════
+-- PARTE B — dados, triggers e funções que sobrescrevem as antigas
+-- (no cumulative-schema: no FIM, para vencer as versões antigas recriadas lá)
+-- ═════════════════════════════════════════════════════════════════════════════
+
+-- Qual login é o agente de WhatsApp (0078). Só existe se a 0078 já rodou.
+DO $$
+BEGIN
+  IF to_regclass('public.agente_config') IS NOT NULL THEN
+    ALTER TABLE public.agente_config
+      ADD COLUMN IF NOT EXISTS usuario_id uuid REFERENCES auth.users(id) ON DELETE SET NULL;
+    COMMENT ON COLUMN public.agente_config.usuario_id IS
+      'Login (auth.users) que o agente usa (0079). A Produtividade mostra esse usuário '
+      'numa linha separada, fora dos totais da equipe. Preencher uma vez (admin).';
+  END IF;
+END $$;
 
 -- 4a. Backfill das transições a partir do log (antes dos triggers novos).
 --     Recorte: só o log anterior à primeira transição gravada por trigger, para
@@ -341,6 +372,11 @@ BEGIN
   ELSIF NEW.status IS DISTINCT FROM OLD.status THEN
     NEW.status_desde := now();
     NEW.finalizada_em := CASE WHEN NEW.status = 'finalizada' THEN now() END;
+    -- Entrou em "OC enviada": o servidor carimba (reenvio sem mudar de etapa
+    -- continua podendo atualizar enviada_em, como hoje).
+    IF NEW.status = 'oc_enviada' THEN
+      NEW.enviada_em := now();
+    END IF;
   ELSE
     NEW.status_desde := OLD.status_desde;
     NEW.finalizada_em := OLD.finalizada_em;
@@ -590,5 +626,7 @@ END; $function$;
 --   (SELECT count(*) FROM solicitacoes s WHERE s.status IS DISTINCT FROM (
 --      SELECT t.para_status FROM solicitacao_transicoes t WHERE t.solicitacao_id = s.id
 --      ORDER BY t.em DESC, t.id DESC LIMIT 1)) AS ultima_transicao_diferente;
+
+RESET lock_timeout;
 
 NOTIFY pgrst, 'reload schema';

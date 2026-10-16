@@ -398,7 +398,7 @@ UPDATE perfis_usuarios SET perfil = 'assistente' WHERE perfil = 'atendente';
 UPDATE perfis_usuarios SET perfil = 'analista'   WHERE perfil = 'documentacao';
 ALTER TABLE perfis_usuarios
   ADD CONSTRAINT perfis_usuarios_perfil_check
-  CHECK (perfil IN ('admin', 'gerente', 'supervisor', 'analista', 'assistente'));
+  CHECK (perfil IN ('admin', 'gerente', 'supervisor', 'analista', 'assistente', 'painel_tv'));  -- lista FINAL (0079)
 
 -- 0015 — materiais.requer_instrucao
 ALTER TABLE materiais
@@ -4340,6 +4340,253 @@ NOTIFY pgrst, 'reload schema';
 
 
 -- =====================================================================
+-- 0079 (parte A) — perfil painel_tv, metas/SLA, transições: estrutura e policies.
+-- ANTES da 0051 porque cria policies. A parte B (backfill, triggers, hook e as
+-- funções de fuso que sobrescrevem as antigas) está no fim do arquivo.
+-- =====================================================================
+
+-- ═════════════════════════════════════════════════════════════════════════════
+-- PARTE A — estrutura e policies (no cumulative-schema: ANTES da seção 0051)
+-- ═════════════════════════════════════════════════════════════════════════════
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 1. Perfil painel_tv
+-- ─────────────────────────────────────────────────────────────────────────────
+
+ALTER TABLE public.perfis_usuarios DROP CONSTRAINT IF EXISTS perfis_usuarios_perfil_check;
+ALTER TABLE public.perfis_usuarios ADD CONSTRAINT perfis_usuarios_perfil_check
+  CHECK (perfil IN ('admin', 'gerente', 'supervisor', 'analista', 'assistente', 'painel_tv'));
+
+-- is_interno(): qualquer perfil ativo, MENOS o da TV. As ~10 policies que
+-- liberam dados pessoais por is_interno() passam a negar para a TV sem precisar
+-- tocar em nenhuma delas.
+CREATE OR REPLACE FUNCTION public.is_interno()
+RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM perfis_usuarios
+    WHERE user_id = auth.uid() AND ativo = true AND perfil <> 'painel_tv'
+  );
+$$;
+
+CREATE OR REPLACE FUNCTION public.is_painel_tv()
+RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM perfis_usuarios
+    WHERE user_id = auth.uid() AND ativo = true AND perfil = 'painel_tv'
+  );
+$$;
+REVOKE ALL ON FUNCTION public.is_painel_tv() FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.is_painel_tv() TO authenticated;
+
+-- Para o hook de inatividade, que roda como supabase_auth_admin (sem auth.uid()).
+CREATE OR REPLACE FUNCTION public.usuario_e_painel_tv(p_user uuid)
+RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM perfis_usuarios
+    WHERE user_id = p_user AND ativo = true AND perfil = 'painel_tv'
+  );
+$$;
+REVOKE ALL ON FUNCTION public.usuario_e_painel_tv(uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.usuario_e_painel_tv(uuid) TO supabase_auth_admin;
+
+-- Cada usuário lê o PRÓPRIO perfil. A TV não é is_interno() e sem isto o app
+-- não sabe que ela é a TV (ficaria em "Aguardando liberação"). Só a própria linha.
+DROP POLICY IF EXISTS perfis_usuarios_select_proprio ON public.perfis_usuarios;
+CREATE POLICY perfis_usuarios_select_proprio ON public.perfis_usuarios FOR SELECT TO authenticated
+  USING (user_id = (SELECT auth.uid()));
+
+-- log_auditoria: ninguém insere direto pela API. Quem grava é o audit_trigger
+-- (SECURITY DEFINER desde a 0049); a policy WITH CHECK (true) da 0025 deixava
+-- qualquer autenticado — parceiro inclusive — forjar linhas, e o backfill
+-- abaixo transforma esse log em histórico de etapas. Fechar ANTES do backfill.
+DROP POLICY IF EXISTS log_auditoria_insert ON public.log_auditoria;
+REVOKE INSERT ON public.log_auditoria FROM PUBLIC, anon, authenticated;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 2. Configuração: SLA por etapa e metas da operação
+-- ─────────────────────────────────────────────────────────────────────────────
+
+-- `id uuid` em ambas: o audit_trigger grava registro_id = NEW.id numa coluna uuid.
+CREATE TABLE IF NOT EXISTS public.sla_etapas (
+  id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  status         text NOT NULL UNIQUE
+                 CHECK (status IN ('recebida', 'em_cadastro', 'instrucao_emitida', 'oc_gerada', 'oc_enviada')),
+  aviso_min      integer NOT NULL CHECK (aviso_min > 0),
+  alerta_min     integer NOT NULL,
+  ativo          boolean NOT NULL DEFAULT true,
+  atualizado_em  timestamptz NOT NULL DEFAULT now(),
+  atualizado_por uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  CONSTRAINT sla_etapas_alerta_maior CHECK (alerta_min > aviso_min)
+);
+COMMENT ON TABLE public.sla_etapas IS
+  'Limites de SLA por etapa (0079), em minutos de horas corridas. aviso = começa a pedir atenção; '
+  'alerta = fora do SLA. OC enviada fica com ativo=false (decisão D1).';
+
+INSERT INTO public.sla_etapas (status, aviso_min, alerta_min, ativo) VALUES
+  ('recebida', 120, 480, true),
+  ('em_cadastro', 120, 480, true),
+  ('instrucao_emitida', 120, 480, true),
+  ('oc_gerada', 120, 480, true),
+  ('oc_enviada', 120, 480, false)
+ON CONFLICT (status) DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS public.metas_operacao (
+  id                     uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  singleton              boolean NOT NULL UNIQUE DEFAULT true CHECK (singleton),
+  meta_finalizadas_dia   integer CHECK (meta_finalizadas_dia >= 0),
+  meta_lead_time_p90_min integer CHECK (meta_lead_time_p90_min > 0),
+  alerta_validade_h      integer NOT NULL DEFAULT 24 CHECK (alerta_validade_h BETWEEN 1 AND 168),
+  expediente_inicio      time NOT NULL DEFAULT '07:00',
+  expediente_fim         time NOT NULL DEFAULT '18:00',
+  atualizado_em          timestamptz NOT NULL DEFAULT now(),
+  atualizado_por         uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  CONSTRAINT metas_operacao_expediente CHECK (expediente_fim > expediente_inicio)
+);
+COMMENT ON TABLE public.metas_operacao IS
+  'Metas da operação (0079), linha única. meta_finalizadas_dia NULL = sem meta (D3): '
+  'Painel e TV mostram só o realizado.';
+
+INSERT INTO public.metas_operacao (singleton) VALUES (true)
+ON CONFLICT (singleton) DO NOTHING;
+
+-- Carimbo de quem alterou (o front não precisa mandar).
+CREATE OR REPLACE FUNCTION public.carimbar_config_metas()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  NEW.atualizado_em := now();
+  BEGIN
+    NEW.atualizado_por := auth.uid();
+  EXCEPTION WHEN OTHERS THEN
+    NEW.atualizado_por := NULL;
+  END;
+  RETURN NEW;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.carimbar_config_metas() FROM PUBLIC, anon, authenticated;
+
+DROP TRIGGER IF EXISTS trg_sla_etapas_carimbo ON public.sla_etapas;
+CREATE TRIGGER trg_sla_etapas_carimbo BEFORE UPDATE ON public.sla_etapas
+  FOR EACH ROW EXECUTE FUNCTION public.carimbar_config_metas();
+DROP TRIGGER IF EXISTS trg_metas_operacao_carimbo ON public.metas_operacao;
+CREATE TRIGGER trg_metas_operacao_carimbo BEFORE UPDATE ON public.metas_operacao
+  FOR EACH ROW EXECUTE FUNCTION public.carimbar_config_metas();
+
+DROP TRIGGER IF EXISTS aud_sla_etapas ON public.sla_etapas;
+CREATE TRIGGER aud_sla_etapas AFTER INSERT OR UPDATE OR DELETE ON public.sla_etapas
+  FOR EACH ROW EXECUTE FUNCTION public.audit_trigger();
+DROP TRIGGER IF EXISTS aud_metas_operacao ON public.metas_operacao;
+CREATE TRIGGER aud_metas_operacao AFTER INSERT OR UPDATE OR DELETE ON public.metas_operacao
+  FOR EACH ROW EXECUTE FUNCTION public.audit_trigger();
+
+ALTER TABLE public.sla_etapas ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.metas_operacao ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.sla_etapas, public.metas_operacao FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.sla_etapas, public.metas_operacao TO authenticated;
+-- Só as colunas de valor: etapa, id e carimbos não se editam pela API.
+GRANT UPDATE (aviso_min, alerta_min, ativo) ON public.sla_etapas TO authenticated;
+GRANT UPDATE (meta_finalizadas_dia, meta_lead_time_p90_min, alerta_validade_h, expediente_inicio, expediente_fim)
+  ON public.metas_operacao TO authenticated;
+
+-- Leitura: equipe interna e a TV (sem dado pessoal). Escrita: só admin. Sem
+-- INSERT/DELETE — as linhas são fixas (seed acima).
+DROP POLICY IF EXISTS sla_etapas_select ON public.sla_etapas;
+CREATE POLICY sla_etapas_select ON public.sla_etapas FOR SELECT TO authenticated
+  USING ((SELECT public.is_interno()) OR (SELECT public.is_painel_tv()));
+DROP POLICY IF EXISTS sla_etapas_update ON public.sla_etapas;
+CREATE POLICY sla_etapas_update ON public.sla_etapas FOR UPDATE TO authenticated
+  USING ((SELECT public.meu_perfil_interno()) = 'admin')
+  WITH CHECK ((SELECT public.meu_perfil_interno()) = 'admin');
+
+DROP POLICY IF EXISTS metas_operacao_select ON public.metas_operacao;
+CREATE POLICY metas_operacao_select ON public.metas_operacao FOR SELECT TO authenticated
+  USING ((SELECT public.is_interno()) OR (SELECT public.is_painel_tv()));
+DROP POLICY IF EXISTS metas_operacao_update ON public.metas_operacao;
+CREATE POLICY metas_operacao_update ON public.metas_operacao FOR UPDATE TO authenticated
+  USING ((SELECT public.meu_perfil_interno()) = 'admin')
+  WITH CHECK ((SELECT public.meu_perfil_interno()) = 'admin');
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 3. Função pura do SLA (espelhada em apps/interno/src/features/metricas/sla.ts)
+-- ─────────────────────────────────────────────────────────────────────────────
+
+-- null = etapa sem SLA (inativa ou fora da fila); 'ok' | 'aviso' | 'fora'.
+-- Minutos na etapa < aviso → 'ok'; aviso ≤ minutos ≤ alerta → 'aviso';
+-- minutos > alerta → 'fora' (mesma regra e vetores de sla.ts).
+CREATE OR REPLACE FUNCTION public.sla_classificar(
+  p_status text, p_desde timestamptz, p_agora timestamptz,
+  p_aviso integer, p_alerta integer, p_ativo boolean
+)
+RETURNS text
+LANGUAGE sql IMMUTABLE PARALLEL SAFE
+SET search_path = public, pg_temp
+AS $$
+  SELECT CASE
+    WHEN p_ativo IS NOT TRUE OR p_desde IS NULL OR p_agora IS NULL
+      OR p_aviso IS NULL OR p_alerta IS NULL
+      OR p_status NOT IN ('recebida', 'em_cadastro', 'instrucao_emitida', 'oc_gerada', 'oc_enviada')
+      THEN NULL
+    WHEN extract(epoch FROM (p_agora - p_desde)) / 60 > p_alerta THEN 'fora'
+    WHEN extract(epoch FROM (p_agora - p_desde)) / 60 >= p_aviso THEN 'aviso'
+    ELSE 'ok'
+  END;
+$$;
+REVOKE ALL ON FUNCTION public.sla_classificar(text, timestamptz, timestamptz, integer, integer, boolean) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.sla_classificar(text, timestamptz, timestamptz, integer, integer, boolean) TO authenticated;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 4. Histórico de etapas e status_desde
+-- ─────────────────────────────────────────────────────────────────────────────
+
+ALTER TABLE public.solicitacoes ADD COLUMN IF NOT EXISTS status_desde timestamptz;
+COMMENT ON COLUMN public.solicitacoes.status_desde IS
+  'Quando a solicitação entrou na etapa atual (0079). Carimbado pelo servidor; '
+  'base do SLA por etapa.';
+
+CREATE TABLE IF NOT EXISTS public.solicitacao_transicoes (
+  id             bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  solicitacao_id uuid NOT NULL REFERENCES public.solicitacoes(id) ON DELETE CASCADE,
+  de_status      text,
+  para_status    text NOT NULL,
+  em             timestamptz NOT NULL,
+  usuario_id     uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  fonte          text NOT NULL DEFAULT 'trigger' CHECK (fonte IN ('trigger', 'backfill'))
+);
+COMMENT ON TABLE public.solicitacao_transicoes IS
+  'Cada mudança de etapa de uma solicitação (0079). Antes da 0079: reconstruído do '
+  'log_auditoria (fonte=backfill). usuario_id só é legível por funções SECURITY '
+  'DEFINER (Produtividade, só gestão) — privilégio de coluna.';
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_solicitacao_transicao
+  ON public.solicitacao_transicoes (solicitacao_id, em, para_status);
+CREATE INDEX IF NOT EXISTS idx_transicoes_para_em ON public.solicitacao_transicoes (para_status, em);
+CREATE INDEX IF NOT EXISTS idx_transicoes_em ON public.solicitacao_transicoes (em);
+CREATE INDEX IF NOT EXISTS idx_transicoes_usuario_em ON public.solicitacao_transicoes (usuario_id, em)
+  WHERE usuario_id IS NOT NULL;
+
+ALTER TABLE public.solicitacao_transicoes ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.solicitacao_transicoes FROM PUBLIC, anon, authenticated;
+GRANT SELECT (id, solicitacao_id, de_status, para_status, em, fonte)
+  ON public.solicitacao_transicoes TO authenticated;
+DROP POLICY IF EXISTS solicitacao_transicoes_select ON public.solicitacao_transicoes;
+CREATE POLICY solicitacao_transicoes_select ON public.solicitacao_transicoes FOR SELECT TO authenticated
+  USING ((SELECT public.is_interno()));
+
+RESET lock_timeout;
+
+-- =====================================================================
 -- 0051 (+0052/0053) — RLS: helpers avaliados UMA vez por query
 -- =====================================================================
 -- PRECISA SER O ULTIMO BLOCO QUE TOCA POLICY. Nao e uma lista de policies: e uma
@@ -4798,194 +5045,19 @@ NOTIFY pgrst, 'reload schema';
 
 
 -- =====================================================================
--- 0079 e 0080 — Dashboards operacionais (metas/SLA, transições, painel_tv, RPCs).
--- NO FIM de propósito: a 0079 redefine funções que blocos acima criam (hook da
--- 0077, limite diário da 0022, agendamento da 0068/0069) e precisa vencer. As
--- policies novas já estão no formato (SELECT fn()) que a varredura da 0051 faria.
--- A 0078 (agente de WhatsApp, PR #107) ainda não está neste arquivo; o trecho da
--- 0079 que toca agente_config é condicional (to_regclass).
+-- 0079 (parte B) e 0080 — Dashboards: backfill, carimbos, hook com o painel_tv,
+-- fuso America/Campo_Grande e RPCs. NO FIM: redefine funções que blocos acima
+-- recriam (hook da 0077, limite diário da 0022, agendamento da 0068/0069).
+-- A 0078 (agente de WhatsApp, PR #107) ainda não está neste arquivo; o trecho
+-- que toca agente_config é condicional.
 -- =====================================================================
 
--- 0079 — Dashboards operacionais: metas e SLA por etapa, histórico de etapas,
--- carimbos no servidor e o perfil "Painel TV".
---
--- Plano: .omc/plans/dashboards-operacionais.md (v2), §2.2–§2.4. Decisões do Davi
--- (2026-10-16): SLA POR ETAPA em horas corridas (aviso 2 h / alerta 8 h; OC
--- enviada fora), metas configuráveis pelo admin, TV com conta dedicada, fuso da
--- operação em Mato Grosso do Sul (America/Campo_Grande).
---
--- O que muda:
---   1. Perfil `painel_tv`: só lê o Painel. `is_interno()` passa a NEGÁ-LO, então
---      as policies que liberam dados por is_interno() não valem para a TV.
---   2. `sla_etapas` e `metas_operacao` (config, auditadas; só admin altera).
---   3. `solicitacoes.status_desde` + `solicitacao_transicoes` (histórico de
---      etapas), reconstruídos do log_auditoria e mantidos por trigger.
---   4. `status_desde` e `finalizada_em` passam a ser carimbados NO SERVIDOR
---      (antes `finalizada_em` vinha do relógio do navegador e podia ser forjado).
---   5. `sla_classificar()`: a regra de SLA numa função pura, espelhada no front
---      (apps/interno/src/features/metricas/sla.ts) com os mesmos vetores.
---   6. Hook de inatividade (0077): renovação sempre liberada para o painel_tv.
---   7. Fuso: limite diário do portal e data mínima de agendamento passam de
---      America/Sao_Paulo para America/Campo_Grande.
---   8. `agente_config.usuario_id` (se a 0078 existir): qual login é o agente de
---      WhatsApp, para a linha separada da Produtividade.
---
--- Idempotente: pode rodar de novo sem duplicar nada (memória "migrations-idempotentes").
--- ATENÇÃO na hora de aplicar: o backfill de status_desde faz UM UPDATE em todas
--- as solicitações (triggers de auditoria e updated_at desligados durante ele).
--- Isso gera eventos de Realtime para quem estiver com o sistema aberto —
--- aplicar fora do expediente.
+SET lock_timeout = '5s';
 
--- ─────────────────────────────────────────────────────────────────────────────
--- 1. Perfil painel_tv
--- ─────────────────────────────────────────────────────────────────────────────
-
-ALTER TABLE public.perfis_usuarios DROP CONSTRAINT IF EXISTS perfis_usuarios_perfil_check;
-ALTER TABLE public.perfis_usuarios ADD CONSTRAINT perfis_usuarios_perfil_check
-  CHECK (perfil IN ('admin', 'gerente', 'supervisor', 'analista', 'assistente', 'painel_tv'));
-
--- is_interno(): qualquer perfil ativo, MENOS o da TV. As ~10 policies que
--- liberam dados pessoais por is_interno() passam a negar para a TV sem precisar
--- tocar em nenhuma delas.
-CREATE OR REPLACE FUNCTION public.is_interno()
-RETURNS boolean
-LANGUAGE sql STABLE SECURITY DEFINER
-SET search_path = public, pg_temp
-AS $$
-  SELECT EXISTS (
-    SELECT 1 FROM perfis_usuarios
-    WHERE user_id = auth.uid() AND ativo = true AND perfil <> 'painel_tv'
-  );
-$$;
-
-CREATE OR REPLACE FUNCTION public.is_painel_tv()
-RETURNS boolean
-LANGUAGE sql STABLE SECURITY DEFINER
-SET search_path = public, pg_temp
-AS $$
-  SELECT EXISTS (
-    SELECT 1 FROM perfis_usuarios
-    WHERE user_id = auth.uid() AND ativo = true AND perfil = 'painel_tv'
-  );
-$$;
-REVOKE ALL ON FUNCTION public.is_painel_tv() FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.is_painel_tv() TO authenticated;
-
--- Para o hook de inatividade, que roda como supabase_auth_admin (sem auth.uid()).
-CREATE OR REPLACE FUNCTION public.usuario_e_painel_tv(p_user uuid)
-RETURNS boolean
-LANGUAGE sql STABLE SECURITY DEFINER
-SET search_path = public, pg_temp
-AS $$
-  SELECT EXISTS (
-    SELECT 1 FROM perfis_usuarios
-    WHERE user_id = p_user AND ativo = true AND perfil = 'painel_tv'
-  );
-$$;
-REVOKE ALL ON FUNCTION public.usuario_e_painel_tv(uuid) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.usuario_e_painel_tv(uuid) TO supabase_auth_admin;
-
--- ─────────────────────────────────────────────────────────────────────────────
--- 2. Configuração: SLA por etapa e metas da operação
--- ─────────────────────────────────────────────────────────────────────────────
-
--- `id uuid` em ambas: o audit_trigger grava registro_id = NEW.id numa coluna uuid.
-CREATE TABLE IF NOT EXISTS public.sla_etapas (
-  id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  status         text NOT NULL UNIQUE
-                 CHECK (status IN ('recebida', 'em_cadastro', 'instrucao_emitida', 'oc_gerada', 'oc_enviada')),
-  aviso_min      integer NOT NULL CHECK (aviso_min > 0),
-  alerta_min     integer NOT NULL,
-  ativo          boolean NOT NULL DEFAULT true,
-  atualizado_em  timestamptz NOT NULL DEFAULT now(),
-  atualizado_por uuid REFERENCES auth.users(id) ON DELETE SET NULL,
-  CONSTRAINT sla_etapas_alerta_maior CHECK (alerta_min > aviso_min)
-);
-COMMENT ON TABLE public.sla_etapas IS
-  'Limites de SLA por etapa (0079), em minutos de horas corridas. aviso = começa a pedir atenção; '
-  'alerta = fora do SLA. OC enviada fica com ativo=false (decisão D1).';
-
-INSERT INTO public.sla_etapas (status, aviso_min, alerta_min, ativo) VALUES
-  ('recebida', 120, 480, true),
-  ('em_cadastro', 120, 480, true),
-  ('instrucao_emitida', 120, 480, true),
-  ('oc_gerada', 120, 480, true),
-  ('oc_enviada', 120, 480, false)
-ON CONFLICT (status) DO NOTHING;
-
-CREATE TABLE IF NOT EXISTS public.metas_operacao (
-  id                     uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  singleton              boolean NOT NULL UNIQUE DEFAULT true CHECK (singleton),
-  meta_finalizadas_dia   integer CHECK (meta_finalizadas_dia >= 0),
-  meta_lead_time_p90_min integer CHECK (meta_lead_time_p90_min > 0),
-  alerta_validade_h      integer NOT NULL DEFAULT 24 CHECK (alerta_validade_h BETWEEN 1 AND 168),
-  expediente_inicio      time NOT NULL DEFAULT '07:00',
-  expediente_fim         time NOT NULL DEFAULT '18:00',
-  atualizado_em          timestamptz NOT NULL DEFAULT now(),
-  atualizado_por         uuid REFERENCES auth.users(id) ON DELETE SET NULL,
-  CONSTRAINT metas_operacao_expediente CHECK (expediente_fim > expediente_inicio)
-);
-COMMENT ON TABLE public.metas_operacao IS
-  'Metas da operação (0079), linha única. meta_finalizadas_dia NULL = sem meta (D3): '
-  'Painel e TV mostram só o realizado.';
-
-INSERT INTO public.metas_operacao (singleton) VALUES (true)
-ON CONFLICT (singleton) DO NOTHING;
-
--- Carimbo de quem alterou (o front não precisa mandar).
-CREATE OR REPLACE FUNCTION public.carimbar_config_metas()
-RETURNS trigger
-LANGUAGE plpgsql
-SET search_path = public, pg_temp
-AS $$
-BEGIN
-  NEW.atualizado_em := now();
-  BEGIN
-    NEW.atualizado_por := auth.uid();
-  EXCEPTION WHEN OTHERS THEN
-    NEW.atualizado_por := NULL;
-  END;
-  RETURN NEW;
-END;
-$$;
-REVOKE ALL ON FUNCTION public.carimbar_config_metas() FROM PUBLIC, anon, authenticated;
-
-DROP TRIGGER IF EXISTS trg_sla_etapas_carimbo ON public.sla_etapas;
-CREATE TRIGGER trg_sla_etapas_carimbo BEFORE UPDATE ON public.sla_etapas
-  FOR EACH ROW EXECUTE FUNCTION public.carimbar_config_metas();
-DROP TRIGGER IF EXISTS trg_metas_operacao_carimbo ON public.metas_operacao;
-CREATE TRIGGER trg_metas_operacao_carimbo BEFORE UPDATE ON public.metas_operacao
-  FOR EACH ROW EXECUTE FUNCTION public.carimbar_config_metas();
-
-DROP TRIGGER IF EXISTS aud_sla_etapas ON public.sla_etapas;
-CREATE TRIGGER aud_sla_etapas AFTER INSERT OR UPDATE OR DELETE ON public.sla_etapas
-  FOR EACH ROW EXECUTE FUNCTION public.audit_trigger();
-DROP TRIGGER IF EXISTS aud_metas_operacao ON public.metas_operacao;
-CREATE TRIGGER aud_metas_operacao AFTER INSERT OR UPDATE OR DELETE ON public.metas_operacao
-  FOR EACH ROW EXECUTE FUNCTION public.audit_trigger();
-
-ALTER TABLE public.sla_etapas ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.metas_operacao ENABLE ROW LEVEL SECURITY;
-REVOKE ALL ON public.sla_etapas, public.metas_operacao FROM PUBLIC, anon;
-GRANT SELECT, UPDATE ON public.sla_etapas, public.metas_operacao TO authenticated;
-
--- Leitura: equipe interna e a TV (sem dado pessoal). Escrita: só admin. Sem
--- INSERT/DELETE — as linhas são fixas (seed acima).
-DROP POLICY IF EXISTS sla_etapas_select ON public.sla_etapas;
-CREATE POLICY sla_etapas_select ON public.sla_etapas FOR SELECT TO authenticated
-  USING ((SELECT public.is_interno()) OR (SELECT public.is_painel_tv()));
-DROP POLICY IF EXISTS sla_etapas_update ON public.sla_etapas;
-CREATE POLICY sla_etapas_update ON public.sla_etapas FOR UPDATE TO authenticated
-  USING ((SELECT public.meu_perfil_interno()) = 'admin')
-  WITH CHECK ((SELECT public.meu_perfil_interno()) = 'admin');
-
-DROP POLICY IF EXISTS metas_operacao_select ON public.metas_operacao;
-CREATE POLICY metas_operacao_select ON public.metas_operacao FOR SELECT TO authenticated
-  USING ((SELECT public.is_interno()) OR (SELECT public.is_painel_tv()));
-DROP POLICY IF EXISTS metas_operacao_update ON public.metas_operacao;
-CREATE POLICY metas_operacao_update ON public.metas_operacao FOR UPDATE TO authenticated
-  USING ((SELECT public.meu_perfil_interno()) = 'admin')
-  WITH CHECK ((SELECT public.meu_perfil_interno()) = 'admin');
+-- ═════════════════════════════════════════════════════════════════════════════
+-- PARTE B — dados, triggers e funções que sobrescrevem as antigas
+-- (no cumulative-schema: no FIM, para vencer as versões antigas recriadas lá)
+-- ═════════════════════════════════════════════════════════════════════════════
 
 -- Qual login é o agente de WhatsApp (0078). Só existe se a 0078 já rodou.
 DO $$
@@ -4998,72 +5070,6 @@ BEGIN
       'numa linha separada, fora dos totais da equipe. Preencher uma vez (admin).';
   END IF;
 END $$;
-
--- ─────────────────────────────────────────────────────────────────────────────
--- 3. Função pura do SLA (espelhada em apps/interno/src/features/metricas/sla.ts)
--- ─────────────────────────────────────────────────────────────────────────────
-
--- null = etapa sem SLA (inativa ou fora da fila); 'ok' | 'aviso' | 'fora'.
--- Minutos na etapa < aviso → 'ok'; aviso ≤ minutos ≤ alerta → 'aviso';
--- minutos > alerta → 'fora' (mesma regra e vetores de sla.ts).
-CREATE OR REPLACE FUNCTION public.sla_classificar(
-  p_status text, p_desde timestamptz, p_agora timestamptz,
-  p_aviso integer, p_alerta integer, p_ativo boolean
-)
-RETURNS text
-LANGUAGE sql IMMUTABLE PARALLEL SAFE
-SET search_path = public, pg_temp
-AS $$
-  SELECT CASE
-    WHEN p_ativo IS NOT TRUE OR p_desde IS NULL OR p_agora IS NULL
-      OR p_aviso IS NULL OR p_alerta IS NULL
-      OR p_status NOT IN ('recebida', 'em_cadastro', 'instrucao_emitida', 'oc_gerada', 'oc_enviada')
-      THEN NULL
-    WHEN extract(epoch FROM (p_agora - p_desde)) / 60 > p_alerta THEN 'fora'
-    WHEN extract(epoch FROM (p_agora - p_desde)) / 60 >= p_aviso THEN 'aviso'
-    ELSE 'ok'
-  END;
-$$;
-REVOKE ALL ON FUNCTION public.sla_classificar(text, timestamptz, timestamptz, integer, integer, boolean) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.sla_classificar(text, timestamptz, timestamptz, integer, integer, boolean) TO authenticated;
-
--- ─────────────────────────────────────────────────────────────────────────────
--- 4. Histórico de etapas e status_desde
--- ─────────────────────────────────────────────────────────────────────────────
-
-ALTER TABLE public.solicitacoes ADD COLUMN IF NOT EXISTS status_desde timestamptz;
-COMMENT ON COLUMN public.solicitacoes.status_desde IS
-  'Quando a solicitação entrou na etapa atual (0079). Carimbado pelo servidor; '
-  'base do SLA por etapa.';
-
-CREATE TABLE IF NOT EXISTS public.solicitacao_transicoes (
-  id             bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  solicitacao_id uuid NOT NULL REFERENCES public.solicitacoes(id) ON DELETE CASCADE,
-  de_status      text,
-  para_status    text NOT NULL,
-  em             timestamptz NOT NULL,
-  usuario_id     uuid REFERENCES auth.users(id) ON DELETE SET NULL,
-  fonte          text NOT NULL DEFAULT 'trigger' CHECK (fonte IN ('trigger', 'backfill'))
-);
-COMMENT ON TABLE public.solicitacao_transicoes IS
-  'Cada mudança de etapa de uma solicitação (0079). Antes da 0079: reconstruído do '
-  'log_auditoria (fonte=backfill). usuario_id só é legível por funções SECURITY '
-  'DEFINER (Produtividade, só gestão) — privilégio de coluna.';
-
-CREATE UNIQUE INDEX IF NOT EXISTS uq_solicitacao_transicao
-  ON public.solicitacao_transicoes (solicitacao_id, em, para_status);
-CREATE INDEX IF NOT EXISTS idx_transicoes_para_em ON public.solicitacao_transicoes (para_status, em);
-CREATE INDEX IF NOT EXISTS idx_transicoes_em ON public.solicitacao_transicoes (em);
-CREATE INDEX IF NOT EXISTS idx_transicoes_usuario_em ON public.solicitacao_transicoes (usuario_id, em)
-  WHERE usuario_id IS NOT NULL;
-
-ALTER TABLE public.solicitacao_transicoes ENABLE ROW LEVEL SECURITY;
-REVOKE ALL ON public.solicitacao_transicoes FROM PUBLIC, anon, authenticated;
-GRANT SELECT (id, solicitacao_id, de_status, para_status, em, fonte)
-  ON public.solicitacao_transicoes TO authenticated;
-DROP POLICY IF EXISTS solicitacao_transicoes_select ON public.solicitacao_transicoes;
-CREATE POLICY solicitacao_transicoes_select ON public.solicitacao_transicoes FOR SELECT TO authenticated
-  USING ((SELECT public.is_interno()));
 
 -- 4a. Backfill das transições a partir do log (antes dos triggers novos).
 --     Recorte: só o log anterior à primeira transição gravada por trigger, para
@@ -5149,6 +5155,11 @@ BEGIN
   ELSIF NEW.status IS DISTINCT FROM OLD.status THEN
     NEW.status_desde := now();
     NEW.finalizada_em := CASE WHEN NEW.status = 'finalizada' THEN now() END;
+    -- Entrou em "OC enviada": o servidor carimba (reenvio sem mudar de etapa
+    -- continua podendo atualizar enviada_em, como hoje).
+    IF NEW.status = 'oc_enviada' THEN
+      NEW.enviada_em := now();
+    END IF;
   ELSE
     NEW.status_desde := OLD.status_desde;
     NEW.finalizada_em := OLD.finalizada_em;
@@ -5399,6 +5410,8 @@ END; $function$;
 --      SELECT t.para_status FROM solicitacao_transicoes t WHERE t.solicitacao_id = s.id
 --      ORDER BY t.em DESC, t.id DESC LIMIT 1)) AS ultima_transicao_diferente;
 
+RESET lock_timeout;
+
 NOTIFY pgrst, 'reload schema';
 
 -- 0080 — Dashboards operacionais: funções de leitura (RPCs) do Painel, do Modo
@@ -5518,8 +5531,9 @@ DECLARE
   v_hoje  date := (now() AT TIME ZONE 'America/Campo_Grande')::date;
   v_lim_validade date;
   v_out   jsonb;
+  v_interno boolean := coalesce(is_interno(), false);
 BEGIN
-  IF NOT (coalesce(is_interno(), false) OR coalesce(is_painel_tv(), false)) THEN
+  IF NOT (v_interno OR coalesce(is_painel_tv(), false)) THEN
     RAISE EXCEPTION 'forbidden' USING ERRCODE = '42501';
   END IF;
 
@@ -5604,7 +5618,10 @@ BEGIN
                                AND dash_filtro(s.origem, s.cliente_id, s.local_carregamento, p_origem, p_cliente_id, p_local)),
     'por_local', coalesce((SELECT jsonb_agg(jsonb_build_object('local', local, 'qtd', qtd, 'fora_sla', fora_sla) ORDER BY rk)
                            FROM por_local), '[]'::jsonb),
-    'atrasadas', coalesce((SELECT jsonb_agg(to_jsonb(x) ORDER BY x.excesso_min DESC) FROM atrasadas x), '[]'::jsonb)
+    -- A TV não recebe o id (nada a abrir na parede, e o id abriria o PDF da OC
+    -- por outras portas). A equipe interna recebe, para o link da linha.
+    'atrasadas', coalesce((SELECT jsonb_agg(CASE WHEN v_interno THEN to_jsonb(x) ELSE to_jsonb(x) - 'id' END
+                                            ORDER BY x.excesso_min DESC) FROM atrasadas x), '[]'::jsonb)
   ) INTO v_out;
   RETURN v_out;
 END;
@@ -5688,6 +5705,10 @@ DECLARE
   v_ids uuid[];
   v_dentro numeric;
 BEGIN
+  PERFORM dash_exigir_interno();
+  IF p_fim - p_ini > interval '401 days' THEN
+    RAISE EXCEPTION 'Período máximo: 400 dias.' USING ERRCODE = '22023';
+  END IF;
   SELECT count(*), count(*) FILTER (WHERE s.status = 'cancelada')
     INTO v_ent, v_canc_coorte
   FROM solicitacoes s
@@ -6039,6 +6060,21 @@ BEGIN
 END;
 $$;
 
+-- As solicitações por trás de um drill-down, como linhas da própria tabela: a
+-- lista chama via PostgREST com select/embed/count/range/order normais (nada de
+-- mandar 1000 ids na URL). INVOKER: a RLS de solicitacoes vale.
+CREATE OR REPLACE FUNCTION public.solicitacoes_drill(
+  p_tipo text, p_de date, p_ate date,
+  p_origem text DEFAULT 'todas', p_cliente_id uuid DEFAULT NULL, p_local text DEFAULT NULL
+)
+RETURNS SETOF public.solicitacoes
+LANGUAGE sql STABLE
+SET search_path = public, pg_temp
+AS $$
+  SELECT s.* FROM solicitacoes s
+  WHERE s.id IN (SELECT ids_para_drill(p_tipo, p_de, p_ate, p_origem, p_cliente_id, p_local));
+$$;
+
 -- Linhas "tidy" para o CSV de dados (uma por solicitação criada no período).
 CREATE OR REPLACE FUNCTION public.exportar_solicitacoes_periodo(
   p_de date, p_ate date,
@@ -6114,7 +6150,10 @@ BEGIN
     RAISE EXCEPTION 'forbidden' USING ERRCODE = '42501';
   END IF;
   SELECT * INTO l FROM dash_limites(p_de, p_ate);
-  IF to_regclass('public.agente_config') IS NOT NULL THEN
+  -- agente_config vem da 0078 e usuario_id da 0079: só lê se os dois existirem.
+  IF EXISTS (SELECT 1 FROM pg_attribute
+              WHERE attrelid = to_regclass('public.agente_config')
+                AND attname = 'usuario_id' AND NOT attisdropped) THEN
     EXECUTE 'SELECT usuario_id FROM public.agente_config WHERE id = 1' INTO v_agente;
   END IF;
 
@@ -6214,8 +6253,11 @@ BEGIN
   END LOOP;
   IF p ? 'metas' THEN
     UPDATE metas_operacao SET
-      meta_finalizadas_dia   = (p -> 'metas' ->> 'meta_finalizadas_dia')::int,
-      meta_lead_time_p90_min = (p -> 'metas' ->> 'meta_lead_time_p90_min')::int,
+      -- chave presente com null = "sem meta"; chave ausente = não mexe
+      meta_finalizadas_dia   = CASE WHEN p -> 'metas' ? 'meta_finalizadas_dia'
+                                    THEN (p -> 'metas' ->> 'meta_finalizadas_dia')::int ELSE meta_finalizadas_dia END,
+      meta_lead_time_p90_min = CASE WHEN p -> 'metas' ? 'meta_lead_time_p90_min'
+                                    THEN (p -> 'metas' ->> 'meta_lead_time_p90_min')::int ELSE meta_lead_time_p90_min END,
       alerta_validade_h      = coalesce((p -> 'metas' ->> 'alerta_validade_h')::int, alerta_validade_h),
       expediente_inicio      = coalesce((p -> 'metas' ->> 'expediente_inicio')::time, expediente_inicio),
       expediente_fim         = coalesce((p -> 'metas' ->> 'expediente_fim')::time, expediente_fim)
@@ -6248,6 +6290,7 @@ BEGIN
     'public.relatorio_locais(date, date)',
     'public.relatorio_mapa_calor(date, date, text, uuid, text)',
     'public.ids_para_drill(text, date, date, text, uuid, text)',
+    'public.solicitacoes_drill(text, date, date, text, uuid, text)',
     'public.exportar_solicitacoes_periodo(date, date, text, uuid, text, int, int)',
     'public.relatorio_produtividade(date, date)',
     'public.salvar_metas_sla(jsonb)'

@@ -115,8 +115,9 @@ DECLARE
   v_hoje  date := (now() AT TIME ZONE 'America/Campo_Grande')::date;
   v_lim_validade date;
   v_out   jsonb;
+  v_interno boolean := coalesce(is_interno(), false);
 BEGIN
-  IF NOT (coalesce(is_interno(), false) OR coalesce(is_painel_tv(), false)) THEN
+  IF NOT (v_interno OR coalesce(is_painel_tv(), false)) THEN
     RAISE EXCEPTION 'forbidden' USING ERRCODE = '42501';
   END IF;
 
@@ -201,7 +202,10 @@ BEGIN
                                AND dash_filtro(s.origem, s.cliente_id, s.local_carregamento, p_origem, p_cliente_id, p_local)),
     'por_local', coalesce((SELECT jsonb_agg(jsonb_build_object('local', local, 'qtd', qtd, 'fora_sla', fora_sla) ORDER BY rk)
                            FROM por_local), '[]'::jsonb),
-    'atrasadas', coalesce((SELECT jsonb_agg(to_jsonb(x) ORDER BY x.excesso_min DESC) FROM atrasadas x), '[]'::jsonb)
+    -- A TV não recebe o id (nada a abrir na parede, e o id abriria o PDF da OC
+    -- por outras portas). A equipe interna recebe, para o link da linha.
+    'atrasadas', coalesce((SELECT jsonb_agg(CASE WHEN v_interno THEN to_jsonb(x) ELSE to_jsonb(x) - 'id' END
+                                            ORDER BY x.excesso_min DESC) FROM atrasadas x), '[]'::jsonb)
   ) INTO v_out;
   RETURN v_out;
 END;
@@ -285,6 +289,10 @@ DECLARE
   v_ids uuid[];
   v_dentro numeric;
 BEGIN
+  PERFORM dash_exigir_interno();
+  IF p_fim - p_ini > interval '401 days' THEN
+    RAISE EXCEPTION 'Período máximo: 400 dias.' USING ERRCODE = '22023';
+  END IF;
   SELECT count(*), count(*) FILTER (WHERE s.status = 'cancelada')
     INTO v_ent, v_canc_coorte
   FROM solicitacoes s
@@ -636,6 +644,21 @@ BEGIN
 END;
 $$;
 
+-- As solicitações por trás de um drill-down, como linhas da própria tabela: a
+-- lista chama via PostgREST com select/embed/count/range/order normais (nada de
+-- mandar 1000 ids na URL). INVOKER: a RLS de solicitacoes vale.
+CREATE OR REPLACE FUNCTION public.solicitacoes_drill(
+  p_tipo text, p_de date, p_ate date,
+  p_origem text DEFAULT 'todas', p_cliente_id uuid DEFAULT NULL, p_local text DEFAULT NULL
+)
+RETURNS SETOF public.solicitacoes
+LANGUAGE sql STABLE
+SET search_path = public, pg_temp
+AS $$
+  SELECT s.* FROM solicitacoes s
+  WHERE s.id IN (SELECT ids_para_drill(p_tipo, p_de, p_ate, p_origem, p_cliente_id, p_local));
+$$;
+
 -- Linhas "tidy" para o CSV de dados (uma por solicitação criada no período).
 CREATE OR REPLACE FUNCTION public.exportar_solicitacoes_periodo(
   p_de date, p_ate date,
@@ -711,7 +734,10 @@ BEGIN
     RAISE EXCEPTION 'forbidden' USING ERRCODE = '42501';
   END IF;
   SELECT * INTO l FROM dash_limites(p_de, p_ate);
-  IF to_regclass('public.agente_config') IS NOT NULL THEN
+  -- agente_config vem da 0078 e usuario_id da 0079: só lê se os dois existirem.
+  IF EXISTS (SELECT 1 FROM pg_attribute
+              WHERE attrelid = to_regclass('public.agente_config')
+                AND attname = 'usuario_id' AND NOT attisdropped) THEN
     EXECUTE 'SELECT usuario_id FROM public.agente_config WHERE id = 1' INTO v_agente;
   END IF;
 
@@ -811,8 +837,11 @@ BEGIN
   END LOOP;
   IF p ? 'metas' THEN
     UPDATE metas_operacao SET
-      meta_finalizadas_dia   = (p -> 'metas' ->> 'meta_finalizadas_dia')::int,
-      meta_lead_time_p90_min = (p -> 'metas' ->> 'meta_lead_time_p90_min')::int,
+      -- chave presente com null = "sem meta"; chave ausente = não mexe
+      meta_finalizadas_dia   = CASE WHEN p -> 'metas' ? 'meta_finalizadas_dia'
+                                    THEN (p -> 'metas' ->> 'meta_finalizadas_dia')::int ELSE meta_finalizadas_dia END,
+      meta_lead_time_p90_min = CASE WHEN p -> 'metas' ? 'meta_lead_time_p90_min'
+                                    THEN (p -> 'metas' ->> 'meta_lead_time_p90_min')::int ELSE meta_lead_time_p90_min END,
       alerta_validade_h      = coalesce((p -> 'metas' ->> 'alerta_validade_h')::int, alerta_validade_h),
       expediente_inicio      = coalesce((p -> 'metas' ->> 'expediente_inicio')::time, expediente_inicio),
       expediente_fim         = coalesce((p -> 'metas' ->> 'expediente_fim')::time, expediente_fim)
@@ -845,6 +874,7 @@ BEGIN
     'public.relatorio_locais(date, date)',
     'public.relatorio_mapa_calor(date, date, text, uuid, text)',
     'public.ids_para_drill(text, date, date, text, uuid, text)',
+    'public.solicitacoes_drill(text, date, date, text, uuid, text)',
     'public.exportar_solicitacoes_periodo(date, date, text, uuid, text, int, int)',
     'public.relatorio_produtividade(date, date)',
     'public.salvar_metas_sla(jsonb)'
