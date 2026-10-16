@@ -163,7 +163,7 @@ export function hasPerfilParceiro(
 function traduzirErroAuth(msg: string): string {
   const m = msg.toLowerCase()
   if (m.includes('invalid login credentials')) return 'E-mail ou senha incorretos.'
-  if (m.includes('email not confirmed')) return 'Confirme seu e-mail antes de entrar.'
+  if (m.includes('email not confirmed')) return 'Confirme o e-mail antes de entrar.'
   if (m.includes('too many requests')) return 'Muitas tentativas. Aguarde alguns instantes.'
   if (m.includes('captcha')) return 'Falha na verificação de segurança. Recarregue a página e tente novamente.'
   return 'Não foi possível entrar. Tente novamente.'

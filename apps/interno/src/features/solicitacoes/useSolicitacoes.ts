@@ -403,7 +403,7 @@ export function useCreateSolicitacao() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['solicitacoes'] })
-      toast.success('Solicitação criada')
+      toast.success('Solicitação criada.')
     },
     onError: (e: unknown) => toast.error(traduzirErroBanco(e)),
   })
@@ -601,7 +601,7 @@ export function useTransitStatus() {
       toast.error(traduzirErroBanco(e))
     },
     onSuccess: () => {
-      toast.success('Status atualizado')
+      toast.success('Status atualizado.')
     },
     onSettled: (_data, _err, vars) => {
       qc.invalidateQueries({ queryKey: ['solicitacoes'] })

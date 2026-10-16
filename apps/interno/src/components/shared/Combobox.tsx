@@ -1,5 +1,6 @@
 import * as React from 'react'
 import { Check, ChevronsUpDown, X, Plus } from 'lucide-react'
+import { Spinner } from '@/components/shared/Spinner'
 import { Button } from '@/components/ui/button'
 import {
   Command,
@@ -31,6 +32,11 @@ interface ComboboxProps {
   disabled?: boolean
   allowClear?: boolean
   ariaLabel?: string
+  /** id do gatilho: liga o <Label htmlFor> (ex.: dentro de <CadastroField>). */
+  id?: string
+  'aria-invalid'?: boolean
+  'aria-describedby'?: string
+  'aria-required'?: boolean
 }
 
 export function Combobox({
@@ -46,6 +52,10 @@ export function Combobox({
   disabled,
   allowClear = true,
   ariaLabel,
+  id,
+  'aria-invalid': ariaInvalid,
+  'aria-describedby': ariaDescribedBy,
+  'aria-required': ariaRequired,
 }: ComboboxProps) {
   const [open, setOpen] = React.useState(false)
   const [search, setSearch] = React.useState('')
@@ -58,12 +68,16 @@ export function Combobox({
           type="button"
           variant="outline"
           role="combobox"
+          id={id}
           aria-label={ariaLabel}
+          aria-invalid={ariaInvalid}
+          aria-describedby={ariaDescribedBy}
+          aria-required={ariaRequired}
           aria-expanded={open}
           disabled={disabled}
           className={cn(
             'h-9 w-full justify-between font-normal',
-            !selected && 'text-muted-foreground',
+            !selected && 'text-tertiary',
           )}
         >
           <span className="truncate">{selected?.label ?? placeholder}</span>
@@ -77,12 +91,12 @@ export function Combobox({
                   e.stopPropagation()
                   onChange(null)
                 }}
-                className="rounded-sm p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                className="rounded-sm p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
               >
                 <X className="h-3.5 w-3.5" />
               </span>
             )}
-            <ChevronsUpDown className="h-3.5 w-3.5 opacity-60" />
+            <ChevronsUpDown className="h-4 w-4 text-tertiary" />
           </span>
         </Button>
       </PopoverTrigger>
@@ -95,13 +109,16 @@ export function Combobox({
           />
           <CommandList>
             {loading && (
-              <div className="px-3 py-3 text-[12px] text-muted-foreground">Carregando…</div>
+              <div className="flex items-center gap-2 px-3 py-3 text-body-sm text-muted-foreground">
+                <Spinner />
+                Carregando…
+              </div>
             )}
             {!loading && (
               <>
                 <CommandEmpty>
                   <div className="space-y-2 px-3 py-3 text-center">
-                    <p className="text-[13px] text-muted-foreground">{emptyMessage}</p>
+                    <p className="text-body text-muted-foreground">{emptyMessage}</p>
                     {onCreateNew && (
                       <Button
                         type="button"
@@ -138,7 +155,7 @@ export function Combobox({
                       <div className="flex flex-1 flex-col">
                         <span className="truncate">{opt.label}</span>
                         {opt.hint && (
-                          <span className="truncate text-[11px] text-muted-foreground">
+                          <span className="truncate text-meta text-muted-foreground">
                             {opt.hint}
                           </span>
                         )}

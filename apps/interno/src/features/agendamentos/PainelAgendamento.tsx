@@ -1,7 +1,6 @@
 import * as React from 'react'
 import { toast } from 'sonner'
 import {
-  Loader2,
   Copy,
   Check,
   Upload,
@@ -27,6 +26,7 @@ import { cn, formatTelefone } from '@/lib/utils'
 import { registrarAcesso } from '@/lib/acesso'
 import { GradeSlots } from '@/features/agendamentos/GradeSlots'
 import { useOcupacaoSlots } from '@/features/agendamentos/useTerminais'
+import { Spinner } from '@/components/shared/Spinner'
 import {
   MAX_OBS_PARCEIRO_CHARS,
   dadosDoVeiculo,
@@ -76,7 +76,7 @@ export function PainelAgendamento({ agendamentoId, onOpenChange }: Props) {
             </DialogHeader>
             <DialogBody>
               <div className="flex items-center justify-center py-10">
-                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                <Spinner size="md" className="text-muted-foreground" />
               </div>
             </DialogBody>
           </>
@@ -165,7 +165,7 @@ function Conteudo({ row, onOpenChange }: { row: AgendamentoRow; onOpenChange: (o
     <>
       <DialogHeader>
         <DialogTitle className="flex flex-wrap items-center gap-2">
-          <span className="font-mono text-[13px] text-muted-foreground">
+          <span className="font-mono text-body text-muted-foreground">
             {numeroAgendamento(row.numero_interno)}
           </span>
           {nomeTerminal(row)}
@@ -180,33 +180,33 @@ function Conteudo({ row, onOpenChange }: { row: AgendamentoRow; onOpenChange: (o
 
       <DialogBody className="space-y-4">
         {encerrado && (
-          <p className="flex items-start gap-2 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-[12px] leading-relaxed text-red-800 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
+          <p className="flex items-start gap-2 rounded-surface border border-danger-border bg-danger-subtle px-3 py-2 text-body-sm text-danger">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
             {row.status === 'cancelado'
-              ? 'Este agendamento foi cancelado. Se você já tinha confirmado a janela no sistema do terminal, desmarque lá — o SisLog não fala com ele.'
+              ? 'Este agendamento foi cancelado. Se a janela já tinha sido confirmada no sistema do terminal, desmarque lá — o SisLog não fala com ele.'
               : 'Este agendamento foi substituído por um reagendamento. O pedido novo está na fila.'}
           </p>
         )}
 
         {row.observacoes && (
-          <p className="rounded-md border bg-card px-3 py-2 text-[12px] leading-relaxed text-muted-foreground">
+          <p className="rounded-surface border px-3 py-2 text-body-sm text-muted-foreground">
             <span className="font-medium text-foreground">Observação do solicitante: </span>
             {row.observacoes}
           </p>
         )}
 
         {row.solicitacao?.cliente?.observacoes_agendamento && (
-          <p className="rounded-md border bg-card px-3 py-2 text-[12px] leading-relaxed text-muted-foreground">
+          <p className="rounded-surface border px-3 py-2 text-body-sm text-muted-foreground">
             <span className="font-medium text-foreground">Regra do terminal: </span>
             {row.solicitacao.cliente.observacoes_agendamento}
           </p>
         )}
 
         <section className="space-y-1.5">
-          <Label className="text-[11px] uppercase tracking-[0.5px] text-muted-foreground">
+          <Label className="text-body-sm font-medium text-muted-foreground">
             Dados para o terminal
           </Label>
-          <div className="divide-y rounded-lg border">
+          <div className="divide-y rounded-surface border">
             <LinhaCopiavel rotulo="Placa cavalo" valor={dados.placaCavalo} />
             <LinhaCopiavel rotulo="Placa carreta" valor={dados.placaCarreta} />
             {dados.placaPrimeiraCarreta && (
@@ -242,14 +242,14 @@ function Conteudo({ row, onOpenChange }: { row: AgendamentoRow; onOpenChange: (o
               <LinhaCopiavel rotulo="Instrução" valor={row.solicitacao.numero_instrucao} />
             )}
           </div>
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-meta text-muted-foreground">
             O CPF só aparece por inteiro no que é copiado, e o acesso fica registrado.
           </p>
         </section>
 
         <section className="space-y-1.5">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <Label htmlFor="nota_fiscal" className="text-[11px] uppercase tracking-[0.5px] text-muted-foreground">
+            <Label htmlFor="nota_fiscal" className="text-body-sm font-medium text-muted-foreground">
               Nota fiscal
             </Label>
             {/* Três estados, não dois: o parceiro agora pode informar o número
@@ -257,17 +257,17 @@ function Conteudo({ row, onOpenChange }: { row: AgendamentoRow; onOpenChange: (o
                 com a nota mostraria "Buscar no Corporate" ao lado do número —
                 mandando procurar o que já está na tela. */}
             {nfLocalizada ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-800">
+              <span className="inline-flex items-center gap-1 rounded-[2px] bg-success-subtle px-1.5 py-0.5 text-meta font-medium text-success">
                 <CheckCircle2 className="h-3 w-3" />
                 NF localizada
               </span>
             ) : row.nota_fiscal ? (
-              <span className="inline-flex items-center gap-1 rounded-full cat-steel px-2 py-0.5 text-[11px] font-medium">
+              <span className="inline-flex items-center gap-1 rounded-[2px] cat-steel px-1.5 py-0.5 text-meta font-medium">
                 <CheckCircle2 className="h-3 w-3" />
                 Informada pelo parceiro
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800">
+              <span className="inline-flex items-center gap-1 rounded-[2px] bg-warning-subtle px-1.5 py-0.5 text-meta font-medium text-warning">
                 <AlertTriangle className="h-3 w-3" />
                 Buscar no Corporate
               </span>
@@ -283,8 +283,8 @@ function Conteudo({ row, onOpenChange }: { row: AgendamentoRow; onOpenChange: (o
           />
         </section>
 
-        <section className="space-y-3 rounded-lg border bg-card p-3">
-          <Label className="text-[11px] uppercase tracking-[0.5px] text-muted-foreground">
+        <section className="space-y-3 rounded-surface border p-3">
+          <Label className="text-body-sm font-medium text-muted-foreground">
             Confirmação do terminal
           </Label>
 
@@ -293,18 +293,18 @@ function Conteudo({ row, onOpenChange }: { row: AgendamentoRow; onOpenChange: (o
               histórico —, não editar por cima. Aqui só os documentos seguem
               abertos, que é o caso de um contrato que chegou depois. */}
           {concluido || encerrado ? (
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px]">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-body">
               <span className="inline-flex items-center gap-1.5 text-foreground">
-                <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                <CheckCircle2 className="h-4 w-4 text-success" />
                 {dataCompleta(row.data_agendada)} às {horaCurta(row.hora_agendada)}
               </span>
               {row.hora_fora_da_grade && (
-                <span className="inline-flex items-center gap-1 text-[12px] text-amber-700">
+                <span className="inline-flex items-center gap-1 text-body-sm text-warning">
                   <AlertTriangle className="h-3 w-3" />
                   fora da grade
                 </span>
               )}
-              <span className="text-[12px] text-muted-foreground">
+              <span className="text-body-sm text-muted-foreground">
                 Para mudar a janela, use Reagendar.
               </span>
             </div>
@@ -319,7 +319,7 @@ function Conteudo({ row, onOpenChange }: { row: AgendamentoRow; onOpenChange: (o
                 onChange={(e) => setDataAgendada(e.target.value)}
               />
               {dataAgendada !== row.data_preferida && (
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-meta text-muted-foreground">
                   Diferente do pedido ({dataCompleta(row.data_preferida)}). É rotina — o portal
                   mostra os dois lado a lado.
                 </p>
@@ -338,7 +338,7 @@ function Conteudo({ row, onOpenChange }: { row: AgendamentoRow; onOpenChange: (o
                   />
                   <button
                     type="button"
-                    className="text-[11px] text-primary-strong underline-offset-2 hover:underline"
+                    className="text-meta text-primary-strong underline-offset-2 hover:underline"
                     onClick={() => setHoraLivre(false)}
                   >
                     voltar à grade
@@ -356,7 +356,7 @@ function Conteudo({ row, onOpenChange }: { row: AgendamentoRow; onOpenChange: (o
                   />
                   <button
                     type="button"
-                    className="text-[11px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+                    className="text-meta text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
                     onClick={() => setHoraLivre(true)}
                   >
                     outro horário
@@ -364,7 +364,7 @@ function Conteudo({ row, onOpenChange }: { row: AgendamentoRow; onOpenChange: (o
                 </>
               )}
               {foraDaGrade && (
-                <p className="inline-flex items-start gap-1.5 text-[11px] text-amber-700">
+                <p className="inline-flex items-start gap-1.5 text-meta text-warning">
                   <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
                   Este horário não existe na grade do terminal. Dá para concluir assim mesmo —
                   o comprovante é a prova final —, e a exceção fica registrada.
@@ -401,7 +401,7 @@ function Conteudo({ row, onOpenChange }: { row: AgendamentoRow; onOpenChange: (o
             />
           </div>
 
-          <p className="text-[11px] leading-relaxed text-muted-foreground">
+          <p className="text-meta leading-relaxed text-muted-foreground">
             {concluido
               ? 'O parceiro já vê estes documentos no portal. Trocar um arquivo aqui substitui o que ele baixa.'
               : 'O contrato de frete da Pamcard sai antes do comprovante do terminal, mas os dois só chegam ao parceiro na conclusão — ele recebe o pacote inteiro de uma vez.'}
@@ -416,7 +416,7 @@ function Conteudo({ row, onOpenChange }: { row: AgendamentoRow; onOpenChange: (o
             <div className="flex flex-wrap items-center justify-between gap-2">
               <Label htmlFor="observacoes_parceiro">Observação para o parceiro (opcional)</Label>
               {obsParceiro.length > MAX_OBS_PARCEIRO_CHARS - 200 && (
-                <span className="text-[11px] tabular-nums text-muted-foreground">
+                <span className="text-meta tabular-nums text-muted-foreground">
                   {obsParceiro.length}/{MAX_OBS_PARCEIRO_CHARS}
                 </span>
               )}
@@ -432,7 +432,7 @@ function Conteudo({ row, onOpenChange }: { row: AgendamentoRow; onOpenChange: (o
               className={encerrado ? 'bg-muted text-muted-foreground' : undefined}
             />
             <div className="flex flex-wrap items-start justify-between gap-2">
-              <p className="max-w-[46ch] text-[11px] leading-relaxed text-muted-foreground">
+              <p className="max-w-[46ch] text-meta leading-relaxed text-muted-foreground">
                 {concluido
                   ? 'O parceiro lê este texto no portal, ao lado do comprovante. Salvar publica na hora.'
                   : 'Chega ao parceiro junto com os documentos, na conclusão. Anotação que ele não pode ler não vai aqui.'}
@@ -445,7 +445,7 @@ function Conteudo({ row, onOpenChange }: { row: AgendamentoRow; onOpenChange: (o
                   disabled={salvarObs.isPending}
                   onClick={() => salvarObs.mutate({ id: row.id, texto: obsParceiro })}
                 >
-                  {salvarObs.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                  {salvarObs.isPending && <Spinner className="h-3.5 w-3.5" />}
                   Salvar observação
                 </Button>
               )}
@@ -455,9 +455,9 @@ function Conteudo({ row, onOpenChange }: { row: AgendamentoRow; onOpenChange: (o
       </DialogBody>
 
       <DialogFooter>
-        <span className="text-[11px] text-muted-foreground/80">
+        <span className="text-meta text-muted-foreground">
           {concluido
-            ? 'Documentos são salvos assim que você anexa.'
+            ? 'Documentos são salvos ao anexar.'
             : 'Concluir avisa o parceiro no portal.'}
         </span>
         <div className="flex items-center gap-2">
@@ -488,7 +488,7 @@ function Conteudo({ row, onOpenChange }: { row: AgendamentoRow; onOpenChange: (o
               onOpenChange(false)
             }}
           >
-            {concluir.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+            {concluir.isPending && <Spinner />}
             Concluir agendamento
           </Button>
           )}
@@ -528,12 +528,12 @@ function LinhaCopiavel({
 
   return (
     <div className="flex items-center gap-3 px-3 py-1.5">
-      <span className="w-[104px] shrink-0 text-[11px] uppercase tracking-[0.5px] text-muted-foreground">
+      <span className="w-[104px] shrink-0 text-meta text-muted-foreground">
         {rotulo}
       </span>
       <span
         className={cn(
-          'flex-1 truncate font-mono text-[13px]',
+          'flex-1 truncate font-mono text-body',
           vazio ? 'text-muted-foreground' : 'text-foreground',
         )}
       >
@@ -543,11 +543,11 @@ function LinhaCopiavel({
         type="button"
         onClick={() => void copiar()}
         disabled={vazio}
-        className="rounded-sm p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+        className="rounded-control p-1 text-muted-foreground transition-colors duration-fast hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:text-tertiary"
         aria-label={`Copiar ${rotulo}`}
         title={vazio ? 'Sem valor para copiar' : `Copiar ${rotulo}`}
       >
-        {copiado ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
+        {copiado ? <Check className="h-3.5 w-3.5 text-success" /> : <Copy className="h-3.5 w-3.5" />}
       </button>
     </div>
   )
@@ -589,22 +589,22 @@ function CampoArquivo({
     <div className="space-y-1.5">
       <Label htmlFor={id}>{rotulo}</Label>
       {path ? (
-        <div className="flex h-9 items-center gap-2 rounded-md border bg-background px-2.5">
-          <FileText className="h-4 w-4 shrink-0 text-emerald-600" />
-          <span className="flex-1 truncate text-[12px] text-foreground">Anexado</span>
+        <div className="flex h-9 items-center gap-2 rounded-control border px-2.5">
+          <FileText className="h-4 w-4 shrink-0 text-success" />
+          <span className="flex-1 truncate text-body-sm text-foreground">Anexado</span>
           <button
             type="button"
             onClick={() => void abrir()}
-            className="rounded-sm p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+            className="rounded-control p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
             aria-label="Abrir arquivo"
             title="Abrir"
           >
-            {abrindo ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ExternalLink className="h-3.5 w-3.5" />}
+            {abrindo ? <Spinner className="h-3.5 w-3.5" /> : <ExternalLink className="h-3.5 w-3.5" />}
           </button>
           {!desabilitado && (
             <label
               htmlFor={id}
-              className="cursor-pointer rounded-sm px-1.5 py-0.5 text-[11px] text-muted-foreground hover:bg-muted hover:text-foreground"
+              className="cursor-pointer rounded-control px-1.5 py-0.5 text-meta text-muted-foreground hover:bg-accent hover:text-foreground"
             >
               trocar
             </label>
@@ -614,11 +614,11 @@ function CampoArquivo({
         <label
           htmlFor={id}
           className={cn(
-            'flex h-9 cursor-pointer items-center gap-2 rounded-md border border-dashed px-2.5 text-[12px] text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground',
-            (enviando || desabilitado) && 'pointer-events-none opacity-60',
+            'flex h-9 cursor-pointer items-center gap-2 rounded-md border border-dashed px-2.5 text-body-sm text-muted-foreground transition-colors duration-fast hover:border-input hover:bg-accent hover:text-foreground',
+            (enviando || desabilitado) && 'pointer-events-none bg-muted text-tertiary',
           )}
         >
-          {enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+          {enviando ? <Spinner /> : <Upload className="h-4 w-4" />}
           {desabilitado ? 'Sem anexo' : 'Selecionar arquivo'}
         </label>
       )}

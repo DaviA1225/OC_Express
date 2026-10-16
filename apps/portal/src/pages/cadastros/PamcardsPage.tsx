@@ -2,7 +2,6 @@ import * as React from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Loader2 } from 'lucide-react'
 import { CrudListPage, useCrudListState, type ColumnDef } from '@/components/shared/CrudListPage'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import {
@@ -18,9 +17,11 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { formatarPamcardParaExibicao } from '@sislog/shared/formatters'
 import type { Tables } from '@sislog/shared/types'
+import { Spinner } from '@/components/shared/Spinner'
+import { CadastroField } from '@/components/forms/CadastroField'
+import { useDescartarAlteracoes } from '@/features/cadastros/useDescartarAlteracoes'
 
 type Row = Tables<'parceiro_pamcards'>
 
@@ -115,9 +116,9 @@ export default function PamcardsPage() {
         onOpenChange={(o) => !o && setConfirmRow(null)}
         title={confirmRow?.ativo ? 'Desativar cartão?' : 'Reativar cartão?'}
         description={confirmRow?.ativo
-          ? 'O cartão não aparecerá na seleção de novas solicitações. Você pode reativá-lo depois.'
+          ? 'O cartão não aparecerá na seleção de novas solicitações. É possível reativá-lo depois.'
           : 'O cartão voltará a aparecer na seleção de novas solicitações.'}
-        confirmLabel={confirmRow?.ativo ? 'Sim, desativar' : 'Sim, reativar'}
+        confirmLabel={confirmRow?.ativo ? 'Desativar' : 'Reativar'}
         destructive={confirmRow?.ativo}
         onConfirm={async () => {
           if (confirmRow) {
@@ -136,7 +137,7 @@ export default function PamcardsPage() {
             ? `O cartão "${deleteRow.apelido ?? formatarPamcardParaExibicao(deleteRow.numero)}" será removido permanentemente. As solicitações já enviadas com esse número não são afetadas.`
             : ''
         }
-        confirmLabel="Sim, excluir"
+        confirmLabel="Excluir"
         destructive
         onConfirm={async () => {
           if (deleteRow) {
@@ -159,7 +160,7 @@ interface FormProps {
 function PamcardForm({ open, onOpenChange, editing, onSubmit }: FormProps) {
   const {
     register, handleSubmit, reset, setValue, watch,
-    formState: { errors, isSubmitting },
+    formState: { errors, isSubmitting, isDirty },
   } = useForm<FormValues>({ resolver: zodResolver(schema) })
 
   React.useEffect(() => {
@@ -173,50 +174,50 @@ function PamcardForm({ open, onOpenChange, editing, onSubmit }: FormProps) {
 
   const numero = watch('numero') ?? ''
 
+  const guarda = useDescartarAlteracoes(isDirty, onOpenChange, isSubmitting)
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <form onSubmit={handleSubmit(onSubmit)} noValidate>
-          <DialogHeader>
-            <DialogTitle>{editing ? 'Editar cartão' : 'Novo cartão'}</DialogTitle>
-            <DialogDescription>
-              Cartões Pamcard da sua operação, disponíveis para selecionar nas solicitações de carregamento.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogBody className="space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="numero">Número do cartão *</Label>
-              <Input
-                id="numero"
-                autoFocus
-                value={numero}
-                onChange={(e) => setValue('numero', e.target.value.replace(/\D/g, '').slice(0, 16), { shouldValidate: true })}
-                placeholder="Ex.: 441781209999"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                maxLength={16}
-              />
-              {errors.numero && <p className="text-[11px] text-destructive">{errors.numero.message}</p>}
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="apelido">Apelido</Label>
-              <Input id="apelido" {...register('apelido')} placeholder="Opcional, ex.: Cartão João, Cofre 1" />
-            </div>
-          </DialogBody>
-          <DialogFooter>
-            <span className="text-[11px] text-muted-foreground/80">Enter para salvar · Esc para cancelar</span>
-            <div className="flex items-center gap-2">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
-                Salvar
-              </Button>
-            </div>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+    <>
+      <Dialog open={open} onOpenChange={guarda.onOpenChange}>
+        <DialogContent>
+          <form onSubmit={handleSubmit(onSubmit)} noValidate>
+            <DialogHeader>
+              <DialogTitle>{editing ? 'Editar cartão' : 'Novo cartão'}</DialogTitle>
+              <DialogDescription>
+                Cartões Pamcard da sua operação, disponíveis para selecionar nas solicitações de carregamento.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogBody className="space-y-4">
+              <CadastroField label="Número do cartão" required id="numero" error={errors.numero?.message}>
+                <Input
+                  autoFocus
+                  value={numero}
+                  onChange={(e) => setValue('numero', e.target.value.replace(/\D/g, '').slice(0, 16), { shouldValidate: true, shouldDirty: true })}
+                  placeholder="Ex.: 441781209999"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={16}
+                />
+              </CadastroField>
+              <CadastroField label="Apelido" id="apelido">
+                <Input {...register('apelido')} placeholder="Opcional, ex.: Cartão João, Cofre 1" />
+              </CadastroField>
+            </DialogBody>
+            <DialogFooter className="justify-end">
+              <div className="flex items-center gap-2">
+                <Button type="button" variant="outline" onClick={() => guarda.onOpenChange(false)} disabled={isSubmitting}>
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting && <Spinner />}
+                  Salvar
+                </Button>
+              </div>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+      {guarda.dialog}
+    </>
   )
 }

@@ -114,7 +114,7 @@ export function WhatsAppEnvioDialog({ open, onOpenChange, solicitacao }: Props) 
       <DialogContent className="max-w-[640px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <MessageCircle className="h-5 w-5 text-emerald-600" />
+            <MessageCircle className="h-5 w-5 text-success" />
             Enviar pelo WhatsApp
           </DialogTitle>
           <DialogDescription>
@@ -124,7 +124,7 @@ export function WhatsAppEnvioDialog({ open, onOpenChange, solicitacao }: Props) 
         </DialogHeader>
         <DialogBody className="space-y-4">
           <div className="space-y-1.5">
-            <Label className="text-[11px] uppercase tracking-[0.5px] text-muted-foreground">
+            <Label className="text-body-sm text-muted-foreground">
               Destinatário
             </Label>
             <div className="flex flex-wrap gap-2">
@@ -134,28 +134,28 @@ export function WhatsAppEnvioDialog({ open, onOpenChange, solicitacao }: Props) 
                   type="button"
                   onClick={() => setDestinoIdx(i)}
                   className={cn(
-                    'rounded-md border px-3 py-1.5 text-left text-[12px] transition-colors',
+                    'rounded-md border px-3 py-1.5 text-left text-body-sm transition-colors',
                     destinoIdx === i
-                      ? 'border-primary bg-primary/5 text-foreground'
-                      : 'border-border bg-card text-foreground/80 hover:bg-muted',
+                      ? 'border-primary bg-primary/[0.08] text-foreground'
+                      : 'border-border text-foreground/80 hover:bg-accent',
                   )}
                 >
                   <div className="font-medium">{d.label}</div>
-                  <div className="text-[11px] text-muted-foreground">{d.raw}</div>
+                  <div className="text-meta text-muted-foreground">{d.raw}</div>
                 </button>
               ))}
               <button
                 type="button"
                 onClick={() => setDestinoIdx(-1)}
                 className={cn(
-                  'rounded-md border px-3 py-1.5 text-left text-[12px] transition-colors',
+                  'rounded-md border px-3 py-1.5 text-left text-body-sm transition-colors',
                   destinoIdx === -1
-                    ? 'border-primary bg-primary/5 text-foreground'
-                    : 'border-border bg-card text-foreground/80 hover:bg-muted',
+                    ? 'border-primary bg-primary/[0.08] text-foreground'
+                    : 'border-border text-foreground/80 hover:bg-accent',
                 )}
               >
                 <div className="font-medium">Outro número</div>
-                <div className="text-[11px] text-muted-foreground">Digitar manualmente</div>
+                <div className="text-meta text-muted-foreground">Digitar manualmente</div>
               </button>
             </div>
           </div>
@@ -169,7 +169,7 @@ export function WhatsAppEnvioDialog({ open, onOpenChange, solicitacao }: Props) 
                 onChange={(e) => setTelefoneManual(e.target.value)}
                 placeholder="(67) 99999-9999  ·  deixe em branco para escolher no WhatsApp"
               />
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-meta text-muted-foreground">
                 Se vazio, o WhatsApp abre na aba de "Nova conversa" com a mensagem pronta.
               </p>
             </div>
@@ -185,9 +185,9 @@ export function WhatsAppEnvioDialog({ open, onOpenChange, solicitacao }: Props) 
                 setMensagem(e.target.value)
               }}
               rows={12}
-              className="font-mono text-[12px]"
+              className="font-mono text-body-sm"
             />
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-meta text-muted-foreground">
               Edite à vontade, a mensagem aparece exatamente assim no WhatsApp.
             </p>
           </div>

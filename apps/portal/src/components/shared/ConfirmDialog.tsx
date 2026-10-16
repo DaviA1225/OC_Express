@@ -50,9 +50,9 @@ export function ConfirmDialog({
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
-        <DialogBody className="py-3 text-[13px] text-muted-foreground" />
+        <DialogBody className="py-3 text-body text-muted-foreground" />
         <DialogFooter>
-          <span className="text-[11px] text-muted-foreground/80">
+          <span className="text-meta text-muted-foreground">
             Enter para confirmar · Esc para cancelar
           </span>
           <div className="flex items-center gap-2">

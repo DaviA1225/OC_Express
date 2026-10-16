@@ -3,8 +3,10 @@ import { useSearchParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Loader2, MapPin, Search as SearchIcon, Map as MapIcon, List as ListIcon, CalendarClock } from 'lucide-react'
-import { CrudListPage, useCrudListState, type ColumnDef } from '@/components/shared/CrudListPage'
+import { MapPin, Search as SearchIcon, Map as MapIcon, List as ListIcon, CalendarClock } from 'lucide-react'
+import { Spinner } from '@/components/shared/Spinner'
+import { CrudListPage, RotuloSituacao, useCrudListState, type ColumnDef } from '@/components/shared/CrudListPage'
+import { PageHeader } from '@/components/layout/PageHeader'
 import { ClientesMapa } from './ClientesMapa'
 import { TerminalAgendamentoDialog } from './TerminalAgendamentoDialog'
 import { useClientesMapaMinerio } from '@/features/clientes/useClientesMapa'
@@ -28,6 +30,8 @@ import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 import type { Tables } from '@/types/database.types'
+import { CadastroField } from '@/components/forms/CadastroField'
+import { useDescartarAlteracoes } from '@/features/crud/useDescartarAlteracoes'
 
 type Row = Tables<'clientes'>
 type TipoCliente = 'minerio' | 'retorno'
@@ -99,7 +103,7 @@ function FreteCell({ row }: { row: Row }) {
     })
   }
   if (items.length === 0) {
-    return <span className="text-[12px] text-muted-foreground">—</span>
+    return <span className="text-body-sm text-muted-foreground">—</span>
   }
   return (
     <div className="flex flex-col gap-1">
@@ -107,7 +111,7 @@ function FreteCell({ row }: { row: Row }) {
         <span
           key={it.label}
           className={cn(
-            'inline-flex items-center justify-between gap-2 rounded-md border px-2 py-0.5 text-[11px] font-medium leading-tight',
+            'inline-flex items-center justify-between gap-2 rounded-[2px] border px-1.5 py-0.5 text-meta font-medium leading-tight',
             it.className,
           )}
         >
@@ -121,22 +125,9 @@ function FreteCell({ row }: { row: Row }) {
 
 function StatusBadge({ liberado }: { liberado: boolean }) {
   return (
-    <span
-      className={cn(
-        'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium',
-        liberado
-          ? 'bg-emerald-100 text-emerald-800'
-          : 'bg-red-100 text-red-800',
-      )}
-    >
-      <span
-        className={cn(
-          'h-1.5 w-1.5 rounded-full',
-          liberado ? 'bg-emerald-500' : 'bg-red-500',
-        )}
-      />
+    <RotuloSituacao tom={liberado ? 'sucesso' : 'perigo'}>
       {liberado ? 'Liberado' : 'Bloqueado'}
-    </span>
+    </RotuloSituacao>
   )
 }
 
@@ -144,10 +135,10 @@ function StatusBadge({ liberado }: { liberado: boolean }) {
  *  terminal como a equipe o chama, porque é por ele que a fila é agrupada. */
 function AgendamentoCell({ row }: { row: Row }) {
   if (!row.requer_agendamento) {
-    return <span className="text-[12px] text-muted-foreground">—</span>
+    return <span className="text-body-sm text-muted-foreground">—</span>
   }
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-[11px] font-medium leading-tight cat-clay">
+    <span className="inline-flex items-center gap-1.5 rounded-[2px] border px-1.5 py-0.5 text-meta font-medium leading-tight cat-clay">
       <CalendarClock className="h-3 w-3" />
       {row.terminal_nome?.trim() || 'Exige agendamento'}
       {row.antecedencia_minima_horas != null && (
@@ -159,7 +150,7 @@ function AgendamentoCell({ row }: { row: Row }) {
 
 function MapaCell({ row }: { row: Row }) {
   if (row.latitude == null || row.longitude == null) {
-    return <span className="text-[12px] text-muted-foreground">—</span>
+    return <span className="text-body-sm text-muted-foreground">—</span>
   }
   const url = `https://www.google.com/maps?q=${row.latitude},${row.longitude}`
   return (
@@ -167,7 +158,7 @@ function MapaCell({ row }: { row: Row }) {
       href={url}
       target="_blank"
       rel="noreferrer noopener"
-      className="inline-flex items-center gap-1 text-[12px] text-primary-strong hover:underline"
+      className="inline-flex items-center gap-1 text-body-sm text-primary-strong hover:underline"
       onClick={(e) => e.stopPropagation()}
     >
       <MapPin className="h-3 w-3" />
@@ -241,11 +232,11 @@ export default function ClientesPage() {
   }, [mapa.data, state.debouncedSearch])
   const semCoordenadas = Math.max(0, (totalActive.data ?? 0) - (mapa.data?.length ?? 0))
 
-  const upsert = useUpsertRow('clientes', tipo === 'minerio' ? 'Cliente de minério' : 'Cliente de retorno')
-  const toggle = useToggleActive('clientes', 'Cliente')
-  const remove = useDeleteRow('clientes', 'Cliente')
-  const bulkToggle = useBulkToggleActive('clientes', 'Cliente')
-  const bulkDelete = useBulkDeleteRows('clientes', 'Cliente')
+  const upsert = useUpsertRow('clientes', tipo === 'minerio' ? { singular: 'Cliente de minério', plural: 'Clientes de minério', genero: 'm' as const } : { singular: 'Cliente de retorno', plural: 'Clientes de retorno', genero: 'm' as const })
+  const toggle = useToggleActive('clientes', { singular: 'Cliente', plural: 'Clientes', genero: 'm' })
+  const remove = useDeleteRow('clientes', { singular: 'Cliente', plural: 'Clientes', genero: 'm' })
+  const bulkToggle = useBulkToggleActive('clientes', { singular: 'Cliente', plural: 'Clientes', genero: 'm' })
+  const bulkDelete = useBulkDeleteRows('clientes', { singular: 'Cliente', plural: 'Clientes', genero: 'm' })
 
   const [editing, setEditing] = React.useState<Row | null>(null)
   const [open, setOpen] = React.useState(false)
@@ -258,7 +249,7 @@ export default function ClientesPage() {
   const openTerminalDialog = (row: Row) => { if (canEdit) setTerminalRow(row) }
 
   const columns: ColumnDef<Row>[] = [
-    { header: 'Razão Social', accessor: (r) => r.razao_social },
+    { header: 'Razão social', accessor: (r) => r.razao_social },
     { header: 'Cidade/UF', accessor: cidadeUf, className: 'text-muted-foreground' },
     {
       header: 'Frete',
@@ -267,7 +258,7 @@ export default function ClientesPage() {
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); openOpDialog(r) }}
-            className="rounded-sm p-1 text-left hover:bg-muted"
+            className="rounded-sm p-1 text-left hover:bg-accent"
             title="Definir frete por tipo"
           >
             <FreteCell row={r} />
@@ -277,14 +268,14 @@ export default function ClientesPage() {
         ),
     },
     {
-      header: 'Status',
+      header: 'Liberação',
       accessor: (r) =>
         canEdit ? (
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); openOpDialog(r) }}
-            className="rounded-full hover:opacity-80"
-            title="Alterar status de liberação"
+            className="rounded-sm p-1 hover:bg-accent"
+            title="Alterar liberação"
           >
             <StatusBadge liberado={r.liberado} />
           </button>
@@ -299,7 +290,7 @@ export default function ClientesPage() {
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); openTerminalDialog(r) }}
-            className="rounded-sm p-1 text-left hover:bg-muted"
+            className="rounded-sm p-1 text-left hover:bg-accent"
             title="Configurar agendamento e grade de horários"
           >
             <AgendamentoCell row={r} />
@@ -312,25 +303,25 @@ export default function ClientesPage() {
       header: 'Observações',
       accessor: (r) =>
         r.observacoes ? (
-          <span className="line-clamp-2 max-w-[260px] text-[12px]" title={r.observacoes}>
+          <span className="line-clamp-2 max-w-[260px] text-body-sm" title={r.observacoes}>
             {r.observacoes}
           </span>
         ) : (
-          <span className="text-[12px] text-muted-foreground">—</span>
+          <span className="text-body-sm text-muted-foreground">—</span>
         ),
       className: 'text-muted-foreground',
     },
     { header: 'Mapa', accessor: (r) => <MapaCell row={r} /> },
   ]
 
-  const titulo = tipo === 'minerio' ? 'Clientes, Carga de Minério' : 'Clientes, Carga de Retorno'
+  const titulo = tipo === 'minerio' ? 'Clientes · Minério' : 'Clientes · Retorno'
   const novoLabel = tipo === 'minerio' ? 'Novo cliente de minério' : 'Novo cliente de retorno'
   const emptyTitle = tipo === 'minerio'
     ? 'Nenhum cliente de minério cadastrado'
     : 'Nenhum cliente de retorno cadastrado'
   const emptyDescription = tipo === 'minerio'
-    ? 'Cadastre os destinatários das cargas de minério.'
-    : 'Cadastre os clientes das cargas de retorno (origens dos retornos).'
+    ? 'Destinatários das cargas de minério.'
+    : 'Origens das cargas de retorno.'
 
   return (
     <>
@@ -341,24 +332,29 @@ export default function ClientesPage() {
         </div>
 
         {view === 'mapa' ? (
-          <div className="space-y-3 rounded-lg border bg-card p-3">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <h1 className="text-[15px] font-semibold text-foreground">{titulo}</h1>
-              <div className="relative w-full max-w-[320px]">
-                <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  value={state.search}
-                  onChange={(e) => state.setSearch(e.target.value)}
-                  placeholder="Buscar por razão social ou cidade"
-                  className="pl-9"
-                />
-              </div>
-            </div>
-            <ClientesMapa
-              pontos={pontosFiltrados}
-              isLoading={mapa.isLoading}
-              semCoordenadas={semCoordenadas}
+          <div className="space-y-4">
+            <PageHeader
+              className="mb-0"
+              title={titulo}
+              actions={
+                <div className="relative w-full min-w-[240px] max-w-[320px]" data-page-search>
+                  <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={state.search}
+                    onChange={(e) => state.setSearch(e.target.value)}
+                    placeholder="Buscar por razão social ou cidade"
+                    className="pl-9"
+                  />
+                </div>
+              }
             />
+            <div className="rounded-lg border bg-card p-3">
+              <ClientesMapa
+                pontos={pontosFiltrados}
+                isLoading={mapa.isLoading}
+                semCoordenadas={semCoordenadas}
+              />
+            </div>
           </div>
         ) : (
           <CrudListPage<Row>
@@ -453,9 +449,9 @@ export default function ClientesPage() {
         onOpenChange={(o) => !o && setConfirmRow(null)}
         title={confirmRow?.ativo ? 'Desativar cliente?' : 'Reativar cliente?'}
         description={confirmRow?.ativo
-          ? 'O cliente não aparecerá nas listas ativas. Você pode reativá-lo depois.'
+          ? 'O cliente não aparecerá nas listas ativas. É possível reativá-lo depois.'
           : 'O cliente voltará a aparecer nas listas ativas.'}
-        confirmLabel={confirmRow?.ativo ? 'Sim, desativar' : 'Sim, reativar'}
+        confirmLabel={confirmRow?.ativo ? 'Desativar' : 'Reativar'}
         destructive={confirmRow?.ativo}
         onConfirm={async () => {
           if (confirmRow) {
@@ -474,7 +470,7 @@ export default function ClientesPage() {
             ? `O cadastro de "${deleteRow.razao_social}" será removido permanentemente. Essa ação não pode ser desfeita. Se houver solicitações vinculadas, a exclusão será bloqueada.`
             : ''
         }
-        confirmLabel="Sim, excluir"
+        confirmLabel="Excluir"
         destructive
         onConfirm={async () => {
           if (deleteRow) {
@@ -494,12 +490,12 @@ interface TabsProps {
 
 function Tabs({ value, onChange }: TabsProps) {
   return (
-    <div className="inline-flex rounded-lg border bg-card p-1" role="tablist">
+    <div className="flex gap-1 border-b" role="tablist" aria-label="Tipo de cliente">
       <TabButton active={value === 'minerio'} onClick={() => onChange('minerio')}>
-        Carga de Minério
+        Carga de minério
       </TabButton>
       <TabButton active={value === 'retorno'} onClick={() => onChange('retorno')}>
-        Carga de Retorno
+        Carga de retorno
       </TabButton>
     </div>
   )
@@ -513,10 +509,10 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
       aria-selected={active}
       onClick={onClick}
       className={cn(
-        'rounded-md px-3 py-1.5 text-[13px] font-medium transition-colors',
+        '-mb-px border-b-2 px-3 py-2 text-body font-medium transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
         active
-          ? 'bg-primary text-primary-foreground shadow-sm'
-          : 'text-foreground/70 hover:bg-muted hover:text-foreground',
+          ? 'border-primary text-foreground'
+          : 'border-transparent text-muted-foreground hover:text-foreground',
       )}
     >
       {children}
@@ -526,14 +522,14 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
 
 function ViewToggle({ value, onChange }: { value: 'lista' | 'mapa'; onChange: (v: 'lista' | 'mapa') => void }) {
   return (
-    <div className="inline-flex items-center rounded-md border p-0.5" role="group" aria-label="Modo de exibição">
+    <div className="inline-flex items-center rounded-md border bg-card p-0.5" role="group" aria-label="Modo de exibição">
       <button
         type="button"
         onClick={() => onChange('lista')}
         aria-pressed={value === 'lista'}
         title="Ver em lista"
         className={cn(
-          'inline-flex items-center gap-1.5 rounded px-2.5 py-1 text-[12px] font-medium transition-colors',
+          'inline-flex items-center gap-1.5 rounded px-2.5 py-1 text-body-sm font-medium transition-colors',
           value === 'lista' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground',
         )}
       >
@@ -546,7 +542,7 @@ function ViewToggle({ value, onChange }: { value: 'lista' | 'mapa'; onChange: (v
         aria-pressed={value === 'mapa'}
         title="Ver no mapa"
         className={cn(
-          'inline-flex items-center gap-1.5 rounded px-2.5 py-1 text-[12px] font-medium transition-colors',
+          'inline-flex items-center gap-1.5 rounded px-2.5 py-1 text-body-sm font-medium transition-colors',
           value === 'mapa' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground',
         )}
       >
@@ -572,7 +568,7 @@ function ClienteForm({ open, onOpenChange, editing, tipo, onSubmit }: FormProps)
     reset,
     setValue,
     watch,
-    formState: { errors, isSubmitting },
+    formState: { errors, isSubmitting, isDirty },
   } = useForm<FormValues>({ resolver: zodResolver(schema) })
 
   React.useEffect(() => {
@@ -597,11 +593,14 @@ function ClienteForm({ open, onOpenChange, editing, tipo, onSubmit }: FormProps)
       ? 'Novo cliente de minério'
       : 'Novo cliente de retorno'
   const descricao = tipo === 'minerio'
-    ? 'Destinatários das cargas de minério. Frete e liberação são definidos diretamente na lista.'
-    : 'Clientes das cargas de retorno (origens dos retornos).'
+    ? 'Frete e liberação são definidos na lista.'
+    : 'Origem das cargas de retorno.'
+
+  const guarda = useDescartarAlteracoes(isDirty, onOpenChange, isSubmitting)
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <>
+    <Dialog open={open} onOpenChange={guarda.onOpenChange}>
       <DialogContent className="max-w-[640px]">
         <form onSubmit={handleSubmit(onSubmit)} noValidate>
           <DialogHeader>
@@ -609,71 +608,51 @@ function ClienteForm({ open, onOpenChange, editing, tipo, onSubmit }: FormProps)
             <DialogDescription>{descricao}</DialogDescription>
           </DialogHeader>
           <DialogBody className="space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="razao_social">Razão social *</Label>
-              <Input id="razao_social" autoFocus {...register('razao_social')} />
-              {errors.razao_social && (
-                <p className="text-[11px] text-destructive">{errors.razao_social.message}</p>
-              )}
-            </div>
+            <CadastroField label="Razão social" required id="razao_social" error={errors.razao_social?.message}>
+              <Input autoFocus {...register('razao_social')} />
+            </CadastroField>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="endereco">Endereço</Label>
-              <Input id="endereco" {...register('endereco')} />
-            </div>
+            <CadastroField label="Endereço" id="endereco">
+              <Input {...register('endereco')} />
+            </CadastroField>
 
             <div className="grid grid-cols-[1fr_120px] gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="cidade">Cidade</Label>
-                <Input id="cidade" {...register('cidade')} />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="uf">UF</Label>
+              <CadastroField label="Cidade" id="cidade">
+                <Input {...register('cidade')} />
+              </CadastroField>
+              <CadastroField label="UF" id="uf">
                 <Input
-                  id="uf"
                   list="uf-list"
                   value={uf}
-                  onChange={(e) => setValue('uf', e.target.value.toUpperCase().slice(0, 2), { shouldValidate: true })}
+                  onChange={(e) => setValue('uf', e.target.value.toUpperCase().slice(0, 2), { shouldValidate: true, shouldDirty: true })}
                   maxLength={2}
                 />
-                <datalist id="uf-list">
-                  {UFS.map((u) => <option key={u} value={u} />)}
-                </datalist>
-              </div>
+              </CadastroField>
+              <datalist id="uf-list">
+                {UFS.map((u) => <option key={u} value={u} />)}
+              </datalist>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="latitude">Latitude</Label>
-                <Input id="latitude" inputMode="decimal" placeholder="-19.5563" {...register('latitude')} />
-                {errors.latitude && (
-                  <p className="text-[11px] text-destructive">{errors.latitude.message}</p>
-                )}
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="longitude">Longitude</Label>
-                <Input id="longitude" inputMode="decimal" placeholder="-57.0133" {...register('longitude')} />
-                {errors.longitude && (
-                  <p className="text-[11px] text-destructive">{errors.longitude.message}</p>
-                )}
-              </div>
+              <CadastroField label="Latitude" id="latitude" error={errors.latitude?.message}>
+                <Input inputMode="decimal" placeholder="-19.5563" {...register('latitude')} />
+              </CadastroField>
+              <CadastroField label="Longitude" id="longitude" error={errors.longitude?.message}>
+                <Input inputMode="decimal" placeholder="-57.0133" {...register('longitude')} />
+              </CadastroField>
             </div>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="observacoes">Observações</Label>
-              <Textarea id="observacoes" rows={2} {...register('observacoes')} />
-            </div>
+            <CadastroField label="Observações" id="observacoes">
+              <Textarea rows={2} {...register('observacoes')} />
+            </CadastroField>
           </DialogBody>
-          <DialogFooter>
-            <span className="text-[11px] text-muted-foreground/80">
-              Enter para salvar · Esc para cancelar
-            </span>
+          <DialogFooter className="justify-end">
             <div className="flex items-center gap-2">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
+              <Button type="button" variant="outline" onClick={() => guarda.onOpenChange(false)} disabled={isSubmitting}>
                 Cancelar
               </Button>
               <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                {isSubmitting && <Spinner />}
                 Salvar
               </Button>
             </div>
@@ -681,6 +660,8 @@ function ClienteForm({ open, onOpenChange, editing, tipo, onSubmit }: FormProps)
         </form>
       </DialogContent>
     </Dialog>
+    {guarda.dialog}
+    </>
   )
 }
 
@@ -697,7 +678,7 @@ function OperacionalDialog({ row, onOpenChange, onSubmit }: OperacionalDialogPro
     reset,
     setValue,
     watch,
-    formState: { errors, isSubmitting },
+    formState: { errors, isSubmitting, isDirty },
   } = useForm<OperacionalValues>({ resolver: zodResolver(operacionalSchema) })
 
   React.useEffect(() => {
@@ -716,8 +697,11 @@ function OperacionalDialog({ row, onOpenChange, onSubmit }: OperacionalDialogPro
   const cacamba = watch('aceita_cacamba') ?? true
   const graneleiro = watch('aceita_graneleiro') ?? true
 
+  const guarda = useDescartarAlteracoes(isDirty, onOpenChange, isSubmitting)
+
   return (
-    <Dialog open={!!row} onOpenChange={onOpenChange}>
+    <>
+    <Dialog open={!!row} onOpenChange={guarda.onOpenChange}>
       <DialogContent className="max-w-[480px]">
         <form onSubmit={handleSubmit(onSubmit)} noValidate>
           <DialogHeader>
@@ -728,15 +712,12 @@ function OperacionalDialog({ row, onOpenChange, onSubmit }: OperacionalDialogPro
           </DialogHeader>
           <DialogBody className="space-y-4">
             <div className="space-y-1.5">
-              <Label className="text-[11px] uppercase tracking-[0.5px] text-muted-foreground">
+              <p className="text-body-sm font-medium text-muted-foreground">
                 Frete por tipo de carreta (R$ por tonelada)
-              </Label>
+              </p>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label htmlFor="frete_cacamba" className="flex items-center gap-1.5 text-[12px]">
-                    <span className="h-2 w-2 rounded-full bg-amber-500" />
-                    Caçamba
-                  </Label>
+                  <Label htmlFor="frete_cacamba">Caçamba</Label>
                   <Input
                     id="frete_cacamba"
                     inputMode="decimal"
@@ -746,14 +727,11 @@ function OperacionalDialog({ row, onOpenChange, onSubmit }: OperacionalDialogPro
                     {...register('frete_cacamba')}
                   />
                   {errors.frete_cacamba && (
-                    <p className="text-[11px] text-destructive">{errors.frete_cacamba.message}</p>
+                    <p role="alert" className="text-body-sm text-destructive">{errors.frete_cacamba.message}</p>
                   )}
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="frete_graneleiro" className="flex items-center gap-1.5 text-[12px]">
-                    <span className="h-2 w-2 rounded-full bg-sky-500" />
-                    Graneleiro
-                  </Label>
+                  <Label htmlFor="frete_graneleiro">Graneleiro</Label>
                   <Input
                     id="frete_graneleiro"
                     inputMode="decimal"
@@ -762,88 +740,79 @@ function OperacionalDialog({ row, onOpenChange, onSubmit }: OperacionalDialogPro
                     {...register('frete_graneleiro')}
                   />
                   {errors.frete_graneleiro && (
-                    <p className="text-[11px] text-destructive">{errors.frete_graneleiro.message}</p>
+                    <p role="alert" className="text-body-sm text-destructive">{errors.frete_graneleiro.message}</p>
                   )}
                 </div>
               </div>
               {(!cacamba || !graneleiro) && (
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-body-sm text-muted-foreground">
                   Tipos desligados ficam indisponíveis até serem reativados abaixo.
                 </p>
               )}
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-[11px] uppercase tracking-[0.5px] text-muted-foreground">
-                Status de liberação
-              </Label>
+              <p className="text-body-sm font-medium text-muted-foreground">
+                Liberação
+              </p>
               <div
                 className={cn(
                   'flex h-10 items-center justify-between rounded-md border px-3',
-                  liberado ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200',
+                  liberado ? 'border-success-border bg-success-subtle' : 'border-danger-border bg-danger-subtle',
                 )}
               >
                 <span
                   className={cn(
-                    'inline-flex items-center gap-1.5 text-[13px] font-medium',
-                    liberado ? 'text-emerald-800' : 'text-red-800',
+                    'text-body font-medium',
+                    liberado ? 'text-success' : 'text-danger',
                   )}
                 >
-                  <span
-                    className={cn(
-                      'h-1.5 w-1.5 rounded-full',
-                      liberado ? 'bg-emerald-500' : 'bg-red-500',
-                    )}
-                  />
                   {liberado ? 'Liberado para receber carregamentos' : 'Bloqueado'}
                 </span>
                 <Switch
                   checked={liberado}
-                  onCheckedChange={(v) => setValue('liberado', v, { shouldValidate: true })}
+                  onCheckedChange={(v) => setValue('liberado', v, { shouldValidate: true, shouldDirty: true })}
                   aria-label="Alternar liberação"
                 />
               </div>
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-[11px] uppercase tracking-[0.5px] text-muted-foreground">
+              <p className="text-body-sm font-medium text-muted-foreground">
                 Tipos de carreta aceitos
-              </Label>
+              </p>
               <div className="space-y-2">
-                <div className="flex h-10 items-center justify-between rounded-md border bg-card px-3">
-                  <span className="text-[13px] text-foreground">Caçamba</span>
+                <div className="flex h-10 items-center justify-between rounded-md border px-3">
+                  <span className="text-body text-foreground">Caçamba</span>
                   <Switch
                     checked={cacamba}
-                    onCheckedChange={(v) => setValue('aceita_cacamba', v, { shouldValidate: true })}
+                    onCheckedChange={(v) => setValue('aceita_cacamba', v, { shouldValidate: true, shouldDirty: true })}
                     aria-label="Aceita caçamba"
                   />
                 </div>
-                <div className="flex h-10 items-center justify-between rounded-md border bg-card px-3">
-                  <span className="text-[13px] text-foreground">Graneleiro</span>
+                <div className="flex h-10 items-center justify-between rounded-md border px-3">
+                  <span className="text-body text-foreground">Graneleiro</span>
                   <Switch
                     checked={graneleiro}
-                    onCheckedChange={(v) => setValue('aceita_graneleiro', v, { shouldValidate: true })}
+                    onCheckedChange={(v) => setValue('aceita_graneleiro', v, { shouldValidate: true, shouldDirty: true })}
                     aria-label="Aceita graneleiro"
                   />
                 </div>
                 {!cacamba && !graneleiro && (
-                  <p className="text-[11px] text-amber-700">
-                    Atenção: nenhum tipo selecionado, esse cliente não receberá carregamentos.
+                  <p className="text-body-sm text-warning">
+                    Nenhum tipo selecionado: o cliente não receberá carregamentos.
                   </p>
                 )}
               </div>
             </div>
           </DialogBody>
-          <DialogFooter>
-            <span className="text-[11px] text-muted-foreground/80">
-              Enter para salvar · Esc para cancelar
-            </span>
+          <DialogFooter className="justify-end">
             <div className="flex items-center gap-2">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
+              <Button type="button" variant="outline" onClick={() => guarda.onOpenChange(false)} disabled={isSubmitting}>
                 Cancelar
               </Button>
               <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                {isSubmitting && <Spinner />}
                 Salvar
               </Button>
             </div>
@@ -851,5 +820,7 @@ function OperacionalDialog({ row, onOpenChange, onSubmit }: OperacionalDialogPro
         </form>
       </DialogContent>
     </Dialog>
+    {guarda.dialog}
+    </>
   )
 }

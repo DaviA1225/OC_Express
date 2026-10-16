@@ -3,12 +3,13 @@ import { Link, useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { ArrowLeft, X, Pencil, AlertCircle, Check, Undo2, Loader2, Download, FileText, Copy } from 'lucide-react'
+import { ArrowLeft, X, Pencil, AlertCircle, Check, Undo2, Download, FileText, Copy } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/shared/EmptyState'
+import { PageHeader } from '@/components/layout/PageHeader'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { StatusBadge } from '@/components/solicitacoes/StatusBadge'
 import { AnexosCard } from '@/features/anexos/AnexosCard'
@@ -31,6 +32,7 @@ import {
 } from '@/features/solicitacoes/useSolicitacoes'
 import { usePendenciaAberta, usePendenciasSolicitacao, useResolverPendencia, type Pendencia } from '@/features/solicitacoes/usePendencias'
 import type { Tables, SolicitacaoStatus } from '@sislog/shared/types'
+import { Spinner } from '@/components/shared/Spinner'
 
 function fmtDataHora(iso: string | null): string {
   return iso ? format(new Date(iso), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR }) : '—'
@@ -73,7 +75,7 @@ export default function SolicitacaoDetailPage() {
   const back = (
     <Link
       to="/solicitacoes"
-      className="mb-3 inline-flex items-center gap-1.5 text-[13px] font-medium text-muted-foreground hover:text-foreground"
+      className="mb-3 inline-flex items-center gap-1.5 rounded-sm text-body font-medium text-muted-foreground transition-colors duration-fast hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       <ArrowLeft className="h-4 w-4" />
       Voltar para solicitações
@@ -95,7 +97,7 @@ export default function SolicitacaoDetailPage() {
     return (
       <div className="mx-auto w-full max-w-[720px]">
         {back}
-        <div className="rounded-lg border bg-background">
+        <div className="rounded-lg border bg-card">
           <EmptyState
             icon={AlertCircle}
             title="Solicitação não encontrada"
@@ -148,16 +150,14 @@ export default function SolicitacaoDetailPage() {
     <div className="mx-auto w-full max-w-[720px]">
       {back}
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <h1 className="text-[22px] font-semibold tracking-tight text-foreground">
-            Solicitação {sol.numero_interno != null ? formatNumeroOC(sol.numero_interno) : ''}
-          </h1>
-          <StatusBadge status={sol.status} variant="full" />
-        </div>
-        <div className="flex items-center gap-2">
+      <PageHeader
+        className="mb-0"
+        title={`Solicitação ${sol.numero_interno != null ? formatNumeroOC(sol.numero_interno) : ''}`}
+        meta={<StatusBadge status={sol.status} variant="full" />}
+        actions={
+        <>
           <Button variant="outline" onClick={() => setConfirmDup(true)} disabled={duplicar.isPending}>
-            {duplicar.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Copy className="h-4 w-4" />}
+            {duplicar.isPending ? <Spinner /> : <Copy className="h-4 w-4" />}
             Duplicar
           </Button>
           {podeEditar(sol.status) && (
@@ -174,8 +174,9 @@ export default function SolicitacaoDetailPage() {
               Cancelar solicitação
             </Button>
           )}
-        </div>
-      </div>
+        </>
+        }
+      />
 
       {pendencia.data && (
         <PendenciaBanner
@@ -184,15 +185,15 @@ export default function SolicitacaoDetailPage() {
       )}
 
       {ocPronta && (
-        <section className="mt-4 rounded-lg border border-emerald-300 bg-emerald-50 p-5 dark:border-emerald-900/60 dark:bg-emerald-950/30">
+        <section className="mt-4 rounded-lg border border-success-border bg-success-subtle p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-start gap-2.5">
-              <FileText className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+              <FileText className="mt-0.5 h-5 w-5 shrink-0 text-success" aria-hidden />
               <div>
-                <h2 className="text-[15px] font-semibold text-emerald-900 dark:text-emerald-200">
+                <h2 className="text-title-sm font-semibold text-foreground">
                   Ordem de Carregamento pronta
                 </h2>
-                <p className="mt-0.5 text-[12px] text-emerald-800 dark:text-emerald-300">
+                <p className="mt-0.5 text-body-sm text-muted-foreground">
                   Baixe a OC em PDF direto pelo portal.
                 </p>
               </div>
@@ -200,10 +201,10 @@ export default function SolicitacaoDetailPage() {
             <Button
               onClick={handleBaixarOC}
               disabled={baixarOC.isPending}
-              className="bg-emerald-600 text-white hover:bg-emerald-700"
+              variant="success"
             >
               {baixarOC.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Spinner />
               ) : (
                 <Download className="h-4 w-4" />
               )}
@@ -227,8 +228,8 @@ export default function SolicitacaoDetailPage() {
         />
       </div>
 
-      <section className="mt-4 rounded-lg border bg-background p-5">
-        <h2 className="text-[15px] font-semibold text-foreground">Dados da solicitação</h2>
+      <section className="mt-4 rounded-lg border bg-card p-5">
+        <h2 className="text-title-sm font-semibold text-foreground">Dados da solicitação</h2>
         <dl className="mt-4 grid gap-x-6 gap-y-3.5 sm:grid-cols-2">
           <DataRow label="Solicitante" value={solicitante} />
           <DataRow label="Tipo" value={sol.tipo === 'retorno' ? 'Retorno' : 'Minério'} />
@@ -260,17 +261,17 @@ export default function SolicitacaoDetailPage() {
           <DataRow label="Pamcard" value={pamcard} />
         </dl>
         <div className="mt-4 border-t pt-4">
-          <dt className="text-[11px] font-medium uppercase tracking-[0.5px] text-muted-foreground">
+          <dt className="text-body-sm text-muted-foreground">
             Observações
           </dt>
-          <dd className="mt-1 whitespace-pre-wrap text-[13px] text-foreground">
+          <dd className="mt-1 whitespace-pre-wrap text-body text-foreground">
             {sol.observacoes?.trim() || 'Nenhuma observação.'}
           </dd>
         </div>
       </section>
 
-      <section className="mt-3 rounded-lg border bg-background p-5">
-        <h2 className="text-[15px] font-semibold text-foreground">Linha do tempo</h2>
+      <section className="mt-3 rounded-lg border bg-card p-5">
+        <h2 className="text-title-sm font-semibold text-foreground">Linha do tempo</h2>
         <Timeline sol={sol} solicitante={solicitante} />
       </section>
 
@@ -299,7 +300,7 @@ export default function SolicitacaoDetailPage() {
         onOpenChange={setConfirmOpen}
         title="Cancelar solicitação?"
         description="A solicitação será cancelada e a equipe da LHG não vai processá-la. Essa ação não pode ser desfeita pelo portal."
-        confirmLabel="Sim, cancelar"
+        confirmLabel="Cancelar solicitação"
         cancelLabel="Voltar"
         destructive
         onConfirm={async () => {
@@ -313,7 +314,7 @@ export default function SolicitacaoDetailPage() {
         onOpenChange={setConfirmDup}
         title="Duplicar solicitação?"
         description={`Será criada uma nova solicitação com os mesmos dados${sol.numero_interno != null ? ` de ${formatNumeroOC(sol.numero_interno)}` : ''} (motorista, veículo, composição, cliente, pamcard e observações). Ela entra como "Recebida" e vai para a equipe da LHG.`}
-        confirmLabel="Sim, duplicar"
+        confirmLabel="Duplicar"
         cancelLabel="Voltar"
         onConfirm={async () => {
           const novoId = await duplicar.mutateAsync({ sourceId: sol.id as string })
@@ -336,19 +337,19 @@ function PendenciaBanner({
   const [resposta, setResposta] = React.useState('')
 
   return (
-    <section className="mt-4 rounded-lg border border-orange-300 bg-orange-50 p-5 dark:border-orange-900/60 dark:bg-orange-950/40">
+    <section className="mt-4 rounded-lg border border-danger-border bg-danger-subtle p-5">
       <div className="flex items-start gap-2.5">
-        <Undo2 className="mt-0.5 h-5 w-5 shrink-0 text-orange-600 dark:text-orange-400" />
+        <Undo2 className="mt-0.5 h-5 w-5 shrink-0 text-danger" aria-hidden />
         <div className="min-w-0 flex-1">
-          <h2 className="text-[15px] font-semibold text-orange-900 dark:text-orange-200">
+          <h2 className="text-title-sm font-semibold text-foreground">
             Ação necessária
           </h2>
-          <p className="mt-0.5 text-[12px] text-orange-800 dark:text-orange-300">
+          <p className="mt-0.5 text-body-sm text-muted-foreground">
             A equipe da LHG devolveu esta solicitação{' '}
             {format(new Date(pendencia.created_at), "dd/MM 'às' HH:mm", { locale: ptBR })}. Resolva
             para a equipe continuar.
           </p>
-          <p className="mt-3 whitespace-pre-wrap rounded-md bg-background/70 px-3 py-2 text-[13px] text-foreground">
+          <p className="mt-3 whitespace-pre-wrap rounded-md border bg-card px-3 py-2 text-body text-foreground">
             {pendencia.motivo}
           </p>
 
@@ -366,10 +367,9 @@ function PendenciaBanner({
                   await resolver.mutateAsync({ id: pendencia.id, resposta: resposta.trim() })
                 }}
                 disabled={resolver.isPending}
-                className="bg-orange-600 text-white hover:bg-orange-700"
               >
                 {resolver.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <Spinner />
                 ) : (
                   <Check className="h-4 w-4" />
                 )}
@@ -388,10 +388,10 @@ function PendenciaBanner({
 // leitura — a ação de resolver fica no banner "Ação necessária" no topo.
 function PendenciasHistoricoCard({ pendencias }: { pendencias: Pendencia[] }) {
   return (
-    <section className="rounded-lg border bg-background">
+    <section className="rounded-lg border bg-card">
       <header className="flex items-center gap-2 border-b px-5 py-3">
-        <Undo2 className="h-4 w-4 text-muted-foreground" />
-        <h2 className="text-[15px] font-semibold text-foreground">Histórico de pendências</h2>
+        <Undo2 className="h-4 w-4 text-tertiary" aria-hidden />
+        <h2 className="text-title-sm font-semibold text-foreground">Histórico de pendências</h2>
       </header>
       <ul className="divide-y">
         {pendencias.map((p) => {
@@ -401,30 +401,28 @@ function PendenciasHistoricoCard({ pendencias }: { pendencias: Pendencia[] }) {
               <div className="flex items-center gap-2">
                 <span
                   className={cn(
-                    'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium',
-                    aberta
-                      ? 'bg-orange-100 text-orange-800 dark:bg-orange-950/60 dark:text-orange-300'
-                      : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300',
+                    'inline-flex items-center gap-1 rounded-[2px] px-1.5 py-0.5 text-meta font-medium',
+                    aberta ? 'bg-danger-subtle text-danger' : 'bg-success-subtle text-success',
                   )}
                 >
                   {aberta ? <Undo2 className="h-3 w-3" /> : <Check className="h-3 w-3" />}
-                  {aberta ? 'Aguardando você' : 'Resolvida'}
+                  {aberta ? 'Aguardando correção' : 'Resolvida'}
                 </span>
-                <span className="text-[11px] text-muted-foreground">
+                <span className="text-meta text-muted-foreground">
                   Devolvida em {format(new Date(p.created_at), "dd/MM 'às' HH:mm", { locale: ptBR })}
                 </span>
               </div>
-              <p className="text-[12px] text-foreground">
+              <p className="text-body-sm text-foreground">
                 <span className="text-muted-foreground">Motivo (LHG): </span>{p.motivo}
               </p>
               {p.resposta_parceiro && (
-                <p className="rounded-md bg-muted/60 px-2.5 py-1.5 text-[12px] text-foreground">
-                  <span className="text-muted-foreground">Sua resposta: </span>
+                <p className="rounded-md bg-muted px-2.5 py-1.5 text-body-sm text-foreground">
+                  <span className="text-muted-foreground">Resposta do parceiro: </span>
                   {p.resposta_parceiro}
                 </p>
               )}
               {!aberta && p.resolvida_em && (
-                <p className="text-[11px] text-emerald-700 dark:text-emerald-400">
+                <p className="text-meta text-success">
                   Resolvida em {format(new Date(p.resolvida_em), "dd/MM 'às' HH:mm", { locale: ptBR })}
                 </p>
               )}
@@ -439,10 +437,10 @@ function PendenciasHistoricoCard({ pendencias }: { pendencias: Pendencia[] }) {
 function DataRow({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-[11px] font-medium uppercase tracking-[0.5px] text-muted-foreground">
+      <dt className="text-body-sm text-muted-foreground">
         {label}
       </dt>
-      <dd className="mt-0.5 text-[13px] text-foreground">{value}</dd>
+      <dd className="mt-0.5 text-body text-foreground">{value}</dd>
     </div>
   )
 }
@@ -475,8 +473,8 @@ function buildTimeline(sol: PortalSolicitacao): TimelineStep[] {
 
 function Timeline({ sol, solicitante }: { sol: PortalSolicitacao; solicitante: string }) {
   const steps = buildTimeline(sol)
-  // Nó mais recente concluído = estado atual; ganha um glow do acento (azul),
-  // menos quando a solicitação foi cancelada (estado terminal). DESIGN.md §7.
+  // Nó mais recente concluído = estado atual: anel de 2px do acento (sem glow —
+  // DESIGN.md §7), menos quando a solicitação foi cancelada (estado terminal).
   const lastDoneIndex = steps.reduce((acc, s, i) => (s.done ? i : acc), -1)
   const cancelada = sol.status === 'cancelada'
   return (
@@ -492,7 +490,7 @@ function Timeline({ sol, solicitante }: { sol: PortalSolicitacao; solicitante: s
                   step.done
                     ? 'border-primary bg-primary text-primary-foreground'
                     : 'border-border bg-muted text-muted-foreground',
-                  i === lastDoneIndex && !cancelada && 'shadow-[0_0_12px_-1px_rgba(30,64,175,0.6)]',
+                  i === lastDoneIndex && !cancelada && 'ring-2 ring-primary/30 ring-offset-1 ring-offset-card',
                 )}
               >
                 {step.done ? <Check className="h-3.5 w-3.5" /> : <span className="h-1.5 w-1.5 rounded-full bg-current" />}
@@ -504,17 +502,17 @@ function Timeline({ sol, solicitante }: { sol: PortalSolicitacao; solicitante: s
             <div className={cn('pb-5', last && 'pb-0')}>
               <p
                 className={cn(
-                  'text-[13px] font-medium',
+                  'text-body font-medium',
                   step.done ? 'text-foreground' : 'text-muted-foreground',
                 )}
               >
                 {step.label}
               </p>
               {i === 0 && (
-                <p className="text-[12px] text-muted-foreground">por {solicitante}</p>
+                <p className="text-body-sm text-muted-foreground">por {solicitante}</p>
               )}
               {step.done && step.at && (
-                <p className="text-[12px] text-muted-foreground">{fmtDataHora(step.at)}</p>
+                <p className="text-body-sm text-muted-foreground">{fmtDataHora(step.at)}</p>
               )}
             </div>
           </li>

@@ -2,7 +2,7 @@ import * as React from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Loader2, Download } from 'lucide-react'
+import { Download } from 'lucide-react'
 import { toast } from 'sonner'
 import { CrudListPage, useCrudListState, type ColumnDef } from '@/components/shared/CrudListPage'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
@@ -21,11 +21,13 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { isValidCpf, isValidTelefone } from '@sislog/shared/validators'
 import { formatCpf, formatTelefone } from '@/lib/utils'
 import type { Tables } from '@sislog/shared/types'
+import { Spinner } from '@/components/shared/Spinner'
+import { CadastroField } from '@/components/forms/CadastroField'
+import { useDescartarAlteracoes } from '@/features/cadastros/useDescartarAlteracoes'
 
 type Row = Tables<'parceiro_motoristas'>
 
@@ -94,9 +96,9 @@ export default function MotoristasPage() {
       const ts = new Date()
       const stamp = `${ts.getFullYear()}${String(ts.getMonth() + 1).padStart(2, '0')}${String(ts.getDate()).padStart(2, '0')}_${String(ts.getHours()).padStart(2, '0')}${String(ts.getMinutes()).padStart(2, '0')}`
       downloadCsv(`motoristas_${stamp}.csv`, buildCsv(rows, cols))
-      toast.success(`${rows.length} ${rows.length === 1 ? 'registro exportado' : 'registros exportados'}`)
+      toast.success(`${rows.length} ${rows.length === 1 ? 'registro exportado' : 'registros exportados'}.`)
     } catch (err) {
-      toast.error('Falha ao exportar. Tente novamente.')
+      toast.error('Não foi possível exportar. Tente novamente.')
       console.error('export motoristas csv error', err)
     } finally {
       setExporting(false)
@@ -121,7 +123,7 @@ export default function MotoristasPage() {
             disabled={exporting || list.isLoading}
             title="Exportar motoristas (filtros atuais) em CSV"
           >
-            {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            {exporting ? <Spinner /> : <Download className="h-4 w-4" />}
             <span className="hidden sm:inline">Exportar CSV</span>
           </Button>
         }
@@ -171,9 +173,9 @@ export default function MotoristasPage() {
         onOpenChange={(o) => !o && setConfirmRow(null)}
         title={confirmRow?.ativo ? 'Desativar motorista?' : 'Reativar motorista?'}
         description={confirmRow?.ativo
-          ? 'O motorista não aparecerá nas listas ativas. Você pode reativá-lo depois.'
+          ? 'O motorista não aparecerá nas listas ativas. É possível reativá-lo depois.'
           : 'O motorista voltará a aparecer nas listas ativas.'}
-        confirmLabel={confirmRow?.ativo ? 'Sim, desativar' : 'Sim, reativar'}
+        confirmLabel={confirmRow?.ativo ? 'Desativar' : 'Reativar'}
         destructive={confirmRow?.ativo}
         onConfirm={async () => {
           if (confirmRow) {
@@ -192,7 +194,7 @@ export default function MotoristasPage() {
             ? `O cadastro de "${deleteRow.nome_completo}" será removido permanentemente. Se houver solicitações vinculadas, a exclusão será bloqueada.`
             : ''
         }
-        confirmLabel="Sim, excluir"
+        confirmLabel="Excluir"
         destructive
         onConfirm={async () => {
           if (deleteRow) {
@@ -215,7 +217,7 @@ interface FormProps {
 function MotoristaForm({ open, onOpenChange, editing, onSubmit }: FormProps) {
   const {
     register, handleSubmit, reset, setValue, watch,
-    formState: { errors, isSubmitting },
+    formState: { errors, isSubmitting, isDirty },
   } = useForm<FormValues>({ resolver: zodResolver(schema) })
 
   React.useEffect(() => {
@@ -232,66 +234,59 @@ function MotoristaForm({ open, onOpenChange, editing, onSubmit }: FormProps) {
   const cpf = watch('cpf') ?? ''
   const tel = watch('telefone') ?? ''
 
+  const guarda = useDescartarAlteracoes(isDirty, onOpenChange, isSubmitting)
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <form onSubmit={handleSubmit(onSubmit)} noValidate>
-          <DialogHeader>
-            <DialogTitle>{editing ? 'Editar motorista' : 'Novo motorista'}</DialogTitle>
-            <DialogDescription>
-              Motoristas da sua frota disponíveis para as solicitações de carregamento.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogBody className="space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="nome_completo">Nome completo *</Label>
-              <Input id="nome_completo" autoFocus {...register('nome_completo')} />
-              {errors.nome_completo && (
-                <p className="text-[11px] text-destructive">{errors.nome_completo.message}</p>
-              )}
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="cpf">CPF *</Label>
-                <Input
-                  id="cpf"
-                  value={cpf}
-                  onChange={(e) => setValue('cpf', formatCpf(e.target.value), { shouldValidate: true })}
-                  placeholder="000.000.000-00"
-                  inputMode="numeric"
-                />
-                {errors.cpf && <p className="text-[11px] text-destructive">{errors.cpf.message}</p>}
+    <>
+      <Dialog open={open} onOpenChange={guarda.onOpenChange}>
+        <DialogContent>
+          <form onSubmit={handleSubmit(onSubmit)} noValidate>
+            <DialogHeader>
+              <DialogTitle>{editing ? 'Editar motorista' : 'Novo motorista'}</DialogTitle>
+              <DialogDescription>
+                Motoristas da sua frota disponíveis para as solicitações de carregamento.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogBody className="space-y-4">
+              <CadastroField label="Nome completo" required id="nome_completo" error={errors.nome_completo?.message}>
+                <Input autoFocus {...register('nome_completo')} />
+              </CadastroField>
+              <div className="grid grid-cols-2 gap-3">
+                <CadastroField label="CPF" required id="cpf" error={errors.cpf?.message}>
+                  <Input
+                    value={cpf}
+                    onChange={(e) => setValue('cpf', formatCpf(e.target.value), { shouldValidate: true, shouldDirty: true })}
+                    placeholder="000.000.000-00"
+                    inputMode="numeric"
+                  />
+                </CadastroField>
+                <CadastroField label="Telefone" id="telefone" error={errors.telefone?.message}>
+                  <Input
+                    value={tel}
+                    onChange={(e) => setValue('telefone', formatTelefone(e.target.value), { shouldValidate: true, shouldDirty: true })}
+                    placeholder="(00) 00000-0000"
+                  />
+                </CadastroField>
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="telefone">Telefone</Label>
-                <Input
-                  id="telefone"
-                  value={tel}
-                  onChange={(e) => setValue('telefone', formatTelefone(e.target.value), { shouldValidate: true })}
-                  placeholder="(00) 00000-0000"
-                />
-                {errors.telefone && <p className="text-[11px] text-destructive">{errors.telefone.message}</p>}
+              <CadastroField label="Observações" id="observacoes">
+                <Textarea rows={2} {...register('observacoes')} />
+              </CadastroField>
+            </DialogBody>
+            <DialogFooter className="justify-end">
+              <div className="flex items-center gap-2">
+                <Button type="button" variant="outline" onClick={() => guarda.onOpenChange(false)} disabled={isSubmitting}>
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting && <Spinner />}
+                  Salvar
+                </Button>
               </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="observacoes">Observações</Label>
-              <Textarea id="observacoes" rows={2} {...register('observacoes')} />
-            </div>
-          </DialogBody>
-          <DialogFooter>
-            <span className="text-[11px] text-muted-foreground/80">Enter para salvar · Esc para cancelar</span>
-            <div className="flex items-center gap-2">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
-                Salvar
-              </Button>
-            </div>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+      {guarda.dialog}
+    </>
   )
 }

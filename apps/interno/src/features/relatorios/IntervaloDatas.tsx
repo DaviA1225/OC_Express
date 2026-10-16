@@ -36,7 +36,7 @@ export function IntervaloDatas({ de, ate, onChange, onLimpar, mostrarLimpar, idP
       <div>
         <label
           htmlFor={`${idPrefix}-de`}
-          className="mb-1 block text-[10px] uppercase tracking-[0.5px] text-muted-foreground"
+          className="mb-1 block text-meta font-medium text-muted-foreground"
         >
           De
         </label>
@@ -52,7 +52,7 @@ export function IntervaloDatas({ de, ate, onChange, onLimpar, mostrarLimpar, idP
       <div>
         <label
           htmlFor={`${idPrefix}-ate`}
-          className="mb-1 block text-[10px] uppercase tracking-[0.5px] text-muted-foreground"
+          className="mb-1 block text-meta font-medium text-muted-foreground"
         >
           Até
         </label>
@@ -73,7 +73,7 @@ export function IntervaloDatas({ de, ate, onChange, onLimpar, mostrarLimpar, idP
       )}
 
       {dias > DIAS_INTERVALO_LONGO && (
-        <p className="w-full text-[11px] text-amber-700 dark:text-amber-400">
+        <p className="w-full text-meta text-warning">
           {dias} dias no intervalo — a consulta varre todas as solicitações do
           período e pode demorar.
         </p>

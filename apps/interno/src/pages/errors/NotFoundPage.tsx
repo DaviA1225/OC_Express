@@ -7,15 +7,14 @@ export default function NotFoundPage() {
   return (
     <div className="flex min-h-[calc(100vh-3.5rem)] items-center justify-center px-4 py-12">
       <div className="w-full max-w-lg text-center">
-        <p className="font-display text-[72px] font-semibold leading-none tracking-tight tabular-nums text-muted-foreground/40">
+        <p className="font-display text-kpi font-medium tabular-nums text-tertiary" aria-hidden>
           404
         </p>
-        <h1 className="mt-3 text-[28px] font-semibold tracking-tight text-foreground">
+        <h1 className="mt-2 font-display text-page font-medium text-foreground">
           Página não encontrada
         </h1>
-        <p className="mt-3 text-[14px] leading-relaxed text-muted-foreground">
-          O endereço que você tentou acessar não existe ou foi movido. Volte para o início
-          ou retorne à página anterior.
+        <p className="mt-3 text-body-lg leading-relaxed text-muted-foreground">
+          Endereço inexistente ou removido.
         </p>
 
         <div className="mt-7 flex flex-wrap items-center justify-center gap-2">
@@ -26,7 +25,7 @@ export default function NotFoundPage() {
           <Button asChild>
             <Link to="/dashboard">
               <Home className="h-4 w-4" />
-              Ir para o Dashboard
+              Ir para o Painel
             </Link>
           </Button>
         </div>

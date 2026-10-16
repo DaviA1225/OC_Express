@@ -27,10 +27,10 @@ export function ProtectedRoute() {
 function AcessoNaoAutorizado() {
   const { signOut } = useAuth()
   return (
-    <div className="flex min-h-full items-center justify-center bg-muted px-4 py-16">
-      <div className="w-full max-w-md rounded-xl border bg-background p-6 text-center shadow-overlay">
-        <h2 className="text-[18px] font-medium text-foreground">Acesso não autorizado</h2>
-        <p className="mt-2 text-[13px] text-muted-foreground">
+    <div className="flex min-h-full items-center justify-center bg-canvas px-4 py-16">
+      <div className="w-full max-w-md rounded-lg border bg-card p-6 text-center">
+        <h2 className="text-title font-semibold text-foreground">Acesso não autorizado</h2>
+        <p className="mt-2 text-body text-muted-foreground">
           Esta conta não está vinculada a nenhuma transportadora parceira ativa.
           Procure o administrador da sua empresa ou o suporte da LHG.
         </p>

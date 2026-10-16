@@ -12,7 +12,6 @@ import {
   Inbox,
   ChevronDown,
   Download,
-  Loader2,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -36,6 +35,8 @@ import {
 } from '@/components/ui/table'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { cn } from '@/lib/utils'
+import { PageHeader } from '@/components/layout/PageHeader'
+import { Spinner } from '@/components/shared/Spinner'
 import {
   useAuditList,
   useAuditUsuarios,
@@ -232,13 +233,10 @@ export default function AuditoriaPage() {
   return (
     <>
       <div className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-[22px] font-semibold tracking-tight text-foreground">Auditoria</h1>
-            <p className="text-[12px] text-muted-foreground">
-              Histórico de criação, edição e exclusão dos registros do sistema.
-            </p>
-          </div>
+        <PageHeader
+          title="Auditoria"
+          description="Histórico de criação, edição e exclusão dos registros do sistema."
+          actions={
           <Button
             type="button"
             variant="outline"
@@ -246,15 +244,16 @@ export default function AuditoriaPage() {
             disabled={exporting || list.isLoading}
             title="Exportar resultados filtrados em CSV"
           >
-            {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            {exporting ? <Spinner /> : <Download className="h-4 w-4" />}
             <span className="hidden sm:inline">Exportar CSV</span>
           </Button>
-        </div>
+          }
+        />
 
         <div className="space-y-3 rounded-lg border bg-card p-3">
           <div className="flex flex-wrap items-end gap-3">
             <div className="space-y-1">
-              <Label className="text-[11px] uppercase tracking-[0.5px] text-muted-foreground">Período</Label>
+              <Label className="text-meta font-medium text-muted-foreground">Período</Label>
               <PeriodoSelect value={periodo} onChange={setPeriodo} />
             </div>
             <div className="ml-auto">
@@ -327,19 +326,19 @@ export default function AuditoriaPage() {
                   className="cursor-pointer"
                   onClick={() => setOpenLog(row)}
                 >
-                  <TableCell className="text-[12px] text-muted-foreground">
+                  <TableCell className="text-body-sm text-muted-foreground">
                     {format(new Date(row.created_at), "dd/MM/yyyy HH:mm:ss", { locale: ptBR })}
                   </TableCell>
                   <TableCell>
                     <AcaoBadge acao={row.acao as AuditAcao} />
                   </TableCell>
-                  <TableCell className="text-[12px] text-foreground">
+                  <TableCell className="text-body-sm text-foreground">
                     {TABELA_LABELS[row.tabela] ?? row.tabela}
                   </TableCell>
-                  <TableCell className="text-[12px]">
+                  <TableCell className="text-body-sm">
                     {row.usuario_nome ?? <span className="text-muted-foreground">Sistema/desconhecido</span>}
                   </TableCell>
-                  <TableCell className="text-[12px] text-muted-foreground">
+                  <TableCell className="text-body-sm text-muted-foreground">
                     <ResumoCell row={row} />
                   </TableCell>
                   <TableCell className="text-right">
@@ -351,7 +350,7 @@ export default function AuditoriaPage() {
           </Table>
 
           {(list.data?.count ?? 0) > PAGE_SIZE && (
-            <div className="flex items-center justify-between border-t px-4 py-3 text-[12px] text-muted-foreground">
+            <div className="flex items-center justify-between border-t px-4 py-3 text-body-sm text-muted-foreground">
               <span>
                 Página {page} de {totalPages} · {list.data?.count} registros
               </span>
@@ -391,7 +390,7 @@ function PeriodoSelect({ value, onChange }: { value: Periodo; onChange: (v: Peri
       <select
         value={value}
         onChange={(e) => onChange(e.target.value as Periodo)}
-        className="h-9 appearance-none rounded-md border bg-card pl-3 pr-8 text-[13px] focus:outline-none focus:ring-2 focus:ring-ring"
+        className="h-9 appearance-none rounded-control border border-input bg-card pl-3 pr-8 text-body focus:outline-none focus:ring-2 focus:ring-ring"
       >
         {(Object.keys(PERIODO_LABELS) as Periodo[]).map((p) => (
           <option key={p} value={p}>{PERIODO_LABELS[p]}</option>
@@ -412,7 +411,7 @@ interface FilterChipsProps {
 function FilterChips({ label, options, value, onToggle }: FilterChipsProps) {
   return (
     <div className="space-y-1.5">
-      <Label className="text-[11px] uppercase tracking-[0.5px] text-muted-foreground">{label}</Label>
+      <Label className="text-meta font-medium text-muted-foreground">{label}</Label>
       <div className="flex flex-wrap gap-1.5">
         {options.map((o) => {
           const active = value.includes(o.value)
@@ -421,11 +420,12 @@ function FilterChips({ label, options, value, onToggle }: FilterChipsProps) {
               key={o.value}
               type="button"
               onClick={() => onToggle(o.value)}
+              aria-pressed={active}
               className={cn(
-                'rounded-full border px-3 py-1 text-[12px] transition-colors',
+                'rounded-control border px-2.5 py-1 text-body-sm transition-colors duration-fast',
                 active
-                  ? 'border-primary bg-primary text-primary-foreground'
-                  : 'border-border bg-card text-foreground/80 hover:bg-muted',
+                  ? 'border-primary bg-primary/[0.08] font-medium text-primary-strong'
+                  : 'border-border bg-card text-foreground hover:border-input hover:bg-row-hover',
               )}
             >
               {o.label}
@@ -447,7 +447,7 @@ function UsuarioFilter({ usuarios, value, onToggle }: UsuarioFilterProps) {
   if (usuarios.length === 0) return null
   return (
     <div className="space-y-1.5">
-      <Label className="text-[11px] uppercase tracking-[0.5px] text-muted-foreground">Usuário</Label>
+      <Label className="text-meta font-medium text-muted-foreground">Usuário</Label>
       <div className="flex flex-wrap gap-1.5">
         {usuarios.map((u) => {
           const active = value.includes(u.user_id)
@@ -456,11 +456,12 @@ function UsuarioFilter({ usuarios, value, onToggle }: UsuarioFilterProps) {
               key={u.user_id}
               type="button"
               onClick={() => onToggle(u.user_id)}
+              aria-pressed={active}
               className={cn(
-                'rounded-full border px-3 py-1 text-[12px] transition-colors',
+                'rounded-control border px-2.5 py-1 text-body-sm transition-colors duration-fast',
                 active
-                  ? 'border-primary bg-primary text-primary-foreground'
-                  : 'border-border bg-card text-foreground/80 hover:bg-muted',
+                  ? 'border-primary bg-primary/[0.08] font-medium text-primary-strong'
+                  : 'border-border bg-card text-foreground hover:border-input hover:bg-row-hover',
               )}
             >
               {u.nome_completo}
@@ -474,13 +475,13 @@ function UsuarioFilter({ usuarios, value, onToggle }: UsuarioFilterProps) {
 
 function AcaoBadge({ acao }: { acao: AuditAcao }) {
   const map: Record<AuditAcao, { label: string; className: string; icon: React.ReactNode }> = {
-    INSERT: { label: 'Criação', className: 'bg-emerald-100 text-emerald-800', icon: <Plus className="h-3 w-3" /> },
+    INSERT: { label: 'Criação', className: 'bg-success-subtle text-success', icon: <Plus className="h-3 w-3" /> },
     UPDATE: { label: 'Edição', className: 'cat-steel', icon: <Pencil className="h-3 w-3" /> },
-    DELETE: { label: 'Exclusão', className: 'bg-red-100 text-red-800', icon: <Trash2 className="h-3 w-3" /> },
+    DELETE: { label: 'Exclusão', className: 'bg-danger-subtle text-danger', icon: <Trash2 className="h-3 w-3" /> },
   }
   const m = map[acao] ?? { label: acao, className: 'bg-muted text-muted-foreground', icon: null }
   return (
-    <span className={cn('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium', m.className)}>
+    <span className={cn('inline-flex items-center gap-1 rounded-[2px] px-1.5 py-0.5 text-meta font-medium', m.className)}>
       {m.icon}
       {m.label}
     </span>
@@ -542,7 +543,7 @@ function DetalheDialog({ log, onClose }: { log: AuditLogRow | null; onClose: () 
         <DialogBody className="space-y-4">
           {acao === 'UPDATE' && (
             <div className="overflow-hidden rounded-md border">
-              <table className="w-full text-[12px]">
+              <table className="w-full text-body-sm">
                 <thead className="bg-muted text-left">
                   <tr>
                     <th className="px-3 py-2 font-medium">Campo</th>
@@ -561,12 +562,12 @@ function DetalheDialog({ log, onClose }: { log: AuditLogRow | null; onClose: () 
                   {diff.map((d) => (
                     <tr key={d.campo} className="align-top">
                       <td className="px-3 py-2 font-medium text-foreground">{d.campo}</td>
-                      <td className="px-3 py-2 text-red-700">
+                      <td className="px-3 py-2 text-danger">
                         <span className="block max-w-[280px] whitespace-pre-wrap break-words">
                           {formatJsonValue(d.antes)}
                         </span>
                       </td>
-                      <td className="px-3 py-2 text-emerald-700">
+                      <td className="px-3 py-2 text-success">
                         <span className="block max-w-[280px] whitespace-pre-wrap break-words">
                           {formatJsonValue(d.depois)}
                         </span>
@@ -586,7 +587,7 @@ function DetalheDialog({ log, onClose }: { log: AuditLogRow | null; onClose: () 
           )}
 
           {log.registro_id && (
-            <p className="text-[11px] text-muted-foreground">ID do registro: <code>{log.registro_id}</code></p>
+            <p className="text-meta text-muted-foreground">ID do registro: <code>{log.registro_id}</code></p>
           )}
         </DialogBody>
       </DialogContent>
@@ -597,8 +598,8 @@ function DetalheDialog({ log, onClose }: { log: AuditLogRow | null; onClose: () 
 function JsonBlock({ titulo, data }: { titulo: string; data: unknown }) {
   return (
     <div>
-      <p className="mb-1 text-[11px] uppercase tracking-[0.5px] text-muted-foreground">{titulo}</p>
-      <pre className="max-h-[360px] overflow-auto rounded-md border bg-muted/40 p-3 text-[11px]">
+      <p className="mb-1 text-meta font-medium text-muted-foreground">{titulo}</p>
+      <pre className="max-h-[360px] overflow-auto rounded-surface border bg-muted p-3 text-meta">
         {JSON.stringify(data, null, 2)}
       </pre>
     </div>

@@ -79,9 +79,9 @@ export function SolicitacoesGradeErp({
   return (
     <div className="flex items-start gap-4">
       <div className="min-w-0 flex-1 overflow-x-auto rounded-lg border bg-card">
-        <table className="w-full border-collapse whitespace-nowrap text-[13px]">
+        <table className="w-full border-collapse whitespace-nowrap text-body">
           <thead>
-            <tr className="border-b bg-muted/50 text-left text-[12px] text-muted-foreground">
+            <tr className="border-b bg-muted/50 text-left text-body-sm text-muted-foreground">
               {selectable && (
                 <th className="w-9 px-3 py-2 font-medium">
                   <Checkbox
@@ -115,9 +115,9 @@ export function SolicitacoesGradeErp({
                   onClick={() => escolher(row.id)}
                   onDoubleClick={() => onAbrir(row.id)}
                   className={cn(
-                    'cursor-pointer border-b last:border-b-0 outline-none transition-colors',
-                    'hover:bg-muted/40 focus-visible:bg-muted/60',
-                    ativa && 'bg-primary/[0.06] shadow-[inset_3px_0_0_hsl(var(--primary))] hover:bg-primary/[0.08]',
+                    'cursor-pointer border-b last:border-b-0 outline-none',
+                    'transition-colors duration-fast hover:bg-row-hover focus-visible:bg-row-hover',
+                    ativa && 'bg-primary/[0.08] shadow-[inset_2px_0_0_hsl(var(--primary))] hover:bg-primary/[0.08]',
                   )}
                 >
                   {selectable && (
@@ -135,7 +135,7 @@ export function SolicitacoesGradeErp({
                   <td className="max-w-[200px] truncate px-3 py-1.5">
                     {row.motorista?.nome_completo ?? row.solicitante_nome ?? '—'}
                   </td>
-                  <td className="px-3 py-1.5 tracking-wide">{row.veiculo?.placa ?? '—'}</td>
+                  <td className="px-3 py-1.5 tabular-nums">{row.veiculo?.placa ?? '—'}</td>
                   <td className="px-3 py-1.5 text-muted-foreground">{ORIGEM_LABELS[row.origem] ?? row.origem}</td>
                   <td className="px-3 py-1.5 tabular-nums text-muted-foreground">
                     {created ? format(created, 'dd/MM HH:mm', { locale: ptBR }) : '—'}
@@ -145,8 +145,8 @@ export function SolicitacoesGradeErp({
                       'px-3 py-1.5 text-right tabular-nums',
                       // Mesmas cores do SlaBadge da lista clássica: âmbar no
                       // aviso, vermelho quando estoura o limite.
-                      sla?.severity === 'alert' && 'font-semibold text-red-700 dark:text-red-300',
-                      sla?.severity === 'warning' && 'font-medium text-amber-700 dark:text-amber-300',
+                      sla?.severity === 'alert' && 'font-semibold text-danger',
+                      sla?.severity === 'warning' && 'font-medium text-warning',
                       !sla && 'text-muted-foreground',
                     )}
                   >
@@ -157,7 +157,7 @@ export function SolicitacoesGradeErp({
             })}
           </tbody>
         </table>
-        <p className="border-t px-3 py-1.5 text-[11px] text-muted-foreground">
+        <p className="border-t px-3 py-1.5 text-meta text-muted-foreground">
           Clique para ver ao lado · duplo clique ou Enter abre em tela cheia · ↑ ↓ andam pela lista
         </p>
       </div>
@@ -171,7 +171,7 @@ export function SolicitacoesGradeErp({
             <div className="flex shrink-0 items-center justify-end gap-1 border-b px-2 py-1.5">
               <Link
                 to={`/solicitacoes/${selecionada}`}
-                className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[12px] text-muted-foreground hover:bg-muted hover:text-foreground"
+                className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-body-sm text-muted-foreground transition-colors duration-fast hover:bg-row-hover hover:text-foreground"
               >
                 <ExternalLink className="h-3.5 w-3.5" /> Tela cheia
               </Link>
@@ -179,12 +179,12 @@ export function SolicitacoesGradeErp({
                 type="button"
                 onClick={() => onSelecionar(null)}
                 aria-label="Fechar detalhe"
-                className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+                className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors duration-fast hover:bg-row-hover hover:text-foreground"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <div className="min-h-0 flex-1 overflow-y-auto p-4">
+            <div className="min-h-0 flex-1 overflow-y-auto bg-canvas p-3">
               {/* key: trocar de linha descarta estado dos formulários da anterior. */}
               <ErrorBoundary resetKey={selecionada!} fallback={(p) => <ErroDaTela {...p} />}>
                 <SolicitacaoDetailPage key={selecionada} embutido={{ id: selecionada! }} />
@@ -192,8 +192,8 @@ export function SolicitacoesGradeErp({
             </div>
           </>
         ) : (
-          <div className="flex flex-1 flex-col items-center justify-center gap-2 px-8 py-16 text-center text-[13px] text-muted-foreground">
-            <MousePointerClick className="h-5 w-5" />
+          <div className="flex flex-1 flex-col items-center justify-center gap-2 px-8 py-16 text-center text-body text-muted-foreground">
+            <MousePointerClick className="h-5 w-5 text-tertiary" />
             Selecione uma solicitação na lista para ver os detalhes aqui.
           </div>
         )}

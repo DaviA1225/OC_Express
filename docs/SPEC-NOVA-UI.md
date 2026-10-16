@@ -1,3 +1,12 @@
+> **SUPERADA NAS TELAS OPERACIONAIS em 2026-10-15** (decisão do Davi, branch
+> `feat/ui-corporativo`). O sistema interno adotou o padrão corporativo (Fluent 2 /
+> Carbon / Fiori): tema escuro com superfícies frias em camadas, **sem gradiente,
+> glow ou backdrop-blur** e sem `hover:scale` em telas de trabalho. Gradiente/glow
+> seguem valendo **só na tela de login** (marca). A fonte de verdade é o
+> `DESIGN.md` (§2, §4 e §7 emendados) e o contrato de tokens em
+> `.omc/handoffs/tokens-contract.md`. Este documento fica como registro histórico
+> da direção v3 e referência para o login/portal.
+
 # SisLog — Especificação de Nova UI/UX (referência: TransporteApp)
 
 Este documento descreve, em detalhe, os padrões de UI/UX de **transporteapp.com.br**

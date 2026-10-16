@@ -19,14 +19,27 @@ export const STATUS_LABELS: Record<SolicitacaoStatus, string> = {
   cancelada: 'Cancelada',
 }
 
+// Par fundo/texto do status vindo dos tokens --st-* (index.css), claro e
+// escuro. Também define --status-dot (cor do ponto) para quem precisar.
 export const STATUS_CLASSES: Record<SolicitacaoStatus, string> = {
-  recebida: 'bg-slate-100 text-slate-700',
+  recebida: 'status-recebida',
   em_cadastro: 'status-em_cadastro',
-  instrucao_emitida: 'bg-amber-100 text-amber-800',
+  instrucao_emitida: 'status-instrucao_emitida',
   oc_gerada: 'status-oc_gerada',
-  oc_enviada: 'bg-emerald-100 text-emerald-800',
-  finalizada: 'bg-emerald-200 text-emerald-900',
-  cancelada: 'bg-red-100 text-red-800',
+  oc_enviada: 'status-oc_enviada',
+  finalizada: 'status-finalizada',
+  cancelada: 'status-cancelada',
+}
+
+/** Cor do status para gráfico/mapa (CSS var; vale em fill/stroke do Recharts). */
+export const STATUS_COLOR_VAR: Record<SolicitacaoStatus, string> = {
+  recebida: 'var(--st-recebida-dot)',
+  em_cadastro: 'var(--st-em_cadastro-dot)',
+  instrucao_emitida: 'var(--st-instrucao_emitida-dot)',
+  oc_gerada: 'var(--st-oc_gerada-dot)',
+  oc_enviada: 'var(--st-oc_enviada-dot)',
+  finalizada: 'var(--st-finalizada-dot)',
+  cancelada: 'var(--st-cancelada-dot)',
 }
 
 

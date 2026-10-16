@@ -37,56 +37,26 @@ import {
   canViewSeguranca,
   canViewPrivacidade,
 } from '@/features/auth/permissions'
+import { iniciais, labelPerfil } from '@/features/auth/perfis'
 import { useRecebidasCount } from '@/features/solicitacoes/useSolicitacoes'
 import { useAgendamentosPendentesCount } from '@/features/agendamentos/useAgendamentos'
 
 interface NavItem {
   to: string
   label: string
-  icon: React.ComponentType<{ className?: string }>
+  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>
+  /** Guarda de permissão; ausente = todo o time interno vê. */
+  visivel?: boolean
 }
 
-
-const PERFIL_LABELS: Record<string, string> = {
-  admin: 'Administrador',
-  gerente: 'Gerente',
-  supervisor: 'Supervisor',
-  analista: 'Analista',
-  assistente: 'Assistente',
+interface NavSecao {
+  titulo: string
+  itens: NavItem[]
 }
 
-function iniciais(nome: string): string {
-  const partes = nome.trim().split(/\s+/).filter(Boolean)
-  if (partes.length === 0) return '?'
-  if (partes.length === 1) return partes[0].slice(0, 2).toUpperCase()
-  return (partes[0][0] + partes[partes.length - 1][0]).toUpperCase()
+function plural(n: number, um: string, varios: string): string {
+  return `${n} ${n === 1 ? um : varios}`
 }
-
-const operacional: NavItem[] = [
-  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/solicitacoes', label: 'Solicitações', icon: Inbox },
-  { to: '/agendamentos', label: 'Agendamentos', icon: CalendarClock },
-  { to: '/cargas-retorno', label: 'Cargas de Retorno', icon: RotateCcw },
-  { to: '/conferencia-viagem', label: 'Conferência de Viagem', icon: ClipboardCheck },
-]
-
-const cadastros: NavItem[] = [
-  { to: '/cadastros/motoristas', label: 'Motoristas', icon: User },
-  { to: '/cadastros/veiculos', label: 'Veículos', icon: Truck },
-  { to: '/cadastros/carretas', label: 'Carretas', icon: Container },
-  { to: '/cadastros/clientes', label: 'Clientes', icon: Building2 },
-  { to: '/cadastros/materiais', label: 'Materiais', icon: Package },
-  { to: '/cadastros/subcontratadas', label: 'Subcontratadas', icon: Handshake },
-  { to: '/cadastros/parceiros', label: 'Parceiros', icon: Network },
-]
-
-const sistemaAdmin: NavItem = { to: '/cadastros/usuarios', label: 'Usuários', icon: Users }
-const sistemaRelatorios: NavItem = { to: '/relatorios', label: 'Relatórios', icon: BarChart3 }
-const sistemaProdutividade: NavItem = { to: '/relatorios-internos', label: 'Relatórios Internos', icon: Gauge }
-const sistemaAtividade: NavItem = { to: '/atividade', label: 'Atividade da Equipe', icon: Activity }
-const sistemaAuditoria: NavItem = { to: '/auditoria', label: 'Auditoria', icon: Search }
-const sistemaSeguranca: NavItem = { to: '/seguranca', label: 'Segurança', icon: ShieldAlert }
-const sistemaPrivacidade: NavItem = { to: '/privacidade', label: 'Privacidade', icon: Fingerprint }
 
 interface SidebarProps {
   collapsed: boolean
@@ -98,28 +68,63 @@ interface SidebarProps {
 
 export function SidebarContent({ collapsed, onToggleCollapse, onNavigate, onClose, className }: SidebarProps) {
   const { profile } = useAuth()
-  const showUsuarios = canViewUsuarios(profile)
-  const showAuditoria = canViewAuditoria(profile)
-  const showRelatorios = canViewRelatorios(profile)
-  const showProdutividade = canViewProdutividade(profile)
-  const showAtividade = canViewAtividade(profile)
-  const showSeguranca = canViewSeguranca(profile)
-  const showPrivacidade = canViewPrivacidade(profile)
-  const recebidas = useRecebidasCount()
-  const recebidasCount = recebidas.data ?? 0
-  const agendamentos = useAgendamentosPendentesCount()
-  const agendamentosCount = agendamentos.data ?? 0
+  const recebidasCount = useRecebidasCount().data ?? 0
+  const agendamentosCount = useAgendamentosPendentesCount().data ?? 0
+
+  // Menu em 4 seções (Operação / Cadastros / Análise / Administração). Rotas e
+  // guardas de permissão são as mesmas de antes; só mudaram rótulos e agrupamento.
+  const secoes: NavSecao[] = [
+    {
+      titulo: 'Operação',
+      itens: [
+        { to: '/dashboard', label: 'Painel', icon: LayoutDashboard },
+        { to: '/solicitacoes', label: 'Solicitações', icon: Inbox },
+        { to: '/agendamentos', label: 'Agendamentos', icon: CalendarClock },
+        { to: '/conferencia-viagem', label: 'Conferência de viagem', icon: ClipboardCheck },
+      ],
+    },
+    {
+      titulo: 'Cadastros',
+      itens: [
+        { to: '/cadastros/clientes', label: 'Clientes', icon: Building2 },
+        { to: '/cadastros/materiais', label: 'Materiais', icon: Package },
+        { to: '/cargas-retorno', label: 'Cargas de retorno', icon: RotateCcw },
+        { to: '/cadastros/motoristas', label: 'Motoristas', icon: User },
+        { to: '/cadastros/veiculos', label: 'Veículos', icon: Truck },
+        { to: '/cadastros/carretas', label: 'Carretas', icon: Container },
+        { to: '/cadastros/subcontratadas', label: 'Subcontratadas', icon: Handshake },
+      ],
+    },
+    {
+      titulo: 'Análise',
+      itens: [
+        { to: '/relatorios', label: 'Relatórios', icon: BarChart3, visivel: canViewRelatorios(profile) },
+        { to: '/relatorios-internos', label: 'Produtividade da equipe', icon: Gauge, visivel: canViewProdutividade(profile) },
+        { to: '/atividade', label: 'Atividade da equipe', icon: Activity, visivel: canViewAtividade(profile) },
+      ],
+    },
+    {
+      titulo: 'Administração',
+      itens: [
+        { to: '/cadastros/parceiros', label: 'Parceiros e acessos', icon: Network },
+        { to: '/cadastros/usuarios', label: 'Usuários', icon: Users, visivel: canViewUsuarios(profile) },
+        { to: '/auditoria', label: 'Auditoria', icon: Search, visivel: canViewAuditoria(profile) },
+        { to: '/seguranca', label: 'Segurança', icon: ShieldAlert, visivel: canViewSeguranca(profile) },
+        { to: '/privacidade', label: 'Privacidade', icon: Fingerprint, visivel: canViewPrivacidade(profile) },
+      ],
+    },
+  ]
 
   // Contadores por rota: o badge é sempre "o que está esperando a equipe" —
   // solicitações recebidas e agendamentos ainda não concluídos.
   const badges: Record<string, { count: number; title: string }> = {
     '/solicitacoes': {
       count: recebidasCount,
-      title: `${recebidasCount} solicitação(ões) com status Recebida`,
+      title: plural(recebidasCount, 'solicitação recebida', 'solicitações recebidas'),
     },
     '/agendamentos': {
       count: agendamentosCount,
-      title: `${agendamentosCount} agendamento(s) na fila`,
+      title: plural(agendamentosCount, 'agendamento na fila', 'agendamentos na fila'),
     },
   }
 
@@ -133,137 +138,68 @@ export function SidebarContent({ collapsed, onToggleCollapse, onNavigate, onClos
     >
       <div
         className={cn(
-          'flex h-14 items-center justify-between',
-          collapsed ? 'justify-center px-2' : 'px-4',
+          'flex h-12 shrink-0 items-center justify-between border-b',
+          collapsed ? 'justify-center px-2' : 'pl-4 pr-2',
         )}
       >
         <div className="flex items-center gap-2">
-          <img src="/favicon.svg" alt="" aria-hidden className="h-8 w-8 shrink-0" />
-          {!collapsed && (
-            <span className="text-[14px] font-medium text-foreground">SisLog</span>
-          )}
+          <img src="/favicon.svg" alt="" aria-hidden className="h-6 w-6 shrink-0" />
+          {!collapsed && <span className="text-body-lg font-semibold text-foreground">SisLog</span>}
         </div>
         {!collapsed && onClose && (
           <button
             type="button"
             onClick={onClose}
             aria-label="Fechar menu"
-            className="flex h-10 w-10 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors duration-fast hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-            <X className="h-6 w-6" />
+            <X className="h-5 w-5" />
           </button>
         )}
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-3 py-2">
-        <ul className="space-y-1">
-          {operacional.map((item) => (
-            <NavListItem
-              key={item.to}
-              item={item}
-              collapsed={collapsed}
-              onNavigate={onNavigate}
-              badgeCount={badges[item.to]?.count ?? 0}
-              badgeTitle={badges[item.to]?.title}
-            />
-          ))}
-        </ul>
-
-        <SectionLabel collapsed={collapsed}>Cadastros</SectionLabel>
-        <ul className="space-y-1">
-          {cadastros.map((item) => (
-            <NavListItem
-              key={item.to}
-              item={item}
-              collapsed={collapsed}
-              onNavigate={onNavigate}
-            />
-          ))}
-        </ul>
-
-        {(showUsuarios || showAuditoria || showRelatorios || showProdutividade || showAtividade || showSeguranca || showPrivacidade) && (
-          <>
-            <SectionLabel collapsed={collapsed}>Sistema</SectionLabel>
-            <ul className="space-y-1">
-              {showRelatorios && (
-                <NavListItem
-                  item={sistemaRelatorios}
-                  collapsed={collapsed}
-                  onNavigate={onNavigate}
-                />
-              )}
-              {showProdutividade && (
-                <NavListItem
-                  item={sistemaProdutividade}
-                  collapsed={collapsed}
-                  onNavigate={onNavigate}
-                />
-              )}
-              {showAtividade && (
-                <NavListItem
-                  item={sistemaAtividade}
-                  collapsed={collapsed}
-                  onNavigate={onNavigate}
-                />
-              )}
-              {showUsuarios && (
-                <NavListItem
-                  item={sistemaAdmin}
-                  collapsed={collapsed}
-                  onNavigate={onNavigate}
-                />
-              )}
-              {showAuditoria && (
-                <NavListItem
-                  item={sistemaAuditoria}
-                  collapsed={collapsed}
-                  onNavigate={onNavigate}
-                />
-              )}
-              {showSeguranca && (
-                <NavListItem
-                  item={sistemaSeguranca}
-                  collapsed={collapsed}
-                  onNavigate={onNavigate}
-                />
-              )}
-              {showPrivacidade && (
-                <NavListItem
-                  item={sistemaPrivacidade}
-                  collapsed={collapsed}
-                  onNavigate={onNavigate}
-                />
-              )}
-            </ul>
-          </>
-        )}
+      <nav aria-label="Navegação principal" className="flex-1 overflow-y-auto px-2 py-2">
+        {secoes.map((secao, i) => {
+          const itens = secao.itens.filter((it) => it.visivel !== false)
+          if (itens.length === 0) return null
+          return (
+            <div key={secao.titulo} className={cn(i > 0 && 'mt-4')}>
+              <SectionLabel collapsed={collapsed} first={i === 0}>
+                {secao.titulo}
+              </SectionLabel>
+              <ul className="space-y-px">
+                {itens.map((item) => (
+                  <NavListItem
+                    key={item.to}
+                    item={item}
+                    collapsed={collapsed}
+                    onNavigate={onNavigate}
+                    badgeCount={badges[item.to]?.count ?? 0}
+                    badgeTitle={badges[item.to]?.title}
+                  />
+                ))}
+              </ul>
+            </div>
+          )
+        })}
       </nav>
 
-      <div className="p-2">
+      <div className="border-t p-2">
         {!collapsed && (
-          <p className="px-2 pb-1.5 text-[10px] tabular-nums text-muted-foreground">
-            SisLog v{SISLOG_VERSAO}
-          </p>
+          <p className="px-2 pb-1 text-meta tabular-nums text-tertiary">SisLog v{SISLOG_VERSAO}</p>
         )}
-        <div
-          className={cn(
-            'flex items-center gap-3 rounded-lg px-2 py-2',
-            collapsed && 'justify-center px-0',
-          )}
-        >
-          <Avatar className="h-10 w-10 shrink-0">
-            <AvatarFallback className="bg-accent text-[12px] font-medium text-accent-foreground">
-              {iniciais(profile?.nome_completo ?? '?')}
+        <div className={cn('flex items-center gap-2.5 px-2 py-1.5', collapsed && 'justify-center px-0')}>
+          <Avatar className="h-8 w-8 shrink-0">
+            <AvatarFallback className="bg-accent text-body-sm font-medium text-accent-foreground">
+              {iniciais(profile?.nome_completo)}
             </AvatarFallback>
           </Avatar>
           {!collapsed && (
-            <div className="min-w-0 leading-tight">
-              <p className="truncate text-[13px] font-medium text-foreground">
+            <div className="min-w-0">
+              <p className="truncate text-body font-medium text-foreground">
                 {profile?.nome_completo ?? 'Usuário'}
               </p>
-              <p className="truncate text-[11px] text-muted-foreground">
-                {PERFIL_LABELS[profile?.perfil ?? ''] ?? profile?.perfil ?? '—'}
-              </p>
+              <p className="truncate text-meta text-muted-foreground">{labelPerfil(profile?.perfil)}</p>
             </div>
           )}
         </div>
@@ -272,7 +208,7 @@ export function SidebarContent({ collapsed, onToggleCollapse, onNavigate, onClos
             type="button"
             onClick={onToggleCollapse}
             className={cn(
-              'mt-1 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-[12px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+              'mt-1 flex h-8 w-full items-center gap-2 rounded-md px-2 text-body-sm text-muted-foreground transition-colors duration-fast hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
               collapsed && 'justify-center px-0',
             )}
             aria-label={collapsed ? 'Expandir menu' : 'Recolher menu'}
@@ -295,18 +231,17 @@ export function SidebarContent({ collapsed, onToggleCollapse, onNavigate, onClos
 function SectionLabel({
   children,
   collapsed,
+  first,
 }: {
   children: React.ReactNode
   collapsed: boolean
+  first: boolean
 }) {
   if (collapsed) {
-    return <div className="my-3 h-px bg-border" />
+    return first ? null : <div className="mx-2 mb-2 h-px bg-border" />
   }
-  return (
-    <div className="mb-1.5 mt-4 px-2 text-[11px] font-medium uppercase tracking-[0.5px] text-muted-foreground">
-      {children}
-    </div>
-  )
+  // 12px semibold, sem maiúsculas/tracking (Fluent/Carbon).
+  return <div className="mb-1 px-2.5 text-body-sm font-semibold text-muted-foreground">{children}</div>
 }
 
 function NavListItem({
@@ -330,38 +265,33 @@ function NavListItem({
         onClick={onNavigate}
         className={({ isActive }) =>
           cn(
-            'group relative flex h-[46px] items-center gap-3 rounded-lg border text-[13px] font-medium transition-all duration-200 ease-out',
-            // O item avança um passo curto na direção da página ao receber o
-            // ponteiro — mesmo gesto no item ativo, para o menu inteiro reagir.
-            'hover:translate-x-1',
-            collapsed ? 'justify-center px-0' : 'px-4',
+            // 36px, sem borda/fundo em repouso; hover = elevação sutil: sobe 2px
+            // + realce de fundo/cor (120ms), sem zoom nem deslize lateral.
+            'group relative flex h-9 items-center gap-2.5 rounded-md text-body transition-[transform,background-color,color] duration-fast ease-out hover:-translate-y-0.5',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring',
+            collapsed ? 'justify-center px-0' : 'px-2.5',
             isActive
-              ? 'border-border bg-accent text-accent-foreground before:absolute before:left-0 before:top-1/2 before:h-6 before:w-[3px] before:-translate-y-1/2 before:rounded-r-full before:bg-primary before:content-[""]'
-              : cn(
-                  'border-border bg-muted/40 text-foreground/80 hover:border-primary/40 hover:bg-accent hover:text-foreground',
-                  // A barra de acento do item ativo "cresce" a partir do centro
-                  // no hover — antecipa o estado para onde o clique leva.
-                  'before:absolute before:left-0 before:top-1/2 before:h-6 before:w-[3px] before:-translate-y-1/2 before:scale-y-0 before:rounded-r-full before:bg-primary before:opacity-0 before:transition before:duration-200 before:ease-out before:content-[""]',
-                  'hover:before:scale-y-100 hover:before:opacity-100',
-                ),
+              ? // Ativo: fundo accent + barra de 2px do acento à esquerda.
+                'bg-accent font-medium text-accent-foreground before:absolute before:inset-y-1.5 before:left-0 before:w-[2px] before:bg-primary before:content-[""]'
+              : 'text-muted-foreground hover:bg-row-hover hover:text-foreground',
           )
         }
         title={collapsed ? [item.label, badgeCount > 0 ? badgeTitle : null].filter(Boolean).join(' — ') : undefined}
       >
-        <Icon className="h-[22px] w-[22px] shrink-0 transition-transform duration-200 ease-out group-hover:scale-125" />
+        <Icon className="h-5 w-5 shrink-0" strokeWidth={1.75} />
         {!collapsed && <span className="truncate">{item.label}</span>}
-        {badgeCount > 0 && (
-          collapsed ? (
-            <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-amber-500" />
+        {badgeCount > 0 &&
+          (collapsed ? (
+            <span aria-hidden className="absolute right-2 top-1.5 h-1.5 w-1.5 rounded-full bg-foreground" />
           ) : (
             <span
-              className="ml-auto inline-flex h-[22px] min-w-[22px] items-center justify-center rounded-full bg-amber-500 px-1.5 text-[10px] font-semibold text-white"
+              className="ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-[2px] border bg-background px-1 text-meta font-medium tabular-nums text-foreground"
               title={badgeTitle}
+              aria-label={badgeTitle}
             >
               {badgeCount}
             </span>
-          )
-        )}
+          ))}
       </NavLink>
     </li>
   )

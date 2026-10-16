@@ -40,13 +40,13 @@ export function PendenciasBell() {
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="relative rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="relative rounded-md p-1.5 text-muted-foreground transition-colors duration-fast hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           aria-label={total > 0 ? `${total} aviso${total === 1 ? '' : 's'}` : 'Avisos'}
-          title={total > 0 ? `${total} aviso${total === 1 ? '' : 's'} para você` : 'Nenhum aviso'}
+          title={total > 0 ? `${total} aviso${total === 1 ? '' : 's'} pendente${total === 1 ? '' : 's'}` : 'Nenhum aviso'}
         >
           <Bell className="h-5 w-5" />
           {total > 0 && (
-            <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-orange-500 px-1 text-[10px] font-semibold text-white">
+            <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-[2px] bg-primary px-1 text-meta font-semibold tabular-nums text-primary-foreground">
               {total > 99 ? '99+' : total}
             </span>
           )}
@@ -54,16 +54,16 @@ export function PendenciasBell() {
       </PopoverTrigger>
       <PopoverContent align="end" className="w-[340px] p-0">
         <header className="border-b px-3 py-2">
-          <p className="text-[13px] font-medium text-foreground">Avisos</p>
-          <p className="text-[10px] text-muted-foreground">
+          <p className="text-body font-medium text-foreground">Avisos</p>
+          <p className="text-meta text-muted-foreground">
             O que precisa da sua ação e o que ficou pronto
           </p>
         </header>
         <div className="max-h-[400px] overflow-y-auto">
           {total === 0 ? (
-            <div className="px-3 py-10 text-center text-[13px] text-muted-foreground">
-              Nada pendente. 🎉
-              <p className="mt-1 text-[11px]">Nenhuma solicitação aguardando você.</p>
+            <div className="px-3 py-10 text-center text-body text-muted-foreground">
+              Nada pendente.
+              <p className="mt-1 text-meta">Nenhuma solicitação aguardando resposta.</p>
             </div>
           ) : (
             <ul className="divide-y">
@@ -74,16 +74,16 @@ export function PendenciasBell() {
                     <button
                       type="button"
                       onClick={() => handleSelect(a.solicitacao_id)}
-                      className="flex w-full items-start gap-3 px-3 py-2.5 text-left hover:bg-muted/60"
+                      className="flex w-full items-start gap-3 px-3 py-2.5 text-left transition-colors duration-fast hover:bg-accent"
                     >
-                      <CalendarCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+                      <CalendarCheck className="mt-0.5 h-4 w-4 shrink-0 text-success" />
                       <div className="min-w-0 flex-1">
                         {numero != null && (
-                          <span className="text-[12px] font-medium tabular-nums text-primary">
+                          <span className="text-body-sm font-medium tabular-nums text-primary-strong">
                             {formatNumeroOC(numero)}
                           </span>
                         )}
-                        <p className="text-[12px] text-foreground">
+                        <p className="text-body-sm text-foreground">
                           Descarga agendada para {dataCompleta(a.data_agendada)} às{' '}
                           {horaCurta(a.hora_agendada)} — comprovante disponível.
                         </p>
@@ -99,16 +99,16 @@ export function PendenciasBell() {
                     <button
                       type="button"
                       onClick={() => handleSelect(p.solicitacao_id)}
-                      className="flex w-full items-start gap-3 px-3 py-2.5 text-left hover:bg-muted/60"
+                      className="flex w-full items-start gap-3 px-3 py-2.5 text-left transition-colors duration-fast hover:bg-accent"
                     >
-                      <Undo2 className="mt-0.5 h-4 w-4 shrink-0 text-orange-500" />
+                      <Undo2 className="mt-0.5 h-4 w-4 shrink-0 text-danger" />
                       <div className="min-w-0 flex-1">
                         {numero != null && (
-                          <span className="text-[12px] font-medium tabular-nums text-primary">
+                          <span className="text-body-sm font-medium tabular-nums text-primary-strong">
                             {formatNumeroOC(numero)}
                           </span>
                         )}
-                        <p className="line-clamp-2 text-[12px] text-foreground">{p.motivo}</p>
+                        <p className="line-clamp-2 text-body-sm text-foreground">{p.motivo}</p>
                       </div>
                     </button>
                   </li>

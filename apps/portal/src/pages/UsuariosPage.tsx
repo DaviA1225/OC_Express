@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Copy, Loader2, Mail, ShieldAlert, Trash2, UserPlus } from 'lucide-react'
+import { Copy, Mail, ShieldAlert, Trash2, UserPlus } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuth, hasPerfilParceiro } from '@/hooks/useAuth'
 import { traduzirErroBanco } from '@/features/cadastros/useParceiroCrud'
@@ -12,7 +12,6 @@ import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import {
   Dialog, DialogContent, DialogHeader, DialogBody, DialogFooter, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog'
-import { Label } from '@/components/ui/label'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
@@ -20,35 +19,23 @@ import {
   Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
 } from '@/components/ui/table'
 import type { Tables, ParceiroPerfil } from '@sislog/shared/types'
+import { Spinner } from '@/components/shared/Spinner'
+import { PERFIL_LABELS } from '@/features/auth/perfis'
+import { PageHeader } from '@/components/layout/PageHeader'
+import { RotuloSituacao } from '@/components/shared/CrudListPage'
+import { useDescartarAlteracoes } from '@/features/cadastros/useDescartarAlteracoes'
+import { CadastroField } from '@/components/forms/CadastroField'
 
 type Usuario = Tables<'parceiro_usuarios'>
-
-const PERFIL_LABELS: Record<ParceiroPerfil, string> = {
-  admin_parceiro: 'Administrador',
-  operador_parceiro: 'Operador',
-}
 
 // Três estados visíveis, derivados de `ativo` + `convite_aceito_em`:
 //   - Aguardando: convite ainda não foi aceito (ativo=true, convite_aceito_em=NULL)
 //   - Inativo:    o admin desativou o usuário (ativo=false)
 //   - Ativo:      logou pelo menos uma vez e segue ativo
-function computarSituacao(u: Usuario): { label: string; className: string } {
-  if (!u.ativo) {
-    return {
-      label: 'Inativo',
-      className: 'inline-flex rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground',
-    }
-  }
-  if (!u.convite_aceito_em) {
-    return {
-      label: 'Aguardando',
-      className: 'inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800 dark:bg-amber-950/50 dark:text-amber-300',
-    }
-  }
-  return {
-    label: 'Ativo',
-    className: 'inline-flex rounded-full bg-success/10 px-2 py-0.5 text-[11px] font-medium text-success',
-  }
+function computarSituacao(u: Usuario): { label: string; tom: 'neutro' | 'aviso' | 'sucesso' } {
+  if (!u.ativo) return { label: 'Inativo', tom: 'neutro' }
+  if (!u.convite_aceito_em) return { label: 'Aguardando', tom: 'aviso' }
+  return { label: 'Ativo', tom: 'sucesso' }
 }
 
 function useUsuariosParceiro() {
@@ -91,13 +78,13 @@ export default function UsuariosPage() {
       if (error) {
         const body = await extractFunctionErrorBody(error)
         if (body?.error) throw new Error(traduzirErroReenvio(body.error, body.detalhe))
-        throw new Error(error.message || 'Falha ao reenviar convite')
+        throw new Error('Não foi possível reenviar o convite. Tente novamente.')
       }
-      if (!data?.action_link) throw new Error('Resposta sem link de convite')
+      if (!data?.action_link) throw new Error('Resposta sem link de convite.')
       return { link: data.action_link, email: data.email ?? usuario.email, nome: data.nome_completo ?? usuario.nome_completo }
     },
     onSuccess: (res) => setReenviarLink(res),
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(traduzirErroBanco(e)),
   })
 
   const updatePerfil = useMutation({
@@ -110,7 +97,7 @@ export default function UsuariosPage() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['parceiro-usuarios'] })
-      toast.success('Perfil atualizado')
+      toast.success('Perfil atualizado.')
     },
     onError: (e: unknown) => toast.error(traduzirErroBanco(e)),
   })
@@ -125,7 +112,7 @@ export default function UsuariosPage() {
     },
     onSuccess: (_d, vars) => {
       qc.invalidateQueries({ queryKey: ['parceiro-usuarios'] })
-      toast.success(vars.ativo ? 'Usuário reativado' : 'Usuário desativado')
+      toast.success(vars.ativo ? 'Usuário reativado.' : 'Usuário desativado.')
     },
     onError: (e: unknown) => toast.error(traduzirErroBanco(e)),
   })
@@ -144,14 +131,14 @@ export default function UsuariosPage() {
         // mensagem real em vez de "non-2xx status code".
         const body = await extractFunctionErrorBody(error)
         if (body?.error) throw new Error(traduzirErroExclusao(body.error, body.detalhe))
-        throw new Error(error.message || 'Falha ao excluir usuário')
+        throw new Error('Não foi possível excluir o usuário. Tente novamente.')
       }
       return data
     },
     onSuccess: (data) => {
-      toast.success(`Usuário ${data?.email ?? ''} excluído, e-mail liberado para reuso`)
+      toast.success(`Usuário ${data?.email ?? ''} excluído. E-mail liberado para reuso.`)
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(traduzirErroBanco(e)),
     // Recarrega a lista mesmo no erro: a Edge Function apaga o vínculo ANTES de
     // liberar o e-mail, então `falha_ao_liberar_email` chega com a linha já
     // removida no banco — sem isto ela continuaria na tela.
@@ -162,10 +149,10 @@ export default function UsuariosPage() {
 
   if (!isAdmin) {
     return (
-      <div className="mx-auto flex max-w-md flex-col items-center rounded-lg border bg-background p-8 text-center">
-        <ShieldAlert className="mb-3 h-9 w-9 text-muted-foreground/60" strokeWidth={1.5} />
-        <h2 className="text-[15px] font-semibold text-foreground">Acesso restrito</h2>
-        <p className="mt-1.5 text-[13px] text-muted-foreground">
+      <div className="mx-auto flex max-w-md flex-col items-center rounded-lg border bg-card p-8 text-center">
+        <ShieldAlert className="mb-3 h-6 w-6 text-tertiary" strokeWidth={1.75} aria-hidden />
+        <h2 className="text-title-sm font-semibold text-foreground">Acesso restrito</h2>
+        <p className="mt-1.5 text-body text-muted-foreground">
           Apenas administradores da transportadora podem gerenciar usuários.
         </p>
       </div>
@@ -176,20 +163,23 @@ export default function UsuariosPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-end justify-between gap-3">
-        <div>
-          <h1 className="text-[22px] font-semibold tracking-tight text-foreground">Usuários</h1>
-          <p className="text-[12px] text-muted-foreground">
+      <PageHeader
+        className="mb-0"
+        title="Usuários"
+        meta={
+          <span className="text-body-sm tabular-nums text-muted-foreground">
             {usuarios.length} {usuarios.length === 1 ? 'usuário' : 'usuários'} da transportadora
-          </p>
-        </div>
-        <Button onClick={() => setConvidarOpen(true)} className="gap-1.5">
-          <UserPlus className="h-4 w-4" />
-          Convidar usuário
-        </Button>
-      </div>
+          </span>
+        }
+        actions={
+          <Button onClick={() => setConvidarOpen(true)} className="gap-1.5">
+            <UserPlus className="h-4 w-4" />
+            Convidar usuário
+          </Button>
+        }
+      />
 
-      <div className="overflow-hidden rounded-lg border bg-background">
+      <div className="overflow-hidden rounded-lg border bg-card">
         <Table>
           <TableHeader>
             <TableRow>
@@ -215,19 +205,19 @@ export default function UsuariosPage() {
               const isSelf = u.id === parceiroUsuario?.id
               const situacao = computarSituacao(u)
               return (
-                <TableRow key={u.id} className={!u.ativo ? 'opacity-60' : undefined}>
+                <TableRow key={u.id} className={!u.ativo ? 'text-muted-foreground' : undefined}>
                   <TableCell className="font-medium text-foreground">
                     {u.nome_completo}
-                    {isSelf && <span className="ml-1.5 text-[11px] text-muted-foreground">(você)</span>}
+                    {isSelf && <span className="ml-1.5 text-meta text-muted-foreground">(você)</span>}
                   </TableCell>
                   <TableCell className="text-muted-foreground">{u.email}</TableCell>
                   <TableCell>{PERFIL_LABELS[u.perfil]}</TableCell>
                   <TableCell>
-                    <span className={situacao.className}>{situacao.label}</span>
+                    <RotuloSituacao tom={situacao.tom}>{situacao.label}</RotuloSituacao>
                   </TableCell>
                   <TableCell>
                     {isSelf ? (
-                      <span className="text-[12px] text-muted-foreground">—</span>
+                      <span className="text-body-sm text-muted-foreground">—</span>
                     ) : (
                       <div className="flex flex-wrap items-center gap-1">
                         {u.ativo && !u.convite_aceito_em && (
@@ -239,7 +229,7 @@ export default function UsuariosPage() {
                             className="gap-1"
                           >
                             {reenviarConvite.isPending && reenviarConvite.variables?.id === u.id
-                              ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ? <Spinner className="h-3.5 w-3.5" />
                               : <Mail className="h-3.5 w-3.5" />}
                             Reenviar
                           </Button>
@@ -274,7 +264,7 @@ export default function UsuariosPage() {
 
             {!list.isLoading && usuarios.length === 0 && (
               <TableRow>
-                <TableCell colSpan={5} className="py-8 text-center text-[13px] text-muted-foreground">
+                <TableCell colSpan={5} className="py-8 text-center text-body text-muted-foreground">
                   Nenhum usuário encontrado.
                 </TableCell>
               </TableRow>
@@ -310,9 +300,9 @@ export default function UsuariosPage() {
         onOpenChange={(o) => !o && setToggleRow(null)}
         title={toggleRow?.ativo ? 'Desativar usuário?' : 'Reativar usuário?'}
         description={toggleRow?.ativo
-          ? `${toggleRow?.nome_completo} perderá o acesso ao portal. Você pode reativá-lo depois.`
+          ? `${toggleRow?.nome_completo} perderá o acesso ao portal. É possível reativá-lo depois.`
           : `${toggleRow?.nome_completo} voltará a ter acesso ao portal.`}
-        confirmLabel={toggleRow?.ativo ? 'Sim, desativar' : 'Sim, reativar'}
+        confirmLabel={toggleRow?.ativo ? 'Desativar' : 'Reativar'}
         destructive={toggleRow?.ativo}
         onConfirm={async () => {
           if (toggleRow) {
@@ -331,7 +321,7 @@ export default function UsuariosPage() {
             ? `${excluirRow.nome_completo} (${excluirRow.email}) será removido para sempre. Solicitações antigas dele ficam no histórico, mas o vínculo com o usuário some. O e-mail fica livre para uso em outro parceiro. Esta ação não pode ser desfeita.`
             : ''
         }
-        confirmLabel="Sim, excluir"
+        confirmLabel="Excluir"
         destructive
         onConfirm={async () => {
           if (excluirRow) {
@@ -392,17 +382,20 @@ function EditarPerfilForm({
           {usuario.nome_completo}, defina o nível de acesso ao portal.
         </DialogDescription>
       </DialogHeader>
-      <DialogBody className="space-y-1.5">
-        <Label htmlFor="perfil">Perfil</Label>
-        <Select value={perfil} onValueChange={(v) => setPerfil(v as ParceiroPerfil)}>
-          <SelectTrigger id="perfil"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="operador_parceiro">Operador, cria solicitações e cadastros</SelectItem>
-            <SelectItem value="admin_parceiro">Administrador, também gerencia usuários</SelectItem>
-          </SelectContent>
-        </Select>
+      <DialogBody>
+        <CadastroField label="Perfil" id="perfil">
+          {(a11y) => (
+            <Select value={perfil} onValueChange={(v) => setPerfil(v as ParceiroPerfil)}>
+              <SelectTrigger {...a11y}><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="operador_parceiro">Operador, cria solicitações e cadastros</SelectItem>
+                <SelectItem value="admin_parceiro">Administrador, também gerencia usuários</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
+        </CadastroField>
       </DialogBody>
-      <DialogFooter>
+      <DialogFooter className="justify-end">
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={onCancel} disabled={saving}>
             Cancelar
@@ -418,7 +411,7 @@ function EditarPerfilForm({
               }
             }}
           >
-            {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+            {saving && <Spinner />}
             Salvar
           </Button>
         </div>
@@ -448,20 +441,45 @@ function ConvidarUsuarioDialog({
   onOpenChange: (o: boolean) => void
   onSuccess: () => void
 }) {
+  // Formulário alterado → fechar (Esc, fora, X, Cancelar) pede "Descartar
+  // alterações?". Depois de enviar, fecha direto (sem passar pela guarda).
+  const [alterado, setAlterado] = React.useState(false)
+  const fechar = React.useCallback(
+    (o: boolean) => {
+      if (!o) setAlterado(false)
+      onOpenChange(o)
+    },
+    [onOpenChange],
+  )
+  const guarda = useDescartarAlteracoes(alterado, fechar)
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        {open && <ConvidarForm onCancel={() => onOpenChange(false)} onSuccess={onSuccess} />}
-      </DialogContent>
-    </Dialog>
+    <>
+      <Dialog open={open} onOpenChange={guarda.onOpenChange}>
+        <DialogContent>
+          {open && (
+            <ConvidarForm
+              onCancel={() => guarda.onOpenChange(false)}
+              onDone={() => fechar(false)}
+              onAlterado={() => setAlterado(true)}
+              onSuccess={onSuccess}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+      {guarda.dialog}
+    </>
   )
 }
 
 function ConvidarForm({
   onCancel,
+  onDone,
+  onAlterado,
   onSuccess,
 }: {
   onCancel: () => void
+  onDone: () => void
+  onAlterado: () => void
   onSuccess: () => void
 }) {
   const [email, setEmail] = React.useState('')
@@ -486,16 +504,16 @@ function ConvidarForm({
         // de error.context pra ver o código real (ex: rate-limit do SMTP).
         const body = await extractFunctionErrorBody(error)
         if (body?.error) throw new Error(traduzirErroConvite(body.error, body.detalhe))
-        throw new Error(error.message || 'Falha ao convidar usuário')
+        throw new Error('Não foi possível enviar o convite. Tente novamente.')
       }
       return data
     },
     onSuccess: () => {
-      toast.success(`Convite enviado para ${email}`)
+      toast.success(`Convite enviado para ${email}.`)
       onSuccess()
-      onCancel()
+      onDone()
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(traduzirErroBanco(e)),
   })
 
   const emailValido = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
@@ -507,48 +525,45 @@ function ConvidarForm({
       <DialogHeader>
         <DialogTitle>Convidar usuário</DialogTitle>
         <DialogDescription>
-          O convidado vai receber um e-mail com link para definir a senha e entrar no portal.
+          O convidado recebe um e-mail com link para definir a senha e entrar no portal.
         </DialogDescription>
       </DialogHeader>
       <DialogBody className="space-y-4">
-        <div className="space-y-1.5">
-          <Label htmlFor="convite-nome">Nome completo *</Label>
+        <CadastroField label="Nome completo" required id="convite-nome">
           <Input
-            id="convite-nome"
             autoFocus
             value={nomeCompleto}
-            onChange={(e) => setNomeCompleto(e.target.value)}
+            onChange={(e) => { setNomeCompleto(e.target.value); onAlterado() }}
             placeholder="Ex: Ana Souza"
           />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="convite-email">E-mail *</Label>
+        </CadastroField>
+        <CadastroField label="E-mail" required id="convite-email">
           <Input
-            id="convite-email"
             type="email"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) => { setEmail(e.target.value); onAlterado() }}
             placeholder="ana@transportadora.com.br"
           />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="convite-perfil">Perfil *</Label>
-          <Select value={perfil} onValueChange={(v) => setPerfil(v as ParceiroPerfil)}>
-            <SelectTrigger id="convite-perfil"><SelectValue /></SelectTrigger>
+        </CadastroField>
+        <CadastroField label="Perfil" required id="convite-perfil">
+          {(a11y) => (
+          <Select value={perfil} onValueChange={(v) => { setPerfil(v as ParceiroPerfil); onAlterado() }}>
+            <SelectTrigger {...a11y}><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="operador_parceiro">Operador, cria solicitações e cadastros</SelectItem>
               <SelectItem value="admin_parceiro">Administrador, também gerencia usuários</SelectItem>
             </SelectContent>
           </Select>
-        </div>
+          )}
+        </CadastroField>
       </DialogBody>
-      <DialogFooter>
+      <DialogFooter className="justify-end">
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={onCancel} disabled={convidar.isPending}>
             Cancelar
           </Button>
           <Button disabled={!podeSubmeter} onClick={() => convidar.mutate()}>
-            {convidar.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+            {convidar.isPending && <Spinner />}
             Enviar convite
           </Button>
         </div>
@@ -562,8 +577,8 @@ function traduzirErroConvite(code: string, detalhe?: string): string {
     case 'email_invalido': return 'E-mail inválido.'
     case 'nome_invalido': return 'Informe o nome completo (mínimo 2 caracteres).'
     case 'perfil_invalido': return 'Perfil inválido.'
-    case 'sessao_invalida': return 'Sua sessão expirou. Saia e entre de novo.'
-    case 'forbidden': return 'Você não tem permissão para convidar usuários.'
+    case 'sessao_invalida': return 'Sessão expirada. Saia e entre de novo.'
+    case 'forbidden': return 'Sem permissão para convidar usuários.'
     case 'parceiro_nao_encontrado': return 'Parceiro alvo não encontrado.'
     case 'parceiro_inativo': return 'Parceiro inativo, não é possível convidar.'
     case 'email_ja_cadastrado': return 'Este e-mail já está vinculado a um usuário do portal.'
@@ -578,8 +593,8 @@ function traduzirErroConvite(code: string, detalhe?: string): string {
 function traduzirErroReenvio(code: string, detalhe?: string): string {
   switch (code) {
     case 'parceiro_usuario_id_obrigatorio': return 'Usuário alvo não informado.'
-    case 'sessao_invalida': return 'Sua sessão expirou. Saia e entre de novo.'
-    case 'forbidden': return 'Você não tem permissão para reenviar este convite.'
+    case 'sessao_invalida': return 'Sessão expirada. Saia e entre de novo.'
+    case 'forbidden': return 'Sem permissão para reenviar este convite.'
     case 'usuario_nao_encontrado': return 'Usuário não encontrado.'
     case 'usuario_inativo': return 'Reative o usuário antes de reenviar o convite.'
     case 'convite_ja_aceito':
@@ -592,10 +607,10 @@ function traduzirErroReenvio(code: string, detalhe?: string): string {
 function traduzirErroExclusao(code: string, detalhe?: string): string {
   switch (code) {
     case 'parceiro_usuario_id_obrigatorio': return 'Usuário alvo não informado.'
-    case 'sessao_invalida': return 'Sua sessão expirou. Saia e entre de novo.'
-    case 'forbidden': return 'Você não tem permissão para excluir este usuário.'
+    case 'sessao_invalida': return 'Sessão expirada. Saia e entre de novo.'
+    case 'forbidden': return 'Sem permissão para excluir este usuário.'
     case 'usuario_nao_encontrado': return 'Usuário não encontrado.'
-    case 'nao_pode_apagar_a_si_mesmo': return 'Você não pode excluir a sua própria conta.'
+    case 'nao_pode_apagar_a_si_mesmo': return 'Não é possível excluir a própria conta.'
     // O vínculo já foi removido quando este erro chega — só o e-mail continua
     // preso em auth.users, o que atrapalha apenas um reconvite dessa pessoa.
     case 'falha_ao_liberar_email':
@@ -652,7 +667,7 @@ function LinkConviteDialog({
     try {
       await navigator.clipboard.writeText(info.link)
       setCopiado(true)
-      toast.success('Link copiado')
+      toast.success('Link copiado.')
     } catch {
       toast.error('Não foi possível copiar. Copie manualmente do campo abaixo.')
     }
@@ -669,26 +684,29 @@ function LinkConviteDialog({
           </DialogDescription>
         </DialogHeader>
         <DialogBody className="space-y-2">
-          <Label htmlFor="link-convite">Link</Label>
+          <CadastroField label="Link" id="link-convite">
+          {(a11y) => (
           <div className="flex items-center gap-2">
             <Input
-              id="link-convite"
+              {...a11y}
               readOnly
               value={info?.link ?? ''}
               onClick={(e) => (e.target as HTMLInputElement).select()}
-              className="font-mono text-[12px]"
+              className="font-mono text-body-sm"
             />
             <Button type="button" variant="outline" size="sm" onClick={copiar} className="shrink-0 gap-1">
               <Copy className="h-3.5 w-3.5" />
               {copiado ? 'Copiado' : 'Copiar'}
             </Button>
           </div>
-          <p className="text-[11px] text-muted-foreground">
-            Ao clicar no link, {info?.nome.split(' ')[0] ?? 'a pessoa'} vai cair na tela
-            de "Definir senha" e entrar no portal automaticamente.
+          )}
+          </CadastroField>
+          <p className="text-body-sm text-muted-foreground">
+            Pelo link, {info?.nome.split(' ')[0] ?? 'o convidado'} abre a tela
+            "Definir senha" e entra no portal automaticamente.
           </p>
         </DialogBody>
-        <DialogFooter>
+        <DialogFooter className="justify-end">
           <Button variant="outline" onClick={() => onOpenChange(false)}>Fechar</Button>
         </DialogFooter>
       </DialogContent>

@@ -3,7 +3,7 @@
    oficial `wanted-sans` (OFL-1.1). O CSS split usa unicode-range, então o
    navegador baixa só os subsets que aparecem no DOM (latim na prática). */
 @import url('https://cdn.jsdelivr.net/npm/wanted-sans@1.0.3/fonts/webfonts/static/split/WantedSans.css');
-@import url('https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -11,122 +11,214 @@
 
 @layer base {
   :root {
-    /* Identidade LHG — estrutura GRAFITE NEUTRA (institucional) com o laranja
-       #FF5100 reservado a acento: ações primárias, estado ativo e foco. O preto
-       LHG #1D1E1B vira a barra superior (sólida). Estrutura em escala fria/ardósia
-       para um visual corporativo, sem o tom "quente" anterior. */
+    /* Identidade LHG — estrutura GRAFITE FRIA (H≈215) com o laranja #FF5100
+       reservado a acento: ação primária, estado ativo e foco (≤10% da tela).
+       MESMA semântica nos dois temas (DESIGN.md §2/§7):
+         canvas      → fundo atrás de tudo (área da página)
+         background  → superfície (input, barra, painel; = card)
+         card        → seção da página (um nível, borda hairline)
+         popover     → camada elevada (popover, dropdown, menu)
+         muted       → realce neutro (cabeçalho de tabela, hover, rodapé de diálogo)
+         row-hover   → linha de tabela/lista em hover
+         border      → hairline · border-strong/input → contorno de controle (≥3:1)
+       Contrastes medidos em .omc/handoffs/tokens-contract.md. */
 
-    --background: 0 0% 100%;             /* #FFFFFF */
-    --foreground: 220 20% 13%;           /* grafite near-black neutro */
+    --background: 0 0% 100%;                  /* #FFFFFF */
+    --foreground: 219 21.2% 12.9%;            /* #1A1F28 texto 1 */
+    --canvas: 210 21.4% 94.5%;                /* #EEF1F4 */
+    --card: 0 0% 100%;                        /* #FFFFFF */
+    --card-foreground: 219 21.2% 12.9%;
+    --popover: 0 0% 100%;                     /* #FFFFFF */
+    --popover-foreground: 219 21.2% 12.9%;
+    --muted: 216 26.3% 96.3%;                 /* #F3F5F8 */
+    --muted-foreground: 217 11.2% 40.2%;      /* #5B6472 texto 2 — 5.98 branco / 5.28 canvas */
+    --tertiary: 220 11.2% 42%;                /* #5F6777 texto 3 (meta, ícone, desabilitado) — 5.69 branco / 5.02 canvas / 5.21 muted */
+    --accent: 213 24.3% 92.7%;                /* #E8ECF1 item ativo/realce */
+    --accent-foreground: 219 21.2% 12.9%;
+    --row-hover: 210 27.3% 95.7%;             /* #F1F4F7 */
 
-    --card: 220 22% 97.5%;               /* tom ardósia sutil p/ cards destacarem do painel branco */
-    --card-foreground: 220 20% 13%;
-
-    --popover: 0 0% 100%;
-    --popover-foreground: 220 20% 13%;
-
-    --primary: 19 100% 40%;              /* #CC4100 laranja queimado — fill de acento */
-    --primary-hover: 19 100% 34%;        /* #AD3700 — queima mais no hover */
-    /* Fill de acento em laranja QUEIMADO (#CC4100, L40) com texto BRANCO. O
-       #FF5100 puro (L50) e' luminoso demais: dark-text passa AA mas fica pesado/
-       "muito forte", e white-text falha (3.27:1). Escurecer o fill p/ L40 resolve
-       os dois — white sobre #CC4100 = 4.86:1 (AA), e o laranja fica menos neon.
-       O #FF5100 da marca segue vivo no FOCO (--ring) e como TEXTO
-       (--primary-strong). Vale p/ todo fill de acento (botao/avatar/checkbox/logo). */
+    /* Fill de acento em laranja QUEIMADO (#CC4100) com texto branco = 4.86:1.
+       O #FF5100 da marca segue no gráfico (--chart-1); o FOCO usa #D64400 no claro
+       (o #FF5100 dava 2.88 sobre o canvas, abaixo dos 3:1 de não-texto). */
+    --primary: 19 100% 40%;                   /* #CC4100 */
+    --primary-hover: 19 100% 33.9%;           /* #AD3700 */
     --primary-foreground: 0 0% 100%;
+    --primary-strong: 18 88.4% 37.1%;         /* #B23C0B acento COMO TEXTO — 5.93 branco / 5.23 canvas */
 
-    --secondary: 220 16% 20%;            /* grafite escuro neutro */
+    --secondary: 219 16.8% 19.8%;             /* #2A303B */
     --secondary-foreground: 0 0% 100%;
 
-    --muted: 220 20% 97%;                /* canvas cinza-ardósia bem claro */
-    --muted-foreground: 220 9% 46%;      /* slate-500 */
-
-    --accent: 220 16% 94%;               /* cinza neutro p/ hover/realce */
-    --accent-foreground: 220 20% 20%;
-
-    --destructive: 0 84% 60%;            /* #EF4444 */
+    --destructive: 2 64.6% 47.6%;             /* #C8312B — fill c/ branco 5.34; texto 5.34 */
     --destructive-foreground: 0 0% 100%;
 
-    --success: 160 84% 36%;              /* verde corporativo */
+    /* Semânticos: DEFAULT = tom de texto/ícone (≥4.5 sobre surface e subtle),
+       subtle = fundo de faixa/badge, border = contorno da faixa. */
+    --success: 147 60.5% 29.8%;               /* #1E7A47 */
     --success-foreground: 0 0% 100%;
+    --success-subtle: 141 41.2% 93.3%;        /* #E7F5EC */
+    --success-border: 142 39.2% 75.5%;        /* #A8D9BA */
+    --warning: 36 100% 27.1%;                 /* #8A5300 */
+    --warning-foreground: 0 0% 100%;
+    --warning-subtle: 42 100% 92.9%;          /* #FFF4DB */
+    --warning-border: 40 81.7% 67.8%;         /* #F0C46A */
+    --danger: 4 76.5% 40%;                    /* #B42318 */
+    --danger-subtle: 6 82.6% 95.5%;           /* #FDECEA */
+    --danger-border: 6 71.1% 82.4%;           /* #F2B8B2 */
+    --info: 211 49.2% 36.3%;                  /* #2F5B8A */
+    --info-subtle: 210 50% 94.5%;             /* #EAF1F8 */
+    --info-border: 211 44% 80.4%;             /* #B7CCE3 */
 
-    --warning: 38 92% 50%;
-    --warning-foreground: 220 20% 13%;
+    --border: 215 20.7% 88.6%;                /* #DCE1E8 hairline */
+    --border-strong: 218 10.6% 53.9%;         /* #7D8696 — 3.67 branco / 3.24 canvas (WCAG 1.4.11) */
+    --input: 218 10.6% 53.9%;                 /* = border-strong */
+    --ring: 19 100% 42%;                      /* #D64400 foco — 3.95 canvas / 4.48 branco (#FF5100 dava 2.88) */
 
-    --border: 220 14% 90%;               /* hairline cinza frio */
-    --input: 220 14% 90%;
-    --ring: 19 100% 50%;                 /* foco em laranja LHG */
-
-    /* Laranja escuro SÓ para texto (text-primary-strong). O #FF5100 é vibrante
-       demais como texto em fundo claro (3.1:1); L=40 passa AA (4.6-4.9:1). Fills,
-       borda e foco seguem #FF5100. */
-    --primary-strong: 19 100% 40%;
+    --header: 219 21.2% 12.9%;                /* #1A1F28 barra superior fria (era #1D1E1B quente) */
+    --header-foreground: 0 0% 100%;
 
     --radius: 0.25rem;
 
-    /* Tema escuro / superfícies "hero" (SPEC-NOVA-UI v3) — valores FIXOS que não
-       invertem por tema, usados em superfícies sempre-escuras (login e, nas
-       próximas etapas, o tema escuro do app). Gradiente/glow são recursos
-       escassos e posicionados (ver DESIGN.md §Elevação escura). */
-    --canvas-dark: #14171D;              /* fundo raiz de superfície escura */
-    --surface-dark: #1A1F28;             /* card/painel (reaproveita o hex de ink) */
-    --elevated-dark: #232833;            /* popover/dropdown/hover no escuro */
+    /* Status de solicitação — fundo / texto / ponto (badge retangular). */
+    --st-recebida-bg: #EEF1F5;
+    --st-recebida-fg: #3F4A5A;
+    --st-recebida-dot: #6E7686;
+    --st-em_cadastro-bg: #FFEBDD;
+    --st-em_cadastro-fg: #B23C0B;
+    --st-em_cadastro-dot: #DE4A00;   /* 3.57 s/ bg (#FF5100 dava 2.83) */
+    --st-instrucao_emitida-bg: #FBF1C7;
+    --st-instrucao_emitida-fg: #634C00;
+    --st-instrucao_emitida-dot: #9A7A00;   /* amarelo: 3.59 s/ bg */
+    --st-oc_gerada-bg: #E3EDFB;
+    --st-oc_gerada-fg: #1D4E8F;
+    --st-oc_gerada-dot: #2F6FC4;   /* azul: 4.24 s/ bg */
+    --st-oc_enviada-bg: #EEE8FA;
+    --st-oc_enviada-fg: #4E2F9E;
+    --st-oc_enviada-dot: #7352C7;   /* violeta: 4.67 s/ bg */
+    --st-finalizada-bg: #D3EEDD;
+    --st-finalizada-fg: #0F5131;
+    --st-finalizada-dot: #1E7A47;
+    --st-cancelada-bg: #FDECEA;
+    --st-cancelada-fg: #A1261E;
+    --st-cancelada-dot: #C8312B;
+
+    /* Gráficos (Recharts lê via var(--chart-n) / chartColors()). */
+    --chart-1: #FF5100;
+    --chart-2: #4E6986;
+    --chart-3: #9A6A3B;
+    --chart-4: #5E7A52;
+    --chart-5: #6E6594;
+    --chart-6: #C44612;
+    --chart-7: #3E4A5B;
+    --chart-8: #A6552F;
+    --chart-ref: #8A93A3;
+    --chart-ok: #2F7D4F;
+    --chart-bad: #C0362C;
+    --chart-grid: #E9ECF1;
+    --chart-axis: #5B6472;
+    --chart-tooltip-bg: #FFFFFF;
+
+    /* Superfícies "marca" do LOGIN (sempre escuras; gradiente/glow permitidos
+       SÓ lá — DESIGN.md §7). Não usar em tela de trabalho. */
+    --canvas-dark: #14171D;
+    --surface-dark: #1A1F28;
+    --elevated-dark: #232833;
     --border-dark: rgba(255, 255, 255, 0.08);
-    --orange-tint: #FFB37A;              /* fim CLARO do gradiente do acento interno */
+    --orange-tint: #FFB37A;
     --glow-orange: rgba(255, 81, 0, 0.18);
-    --portal-blue-tint: #93B4FF;         /* fim claro do acento do portal */
+    --portal-blue-tint: #93B4FF;
     --glow-blue: rgba(30, 64, 175, 0.18);
   }
 
   .dark {
-    /* Superfícies em camadas (SPEC-NOVA-UI v3 / DESIGN.md §7): canvas-dark →
-       surface-dark → elevated-dark. Dá profundidade "TransporteApp" a todo o app
-       no modo escuro, sem tocar componente a componente. */
-    --background: 220 18% 10%;           /* #14171D canvas-dark (fundo raiz) */
-    --foreground: 220 14% 96%;           /* off-white neutro */
+    --background: 216 18.5% 10.6%;            /* #161A20 surface */
+    --foreground: 218 19% 91.8%;              /* #E6E9EE — 14.35 surface */
+    --canvas: 214 20% 6.9%;                   /* #0E1115 */
+    --card: 216 18.5% 10.6%;                  /* #161A20 */
+    --card-foreground: 218 19% 91.8%;
+    --popover: 217 17.8% 14.3%;               /* #1E232B raised */
+    --popover-foreground: 218 19% 91.8%;
+    --muted: 217 17.8% 14.3%;                 /* #1E232B */
+    --muted-foreground: 217 11% 67.8%;        /* #A4ABB6 — 7.55 surface */
+    --tertiary: 217 8.3% 57.6%;               /* #8A919C — 5.50 surface */
+    --accent: 216 16.5% 17.8%;                /* #262C35 */
+    --accent-foreground: 218 19% 91.8%;
+    --row-hover: 216 16.5% 17.8%;             /* #262C35 */
 
-    --card: 219 21% 13%;                 /* #1A1F28 surface-dark (card/painel) */
-    --card-foreground: 220 14% 96%;
+    /* Acento no dark: fill claro + tinta ESCURA (branco sobre laranja nunca
+       passa AA). #1A0A02 sobre #FF6A1F = 6.74; hover clareia. */
+    --primary: 20 100% 56.1%;                 /* #FF6A1F */
+    --primary-hover: 21 100% 64.9%;           /* #FF8A4C */
+    --primary-foreground: 20 85.7% 5.5%;      /* #1A0A02 */
+    --primary-strong: 21 100% 64.9%;          /* #FF8A4C texto — 7.48 surface */
 
-    --popover: 221 19% 17%;              /* #232833 elevated-dark (popover/dropdown) */
-    --popover-foreground: 220 14% 96%;
+    --secondary: 218 16% 19.6%;               /* #2A303A */
+    --secondary-foreground: 218 19% 91.8%;
 
-    /* Acento laranja do dark: fill claro + tinta ESCURA quente (mesmo tratamento
-       do azul do portal). Branco sobre laranja NUNCA passa WCAG AA (2.3-2.7:1 em
-       qualquer L — o laranja e' luminoso demais). Tinta escura sobre o fill passa
-       (6.76:1) e o laranja-como-texto sobre card/canvas ja passava (6.4/6.8:1).
-       So no dark: no claro o botao segue branco sobre #FF5100 (ver nota abaixo).
-       `--primary-foreground` escuro vale p/ todo fill de acento (botao/avatar/
-       checkbox). Hover CLAREIA (L66), porque tinta escura pede mais luz. */
-    --primary: 21 100% 60%;              /* laranja luminoso para dark */
-    --primary-hover: 21 100% 66%;        /* hover CLAREIA (tinta escura) */
-    --primary-foreground: 20 50% 10%;    /* tinta escura quente do fill no dark */
+    /* Mesmo tratamento do acento: fill claro + tinta escura (6.72); como
+       texto sobre surface 6.07 (antes branco sobre vermelho = 4.37). */
+    --destructive: 3 84% 68.2%;               /* #F2706A */
+    --destructive-foreground: 0 67.6% 7.3%;   /* #1F0606 */
 
-    --secondary: 220 10% 30%;
-    --secondary-foreground: 220 14% 96%;
+    --success: 151 65.1% 53.9%;               /* #3DD68C — tinta 9.09; texto 9.31 (antes branco 2.27) */
+    --success-foreground: 140 69.2% 7.6%;     /* #06210F */
+    --success-subtle: 149 38.2% 10.8%;        /* #11261B */
+    --success-border: 146 37.3% 26.3%;        /* #2A5C40 */
+    --warning: 40 83.9% 68.4%;                /* #F2C46B */
+    --warning-foreground: 39 82.4% 6.7%;      /* #1F1503 */
+    --warning-subtle: 42 44.8% 11.4%;         /* #2A2210 */
+    --warning-border: 41 54% 27.3%;           /* #6B5320 */
+    --danger: 5 100% 75.1%;                   /* #FF8A80 */
+    --danger-subtle: 3 35.3% 13.3%;           /* #2E1716 */
+    --danger-border: 3 46.7% 29.4%;           /* #6E2B28 */
+    --info: 212 57.2% 71.6%;                  /* #8DB4E0 */
+    --info-subtle: 213 36.4% 12.9%;           /* #15202D */
+    --info-border: 212 36.1% 28.8%;           /* #2F4864 */
 
-    --muted: 220 14% 16%;
-    --muted-foreground: 220 9% 66%;
+    --border: 215 14% 23.7%;                  /* #343B45 hairline */
+    --border-strong: 218 9.4% 45.9%;          /* #6A7280 — 3.60 surface / 3.26 popover / 3.90 canvas */
+    --input: 218 9.4% 45.9%;
+    --ring: 20 100% 56.1%;                    /* #FF6A1F */
 
-    --accent: 220 14% 22%;               /* cinza neutro p/ realce */
-    --accent-foreground: 220 14% 96%;
+    --header: 216 20% 4.9%;                   /* #0A0C0F + border-b */
+    --header-foreground: 218 19% 91.8%;
 
-    --destructive: 0 72% 55%;
-    --destructive-foreground: 0 0% 100%;
+    --st-recebida-bg: #232933;
+    --st-recebida-fg: #C3CAD5;
+    --st-recebida-dot: #8A919C;
+    --st-em_cadastro-bg: #33200F;
+    --st-em_cadastro-fg: #FFA877;
+    --st-em_cadastro-dot: #FF6A1F;
+    --st-instrucao_emitida-bg: #2E2A10;
+    --st-instrucao_emitida-fg: #F0D36A;
+    --st-instrucao_emitida-dot: #D9B92E;
+    --st-oc_gerada-bg: #142338;
+    --st-oc_gerada-fg: #8DB8F2;
+    --st-oc_gerada-dot: #4C8FE0;
+    --st-oc_enviada-bg: #241C3A;
+    --st-oc_enviada-fg: #BFA8F5;
+    --st-oc_enviada-dot: #9277E0;
+    --st-finalizada-bg: #0F2E1F;
+    --st-finalizada-fg: #A6EBC4;
+    --st-finalizada-dot: #3DD68C;
+    --st-cancelada-bg: #321A1A;
+    --st-cancelada-fg: #FF9A91;
+    --st-cancelada-dot: #F2706A;
 
-    --success: 160 70% 45%;
-    --success-foreground: 0 0% 100%;
-
-    --warning: 38 92% 55%;
-    --warning-foreground: 220 20% 13%;
-
-    --border: 220 12% 22%;               /* contraste de borda um pouco mais visível */
-    --input: 220 12% 22%;
-    --ring: 21 100% 60%;
-
-    /* No dark o laranja-texto já passa (6.4:1 sobre card); o strong iguala o
-       --primary para manter o brilho no escuro. */
-    --primary-strong: 21 100% 60%;
+    /* Todas as séries ≥ 3:1 sobre #161A20 (a mais fraca, --chart-ref, 4.57). */
+    --chart-1: #FF6A1F;
+    --chart-2: #7F9BB8;
+    --chart-3: #C49A6B;
+    --chart-4: #8FAE82;
+    --chart-5: #A39BC6;
+    --chart-6: #E07A4E;
+    --chart-7: #9AA6B8;
+    --chart-8: #D08A62;
+    --chart-ref: #7A8394;
+    --chart-ok: #5FBF86;
+    --chart-bad: #F07167;
+    --chart-grid: #262C35;
+    --chart-axis: #A4ABB6;
+    --chart-tooltip-bg: #1E232B;
   }
 }
 
@@ -138,7 +230,7 @@
     @apply h-full;
   }
   body {
-    @apply bg-background text-foreground font-sans antialiased;
+    @apply bg-canvas text-foreground font-sans antialiased;
     font-size: 14px;
     line-height: 1.5;
   }
@@ -181,29 +273,21 @@ body.density-compact ul.divide-y > li {
   main { overflow: visible !important; }
 }
 
-/* Status badges — paleta LHG: cinza → laranja → verde como gradiente de progresso */
+/* Status de solicitação — par fundo/texto + ponto, lidos das variáveis --st-*
+   (claro e escuro no :root/.dark). Badge RETANGULAR (raio 2px), nunca pílula:
+   ver <SolicitacaoStatusBadge>. `.status-*` segue existindo porque o filtro de
+   Solicitações aplica `status-${s}` dinamicamente. */
 @layer components {
-  .status-recebida          { background-color: #F1F5F9; color: #475569; }
-  .status-em_cadastro       { background-color: #FFE8D6; color: #C44612; }
-  .status-instrucao_emitida { background-color: #FEF3C7; color: #92400E; }
-  .status-oc_gerada         { background-color: #F4D4BD; color: #8F3700; }
-  .status-oc_enviada        { background-color: #D1FAE5; color: #065F46; }
-  .status-finalizada        { background-color: #A7F3D0; color: #064E3B; }
-  .status-cancelada         { background-color: #FEE2E2; color: #991B1B; }
+  .status-recebida          { background-color: var(--st-recebida-bg);          color: var(--st-recebida-fg);          --status-dot: var(--st-recebida-dot); }
+  .status-em_cadastro       { background-color: var(--st-em_cadastro-bg);       color: var(--st-em_cadastro-fg);       --status-dot: var(--st-em_cadastro-dot); }
+  .status-instrucao_emitida { background-color: var(--st-instrucao_emitida-bg); color: var(--st-instrucao_emitida-fg); --status-dot: var(--st-instrucao_emitida-dot); }
+  .status-oc_gerada         { background-color: var(--st-oc_gerada-bg);         color: var(--st-oc_gerada-fg);         --status-dot: var(--st-oc_gerada-dot); }
+  .status-oc_enviada        { background-color: var(--st-oc_enviada-bg);        color: var(--st-oc_enviada-fg);        --status-dot: var(--st-oc_enviada-dot); }
+  .status-finalizada        { background-color: var(--st-finalizada-bg);        color: var(--st-finalizada-fg);        --status-dot: var(--st-finalizada-dot); }
+  .status-cancelada         { background-color: var(--st-cancelada-bg);         color: var(--st-cancelada-fg);         --status-dot: var(--st-cancelada-dot); }
 
-  /* Dark mode — variantes com fundos translúcidos / textos clareados */
-  .dark .status-recebida          { background-color: rgba(148, 163, 184, 0.18); color: #cbd5e1; }
-  .dark .status-em_cadastro       { background-color: rgba(255, 81, 0, 0.18);    color: #FFA877; }
-  .dark .status-instrucao_emitida { background-color: rgba(245, 158, 11, 0.18);  color: #fcd34d; }
-  .dark .status-oc_gerada         { background-color: rgba(196, 70, 18, 0.22);   color: #FFB37A; }
-  .dark .status-oc_enviada        { background-color: rgba(16, 185, 129, 0.18);  color: #6ee7b7; }
-  .dark .status-finalizada        { background-color: rgba(5, 150, 105, 0.28);   color: #a7f3d0; }
-  .dark .status-cancelada         { background-color: rgba(239, 68, 68, 0.18);   color: #fca5a5; }
-
-  /* Faixa lateral esquerda por status — mesma leitura de cor dos badges/chips.
-     Implementada como pseudo-elemento para não competir com os utilitários de
-     borda (SLA, pendência, selecionado, hover), que continuam envolvendo o card
-     nos 4 lados como sinal de urgência. A cor vem de `--stripe-color`. */
+  /* Faixa lateral de status (6px) — pseudo-elemento para não competir com os
+     utilitários de borda (SLA, pendência, selecionado). Cor = ponto do status. */
   .card-status::before {
     content: '';
     position: absolute;
@@ -215,26 +299,21 @@ body.density-compact ul.divide-y > li {
     border-bottom-left-radius: inherit;
     background-color: var(--stripe-color);
     pointer-events: none;
+    /* Mudança de status: a faixa troca de cor em 200ms, junto com o badge. */
+    transition: background-color 200ms ease-out;
   }
 
-  .card-status-recebida          { --stripe-color: #94A3B8; } /* slate — estado neutro/novo */
-  .card-status-em_cadastro       { --stripe-color: #EA8A54; } /* laranja (Em emissão) */
-  .card-status-instrucao_emitida { --stripe-color: #E6B24A; } /* âmbar */
-  .card-status-oc_gerada         { --stripe-color: #CD853F; } /* marrom-areia — distinto do vermelho */
-  .card-status-oc_enviada        { --stripe-color: #34D399; } /* esmeralda */
-  .card-status-finalizada        { --stripe-color: #10B981; } /* verde */
-  .card-status-cancelada         { --stripe-color: #E5484D; } /* vermelho vivo */
+  .card-status-recebida          { --stripe-color: var(--st-recebida-dot); }
+  .card-status-em_cadastro       { --stripe-color: var(--st-em_cadastro-dot); }
+  .card-status-instrucao_emitida { --stripe-color: var(--st-instrucao_emitida-dot); }
+  .card-status-oc_gerada         { --stripe-color: var(--st-oc_gerada-dot); }
+  .card-status-oc_enviada        { --stripe-color: var(--st-oc_enviada-dot); }
+  .card-status-finalizada        { --stripe-color: var(--st-finalizada-dot); }
+  .card-status-cancelada         { --stripe-color: var(--st-cancelada-dot); }
 
-  .dark .card-status-recebida          { --stripe-color: #64748B; }
-  .dark .card-status-em_cadastro       { --stripe-color: #FF5100; }
-  .dark .card-status-instrucao_emitida { --stripe-color: #F59E0B; }
-  .dark .card-status-oc_gerada         { --stripe-color: #C44612; }
-  .dark .card-status-oc_enviada        { --stripe-color: #10B981; }
-  .dark .card-status-finalizada        { --stripe-color: #059669; }
-  .dark .card-status-cancelada         { --stripe-color: #EF4444; }
-
+  /* Rótulo de KPI — ÚNICO uso aceito de maiúsculas (DESIGN.md §3). */
   .label-uppercase {
-    @apply text-[10px] font-medium uppercase tracking-[0.5px] text-muted-foreground;
+    @apply text-meta font-medium uppercase tracking-[0.5px] text-muted-foreground;
   }
 
   /* Escala CATEGÓRICA LHG — tons industriais foscos para taxonomias (papéis,
@@ -260,10 +339,19 @@ body.density-compact ul.divide-y > li {
   .dark .cat-brass { background-color: rgba(180,150,80,0.18);  color: #ddc99a; border-color: rgba(180,150,80,0.30); }
 }
 
-/* Recharts no modo escuro — eixos e grade legíveis sobre a superfície escura
-   (DESIGN.md §7): tick em text-secondary-dark, grade em hairline translúcido. */
-.dark .recharts-cartesian-axis-tick text { fill: #94A3B8; }
-.dark .recharts-cartesian-grid line { stroke: rgba(255, 255, 255, 0.07); }
+/* Recharts — eixos, grade e tooltip padrão seguem os tokens --chart-* nos dois
+   temas (o tooltip padrão saía branco no escuro). O <ChartTooltip> substitui o
+   padrão; estas regras cobrem gráficos ainda não migrados. */
+.recharts-cartesian-axis-tick text { fill: var(--chart-axis); }
+.recharts-cartesian-grid line { stroke: var(--chart-grid); }
+.recharts-default-tooltip {
+  background-color: var(--chart-tooltip-bg) !important;
+  border: 1px solid hsl(var(--border)) !important;
+  border-radius: 4px;
+  color: hsl(var(--popover-foreground));
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
 
 /* Mapa de clientes (Leaflet) — pin sem caixa branca e rótulo permanente */
 .cliente-pin-icon {
@@ -275,25 +363,72 @@ body.density-compact ul.divide-y > li {
   max-width: 180px;
   overflow: hidden;
   padding: 2px 7px;
-  border: 1px solid rgba(0, 0, 0, 0.12);
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.95);
-  color: #111827;
+  border: 1px solid hsl(var(--border));
+  border-radius: 2px;
+  background: hsl(var(--popover));
+  color: hsl(var(--popover-foreground));
   font-size: 11px;
   font-weight: 600;
   line-height: 1.2;
   white-space: nowrap;
   text-overflow: ellipsis;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+  box-shadow: none;
 }
 .cliente-tooltip.leaflet-tooltip-top::before {
-  border-top-color: rgba(255, 255, 255, 0.95);
+  border-top-color: hsl(var(--popover));
 }
-.dark .cliente-tooltip.leaflet-tooltip {
-  border-color: rgba(255, 255, 255, 0.12);
-  background: rgba(30, 41, 59, 0.96);
-  color: #e5e7eb;
+
+/* ── Movimento ─────────────────────────────────────────────────────────────
+   Bloco IDÊNTICO em apps/interno e apps/portal (+ hooks/useMovimento.ts).
+   Só transform/opacity; fill-mode `backwards` (nunca `both`/`forwards`) para a
+   animação não prender o transform e não brigar com o hover de elevação 2px.
+   Sem guarda de "reduzir movimento" — decisão do dono (ver MEMORY/DESIGN.md). */
+:root {
+  --ease-firme: cubic-bezier(0.16, 1, 0.3, 1);
 }
-.dark .cliente-tooltip.leaflet-tooltip-top::before {
-  border-top-color: rgba(30, 41, 59, 0.96);
+
+@keyframes entrada {
+  from { opacity: 0; transform: translateY(8px); }
+}
+@keyframes entrada-sutil {
+  from { opacity: 0; transform: translateY(4px); }
+}
+@keyframes surgir {
+  from { opacity: 0; }
+}
+@keyframes etapa-da-direita {
+  from { opacity: 0; transform: translateX(16px); }
+}
+@keyframes etapa-da-esquerda {
+  from { opacity: 0; transform: translateX(-16px); }
+}
+
+@layer components {
+  /* Login: entrada coreografada. Atraso por `--ordem` × 40ms (inline style). */
+  .entrada-login {
+    animation: entrada 240ms var(--ease-firme) backwards;
+    animation-delay: calc(var(--ordem, 0) * 40ms);
+  }
+  /* Login: troca de etapa (1 → 2 entra da direita; voltar entra da esquerda). */
+  .etapa-avanca { animation: etapa-da-direita 200ms var(--ease-firme) backwards; }
+  .etapa-volta  { animation: etapa-da-esquerda 200ms var(--ease-firme) backwards; }
+
+  /* Valor não numérico do KPI ("3 h 40 min", "—"): só fade. */
+  .surgir { animation: surgir 200ms ease-out backwards; }
+
+  /* Cascata da 1ª renderização de cards (useCascataInicial): 25ms por índice,
+     teto de 300ms a partir do 13º. */
+  .cascata > * { animation: entrada-sutil 200ms var(--ease-firme) backwards; }
+  .cascata > :nth-child(2)  { animation-delay: 25ms; }
+  .cascata > :nth-child(3)  { animation-delay: 50ms; }
+  .cascata > :nth-child(4)  { animation-delay: 75ms; }
+  .cascata > :nth-child(5)  { animation-delay: 100ms; }
+  .cascata > :nth-child(6)  { animation-delay: 125ms; }
+  .cascata > :nth-child(7)  { animation-delay: 150ms; }
+  .cascata > :nth-child(8)  { animation-delay: 175ms; }
+  .cascata > :nth-child(9)  { animation-delay: 200ms; }
+  .cascata > :nth-child(10) { animation-delay: 225ms; }
+  .cascata > :nth-child(11) { animation-delay: 250ms; }
+  .cascata > :nth-child(12) { animation-delay: 275ms; }
+  .cascata > :nth-child(n+13) { animation-delay: 300ms; }
 }

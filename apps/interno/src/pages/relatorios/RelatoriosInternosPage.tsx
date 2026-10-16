@@ -7,12 +7,16 @@ import {
   CheckCircle2,
   AlarmClock,
   Download,
-  Loader2,
   TriangleAlert,
-  Trophy,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { PageHeader } from '@/components/layout/PageHeader'
+import { KpiTile } from '@/components/shared/KpiTile'
+import { Spinner } from '@/components/shared/Spinner'
+import { SolicitacaoStatusBadge } from '@/components/shared/SolicitacaoStatusBadge'
+import { labelPerfil } from '@/features/auth/perfis'
+import { fmtInt } from '@/lib/format'
 import {
   periodoDeIntervalo,
   intervaloPadrao,
@@ -23,9 +27,9 @@ import { useIntervaloPersistido } from '@/features/relatorios/useIntervaloPersis
 import {
   useRelatorioInterno,
   formatHoras,
+  formatHorasCsv,
   type ProdutividadeUsuario,
 } from '@/features/relatorios/useRelatoriosInternos'
-import { STATUS_LABELS } from '@/features/solicitacoes/status'
 import type { SolicitacaoStatus } from '@/types/database.types'
 import { buildCsv, downloadCsv, type CsvColumn } from '@/lib/csv'
 import { cn } from '@/lib/utils'
@@ -63,8 +67,8 @@ export default function RelatoriosInternosPage() {
         { header: 'Enviou OC', accessor: (u) => u.enviouOC },
         { header: 'Finalizou', accessor: (u) => u.finalizou },
         { header: 'Em aberto na mão (parceiro)', accessor: (u) => u.emAbertoNaMao },
-        { header: 'Tempo médio p/ finalizar', accessor: (u) => formatHoras(u.tempoMedioConclusaoH) },
-        { header: 'Parada mais longa (aberta)', accessor: (u) => formatHoras(u.paradaMaisLongaH) },
+        { header: 'Tempo médio p/ finalizar', accessor: (u) => formatHorasCsv(u.tempoMedioConclusaoH) },
+        { header: 'Parada mais longa (aberta)', accessor: (u) => formatHorasCsv(u.paradaMaisLongaH) },
       ]
       const csv = buildCsv(usuarios, cols)
       const ts = new Date()
@@ -82,15 +86,12 @@ export default function RelatoriosInternosPage() {
   const totais = data?.totais
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-[22px] font-semibold tracking-tight text-foreground">Relatórios Internos</h1>
-          <p className="text-[12px] text-muted-foreground">
-            Produtividade da equipe · {periodo.label}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
+    <div className="space-y-4">
+      <PageHeader
+        title="Produtividade da equipe"
+        description={periodo.label}
+        actions={
+          <>
           <IntervaloDatas
             idPrefix="rel-int"
             de={deCampo}
@@ -106,13 +107,14 @@ export default function RelatoriosInternosPage() {
             disabled={exporting || q.isLoading || !data}
             title="Exportar produtividade em CSV"
           >
-            {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            {exporting ? <Spinner /> : <Download className="h-4 w-4" />}
             <span className="hidden sm:inline">Exportar</span>
           </Button>
-        </div>
-      </div>
+          </>
+        }
+      />
 
-      <p className="rounded-md border bg-muted/50 px-3 py-2 text-[12px] leading-relaxed text-muted-foreground">
+      <p className="rounded-lg border bg-card px-4 py-3 text-body-sm text-muted-foreground">
         Considera as solicitações <strong>criadas no período</strong>. Cada coluna conta em quantas solicitações a
         pessoa executou aquela etapa (<em>Em emissão</em>, <em>Gerou OC</em>, <em>Enviou OC</em>, <em>Finalizou</em>),
         sem contar em dobro reaberturas. <em>Em aberto</em> = solicitações de parceiro que ela pôs em emissão e ainda
@@ -120,15 +122,20 @@ export default function RelatoriosInternosPage() {
       </p>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-        <KpiCard label="Solicitações no período" value={totais?.solicitacoesNoPeriodo ?? 0} icon={<ClipboardList className="h-4 w-4 text-muted-foreground" />} accent="bg-muted/60" isLoading={q.isLoading} />
-        <KpiCard label="De parceiros" value={totais?.deParceiro ?? 0} icon={<Handshake className="h-4 w-4 text-muted-foreground" />} accent="bg-muted/60" isLoading={q.isLoading} />
-        <KpiCard label="Finalizadas" value={totais?.finalizadas ?? 0} icon={<CheckCircle2 className="h-4 w-4 text-muted-foreground" />} accent="bg-muted/60" isLoading={q.isLoading} />
-        <KpiCard label="Ainda abertas" value={totais?.abertas ?? 0} icon={<AlarmClock className="h-4 w-4 text-muted-foreground" />} accent="bg-muted/60" isLoading={q.isLoading} />
-        <KpiCard label="Recebidas sem ninguém pegar" value={totais?.recebidasNaoIniciadas ?? 0} icon={<TriangleAlert className="h-4 w-4 text-red-600 dark:text-red-400" />} accent="bg-red-50 dark:bg-red-950/40" isLoading={q.isLoading} highlight={(totais?.recebidasNaoIniciadas ?? 0) > 0} />
+        <KpiTile label="Solicitações no período" value={kpiValor(q.isLoading, totais?.solicitacoesNoPeriodo)} icon={ClipboardList} />
+        <KpiTile label="De parceiros" value={kpiValor(q.isLoading, totais?.deParceiro)} icon={Handshake} />
+        <KpiTile label="Finalizadas" value={kpiValor(q.isLoading, totais?.finalizadas)} icon={CheckCircle2} />
+        <KpiTile label="Ainda abertas" value={kpiValor(q.isLoading, totais?.abertas)} icon={AlarmClock} />
+        <KpiTile
+          label="Recebidas sem ninguém pegar"
+          value={kpiValor(q.isLoading, totais?.recebidasNaoIniciadas)}
+          icon={TriangleAlert}
+          tone={!q.isLoading && (totais?.recebidasNaoIniciadas ?? 0) > 0 ? 'alert' : 'default'}
+        />
       </div>
 
       {q.isError && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-[13px] text-red-800">
+        <div className="rounded-lg border border-danger-border bg-danger-subtle px-4 py-3 text-body text-danger">
           Falha ao carregar o relatório. Tente recarregar a página.
         </div>
       )}
@@ -147,37 +154,17 @@ export default function RelatoriosInternosPage() {
   )
 }
 
-interface KpiCardProps {
-  label: string
-  value: number | string
-  icon: React.ReactNode
-  accent: string
-  isLoading: boolean
-  highlight?: boolean
-}
-
-function KpiCard({ label, value, icon, accent, isLoading, highlight }: KpiCardProps) {
-  return (
-    <div className={cn('rounded-lg border bg-card p-4', highlight && 'border-red-300 bg-red-50/40')}>
-      <div className="flex items-center justify-between">
-        <p className="text-[11px] font-medium uppercase tracking-[0.5px] text-muted-foreground">{label}</p>
-        <span className={cn('flex h-7 w-7 items-center justify-center rounded-md', accent)}>{icon}</span>
-      </div>
-      {isLoading ? (
-        <Skeleton className="mt-2 h-8 w-16" />
-      ) : (
-        <p className="mt-1 text-[24px] font-medium tabular-nums text-foreground">{value}</p>
-      )}
-    </div>
-  )
+// Valor do <KpiTile>: esqueleto enquanto carrega, inteiro pt-BR depois.
+function kpiValor(isLoading: boolean, n: number | undefined): React.ReactNode {
+  return isLoading ? <Skeleton className="inline-block h-8 w-16 align-middle" /> : fmtInt(n ?? 0)
 }
 
 function Card({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
   return (
     <section className="rounded-lg border bg-card">
       <header className="border-b px-4 py-3">
-        <h2 className="text-[14px] font-medium text-foreground">{title}</h2>
-        {subtitle && <p className="text-[11px] text-muted-foreground">{subtitle}</p>}
+        <h2 className="text-body-lg font-medium text-foreground">{title}</h2>
+        {subtitle && <p className="text-meta text-muted-foreground">{subtitle}</p>}
       </header>
       <div className="p-4">{children}</div>
     </section>
@@ -196,17 +183,16 @@ function ProdutividadeTable({ usuarios, isLoading }: { usuarios: ProdutividadeUs
   }
   if (usuarios.length === 0) {
     return (
-      <div className="flex h-[120px] items-center justify-center text-[13px] text-muted-foreground">
+      <div className="flex h-[120px] items-center justify-center text-body text-muted-foreground">
         Nenhuma atividade da equipe no período.
       </div>
     )
   }
-  const melhorFinalizador = usuarios.reduce((m, u) => (u.finalizou > m ? u.finalizou : m), 0)
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-[12px]">
+      <table className="w-full text-body-sm">
         <thead>
-          <tr className="border-b text-left text-[11px] uppercase tracking-[0.4px] text-muted-foreground">
+          <tr className="border-b bg-muted text-left text-meta text-muted-foreground">
             <th className="px-2 py-2 font-medium">Atendente</th>
             <th className="px-2 py-2 text-right font-medium" title="Solicitações que ele mesmo criou">Solicitou</th>
             <th className="px-2 py-2 text-right font-medium" title="Solicitações que ele colocou Em emissão">Em emissão</th>
@@ -221,28 +207,26 @@ function ProdutividadeTable({ usuarios, isLoading }: { usuarios: ProdutividadeUs
         <tbody>
           {usuarios.map((u) => {
             const enrolando = u.emAbertoNaMao > 0 && u.finalizou < u.emAbertoNaMao
-            const topFinalizador = u.finalizou > 0 && u.finalizou === melhorFinalizador
             return (
-              <tr key={u.userId} className="border-b last:border-0 hover:bg-muted/40">
+              <tr key={u.userId} className="border-b last:border-0 transition-colors duration-fast hover:bg-row-hover">
                 <td className="px-2 py-2">
                   <div className="flex items-center gap-1.5">
-                    {topFinalizador && <Trophy className="h-3.5 w-3.5 text-amber-500" aria-label="Maior número de finalizações" />}
                     <span className={cn('font-medium text-foreground', !u.ativo && 'text-muted-foreground line-through')}>
                       {u.nome}
                     </span>
-                    <span className="text-[10px] uppercase tracking-[0.4px] text-muted-foreground">{u.perfil}</span>
+                    <span className="text-meta text-muted-foreground">{labelPerfil(u.perfil)}</span>
                   </div>
                 </td>
                 <td className="px-2 py-2 text-right tabular-nums">{u.criou}</td>
                 <td className="px-2 py-2 text-right tabular-nums">{u.emEmissao}</td>
                 <td className="px-2 py-2 text-right tabular-nums">{u.gerouOC}</td>
                 <td className="px-2 py-2 text-right tabular-nums text-muted-foreground">{u.enviouOC}</td>
-                <td className="px-2 py-2 text-right tabular-nums font-medium text-emerald-700">{u.finalizou}</td>
-                <td className={cn('px-2 py-2 text-right tabular-nums', u.emAbertoNaMao > 0 ? (enrolando ? 'font-semibold text-red-700' : 'font-medium text-amber-700') : 'text-muted-foreground')}>
+                <td className="px-2 py-2 text-right tabular-nums font-medium text-success">{u.finalizou}</td>
+                <td className={cn('px-2 py-2 text-right tabular-nums', u.emAbertoNaMao > 0 ? (enrolando ? 'font-semibold text-danger' : 'font-medium text-warning') : 'text-muted-foreground')}>
                   {u.emAbertoNaMao}
                 </td>
                 <td className="px-2 py-2 text-right tabular-nums text-muted-foreground">{formatHoras(u.tempoMedioConclusaoH)}</td>
-                <td className={cn('px-2 py-2 text-right tabular-nums', (u.paradaMaisLongaH ?? 0) >= PARADA_ALERTA_HORAS ? 'font-medium text-red-700' : 'text-muted-foreground')}>
+                <td className={cn('px-2 py-2 text-right tabular-nums', (u.paradaMaisLongaH ?? 0) >= PARADA_ALERTA_HORAS ? 'font-medium text-danger' : 'text-muted-foreground')}>
                   {formatHoras(u.paradaMaisLongaH)}
                 </td>
               </tr>
@@ -279,8 +263,8 @@ function ParadasList({
   }
   if (abertas.length === 0) {
     return (
-      <div className="flex h-[100px] items-center justify-center text-[13px] text-muted-foreground">
-        Nenhuma solicitação de parceiro parada na mão de alguém. 👏
+      <div className="flex h-[100px] items-center justify-center text-body text-muted-foreground">
+        Nenhuma solicitação de parceiro parada.
       </div>
     )
   }
@@ -289,7 +273,7 @@ function ParadasList({
       {abertas.map((a) => {
         const critico = a.paradaHoras >= PARADA_ALERTA_HORAS
         return (
-          <li key={a.solicitacaoId} className="flex items-center gap-3 py-2 text-[12px]">
+          <li key={a.solicitacaoId} className="flex items-center gap-3 py-2 text-body-sm">
             <Link
               to={`/solicitacoes/${a.solicitacaoId}`}
               className="w-16 shrink-0 font-medium text-primary-strong hover:underline tabular-nums"
@@ -298,14 +282,12 @@ function ParadasList({
             </Link>
             <span className="min-w-0 flex-1 truncate text-foreground">
               {a.parceiroNome ?? 'Parceiro —'}
-              <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                {STATUS_LABELS[a.status]}
-              </span>
+              <SolicitacaoStatusBadge status={a.status} className="ml-2" />
             </span>
             <span className="shrink-0 text-muted-foreground">
               com <span className="font-medium text-foreground">{a.ownerNome}</span>
             </span>
-            <span className={cn('w-20 shrink-0 text-right tabular-nums', critico ? 'font-semibold text-red-700' : 'text-muted-foreground')}>
+            <span className={cn('w-20 shrink-0 text-right tabular-nums', critico ? 'font-semibold text-danger' : 'text-muted-foreground')}>
               {critico && <TriangleAlert className="mr-1 inline h-3 w-3" />}
               {formatHoras(a.paradaHoras)}
             </span>

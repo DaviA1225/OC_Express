@@ -105,8 +105,8 @@ export function VigiaDeSessao() {
       <DialogContent className="max-w-[420px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Clock className="h-4 w-4 text-muted-foreground" />
-            Sua sessão vai expirar
+            <Clock className="h-4 w-4 text-tertiary" aria-hidden />
+            Sessão prestes a expirar
           </DialogTitle>
           <DialogDescription>
             Por segurança dos dados, o portal encerra sessões inativas.
@@ -114,14 +114,14 @@ export function VigiaDeSessao() {
         </DialogHeader>
 
         <DialogBody>
-          <p className="text-[13px] leading-relaxed text-foreground">
-            Você será desconectado em{' '}
+          <p className="text-body leading-relaxed text-foreground">
+            A sessão será encerrada em{' '}
             <span className="font-mono font-semibold tabular-nums">
               {formatarRestante(restanteMs ?? 0)}
             </span>
-            . Qualquer clique ou tecla mantém você conectado.
+            . Qualquer clique ou tecla mantém a sessão ativa.
           </p>
-          <p className="mt-2 text-[12px] text-muted-foreground">
+          <p className="mt-2 text-body-sm text-muted-foreground">
             Uma solicitação em preenchimento se perde no logout — se estiver no meio dela,
             continue e envie antes de sair.
           </p>

@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Plus, Search as SearchIcon, Inbox, Eraser, ChevronLeft, ChevronRight, X, CheckSquare, Square, Download, Loader2, Trash2, Clock, Undo2, Reply, AlertTriangle, RefreshCw, LayoutGrid, List as ListIcon } from 'lucide-react'
+import { Plus, Search as SearchIcon, Inbox, Eraser, ChevronLeft, ChevronRight, X, CheckSquare, Square, Download, Trash2, Clock, Undo2, Reply, AlertTriangle, RefreshCw, LayoutGrid, List as ListIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -12,9 +12,13 @@ import {
 } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/shared/EmptyState'
+import { Spinner } from '@/components/shared/Spinner'
+import { PageHeader } from '@/components/layout/PageHeader'
+import { fmtInt } from '@/lib/format'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { SolicitacaoStatusBadge } from '@/components/shared/SolicitacaoStatusBadge'
 import { useDebounce } from '@/hooks/useDebounce'
+import { useCascataInicial } from '@/hooks/useMovimento'
 import { useAuth } from '@/hooks/useAuth'
 import { canEditSolicitacoes, canUseBulkActions } from '@/features/auth/permissions'
 import { useNovaSolicitacao } from '@/features/solicitacoes/NovaSolicitacaoProvider'
@@ -203,6 +207,8 @@ export function SolicitacoesListPage() {
 
   const list = useSolicitacoesList(filters)
   const pendenciaSinais = usePendenciasSinais()
+  // Cascata só no 1º paint com dados; refetch/realtime/filtro não re-animam.
+  const cascata = useCascataInicial(!list.isLoading && !list.isError && (list.data?.data.length ?? 0) > 0)
   const materiais = useCrudOptions<MaterialOpt>({
     table: 'materiais', selectColumns: 'id, nome', orderBy: 'nome',
   })
@@ -364,14 +370,12 @@ export function SolicitacoesListPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-[22px] font-semibold tracking-tight text-foreground">Solicitações</h1>
-          <p className="text-[12px] text-muted-foreground">
-            {list.data?.count ?? 0} {list.data?.count === 1 ? 'registro' : 'registros'}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
+      <PageHeader
+        className="mb-0"
+        title="Solicitações"
+        description={`${fmtInt(list.data?.count ?? 0)} ${list.data?.count === 1 ? 'registro' : 'registros'}`}
+        actions={
+        <>
           {!modoErp && (
           <div className="flex items-center rounded-md border p-0.5" role="group" aria-label="Modo de exibição">
             <button
@@ -381,7 +385,7 @@ export function SolicitacoesListPage() {
               title="Ver em grade"
               className={cn(
                 'inline-flex items-center justify-center rounded p-1.5 transition-colors',
-                view === 'grade' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground',
+                view === 'grade' ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground',
               )}
             >
               <LayoutGrid className="h-4 w-4" />
@@ -393,7 +397,7 @@ export function SolicitacoesListPage() {
               title="Ver em lista"
               className={cn(
                 'inline-flex items-center justify-center rounded p-1.5 transition-colors',
-                view === 'lista' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground',
+                view === 'lista' ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground',
               )}
             >
               <ListIcon className="h-4 w-4" />
@@ -407,7 +411,7 @@ export function SolicitacoesListPage() {
             disabled={exporting || list.isLoading}
             title="Exportar resultados filtrados em CSV"
           >
-            {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            {exporting ? <Spinner /> : <Download className="h-4 w-4" />}
             <span className="hidden sm:inline">Exportar CSV</span>
           </Button>
           {canEdit && (
@@ -415,15 +419,16 @@ export function SolicitacoesListPage() {
               <Plus className="h-4 w-4" />
               <span className="hidden sm:inline">Nova solicitação</span>
               <span className="sm:hidden">Nova</span>
-              <kbd className="ml-1 hidden text-[10px] text-primary-foreground/70 md:inline">Ctrl+N</kbd>
+              <kbd className="ml-1 hidden text-meta text-primary-foreground/70 md:inline">Ctrl+N</kbd>
             </Button>
           )}
-        </div>
-      </div>
+        </>
+        }
+      />
 
       <div className="space-y-3 rounded-lg border bg-card p-3">
         <div className="flex flex-wrap items-center gap-3">
-          <div className="relative flex-1 min-w-[220px]">
+          <div className="relative flex-1 min-w-[220px]" data-page-search>
             <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={search}
@@ -489,12 +494,12 @@ export function SolicitacoesListPage() {
             onClick={() => setApenasAtrasadas(!apenasAtrasadas)}
             aria-pressed={apenasAtrasadas}
             className={cn(
-              'inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] transition-colors',
+              'inline-flex items-center gap-1 rounded-[2px] border px-2 py-0.5 text-meta transition-colors duration-fast',
               apenasAtrasadas
-                ? 'border-red-500 bg-red-500 text-white'
-                : 'border-red-300 bg-red-50 text-red-700 hover:bg-red-100 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300',
+                ? 'border-danger-border bg-danger-subtle font-semibold text-danger'
+                : 'border-border bg-card text-danger hover:bg-row-hover',
             )}
-            title={`Pendentes há mais de ${8}h`}
+            title="Pendentes há mais de 8 h"
           >
             <Clock className="h-3 w-3" />
             Atrasadas
@@ -508,10 +513,10 @@ export function SolicitacoesListPage() {
                 onClick={() => toggleStatus(s)}
                 aria-pressed={active}
                 className={cn(
-                  'rounded-full border px-2.5 py-0.5 text-[11px] transition-colors',
+                  'rounded-[2px] border px-2 py-0.5 text-meta transition-colors duration-fast',
                   active
                     ? `status-${s} border-transparent font-semibold`
-                    : 'border-border bg-card text-muted-foreground hover:bg-muted',
+                    : 'border-border bg-card text-muted-foreground hover:bg-row-hover',
                 )}
               >
                 {STATUS_LABELS[s]}
@@ -542,7 +547,7 @@ export function SolicitacoesListPage() {
             description="Houve um erro ao buscar as solicitações. Verifique a conexão e tente novamente."
             action={
               <Button variant="outline" onClick={() => { void list.refetch() }}>
-                <RefreshCw className="h-4 w-4" /> Tentar de novo
+                <RefreshCw className="h-4 w-4" /> Tentar novamente
               </Button>
             }
           />
@@ -553,8 +558,8 @@ export function SolicitacoesListPage() {
         <div className="rounded-lg border bg-card py-2">
           <EmptyState
             icon={Inbox}
-            title={hasFilters ? 'Nada encontrado com esses filtros' : 'Nenhuma solicitação ainda'}
-            description={hasFilters ? 'Tente limpar alguns filtros.' : 'Que tal criar a primeira?'}
+            title={hasFilters ? 'Nada encontrado com esses filtros' : 'Nenhuma solicitação registrada'}
+            description={hasFilters ? 'Ajuste ou limpe os filtros.' : 'Crie a primeira solicitação para começar.'}
             action={
               hasFilters ? (
                 <Button variant="outline" onClick={clearFilters}>Limpar filtros</Button>
@@ -586,7 +591,7 @@ export function SolicitacoesListPage() {
               </Button>
               )}
               {selectedIds.size > 0 && (
-                <span className="text-[12px] text-muted-foreground">
+                <span className="text-body-sm text-muted-foreground">
                   {selectedIds.size} {selectedIds.size === 1 ? 'selecionada' : 'selecionadas'}
                 </span>
               )}
@@ -621,7 +626,7 @@ export function SolicitacoesListPage() {
               allVisibleSelected={allVisibleSelected}
             />
           ) : view === 'grade' ? (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <div className={cn('grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3', cascata && 'cascata')}>
               {list.data!.data.map((row) => (
                 <SolicitacaoCard
                   key={row.id}
@@ -635,7 +640,7 @@ export function SolicitacoesListPage() {
               ))}
             </div>
           ) : (
-            <div className="divide-y rounded-lg border bg-card">
+            <div className={cn('divide-y rounded-lg border bg-card', cascata && 'cascata')}>
               {list.data!.data.map((row) => (
                 <SolicitacaoListaRow
                   key={row.id}
@@ -656,8 +661,8 @@ export function SolicitacoesListPage() {
         open={!!bulkConfirm}
         onOpenChange={(o) => !o && setBulkConfirm(null)}
         title={`${bulkConfirm?.label} ${selectedIds.size} ${selectedIds.size === 1 ? 'solicitação' : 'solicitações'}?`}
-        description="Esta ação afeta todos os registros selecionados. Você pode duplicá-las depois caso precise refazer."
-        confirmLabel={`Sim, ${bulkConfirm?.label.toLowerCase()}`}
+        description="A ação vale para todos os registros selecionados. Para refazer, duplique a solicitação depois."
+        confirmLabel={bulkConfirm ? `${bulkConfirm.label} solicitações` : undefined}
         destructive
         onConfirm={async () => {
           if (bulkConfirm) {
@@ -672,7 +677,7 @@ export function SolicitacoesListPage() {
         onOpenChange={setDeleteConfirmOpen}
         title={`Excluir ${selectedIds.size} ${selectedIds.size === 1 ? 'solicitação' : 'solicitações'}?`}
         description="Esta ação é irreversível. Os registros selecionados e seus dados associados serão removidos permanentemente."
-        confirmLabel="Sim, excluir"
+        confirmLabel="Excluir"
         destructive
         onConfirm={async () => {
           await runBulkDelete()
@@ -681,8 +686,8 @@ export function SolicitacoesListPage() {
       />
 
       {(list.data?.count ?? 0) > pageSize && (
-        <div className="flex items-center justify-between text-[12px] text-muted-foreground">
-          <span>Página {page} de {totalPages} · {list.data?.count} registros</span>
+        <div className="flex items-center justify-between text-body-sm text-muted-foreground">
+          <span>Página {page} de {totalPages} · {fmtInt(list.data?.count ?? 0)} registros</span>
           <div className="flex items-center gap-1">
             <Button variant="outline" size="sm" onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1}>
               <ChevronLeft className="h-4 w-4" /> Anterior
@@ -719,20 +724,16 @@ function SolicitacaoCard({ row, sinalPendencia, selectable, selected, onToggleSe
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen() } }}
       aria-label={`Abrir ${formatNumeroOC(row.numero_interno)}`}
       className={cn(
-        'relative cursor-pointer overflow-hidden rounded-lg border border-slate-300 bg-card p-4 pl-5 dark:border-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-        // O card cresce por inteiro sob o ponteiro. `scale` age no elemento
-        // todo, então texto, borda e faixa de status ampliam juntos, na mesma
-        // proporção — nada é redesenhado, é a caixa inteira que escala. O
-        // hover:z-10 mantém o card ampliado por cima dos vizinhos.
-        // Sem guarda `motion-reduce`: por decisão de produto o efeito roda
-        // mesmo para quem liga "reduzir movimento" no sistema.
-        'transition-transform duration-300 ease-out hover:z-10 hover:scale-[1.03]',
+        'relative cursor-pointer overflow-hidden rounded-lg border bg-card p-4 pl-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+        // Hover = elevação sutil (decisão de 2026-10-15): sobe 2px + realce de
+        // borda e fundo; sem ampliar, sem glow. Vale com "reduzir movimento".
+        'transition-[transform,background-color,border-color] duration-fast ease-out hover:-translate-y-0.5 hover:border-input hover:bg-row-hover',
         `card-status card-status-${row.status}`,
-        selectable && selected && 'border-primary bg-primary/5',
-        !selected && sinal === 'parceiro_respondeu' && 'border-emerald-400 ring-1 ring-emerald-200 dark:border-emerald-700 dark:ring-emerald-900/50',
-        !selected && sinal === 'aguardando_parceiro' && 'border-red-400 ring-1 ring-red-200 dark:border-red-900/60 dark:ring-red-900/40',
-        !selected && !sinal && sla?.severity === 'alert' && 'border-red-300 dark:border-red-900/60',
-        !selected && !sinal && sla?.severity === 'warning' && 'border-amber-300 dark:border-amber-900/60',
+        selectable && selected && 'border-primary bg-primary/[0.08] hover:border-primary hover:bg-primary/[0.08]',
+        !selected && sinal === 'parceiro_respondeu' && 'border-success hover:border-success',
+        !selected && sinal === 'aguardando_parceiro' && 'border-danger hover:border-danger',
+        !selected && !sinal && sla?.severity === 'alert' && 'border-danger-border',
+        !selected && !sinal && sla?.severity === 'warning' && 'border-warning-border',
       )}
     >
       <div className="flex items-start justify-between gap-2">
@@ -746,33 +747,33 @@ function SolicitacaoCard({ row, sinalPendencia, selectable, selected, onToggleSe
             />
           </span>
           )}
-          <span className="shrink-0 text-[14px] font-medium text-primary-strong">{formatNumeroOC(row.numero_interno)}</span>
+          <span className="shrink-0 text-body-lg font-medium text-primary-strong">{formatNumeroOC(row.numero_interno)}</span>
           {sinal && <PendenciaPop sinal={sinal} />}
           {row.origem === 'parceiro'
             && row.pamcard_status === 'nao_tem_cartao'
             && !row.pamcard_providenciado_em && (
             <span
-              className="shrink-0 rounded bg-amber-500/20 px-2 py-0.5 text-[10px] font-medium text-amber-800 dark:text-amber-300"
+              className="shrink-0 rounded-[2px] bg-warning-subtle px-1.5 py-0.5 text-meta font-medium text-warning"
               title="Cartão Pamcard ainda não providenciado"
             >
               Cartão pendente
             </span>
           )}
           {row.origem === 'email' && (
-            <span className="shrink-0 rounded bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+            <span className="shrink-0 rounded-[2px] bg-muted px-1.5 py-0.5 text-meta font-medium text-muted-foreground">
               via e-mail
             </span>
           )}
           {row.origem === 'parceiro' && (
             <span
-              className="max-w-[150px] shrink-0 truncate rounded cat-partner px-2 py-0.5 text-[10px] font-medium"
+              className="max-w-[150px] shrink-0 truncate rounded-[2px] cat-partner px-1.5 py-0.5 text-meta font-medium"
               title={`Solicitação criada pelo parceiro ${row.parceiro?.razao_social ?? ''}`}
             >
               via {row.parceiro?.razao_social ?? 'parceiro'}
             </span>
           )}
           {row.solicitante_nome && (
-            <span className="truncate text-[13px] text-muted-foreground" title={row.solicitante_nome}>
+            <span className="truncate text-body text-muted-foreground" title={row.solicitante_nome}>
               · Solicitante: <span className="text-foreground">{row.solicitante_nome}</span>
             </span>
           )}
@@ -783,7 +784,7 @@ function SolicitacaoCard({ row, sinalPendencia, selectable, selected, onToggleSe
         </div>
       </div>
       <div className="mt-3 border-t pt-3">
-        <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-[13px]">
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-body">
           <Field
             label="Motorista"
             value={row.motorista?.nome_completo}
@@ -796,20 +797,20 @@ function SolicitacaoCard({ row, sinalPendencia, selectable, selected, onToggleSe
           <Field label="Cliente" value={row.cliente?.razao_social} />
           {row.origem === 'parceiro' && !row.material_id ? (
             <div>
-              <dt className="text-[10px] uppercase tracking-[0.5px] text-muted-foreground">Material</dt>
-              <dd className="font-medium text-amber-700 dark:text-amber-400">Material a definir</dd>
+              <dt className="text-meta text-muted-foreground">Material</dt>
+              <dd className="font-medium text-warning">Material a definir</dd>
             </div>
           ) : (
             <Field label="Material" value={row.material?.nome} />
           )}
         </dl>
       </div>
-      <div className="mt-3 flex items-center justify-between border-t pt-3 text-[11px] text-muted-foreground">
+      <div className="mt-3 flex items-center justify-between border-t pt-3 text-meta text-muted-foreground">
         <span>
           {created ? format(created, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR }) : '—'}
           {row.numero_instrucao ? ` · Instr. ${row.numero_instrucao}` : ''}
         </span>
-        <span className="inline-flex items-center gap-0.5 text-[12px] font-medium text-primary-strong">
+        <span className="inline-flex items-center gap-0.5 text-body-sm font-medium text-primary-strong">
           Abrir <ChevronRight className="h-3.5 w-3.5" />
         </span>
       </div>
@@ -830,10 +831,9 @@ function SolicitacaoListaRow({ row, sinalPendencia, selectable, selected, onTogg
   return (
     <div
       className={cn(
-        // Sem reação ao ponteiro, como nos cards: nada de levantar, sombrear ou
-        // trocar o fundo.
-        'relative flex items-center gap-3 rounded-md px-3 py-2.5',
-        selectable && selected && 'bg-primary/5',
+        // Linha de lista: sob o ponteiro só o fundo muda (row-hover).
+        'relative flex items-center gap-3 px-3 py-2.5 transition-colors duration-fast hover:bg-row-hover',
+        selectable && selected && 'bg-primary/[0.08] shadow-[inset_2px_0_0_hsl(var(--primary))] hover:bg-primary/[0.08]',
       )}
     >
       {selectable && (
@@ -848,19 +848,19 @@ function SolicitacaoListaRow({ row, sinalPendencia, selectable, selected, onTogg
         onClick={onOpen}
         className="flex min-w-0 flex-1 items-center gap-2 text-left"
       >
-        <span className="shrink-0 text-[13px] font-medium text-primary-strong">{formatNumeroOC(row.numero_interno)}</span>
+        <span className="shrink-0 text-body font-medium text-primary-strong">{formatNumeroOC(row.numero_interno)}</span>
         {sinal && <PendenciaPop sinal={sinal} />}
         {row.origem === 'parceiro'
           && row.pamcard_status === 'nao_tem_cartao'
           && !row.pamcard_providenciado_em && (
-          <span className="hidden shrink-0 rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-medium text-amber-800 dark:text-amber-300 sm:inline">
+          <span className="hidden shrink-0 rounded-[2px] bg-warning-subtle px-1.5 py-0.5 text-meta font-medium text-warning sm:inline">
             Cartão pendente
           </span>
         )}
-        <span className="truncate text-[13px] text-muted-foreground">{resumo || '—'}</span>
+        <span className="truncate text-body text-muted-foreground">{resumo || '—'}</span>
       </button>
       <div className="flex shrink-0 items-center gap-2">
-        <span className="hidden text-[11px] text-muted-foreground md:inline">
+        <span className="hidden text-meta text-muted-foreground md:inline">
           {created ? format(created, 'dd/MM/yyyy HH:mm', { locale: ptBR }) : '—'}
         </span>
         {sla && <SlaBadge sla={sla} />}
@@ -893,8 +893,8 @@ function BulkActionsBar({
   onDeleteRequest,
 }: BulkActionsBarProps) {
   return (
-    <div className="sticky top-2 z-10 flex flex-wrap items-center gap-2 rounded-lg border border-primary/40 bg-primary/5 px-3 py-2 shadow-sm backdrop-blur">
-      <span className="text-[13px] font-medium text-foreground">
+    <div className="sticky top-2 z-10 flex flex-wrap items-center gap-2 rounded-lg border bg-popover px-3 py-2 shadow-overlay">
+      <span className="text-body font-medium text-foreground">
         {count} {count === 1 ? 'selecionada' : 'selecionadas'}
       </span>
       <span className="mx-1 h-4 w-px bg-border" />
@@ -915,7 +915,7 @@ function BulkActionsBar({
         className="text-destructive hover:text-destructive"
       >
         <X className="h-4 w-4" />
-        Cancelar
+        Cancelar solicitações
       </Button>
       <Button
         size="sm"
@@ -943,12 +943,12 @@ function PendenciaPop({ sinal }: { sinal: PendenciaSinal }) {
   if (sinal === 'parceiro_respondeu') {
     return (
       <span
-        className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300"
+        className="inline-flex shrink-0 items-center gap-1 rounded-[2px] bg-success-subtle px-1.5 py-0.5 text-meta font-semibold text-success"
         title="O parceiro respondeu a pendência e ainda não foi tratada"
       >
         <span className="relative flex h-2 w-2">
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-75 motion-reduce:animate-none" />
-          <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-75" />
+          <span className="relative inline-flex h-2 w-2 rounded-full bg-success" />
         </span>
         <Reply className="h-3 w-3" />
         Respondido
@@ -957,12 +957,12 @@ function PendenciaPop({ sinal }: { sinal: PendenciaSinal }) {
   }
   return (
     <span
-      className="inline-flex shrink-0 items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-800 dark:bg-red-950/60 dark:text-red-300"
+      className="inline-flex shrink-0 items-center gap-1 rounded-[2px] bg-danger-subtle px-1.5 py-0.5 text-meta font-semibold text-danger"
       title="Pendência aberta nesta solicitação"
     >
       <span className="relative flex h-2 w-2">
-        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75 motion-reduce:animate-none" />
-        <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
+        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-danger opacity-75" />
+        <span className="relative inline-flex h-2 w-2 rounded-full bg-danger" />
       </span>
       <Undo2 className="h-3 w-3" />
       Aguardando parceiro
@@ -973,12 +973,12 @@ function PendenciaPop({ sinal }: { sinal: PendenciaSinal }) {
 function SlaBadge({ sla }: { sla: SlaInfo }) {
   const cls =
     sla.severity === 'alert'
-      ? 'bg-red-100 text-red-800 dark:bg-red-950/60 dark:text-red-300'
-      : 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
+      ? 'bg-danger-subtle text-danger'
+      : 'bg-warning-subtle text-warning'
   const titulo = sla.severity === 'alert' ? 'Atrasada' : 'Atenção'
   return (
     <span
-      className={cn('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium', cls)}
+      className={cn('inline-flex items-center gap-1 rounded-[2px] px-1.5 py-0.5 text-meta font-medium tabular-nums', cls)}
       title={`${titulo}, pendente ${sla.label}`}
     >
       <Clock className="h-3 w-3" />
@@ -998,7 +998,7 @@ function Field({
 }) {
   return (
     <div>
-      <dt className="text-[10px] uppercase tracking-[0.5px] text-muted-foreground">{label}</dt>
+      <dt className="text-meta text-muted-foreground">{label}</dt>
       <dd className="text-foreground">
         {value ?? '—'}
         {value && extra ? (
