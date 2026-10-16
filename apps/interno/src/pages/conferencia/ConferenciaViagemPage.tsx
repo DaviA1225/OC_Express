@@ -39,19 +39,6 @@ function Placa({ value }: { value: string | null }) {
   return <span className="font-medium tabular-nums tracking-[0.3px] text-foreground">{value}</span>
 }
 
-// Converte o yyyy-mm-dd do <input type="date"> em limites de dia no fuso local
-// (mesma convenção do periodoToISO). Fim de dia é inclusivo.
-function inicioDoDiaISO(d: string): string | null {
-  const [y, m, day] = d.split('-').map(Number)
-  if (!y || !m || !day) return null
-  return new Date(y, m - 1, day, 0, 0, 0, 0).toISOString()
-}
-function fimDoDiaISO(d: string): string | null {
-  const [y, m, day] = d.split('-').map(Number)
-  if (!y || !m || !day) return null
-  return new Date(y, m - 1, day, 23, 59, 59, 999).toISOString()
-}
-
 const PAGE_SIZE = 50
 
 // Persiste os filtros da Conferência entre navegações (sair para outra página e
@@ -88,8 +75,10 @@ export function ConferenciaViagemPage() {
   const [page, setPage] = React.useState(inicial.page ?? 1)
   const debouncedSearch = useDebounce(search, 300)
 
-  const dataInicio = dataDe ? inicioDoDiaISO(dataDe) : null
-  const dataFim = dataAte ? fimDoDiaISO(dataAte) : null
+  // O yyyy-mm-dd do <input type="date"> segue direto: a lista converte em
+  // limites de dia no fuso da operação (MS) (fim inclusivo).
+  const dataInicio = dataDe || null
+  const dataFim = dataAte || null
 
   // Volta para a 1ª página quando um filtro muda — mas NÃO na montagem, para não
   // sobrescrever a página restaurada do storage.
