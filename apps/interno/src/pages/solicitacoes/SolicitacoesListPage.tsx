@@ -27,6 +27,8 @@ import { SolicitacoesGradeErp } from './SolicitacoesGradeErp'
 import { useCrudOptions } from '@/features/crud/useCrudOptions'
 import {
   useSolicitacoesList,
+  useContagemFila,
+  FILA_STATUSES,
   useBulkTransitStatus,
   useBulkDeleteSolicitacoes,
   fetchSolicitacoesParaExport,
@@ -90,6 +92,16 @@ export function SolicitacoesListPage() {
     return VALID_PAMCARD.includes(raw as PamcardFiltro) ? (raw as PamcardFiltro) : 'todos'
   })()
   const apenasAtrasadas = params.get('atrasadas') === '1'
+  // Escopo: "Fila de trabalho" (padrão) mostra só o que ainda não terminou, da
+  // mais antiga para a mais nova — quem abre a tela vê primeiro o que espera
+  // há mais tempo. "Todas" é o histórico completo, mais recentes primeiro.
+  // Busca e filtro por etapa encerrada (ex.: drill-down de "Finalizadas")
+  // sempre olham o histórico inteiro: ninguém procura uma placa só na fila.
+  const escopoTodas = params.get('ver') === 'todas'
+  const buscando = debouncedSearch.trim() !== ''
+  const pedeEncerradas = statuses.some((s) => !FILA_STATUSES.includes(s))
+  const emFila = !escopoTodas && !buscando && !pedeEncerradas
+  const statusesEfetivos = emFila && statuses.length === 0 ? FILA_STATUSES : statuses
   const view: 'grade' | 'lista' = params.get('view') === 'lista' ? 'lista' : 'grade'
   // Modo ERP (fase 2): grade densa + detalhe ao lado. A linha aberta no painel
   // fica na URL (?sel=) para sobreviver a recarregar e voltar do detalhe.
@@ -186,6 +198,16 @@ export function SolicitacoesListPage() {
     updateParams((n) => {
       if (id) n.set('sel', id); else n.delete('sel')
     })
+  const setEscopo = (todas: boolean) =>
+    updateParams((n) => {
+      if (todas) n.set('ver', 'todas'); else n.delete('ver')
+      // Etapas encerradas não existem na fila: sair delas ao voltar para a fila.
+      if (!todas) {
+        const abertas = statuses.filter((st) => FILA_STATUSES.includes(st))
+        if (abertas.length > 0) n.set('status', abertas.join(',')); else n.delete('status')
+      }
+      n.delete('page')
+    })
   const setView = (v: 'grade' | 'lista') =>
     updateParams((n) => {
       if (v === 'lista') n.set('view', 'lista'); else n.delete('view')
@@ -193,7 +215,7 @@ export function SolicitacoesListPage() {
 
   const filters: ListFilters = {
     search: debouncedSearch,
-    statuses,
+    statuses: statusesEfetivos,
     periodo,
     materialId,
     tipo,
@@ -203,9 +225,11 @@ export function SolicitacoesListPage() {
     apenasAtrasadas,
     page,
     pageSize,
+    ordem: emFila ? 'antigas' : 'recentes',
   }
 
   const list = useSolicitacoesList(filters)
+  const contagemFila = useContagemFila()
   const pendenciaSinais = usePendenciasSinais()
   // Cascata só no 1º paint com dados; refetch/realtime/filtro não re-animam.
   const cascata = useCascataInicial(!list.isLoading && !list.isError && (list.data?.data.length ?? 0) > 0)
@@ -488,7 +512,30 @@ export function SolicitacoesListPage() {
           )}
         </div>
 
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <div className="mr-1 flex items-center gap-0.5 rounded-surface border bg-card p-0.5" role="group" aria-label="Escopo da lista">
+            {[
+              { todas: false, label: 'Fila de trabalho', qtd: contagemFila.data?.total },
+              { todas: true, label: 'Todas', qtd: undefined },
+            ].map((o) => {
+              const ativo = o.todas ? !emFila : emFila
+              return (
+                <button
+                  key={o.label}
+                  type="button"
+                  onClick={() => setEscopo(o.todas)}
+                  aria-pressed={ativo}
+                  className={cn(
+                    'rounded-control px-2.5 py-1 text-body-sm font-medium transition-colors duration-fast',
+                    ativo ? 'bg-primary/[0.08] text-primary-strong' : 'text-muted-foreground hover:bg-row-hover hover:text-foreground',
+                  )}
+                >
+                  {o.label}
+                  {o.qtd != null && <span className="ml-1.5 tabular-nums">{fmtInt(o.qtd)}</span>}
+                </button>
+              )
+            })}
+          </div>
           <button
             type="button"
             onClick={() => setApenasAtrasadas(!apenasAtrasadas)}
@@ -504,8 +551,9 @@ export function SolicitacoesListPage() {
             <Clock className="h-3 w-3" />
             Atrasadas
           </button>
-          {VALID_STATUSES.map((s) => {
+          {(emFila ? FILA_STATUSES : VALID_STATUSES).map((s) => {
             const active = statuses.includes(s)
+            const qtd = emFila ? contagemFila.data?.porEtapa[s] : undefined
             return (
               <button
                 key={s}
@@ -517,12 +565,17 @@ export function SolicitacoesListPage() {
                   active
                     ? `status-${s} border-transparent font-semibold`
                     : 'border-border bg-card text-muted-foreground hover:bg-row-hover',
+                  !active && qtd === 0 && 'opacity-50',
                 )}
               >
                 {STATUS_LABELS[s]}
+                {qtd != null && <span className="ml-1 tabular-nums opacity-80">{fmtInt(qtd)}</span>}
               </button>
             )
           })}
+          {!escopoTodas && buscando && (
+            <span className="ml-1 text-meta text-muted-foreground">Buscando em todas, inclusive finalizadas</span>
+          )}
         </div>
       </div>
 
@@ -558,8 +611,14 @@ export function SolicitacoesListPage() {
         <div className="rounded-lg border bg-card py-2">
           <EmptyState
             icon={Inbox}
-            title={hasFilters ? 'Nada encontrado com esses filtros' : 'Nenhuma solicitação registrada'}
-            description={hasFilters ? 'Ajuste ou limpe os filtros.' : 'Crie a primeira solicitação para começar.'}
+            title={hasFilters ? 'Nada encontrado com esses filtros' : emFila ? 'Fila vazia' : 'Nenhuma solicitação registrada'}
+            description={
+              hasFilters
+                ? 'Ajuste ou limpe os filtros.'
+                : emFila
+                  ? 'Nada aguardando a equipe agora. O histórico fica em "Todas".'
+                  : 'Crie a primeira solicitação para começar.'
+            }
             action={
               hasFilters ? (
                 <Button variant="outline" onClick={clearFilters}>Limpar filtros</Button>

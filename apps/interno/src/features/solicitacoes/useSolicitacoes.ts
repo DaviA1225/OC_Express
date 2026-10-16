@@ -124,6 +124,8 @@ export interface ListFilters {
   // ambos vierem, os dois se aplicam (AND). Usado no filtro De/Até.
   dataInicio?: string | null
   dataFim?: string | null
+  /** 'antigas' = mais antiga primeiro (fila de trabalho). Padrão: mais recentes. */
+  ordem?: 'recentes' | 'antigas'
   page: number
   pageSize: number
 }
@@ -289,7 +291,7 @@ export async function fetchSolicitacoesParaExport(
     query = query.or(buildSearchOrClause(t, aux))
   }
 
-  query = query.order('created_at', { ascending: false }).range(0, 9999)
+  query = query.order('created_at', { ascending: filters.ordem === 'antigas' }).range(0, 9999)
   const { data, error } = await query
   if (error) throw error
   return ((data ?? []) as unknown as SolicitacaoListRow[]).map(normalizeParceiroJoins)
@@ -332,7 +334,7 @@ export function useSolicitacoesList(filters: ListFilters) {
         query = query.or(buildSearchOrClause(t, aux))
       }
 
-      query = query.order('created_at', { ascending: false })
+      query = query.order('created_at', { ascending: filters.ordem === 'antigas' })
 
       const from = (filters.page - 1) * filters.pageSize
       const to = from + filters.pageSize - 1
@@ -384,6 +386,61 @@ export function useRecebidasCount() {
     },
     refetchInterval: 300_000,
     refetchOnWindowFocus: true,
+  })
+}
+
+/** Etapas que formam a fila de trabalho (tudo que ainda não terminou). */
+export const FILA_STATUSES: SolicitacaoStatus[] = ['recebida', 'em_cadastro', 'instrucao_emitida', 'oc_gerada', 'oc_enviada']
+
+/**
+ * Quantas solicitações há em cada etapa da fila. UMA requisição (só a coluna
+ * status das abertas, poucas dezenas de linhas) em vez de um count por etapa:
+ * a chave fica sob `['solicitacoes']`, então o realtime já a invalida junto
+ * com a lista — cada requisição a mais por evento pesa na cota de logs.
+ */
+/**
+ * A próxima da fila depois da solicitação atual (ordem de chegada), voltando
+ * ao início quando a atual é a última. Uma consulta só, no clique — percorrer
+ * a fila sem voltar à lista.
+ */
+export async function fetchProximaDaFila(atual: { id: string; created_at: string }): Promise<string | null> {
+  const depois = await supabase
+    .from('solicitacoes')
+    .select('id')
+    .in('status', FILA_STATUSES)
+    .gt('created_at', atual.created_at)
+    .order('created_at', { ascending: true })
+    .limit(1)
+  if (depois.error) throw depois.error
+  const prox = (depois.data ?? []) as { id: string }[]
+  if (prox[0]) return prox[0].id
+  const inicio = await supabase
+    .from('solicitacoes')
+    .select('id')
+    .in('status', FILA_STATUSES)
+    .neq('id', atual.id)
+    .order('created_at', { ascending: true })
+    .limit(1)
+  if (inicio.error) throw inicio.error
+  return ((inicio.data ?? []) as { id: string }[])[0]?.id ?? null
+}
+
+export function useContagemFila() {
+  return useQuery({
+    queryKey: ['solicitacoes', 'contagem-fila'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('solicitacoes')
+        .select('status')
+        .in('status', FILA_STATUSES)
+        .range(0, 9999)
+      if (error) throw error
+      const porEtapa = Object.fromEntries(FILA_STATUSES.map((st) => [st, 0])) as Record<SolicitacaoStatus, number>
+      const linhas = (data ?? []) as { status: SolicitacaoStatus }[]
+      for (const r of linhas) porEtapa[r.status] += 1
+      return { porEtapa, total: linhas.length }
+    },
+    staleTime: 30_000,
   })
 }
 

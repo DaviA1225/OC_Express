@@ -29,10 +29,50 @@ export interface HistoricoSummary {
 }
 
 interface Params {
-  motoristaId: string | null
-  veiculoId: string | null
+  /** CPF do motorista (cadastro interno OU do parceiro — o mesmo motorista
+   *  pode estar nos dois, com ids diferentes). */
+  motoristaCpf: string | null
+  /** Placa do cavalo, idem. */
+  veiculoPlaca: string | null
   clienteId: string | null
   currentId: string
+}
+
+/** Variantes do CPF como pode estar gravado: formatado e só dígitos. */
+function variantesCpf(cpf: string): string[] {
+  const digitos = cpf.replace(/\D/g, '')
+  const formatado =
+    digitos.length === 11 ? `${digitos.slice(0, 3)}.${digitos.slice(3, 6)}.${digitos.slice(6, 9)}-${digitos.slice(9)}` : cpf
+  return Array.from(new Set([cpf, digitos, formatado].filter(Boolean)))
+}
+
+const lista = (vals: string[]) => vals.map((v) => `"${v.replace(/"/g, '')}"`).join(',')
+
+/**
+ * Ids do motorista e do cavalo nos dois cadastros (interno e parceiros). Sem
+ * isso, solicitação vinda do portal (que só tem parceiro_motorista_id) ficava
+ * sem histórico, e o histórico do interno ignorava o que veio pelo portal.
+ */
+async function resolverIds(motoristaCpf: string, veiculoPlaca: string | null) {
+  const cpfs = lista(variantesCpf(motoristaCpf))
+  const placa = veiculoPlaca?.trim().toUpperCase() || null
+  const [mot, parcMot, veic, parcVeic] = await Promise.all([
+    supabase.from('motoristas').select('id').or(`cpf.in.(${cpfs})`).limit(20),
+    supabase.from('parceiro_motoristas').select('id').or(`cpf.in.(${cpfs})`).limit(50),
+    placa ? supabase.from('veiculos').select('id').eq('placa', placa).limit(20) : Promise.resolve({ data: [], error: null }),
+    placa ? supabase.from('parceiro_veiculos').select('id').eq('placa', placa).limit(50) : Promise.resolve({ data: [], error: null }),
+  ])
+  for (const r of [mot, parcMot, veic, parcVeic]) if (r.error) throw r.error
+  const ids = (r: { data: unknown }) => ((r.data ?? []) as { id: string }[]).map((x) => x.id)
+  return { motoristaIds: ids(mot), parceiroMotoristaIds: ids(parcMot), veiculoIds: ids(veic), parceiroVeiculoIds: ids(parcVeic) }
+}
+
+/** Filtro `or` do PostgREST: qualquer um dos ids, em qualquer dos dois campos. */
+function orIds(campo: string, idsInternos: string[], campoParceiro: string, idsParceiro: string[]): string | null {
+  const partes: string[] = []
+  if (idsInternos.length) partes.push(`${campo}.in.(${idsInternos.join(',')})`)
+  if (idsParceiro.length) partes.push(`${campoParceiro}.in.(${idsParceiro.join(',')})`)
+  return partes.length ? partes.join(',') : null
 }
 
 /**
@@ -40,35 +80,41 @@ interface Params {
  * usado pra ajudar o atendente a reconhecer "essa rota o cara já fez".
  */
 export function useHistoricoOperacional({
-  motoristaId,
-  veiculoId,
+  motoristaCpf,
+  veiculoPlaca,
   clienteId,
   currentId,
 }: Params) {
-  const enabled = !!motoristaId
+  const enabled = !!motoristaCpf
   return useQuery({
     enabled,
-    queryKey: ['historico-operacional', motoristaId, veiculoId, clienteId, currentId],
+    queryKey: ['historico-operacional', motoristaCpf, veiculoPlaca, clienteId, currentId],
     staleTime: 60_000,
     queryFn: async (): Promise<HistoricoSummary> => {
       const desde = new Date(Date.now() - HISTORICO_DIAS * 24 * 3_600_000).toISOString()
+      const ids = await resolverIds(motoristaCpf!, veiculoPlaca)
+      const filtroMotorista = orIds('motorista_id', ids.motoristaIds, 'parceiro_motorista_id', ids.parceiroMotoristaIds)
+      const filtroVeiculo = orIds('veiculo_id', ids.veiculoIds, 'parceiro_veiculo_id', ids.parceiroVeiculoIds)
+      if (!filtroMotorista) {
+        return { totalMotorista: 0, totalVeiculo: 0, totalParaCliente: 0, ultimaParaCliente: null, topRota: null, recentes: [] }
+      }
 
       const recentesPromise = supabase
         .from('solicitacoes')
         .select(
-          'id, numero_interno, status, tipo, cliente_id, created_at, cliente:cliente_id(razao_social), veiculo:veiculo_id(placa)',
+          'id, numero_interno, status, tipo, cliente_id, created_at, cliente:cliente_id(razao_social), veiculo:veiculo_id(placa), parceiro_veiculo:parceiro_veiculo_id(placa)',
         )
-        .eq('motorista_id', motoristaId!)
+        .or(filtroMotorista)
         .neq('id', currentId)
         .gte('created_at', desde)
         .order('created_at', { ascending: false })
         .limit(20)
 
-      const veiculoCountPromise = veiculoId
+      const veiculoCountPromise = filtroVeiculo
         ? supabase
             .from('solicitacoes')
             .select('id', { count: 'exact', head: true })
-            .eq('veiculo_id', veiculoId)
+            .or(filtroVeiculo)
             .neq('id', currentId)
             .gte('created_at', desde)
         : Promise.resolve({ count: 0, error: null })
@@ -86,7 +132,7 @@ export function useHistoricoOperacional({
         ? (supabase
             .from('solicitacoes')
             .select('id, numero_interno, status, created_at')
-            .eq('motorista_id', motoristaId!)
+            .or(filtroMotorista)
             .eq('cliente_id', clienteId)
             .neq('id', currentId)
             .order('created_at', { ascending: false })
@@ -107,9 +153,9 @@ export function useHistoricoOperacional({
       if (veicRes.error) throw veicRes.error
       if (ultimaRes.error) throw ultimaRes.error
 
-      const recentes = (recentesRes.data ?? []) as unknown as Array<
-        HistoricoRecent & { cliente_id: string | null }
-      >
+      const recentes = ((recentesRes.data ?? []) as unknown as Array<
+        HistoricoRecent & { cliente_id: string | null; parceiro_veiculo: { placa: string } | null }
+      >).map((r) => ({ ...r, veiculo: r.veiculo ?? r.parceiro_veiculo }))
 
       // Top rota do motorista nos últimos 30d (cliente mais frequente)
       const counts = new Map<string, { label: string; count: number }>()

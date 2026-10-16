@@ -9,8 +9,9 @@ import { HISTORICO_JANELA_DIAS, useHistoricoOperacional } from './useHistorico'
 
 interface Props {
   solicitacaoId: string
-  motoristaId: string | null
-  veiculoId: string | null
+  /** CPF e placa, não ids: o mesmo motorista/cavalo pode estar no cadastro
+   *  interno e no do parceiro (ver useHistoricoOperacional). */
+  motoristaCpf: string | null
   clienteId: string | null
   motoristaNome?: string | null
   veiculoPlaca?: string | null
@@ -18,20 +19,19 @@ interface Props {
 
 export function HistoricoCard({
   solicitacaoId,
-  motoristaId,
-  veiculoId,
+  motoristaCpf,
   clienteId,
   motoristaNome,
   veiculoPlaca,
 }: Props) {
   const q = useHistoricoOperacional({
-    motoristaId,
-    veiculoId,
+    motoristaCpf,
+    veiculoPlaca: veiculoPlaca ?? null,
     clienteId,
     currentId: solicitacaoId,
   })
 
-  if (!motoristaId) {
+  if (!motoristaCpf) {
     return (
       <section className="rounded-lg border bg-card">
         <header className="flex items-center gap-2 border-b px-4 py-2">
