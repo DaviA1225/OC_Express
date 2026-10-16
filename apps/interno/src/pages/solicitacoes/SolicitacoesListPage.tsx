@@ -29,6 +29,7 @@ import {
   useSolicitacoesList,
   useContagemFila,
   FILA_STATUSES,
+  FILA_CHIPS,
   useBulkTransitStatus,
   useBulkDeleteSolicitacoes,
   fetchSolicitacoesParaExport,
@@ -99,7 +100,7 @@ export function SolicitacoesListPage() {
   // sempre olham o histórico inteiro: ninguém procura uma placa só na fila.
   const escopoTodas = params.get('ver') === 'todas'
   const buscando = debouncedSearch.trim() !== ''
-  const pedeEncerradas = statuses.some((s) => !FILA_STATUSES.includes(s))
+  const pedeEncerradas = statuses.some((s) => !FILA_CHIPS.includes(s))
   const emFila = !escopoTodas && !buscando && !pedeEncerradas
   const statusesEfetivos = emFila && statuses.length === 0 ? FILA_STATUSES : statuses
   const view: 'grade' | 'lista' = params.get('view') === 'lista' ? 'lista' : 'grade'
@@ -205,7 +206,7 @@ export function SolicitacoesListPage() {
       if (!todas) n.delete('search')
       // Etapas encerradas não existem na fila: sair delas ao voltar para a fila.
       if (!todas) {
-        const abertas = statuses.filter((st) => FILA_STATUSES.includes(st))
+        const abertas = statuses.filter((st) => FILA_CHIPS.includes(st))
         if (abertas.length > 0) n.set('status', abertas.join(',')); else n.delete('status')
       }
       n.delete('page')
@@ -561,7 +562,7 @@ export function SolicitacoesListPage() {
             <Clock className="h-3 w-3" />
             Atrasadas
           </button>
-          {(emFila ? FILA_STATUSES : VALID_STATUSES).map((s) => {
+          {(emFila ? FILA_CHIPS : VALID_STATUSES).map((s) => {
             const active = statuses.includes(s)
             const qtd = emFila ? contagemFila.data?.porEtapa[s] : undefined
             return (

@@ -387,8 +387,14 @@ export function useRecebidasCount() {
   })
 }
 
-/** Etapas que formam a fila de trabalho (tudo que ainda não terminou). */
-export const FILA_STATUSES: SolicitacaoStatus[] = ['recebida', 'em_cadastro', 'instrucao_emitida', 'oc_gerada', 'oc_enviada']
+/**
+ * Etapas que formam a fila de trabalho: o que ainda depende da equipe. A OC
+ * enviada já está com o motorista e só espera a finalização — fica fora da
+ * fila e acessível pelo chip "OC enviada" (Davi, 2026-10-16).
+ */
+export const FILA_STATUSES: SolicitacaoStatus[] = ['recebida', 'em_cadastro', 'instrucao_emitida', 'oc_gerada']
+/** Chips da fila: as etapas dela + OC enviada (filtrável, fora do padrão). */
+export const FILA_CHIPS: SolicitacaoStatus[] = [...FILA_STATUSES, 'oc_enviada']
 
 /**
  * A próxima da fila depois da solicitação atual, na MESMA ordem da lista (mais
@@ -435,7 +441,7 @@ export function useContagemFila(
     enabled: ativo,
     queryKey: ['solicitacoes', 'contagem-fila', filters],
     queryFn: async () => {
-      let query = supabase.from('solicitacoes').select('status').in('status', FILA_STATUSES)
+      let query = supabase.from('solicitacoes').select('status').in('status', FILA_CHIPS)
       if (filters.materialId) query = query.eq('material_id', filters.materialId)
       if (filters.tipo !== 'todos') query = query.eq('tipo', filters.tipo)
       query = applyOrigemPamcardFilters(query, filters)
@@ -446,10 +452,12 @@ export function useContagemFila(
       if (filters.dataFim) query = query.lte('created_at', filters.dataFim)
       const { data, error } = await query.range(0, 999)
       if (error) throw error
-      const porEtapa = Object.fromEntries(FILA_STATUSES.map((st) => [st, 0])) as Record<SolicitacaoStatus, number>
+      const porEtapa = Object.fromEntries(FILA_CHIPS.map((st) => [st, 0])) as Record<SolicitacaoStatus, number>
       const linhas = (data ?? []) as { status: SolicitacaoStatus }[]
       for (const r of linhas) porEtapa[r.status] += 1
-      return { porEtapa, total: linhas.length, truncado: linhas.length >= 1000 }
+      // O total do botão "Fila de trabalho" é só a fila (sem as OCs enviadas).
+      const total = linhas.filter((r) => FILA_STATUSES.includes(r.status)).length
+      return { porEtapa, total, truncado: linhas.length >= 1000 }
     },
     staleTime: 30_000,
   })
