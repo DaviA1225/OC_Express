@@ -1,3 +1,4 @@
+import { memo, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Bar, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { ChartTooltip } from '@/components/charts/ChartTooltip'
@@ -24,22 +25,33 @@ interface Props {
  * secundária. Clique numa barra abre a lista das finalizadas naquela hora
  * (com os dados reais ligados).
  */
-export function VazaoHora({ porHora, filtros, tv }: Props) {
+export const VazaoHora = memo(function VazaoHora({ porHora, filtros, tv }: Props) {
   const navigate = useNavigate()
-  const comDado = porHora.filter((h) => h.finalizadas > 0 || h.entradas > 0 || h.ref > 0).map((h) => h.hora)
-  const ini = Math.min(6, ...comDado)
-  const fim = Math.max(20, ...comDado)
-  // `ref` NÃO pode ir para o dado do gráfico: o Recharts espalha os campos do
-  // ponto nas props do <path> da barra, e `ref` numérico derruba o React.
-  const dados = porHora
-    .filter((h) => h.hora >= ini && h.hora <= fim)
-    .map((h) => ({ hora: h.hora, finalizadas: h.finalizadas, entradas: h.entradas, media: h.ref, rotulo: `${h.hora}h` }))
+  // Dados e clique estáveis: o Recharts reinicia a animação quando a referência
+  // muda, e a página re-renderiza a cada 30 s pelo relógio.
+  const dados = useMemo(() => {
+    const comDado = porHora.filter((h) => h.finalizadas > 0 || h.entradas > 0 || h.ref > 0).map((h) => h.hora)
+    const ini = Math.min(6, ...comDado)
+    const fim = Math.max(20, ...comDado)
+    // `ref` NÃO pode ir para o dado do gráfico: o Recharts espalha os campos do
+    // ponto nas props do <path> da barra, e `ref` numérico derruba o React.
+    return porHora
+      .filter((h) => h.hora >= ini && h.hora <= fim)
+      .map((h) => ({ hora: h.hora, finalizadas: h.finalizadas, entradas: h.entradas, media: h.ref, rotulo: `${h.hora}h` }))
+  }, [porHora])
   const altura = tv ? 360 : 240
-  const abrirHora = (hora: number) => {
+  const abrirHora = useCallback((hora: number) => {
     if (!filtros || !DRILL_ATIVO) return
     const hoje = hojeOperacao()
     navigate(linkSolicitacoes({ status: 'finalizada', data: 'finalizada', de: hoje, ate: hoje, hora }, filtros))
-  }
+  }, [filtros, navigate])
+  const aoClicarBarra = useCallback(
+    (d: unknown) => {
+      const hora = (d as { payload?: { hora?: number } }).payload?.hora
+      if (typeof hora === 'number') abrirHora(hora)
+    },
+    [abrirHora],
+  )
   return (
     <div>
       <p className="sr-only">
@@ -73,10 +85,7 @@ export function VazaoHora({ porHora, filtros, tv }: Props) {
                 radius={[2, 2, 0, 0]}
                 maxBarSize={28}
                 cursor={filtros && !tv && DRILL_ATIVO ? 'pointer' : undefined}
-                onClick={(d) => {
-                  const hora = (d as { payload?: { hora?: number } }).payload?.hora
-                  if (typeof hora === 'number') abrirHora(hora)
-                }}
+                onClick={aoClicarBarra}
                 {...animacaoSerie}
               />
               <Line dataKey="entradas" name="Entradas" stroke={COR_ENTRADAS} strokeWidth={1.5} dot={false} {...animacaoSerie} />
@@ -106,4 +115,4 @@ export function VazaoHora({ porHora, filtros, tv }: Props) {
       </div>
     </div>
   )
-}
+})
