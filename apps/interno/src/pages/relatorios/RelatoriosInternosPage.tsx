@@ -1,4 +1,3 @@
-import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
 import { AlarmClock, CheckCircle2, ClipboardList, Download, Handshake, TriangleAlert } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -12,9 +11,11 @@ import { IntervaloDatas } from '@/features/relatorios/IntervaloDatas'
 import { useIntervaloPersistido } from '@/features/relatorios/useIntervaloPersistido'
 import { intervaloPadrao, rotuloIntervalo } from '@/features/relatorios/intervalo'
 import { exportarProdutividade } from '@/features/relatorios/exportacao'
-import { SeloSimulado } from '@/features/metricas/SeloSimulado'
+import { FaixaSimulacaoProducao, SeloSimulado } from '@/features/metricas/SeloSimulado'
 import { linkSolicitacao } from '@/features/metricas/links'
-import { SLA_FALLBACK } from '@/features/metricas/sla'
+import { mapaSla, type SlaCfg } from '@/features/metricas/sla'
+import { useMetasSla } from '@/features/metricas/useMetasSla'
+import { LinkDrill } from '@/components/painel/LinkDrill'
 import { useProdutividade } from '@/features/metricas/useRelatorioMetricas'
 import type { AbertaParada, ProdutividadeUsuario } from '@/features/metricas/tipos'
 import { fmtDur, fmtInt } from '@/lib/format'
@@ -50,6 +51,7 @@ export default function RelatoriosInternosPage() {
 
   return (
     <div className="space-y-4">
+      <FaixaSimulacaoProducao />
       <PageHeader
         title="Produtividade da equipe"
         meta={<SeloSimulado />}
@@ -94,7 +96,12 @@ export default function RelatoriosInternosPage() {
         onRetry={() => void q.refetch()}
         alturaEsqueleto={320}
       >
-        {data && (data.usuarios.length === 0 ? <Vazio>Nenhuma atividade da equipe no período.</Vazio> : <TabelaEquipe usuarios={data.usuarios} agente={data.agente} />)}
+        {data &&
+          (data.usuarios.length === 0 && !data.agente ? (
+            <Vazio>Nenhuma atividade da equipe no período.</Vazio>
+          ) : (
+            <TabelaEquipe usuarios={data.usuarios} agente={data.agente} />
+          ))}
       </Bloco>
 
       <Bloco
@@ -206,33 +213,40 @@ function TabelaEquipe({ usuarios, agente }: { usuarios: ProdutividadeUsuario[]; 
   )
 }
 
-// "Parada" = passou do aviso da etapa (M4); acima do alerta, laranja.
-function TempoParado({ min }: { min: number | null }) {
+/**
+ * Tempo parado. Com a etapa conhecida (lista de abertas), colore pelo SLA
+ * VIGENTE dessa etapa: aviso em atenção, acima do alerta em laranja. Na coluna
+ * "Parada mais longa" o payload não traz a etapa — fica neutro (contrato: se
+ * quiserem cor ali, `relatorio_produtividade` precisa devolver a etapa).
+ */
+function TempoParado({ min, cfg }: { min: number | null; cfg?: SlaCfg | null }) {
   if (min == null) return <span className="text-muted-foreground">—</span>
-  const { aviso_min, alerta_min } = SLA_FALLBACK.em_cadastro
+  if (!cfg || !cfg.ativo) return <span className="text-muted-foreground">{fmtDur(min)}</span>
   return (
-    <span className={cn(min > alerta_min ? 'font-medium text-primary-strong' : min >= aviso_min ? 'text-warning' : 'text-muted-foreground')}>
+    <span className={cn(min > cfg.alerta_min ? 'font-medium text-primary-strong' : min >= cfg.aviso_min ? 'text-warning' : 'text-muted-foreground')}>
       {fmtDur(min)}
     </span>
   )
 }
 
 function Paradas({ abertas }: { abertas: AbertaParada[] }) {
+  const metas = useMetasSla()
+  const sla = mapaSla(metas.data?.etapas)
   if (abertas.length === 0) return <Vazio altura={80}>Nenhuma solicitação de parceiro parada.</Vazio>
   return (
     <ul className="divide-y">
       {abertas.map((a) => (
         <li key={a.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2 text-body-sm">
-          <Link to={linkSolicitacao(a.id)} className="w-14 shrink-0 font-medium tabular-nums text-primary-strong hover:underline">
+          <LinkDrill to={linkSolicitacao(a.id)} className="w-14 shrink-0 font-medium tabular-nums text-primary-strong hover:underline">
             #{String(a.numero_interno).padStart(4, '0')}
-          </Link>
+          </LinkDrill>
           <SolicitacaoStatusBadge status={a.status} />
           <span className="min-w-0 flex-1 truncate text-foreground">{a.parceiro ?? 'Parceiro —'}</span>
           <span className="shrink-0 text-muted-foreground">
             com <span className="font-medium text-foreground">{a.responsavel}</span>
           </span>
           <span className="w-24 shrink-0 text-right tabular-nums">
-            <TempoParado min={a.min_na_etapa} />
+            <TempoParado min={a.min_na_etapa} cfg={a.status in sla ? sla[a.status as keyof typeof sla] : null} />
           </span>
         </li>
       ))}

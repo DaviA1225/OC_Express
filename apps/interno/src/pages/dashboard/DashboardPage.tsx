@@ -14,8 +14,10 @@ import { MaisAtrasadas } from '@/components/painel/MaisAtrasadas'
 import { Pendencias } from '@/components/painel/Pendencias'
 import { PorLocal } from '@/components/painel/PorLocal'
 import { VazaoHora } from '@/components/painel/VazaoHora'
-import { SeloSimulado } from '@/features/metricas/SeloSimulado'
-import { linkSolicitacoes } from '@/features/metricas/links'
+import { FaixaSimulacaoProducao, SeloSimulado } from '@/features/metricas/SeloSimulado'
+import { DRILL_ATIVO, MSG_DRILL_INATIVO, drillTo, linkSolicitacoes } from '@/features/metricas/links'
+import { LinkDrill } from '@/components/painel/LinkDrill'
+import { diaSP } from '@/lib/datasSp'
 import { fmtHoraMin, projetarRitmo, rotuloHorario } from '@/features/metricas/rotulos'
 import { ETAPAS_FILA } from '@/features/metricas/sla'
 import { useAgora } from '@/features/metricas/useAgora'
@@ -61,6 +63,7 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-4">
+      <FaixaSimulacaoProducao />
       <PageHeader
         title="Painel"
         meta={<SeloSimulado />}
@@ -91,7 +94,8 @@ export default function DashboardPage() {
           icon={Inbox}
           value={valor(estado.isLoading, estado.isError, e?.fila.total)}
           hint={e && <span className="tabular-nums">{fmtInt(e.fila.aguardando_finalizacao)} aguardando finalização</span>}
-          to={e ? linkSolicitacoes({ status: ETAPAS_FILA.join(','), ordem: 'antiga' }, filtros) : undefined}
+          to={e ? drillTo(linkSolicitacoes({ status: ETAPAS_FILA.join(','), ordem: 'antiga' }, filtros)) : undefined}
+          title={DRILL_ATIVO ? undefined : MSG_DRILL_INATIVO}
         />
         <KpiTile
           label="Fora do SLA"
@@ -99,7 +103,8 @@ export default function DashboardPage() {
           tone={e && e.fila.fora_sla > 0 ? 'alert' : 'default'}
           value={valor(estado.isLoading, estado.isError, e?.fila.fora_sla)}
           hint={e && <span className="tabular-nums">{fmtInt(e.fila.aviso)} em aviso</span>}
-          to={e ? linkSolicitacoes({ sla: 'fora', ordem: 'antiga' }, filtros) : undefined}
+          to={e ? drillTo(linkSolicitacoes({ sla: 'fora', ordem: 'antiga' }, filtros)) : undefined}
+          title={DRILL_ATIVO ? undefined : MSG_DRILL_INATIVO}
         />
         <KpiTile
           label="Finalizadas hoje"
@@ -107,7 +112,8 @@ export default function DashboardPage() {
           value={valor(hoje.isLoading, hoje.isError, h?.finalizadas)}
           delta={h ? deltaPct(h.finalizadas, h.finalizadas_ref, `vs. ontem até ${fmtHoraMin(agora).replace(':', 'h')}`, true) : undefined}
           hint={h && <Ritmo finalizadas={h.finalizadas} projecao={projetarRitmo(h, expediente, new Date(agora))} meta={metaVisivel(h.meta, filtros)} fim={expediente.expediente_fim} />}
-          to={h ? linkSolicitacoes({ status: 'finalizada', data: 'finalizada', de: diaIso(agora), ate: diaIso(agora) }, filtros) : undefined}
+          to={h ? drillTo(linkSolicitacoes({ status: 'finalizada', data: 'finalizada', de: diaSP(agora), ate: diaSP(agora) }, filtros)) : undefined}
+          title={DRILL_ATIVO ? undefined : MSG_DRILL_INATIVO}
         />
         <KpiTile
           label="Lead time 7 dias"
@@ -130,7 +136,8 @@ export default function DashboardPage() {
               </span>
             )
           }
-          to={e ? linkSolicitacoes({ validade: 'vencendo' }, filtros) : undefined}
+          to={e ? drillTo(linkSolicitacoes({ validade: 'vencendo' }, filtros)) : undefined}
+          title={DRILL_ATIVO ? undefined : MSG_DRILL_INATIVO}
         />
       </div>
 
@@ -185,9 +192,9 @@ export default function DashboardPage() {
           className="order-2 lg:order-none lg:col-span-5"
           acao={
             e && e.fila.fora_sla > 0 ? (
-              <Link to={linkSolicitacoes({ sla: 'fora', ordem: 'antiga' }, filtros)} className="shrink-0 text-body-sm font-medium text-primary-strong hover:underline">
+              <LinkDrill to={linkSolicitacoes({ sla: 'fora', ordem: 'antiga' }, filtros)} className="shrink-0 text-body-sm font-medium text-primary-strong hover:underline">
                 Ver todas ({fmtInt(e.fila.fora_sla)})
-              </Link>
+              </LinkDrill>
             ) : undefined
           }
           carregando={estado.isLoading}
@@ -253,10 +260,6 @@ function metaVisivel(meta: number | null, f: FiltrosComuns): number | null {
   return f.origem === 'todas' && !f.clienteId && !f.local ? meta : null
 }
 
-function diaIso(ms: number): string {
-  const d = new Date(ms)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
 
 /** P4/P5: sem meta, só "≈ N até 18h"; com meta, "31/45" + barra (laranja se o ritmo não chega). */
 function Ritmo({ finalizadas, projecao, meta, fim }: { finalizadas: number; projecao: number; meta: number | null; fim: string }) {

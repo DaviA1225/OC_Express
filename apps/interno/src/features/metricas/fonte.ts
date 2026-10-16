@@ -11,6 +11,12 @@
 //      `mocks.ts` + o selo "Dados simulados" (some sozinho com FONTE='rpc').
 // Os nomes de parâmetro (`p_de`, `p_origem`…) e os retornos (tipos.ts) já
 // seguem o plano; nenhuma tela muda.
+//
+// Trava de produção: com `FONTE === 'simulada'` num build de produção
+// (`import.meta.env.PROD`), Painel, Relatórios, Produtividade, Metas e TV
+// mostram uma faixa "Dados simulados — não usar para decisão" de largura total
+// (FaixaSimulacaoProducao, em SeloSimulado.tsx), além do selo, e os links de
+// drill-down ficam desligados (links.ts, DRILL_ATIVO).
 // ────────────────────────────────────────────────────────────────────────────
 
 import { supabase } from '@/lib/supabase'
@@ -144,6 +150,17 @@ export async function buscarOpcoesClientes(): Promise<OpcaoCliente[]> {
 
 // ── Metas e SLA ─────────────────────────────────────────────────────────────
 
+const METAS_PADRAO: ConfigMetasSla['metas'] = {
+  id: '',
+  meta_finalizadas_dia: null,
+  meta_lead_time_p90_min: null,
+  alerta_validade_h: 24,
+  expediente_inicio: '07:00',
+  expediente_fim: '18:00',
+  atualizado_em: new Date(0).toISOString(),
+  atualizado_por: null,
+}
+
 export async function buscarConfigMetasSla(): Promise<ConfigMetasSla> {
   if (FONTE === 'simulada') return simular(() => mock.mockConfigMetasSla())
   const sb = supabase as unknown as { from: (t: string) => { select: (c: string) => PromiseLike<{ data: unknown; error: { message: string } | null }> } }
@@ -153,9 +170,12 @@ export async function buscarConfigMetasSla(): Promise<ConfigMetasSla> {
   ])
   if (et.error) throw et.error
   if (me.error) throw me.error
-  const etapas = et.data as ConfigMetasSla['etapas']
-  const metas = (me.data as ConfigMetasSla['metas'][])[0]
-  const ultima = [metas, ...etapas].sort((a, b) => b.atualizado_em.localeCompare(a.atualizado_em))[0]
+  const etapas = (et.data as ConfigMetasSla['etapas'] | null) ?? []
+  // Singleton ausente (seed não rodou) não pode derrubar a tela: cai nos
+  // valores do seed (D3: sem meta) e a primeira gravação revela o problema.
+  const metas = (me.data as ConfigMetasSla['metas'][] | null)?.[0] ?? METAS_PADRAO
+  const ultima = [metas, ...etapas]
+    .filter((x) => x !== METAS_PADRAO).sort((a, b) => b.atualizado_em.localeCompare(a.atualizado_em))[0]
   let porNome: string | null = null
   if (ultima?.atualizado_por) {
     const { data } = await supabase.from('perfis_usuarios').select('nome_completo').eq('user_id', ultima.atualizado_por).maybeSingle()

@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { Ban, CheckCheck, ChevronDown, Download, Inbox, PackageCheck, RefreshCw, ShieldCheck, Timer } from 'lucide-react'
@@ -24,15 +24,17 @@ import { IntervaloDatas } from '@/features/relatorios/IntervaloDatas'
 import { useIntervaloPersistido } from '@/features/relatorios/useIntervaloPersistido'
 import { intervaloPadrao, rotuloIntervalo } from '@/features/relatorios/intervalo'
 import { exportarDados, exportarResumo, exportarSerie } from '@/features/relatorios/exportacao'
-import { SeloSimulado } from '@/features/metricas/SeloSimulado'
+import { FaixaSimulacaoProducao, SeloSimulado } from '@/features/metricas/SeloSimulado'
 import {
   buscarRelatorioRanking,
   buscarRelatorioResumo,
   buscarRelatorioSerie,
   buscarRelatorioTempoEtapas,
 } from '@/features/metricas/fonte'
-import { linkSolicitacoes } from '@/features/metricas/links'
-import { granularidadePara, textoComparador } from '@/features/metricas/periodo'
+import { DRILL_ATIVO, MSG_DRILL_INATIVO, drillTo, linkSolicitacoes } from '@/features/metricas/links'
+import { useAgora } from '@/features/metricas/useAgora'
+import { LinkDrill } from '@/components/painel/LinkDrill'
+import { granularidadePara, isoDia, lerBalde, textoComparador } from '@/features/metricas/periodo'
 import { mapaSla } from '@/features/metricas/sla'
 import { useFiltrosAnalise } from '@/features/metricas/useFiltrosAnalise'
 import { useMetasSla } from '@/features/metricas/useMetasSla'
@@ -94,6 +96,7 @@ export default function RelatoriosPage() {
   const mostrarParceiros = p.origem !== 'interno'
   const abaUrl = params.get('aba') as Aba | null
   const aba: Aba = ABAS.some((a) => a.id === abaUrl) && !(abaUrl === 'parceiros' && !mostrarParceiros) ? (abaUrl as Aba) : 'geral'
+  const abasVisiveis = ABAS.filter((a) => a.id !== 'parceiros' || mostrarParceiros)
   const setAba = (a: Aba) =>
     setParams((prev) => {
       const next = new URLSearchParams(prev)
@@ -115,8 +118,9 @@ export default function RelatoriosPage() {
         const serie = await busca(['metricas', 'serie', gran, ...k], () => buscarRelatorioSerie(p, gran))
         exportarSerie(p, gran, serie)
       } else if (tipo === 'dados') {
-        const n = await exportarDados(p)
-        toast.success(`${fmtInt(n)} solicitações exportadas`)
+        const r = await exportarDados(p)
+        if (r.truncado) toast.warning(`Exportadas só as primeiras ${fmtInt(r.linhas)} solicitações (teto de 50 mil). Reduza o período para exportar tudo.`)
+        else toast.success(`${fmtInt(r.linhas)} solicitações exportadas`)
         return
       } else {
         const dims: DimensaoRanking[] = ['cliente', 'motorista', 'veiculo', 'subcontratada', 'material']
@@ -149,6 +153,7 @@ export default function RelatoriosPage() {
 
   return (
     <div className="space-y-4">
+      <FaixaSimulacaoProducao />
       <PageHeader
         title="Relatórios"
         meta={<SeloSimulado />}
@@ -209,13 +214,35 @@ export default function RelatoriosPage() {
 
       <FiltrosAnalise {...f} />
 
-      <div role="tablist" aria-label="Seções do relatório" className="flex gap-1 overflow-x-auto border-b">
-        {ABAS.filter((a) => a.id !== 'parceiros' || mostrarParceiros).map((a) => (
+      <div
+        role="tablist"
+        aria-label="Seções do relatório"
+        className="flex gap-1 overflow-x-auto border-b"
+        onKeyDown={(ev) => {
+          // Padrão de abas (WAI-ARIA): setas, Home e End movem o foco e ativam.
+          const ids = abasVisiveis.map((a) => a.id)
+          const i = ids.indexOf(aba)
+          const alvo =
+            ev.key === 'ArrowRight' ? ids[(i + 1) % ids.length]
+            : ev.key === 'ArrowLeft' ? ids[(i - 1 + ids.length) % ids.length]
+            : ev.key === 'Home' ? ids[0]
+            : ev.key === 'End' ? ids[ids.length - 1]
+            : null
+          if (!alvo) return
+          ev.preventDefault()
+          setAba(alvo)
+          document.getElementById(`aba-${alvo}`)?.focus()
+        }}
+      >
+        {abasVisiveis.map((a) => (
           <button
             key={a.id}
+            id={`aba-${a.id}`}
             type="button"
             role="tab"
             aria-selected={aba === a.id}
+            aria-controls={`painel-${a.id}`}
+            tabIndex={aba === a.id ? 0 : -1}
             onClick={() => setAba(a.id)}
             className={cn(
               'relative -mb-px whitespace-nowrap border-b-2 px-3 py-2 text-body font-medium transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring',
@@ -227,7 +254,7 @@ export default function RelatoriosPage() {
         ))}
       </div>
 
-      <div role="tabpanel">
+      <div role="tabpanel" id={`painel-${aba}`} aria-labelledby={`aba-${aba}`} tabIndex={0} className="focus-visible:outline-none">
         {aba === 'geral' && <VisaoGeral p={p} gran={gran} resumo={resumo} onIrFluxo={() => setAba('fluxo')} />}
         {aba === 'fluxo' && <FluxoSla p={p} resumo={resumo} />}
         {aba === 'clientes' && <Cadastros p={p} />}
@@ -262,8 +289,8 @@ function deltaPp(atual: number | null, ant: number | null, comparador: string, s
 }
 
 function Kpis({ p, resumo, onIrFluxo }: { p: FiltrosPeriodo; resumo: ResumoQuery; onIrFluxo: () => void }) {
-  const [agora] = React.useState(() => new Date())
-  const comp = textoComparador(p, agora)
+  const agoraMs = useAgora(60_000)
+  const comp = textoComparador(p, new Date(agoraMs))
   const a = resumo.data?.atual
   const b = resumo.data?.anterior
   const esq = <Skeleton className="inline-block h-8 w-20 align-middle" />
@@ -277,7 +304,8 @@ function Kpis({ p, resumo, onIrFluxo }: { p: FiltrosPeriodo; resumo: ResumoQuery
         icon={Inbox}
         value={v((x) => fmtInt(x.entradas))}
         delta={a && b ? deltaNum(a.entradas, b.entradas, comp, true) : undefined}
-        to={linkSolicitacoes({ data: 'criada', ...per }, p)}
+        to={drillTo(linkSolicitacoes({ data: 'criada', ...per }, p))}
+        title={DRILL_ATIVO ? undefined : MSG_DRILL_INATIVO}
       />
       <KpiTile
         label="Finalizadas"
@@ -285,7 +313,8 @@ function Kpis({ p, resumo, onIrFluxo }: { p: FiltrosPeriodo; resumo: ResumoQuery
         value={v((x) => fmtInt(x.finalizadas))}
         delta={a && b ? deltaNum(a.finalizadas, b.finalizadas, comp, true) : undefined}
         hint="Finalizadas no período, qualquer que seja a data de entrada"
-        to={linkSolicitacoes({ status: 'finalizada', data: 'finalizada', ...per }, p)}
+        to={drillTo(linkSolicitacoes({ status: 'finalizada', data: 'finalizada', ...per }, p))}
+        title={DRILL_ATIVO ? undefined : MSG_DRILL_INATIVO}
       />
       <KpiTile
         label="Canceladas"
@@ -293,19 +322,25 @@ function Kpis({ p, resumo, onIrFluxo }: { p: FiltrosPeriodo; resumo: ResumoQuery
         value={v((x) => fmtInt(x.canceladas))}
         delta={a && b ? deltaNum(a.canceladas, b.canceladas, comp, false) : undefined}
         hint={a && <span className="tabular-nums">{fmtPct(a.cancelamento_pct)} das entradas</span>}
-        to={linkSolicitacoes({ data: 'cancelada', ...per }, p)}
+        to={drillTo(linkSolicitacoes({ data: 'cancelada', ...per }, p))}
+        title={DRILL_ATIVO ? undefined : MSG_DRILL_INATIVO}
       />
-      <div title="Entradas com pelo menos 48 h de idade; finalizada em até 48 h após a entrada; canceladas fora do cálculo">
-        <KpiTile
+      <KpiTile
           label="Concluídas em 48 h"
           icon={CheckCheck}
           className="h-full"
           value={v((x) => (x.conclusao48_n > 0 ? fmtPct(x.conclusao48_pct) : '—'))}
           delta={a && b ? deltaPp(a.conclusao48_pct, b.conclusao48_pct, comp, true) : undefined}
-          hint={a && (a.conclusao48_n > 0 ? <span className="tabular-nums">de {fmtInt(a.conclusao48_n)} entradas com 48 h+</span> : 'Nenhuma entrada com 48 h ainda')}
-          to={linkSolicitacoes({ drill: 'conclusao48', ...per }, p)}
+          hint={
+            a && (
+              <span className="tabular-nums">
+                {a.conclusao48_n > 0 ? `De ${fmtInt(a.conclusao48_n)} entradas com 48 h ou mais de idade` : 'Nenhuma entrada com 48 h ainda'}; finalizadas em até 48 h após a entrada; canceladas fora do cálculo
+              </span>
+            )
+          }
+          to={drillTo(linkSolicitacoes({ drill: 'conclusao48', ...per }, p))}
+          title={DRILL_ATIVO ? undefined : MSG_DRILL_INATIVO}
         />
-      </div>
       <KpiTile
         label="Lead time"
         icon={Timer}
@@ -320,7 +355,8 @@ function Kpis({ p, resumo, onIrFluxo }: { p: FiltrosPeriodo; resumo: ResumoQuery
         value={v((x) => fmtPct(x.dentro_sla_pct))}
         delta={a && b ? deltaPp(a.dentro_sla_pct, b.dentro_sla_pct, comp, true) : undefined}
         hint="Finalizadas sem nenhuma etapa acima do alerta"
-        to={linkSolicitacoes({ drill: 'sla_estourou', ...per }, p)}
+        to={drillTo(linkSolicitacoes({ drill: 'sla_estourou', ...per }, p))}
+        title={DRILL_ATIVO ? undefined : MSG_DRILL_INATIVO}
       />
     </div>
   )
@@ -339,7 +375,7 @@ function VisaoGeral({ p, gran, resumo, onIrFluxo }: { p: FiltrosPeriodo; gran: G
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
         <Bloco
           titulo="Entradas × finalizadas"
-          subtitulo={`Por ${gran}; tracejado = período anterior. Clique num ponto para ver a lista.`}
+          subtitulo={`Por ${gran}; tracejado = período anterior.${DRILL_ATIVO ? ' Clique num ponto para ver a lista.' : ''}`}
           className="xl:col-span-2"
           carregando={serie.isLoading}
           erro={serie.isError}
@@ -362,8 +398,8 @@ function VisaoGeral({ p, gran, resumo, onIrFluxo }: { p: FiltrosPeriodo; gran: G
   )
 }
 
-function rotuloEixo(iso: string, gran: Granularidade): string {
-  const d = new Date(iso)
+function rotuloEixo(balde: string, gran: Granularidade): string {
+  const d = lerBalde(balde)
   if (gran === 'hora') return `${d.getHours()}h`
   return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`
 }
@@ -377,11 +413,10 @@ function GraficoSerie({ serie, gran, p }: { serie: SerieLinha[]; gran: Granulari
   const abrir = (i: number) => {
     const s = serie[i]
     if (!s) return
-    const d = new Date(s.balde)
-    const dia = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    const d = lerBalde(s.balde)
+    const dia = isoDia(d)
     if (gran === 'semana') {
-      const fim = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 6)
-      const ate = `${fim.getFullYear()}-${String(fim.getMonth() + 1).padStart(2, '0')}-${String(fim.getDate()).padStart(2, '0')}`
+      const ate = isoDia(new Date(d.getFullYear(), d.getMonth(), d.getDate() + 6))
       navigate(linkSolicitacoes({ data: 'criada', de: dia < p.de ? p.de : dia, ate: ate > p.ate ? p.ate : ate }, p))
     } else {
       navigate(linkSolicitacoes({ data: 'criada', de: dia, ate: dia, hora: gran === 'hora' ? d.getHours() : undefined }, p))
@@ -399,10 +434,11 @@ function GraficoSerie({ serie, gran, p }: { serie: SerieLinha[]; gran: Granulari
             data={dados}
             margin={{ top: 8, right: 12, left: -16, bottom: 0 }}
             onClick={(e) => {
+              if (!DRILL_ATIVO) return
               const i = Number((e as { activeIndex?: number | string | null } | null)?.activeIndex)
               if (Number.isInteger(i)) abrir(i)
             }}
-            className="cursor-pointer"
+            className={DRILL_ATIVO ? 'cursor-pointer' : undefined}
           >
             <CartesianGrid {...gridProps} />
             <XAxis dataKey="rotulo" {...axisProps} interval="preserveStartEnd" minTickGap={16} />
@@ -440,7 +476,7 @@ function PorOrigem({ linhas, p }: { linhas: RankingLinha[]; p: FiltrosPeriodo })
     <ul className="space-y-4">
       {linhas.map((l) => (
         <li key={l.chave}>
-          <Link
+          <LinkDrill
             to={linkSolicitacoes({ origem: l.chave, data: 'criada', de: p.de, ate: p.ate }, { ...p, origem: 'todas' })}
             className="-mx-2 block rounded-md px-2 py-1 transition-[transform,background-color] duration-fast ease-out hover:-translate-y-0.5 hover:bg-row-hover"
           >
@@ -457,7 +493,7 @@ function PorOrigem({ linhas, p }: { linhas: RankingLinha[]; p: FiltrosPeriodo })
             <p className="mt-1 text-meta text-muted-foreground tabular-nums">
               {fmtInt(l.finalizadas)} finalizadas · lead P50 {fmtDur(l.lead_p50_min)}
             </p>
-          </Link>
+          </LinkDrill>
         </li>
       ))}
     </ul>
@@ -492,11 +528,11 @@ function FluxoSla({ p, resumo }: { p: FiltrosPeriodo; resumo: ResumoQuery }) {
           ) : (
             <dl className="grid grid-cols-2 gap-4">
               <div>
-                <dt className="label-uppercase">P50</dt>
+                <dt className="text-meta font-medium text-muted-foreground">P50</dt>
                 <dd className="font-display text-kpi font-medium tabular-nums text-foreground">{fmtDur(a.lead.p50)}</dd>
               </div>
               <div>
-                <dt className="label-uppercase">P90</dt>
+                <dt className="text-meta font-medium text-muted-foreground">P90</dt>
                 <dd className={cn('font-display text-kpi font-medium tabular-nums', alvoP90 != null && (a.lead.p90 ?? 0) > alvoP90 ? 'text-primary-strong' : 'text-foreground')}>
                   {fmtDur(a.lead.p90)}
                 </dd>
@@ -580,12 +616,12 @@ function Cadastros({ p }: { p: FiltrosPeriodo }) {
       valor: (l) => l.rotulo,
       render: (l) =>
         def.param ? (
-          <Link
+          <LinkDrill
             to={linkSolicitacoes({ [def.param]: l.chave, data: 'criada', de: p.de, ate: p.ate }, p)}
             className="text-foreground hover:text-primary-strong hover:underline"
           >
             {l.rotulo}
-          </Link>
+          </LinkDrill>
         ) : (
           <span className="text-foreground">{l.rotulo}</span>
         ),
@@ -668,12 +704,12 @@ function Parceiros({ p }: { p: FiltrosPeriodo }) {
       rotulo: 'Parceiro',
       valor: (l) => l.rotulo,
       render: (l) => (
-        <Link
+        <LinkDrill
           to={linkSolicitacoes({ origem: 'parceiro', parceiro: l.chave, data: 'criada', de: p.de, ate: p.ate }, { ...p, origem: 'todas' })}
           className="text-foreground hover:text-primary-strong hover:underline"
         >
           {l.rotulo}
-        </Link>
+        </LinkDrill>
       ),
     },
     { chave: 'entradas', rotulo: 'Enviadas', alinhar: 'direita', valor: (l) => l.entradas, render: (l) => fmtInt(l.entradas) },

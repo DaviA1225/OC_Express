@@ -154,7 +154,11 @@ export interface RelatorioResumo {
 export type Granularidade = 'hora' | 'dia' | 'semana'
 
 export interface SerieLinha {
-  /** ISO do início do balde (hora, dia ou semana). */
+  /**
+   * CONTRATO: timestamptz (ISO 8601 com fuso) do INÍCIO do balde em
+   * America/Sao_Paulo — hora cheia, 00:00 do dia ou 00:00 da segunda-feira. O
+   * front lê com `lerBalde` (periodo.ts), que também tolera `yyyy-mm-dd`.
+   */
   balde: string
   entradas: number
   finalizadas: number

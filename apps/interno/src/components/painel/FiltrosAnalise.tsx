@@ -8,6 +8,7 @@ import { Combobox } from '@/components/shared/Combobox'
 import { useOpcoesClientes, useOpcoesLocais } from '@/features/metricas/useRelatorioMetricas'
 import type { FiltrosComuns, OrigemFiltro } from '@/features/metricas/tipos'
 import { cn } from '@/lib/utils'
+import { intervaloPadrao } from '@/features/relatorios/intervalo'
 
 const ORIGENS: { value: OrigemFiltro; label: string; title?: string }[] = [
   { value: 'todas', label: 'Todas' },
@@ -18,12 +19,7 @@ const ORIGENS: { value: OrigemFiltro; label: string; title?: string }[] = [
 const QUALQUER_LOCAL = '__todos'
 
 // Opções de local: os locais com movimento nos últimos 90 dias (relatorio_locais).
-function ultimos90(): { de: string; ate: string } {
-  const hoje = new Date()
-  const ini = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - 89)
-  const f = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-  return { de: f(ini), ate: f(hoje) }
-}
+const ultimos90 = () => intervaloPadrao(90)
 
 interface Props {
   filtros: FiltrosComuns

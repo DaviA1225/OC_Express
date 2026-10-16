@@ -33,6 +33,8 @@ interface KpiTileProps {
   to?: string
   /** Torna o tile clicável (ação sem rota). */
   onClick?: () => void
+  /** Dica nativa no tile inteiro (ex.: por que o drill-down está desligado). */
+  title?: string
   className?: string
 }
 
@@ -41,7 +43,7 @@ interface KpiTileProps {
  * Internos e ResumoCard da Atividade). Superfície plana com hairline; número
  * em Kanit 500 tabular; nada de gradiente, glow ou caixa de ícone.
  */
-export function KpiTile({ label, value, unit, icon: Icon, delta, hint, tone = 'default', to, onClick, className }: KpiTileProps) {
+export function KpiTile({ label, value, unit, icon: Icon, delta, hint, tone = 'default', to, onClick, title, className }: KpiTileProps) {
   const interativo = !!to || !!onClick
   const classes = cn(
     'flex min-w-0 flex-col gap-2 rounded-lg border bg-card p-4 text-left',
@@ -73,19 +75,19 @@ export function KpiTile({ label, value, unit, icon: Icon, delta, hint, tone = 'd
   )
   if (to) {
     return (
-      <Link to={to} className={classes}>
+      <Link to={to} className={classes} title={title}>
         {conteudo}
       </Link>
     )
   }
   if (onClick) {
     return (
-      <button type="button" onClick={onClick} className={classes}>
+      <button type="button" onClick={onClick} className={classes} title={title}>
         {conteudo}
       </button>
     )
   }
-  return <div className={classes}>{conteudo}</div>
+  return <div className={classes} title={title}>{conteudo}</div>
 }
 
 // Número pt-BR já formatado: "1.234", "93,4%", "12,5". Qualquer outra coisa

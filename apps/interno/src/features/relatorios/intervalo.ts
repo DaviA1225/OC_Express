@@ -2,18 +2,12 @@
 // são `yyyy-mm-dd`, como o `<input type="date">` usa, e chegam inteiras às
 // RPCs (`p_de`, `p_ate`, inclusivas, cortadas no fuso de São Paulo no servidor).
 
-/** `yyyy-mm-dd` de uma data local. */
-export function paraInputDate(d: Date): string {
-  const mes = String(d.getMonth() + 1).padStart(2, '0')
-  const dia = String(d.getDate()).padStart(2, '0')
-  return `${d.getFullYear()}-${mes}-${dia}`
-}
+import { hojeSP, somarDiasIso } from '@/lib/datasSp'
 
-/** Intervalo inicial das telas: os últimos N dias terminando hoje. */
+/** Intervalo inicial das telas: os últimos N dias terminando hoje (dia de São Paulo). */
 export function intervaloPadrao(dias: number): { de: string; ate: string } {
-  const hoje = new Date()
-  const de = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - (dias - 1))
-  return { de: paraInputDate(de), ate: paraInputDate(hoje) }
+  const ate = hojeSP()
+  return { de: somarDiasIso(ate, -(dias - 1)), ate }
 }
 
 /** Dias corridos do intervalo, para a tela avisar quando ele fica muito longo. */

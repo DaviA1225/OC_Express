@@ -15,3 +15,17 @@ export function SeloSimulado() {
     </span>
   )
 }
+
+/**
+ * Trava de produção: se um build de produção sair com `FONTE === 'simulada'`
+ * (fonte.ts), a tela ganha uma faixa de largura total, além do selo — número de
+ * mentira em produção não pode passar por número real.
+ */
+export function FaixaSimulacaoProducao() {
+  if (!(import.meta.env.PROD && DADOS_SIMULADOS)) return null
+  return (
+    <div role="alert" className="w-full border border-warning-border bg-warning-subtle px-4 py-2 text-body font-medium text-warning">
+      Dados simulados — não usar para decisão. As consultas reais ainda não foram ligadas nesta versão.
+    </div>
+  )
+}

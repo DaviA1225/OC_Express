@@ -14,14 +14,15 @@ interface Props {
 /** P15 — "Atualizado às 14:37 · ao vivo" + botão de atualizar. */
 export function AtualizadoAs({ atualizadoEm, atualizando, erro, onAtualizar }: Props) {
   return (
-    <div className="flex items-center gap-2 text-body-sm text-muted-foreground" aria-live="polite">
+    <div className="flex items-center gap-2 text-body-sm text-muted-foreground">
       {atualizadoEm > 0 && <span className="tabular-nums">Atualizado às {fmtHoraMin(atualizadoEm)}</span>}
       <span className="flex items-center gap-1.5">
         <span
           aria-hidden
           className={cn('h-1.5 w-1.5 rounded-full', erro ? 'bg-danger' : 'bg-success')}
         />
-        {erro ? 'sem conexão' : 'ao vivo'}
+        {/* Só a perda de conexão é anunciada; o relógio mudando não. */}
+        {erro ? <span role="alert">sem conexão</span> : 'ao vivo'}
       </span>
       <button
         type="button"

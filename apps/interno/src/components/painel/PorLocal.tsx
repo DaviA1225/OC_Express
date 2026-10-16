@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { LinkDrill } from './LinkDrill'
 import { linkSolicitacoes } from '@/features/metricas/links'
 import type { FiltrosComuns, PainelPorLocal } from '@/features/metricas/tipos'
 import { fmtInt } from '@/lib/format'
@@ -31,12 +31,12 @@ export function PorLocal({ locais, filtros }: { locais: PainelPorLocal[]; filtro
         return (
           <li key={l.local}>
             {filtravel ? (
-              <Link
+              <LinkDrill
                 to={linkSolicitacoes({ local: l.local, ordem: 'antiga' }, filtros)}
                 className="-mx-2 block rounded-md px-2 py-1 transition-[transform,background-color] duration-fast ease-out hover:-translate-y-0.5 hover:bg-row-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 {linha}
-              </Link>
+              </LinkDrill>
             ) : (
               <div className="px-0 py-1">{linha}</div>
             )}

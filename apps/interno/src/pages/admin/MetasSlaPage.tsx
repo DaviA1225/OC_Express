@@ -15,7 +15,7 @@ import { canEditMetasSla } from '@/features/auth/permissions'
 import { useDescartarAlteracoes } from '@/features/crud/useDescartarAlteracoes'
 import { intervaloPadrao } from '@/features/relatorios/intervalo'
 import { STATUS_LABELS } from '@/features/solicitacoes/status'
-import { SeloSimulado } from '@/features/metricas/SeloSimulado'
+import { FaixaSimulacaoProducao, SeloSimulado } from '@/features/metricas/SeloSimulado'
 import { classificarSla, ETAPAS_SLA, mapaSla } from '@/features/metricas/sla'
 import { useFilaPrevia, useMetasSla, useSalvarMetasSla } from '@/features/metricas/useMetasSla'
 import { useRelatorioTempoEtapas } from '@/features/metricas/useRelatorioMetricas'
@@ -35,6 +35,7 @@ export default function MetasSlaPage() {
 
   return (
     <div className="space-y-4">
+      <FaixaSimulacaoProducao />
       <PageHeader
         title="Metas e SLA"
         breadcrumb={[{ label: 'Administração' }, { label: 'Metas e SLA' }]}

@@ -3,8 +3,16 @@ import { buscarConfigMetasSla, buscarFilaPrevia, salvarConfigMetasSla } from './
 import type { ConfigMetasSlaEntrada } from './tipos'
 
 /** Config de SLA por etapa e metas (muda raramente; invalidada ao salvar). */
-export function useMetasSla() {
-  return useQuery({ queryKey: ['metas-operacao'], queryFn: buscarConfigMetasSla, staleTime: 10 * 60_000 })
+export function useMetasSla({ periodico = false }: { periodico?: boolean } = {}) {
+  return useQuery({
+    queryKey: ['metas-operacao'],
+    queryFn: buscarConfigMetasSla,
+    staleTime: 10 * 60_000,
+    // A TV fica dias aberta sem ninguém salvar nada nela: relê a cada 10 min,
+    // também em segundo plano, para pegar meta/expediente alterados.
+    refetchInterval: periodico ? 10 * 60_000 : false,
+    refetchIntervalInBackground: periodico,
+  })
 }
 
 /** Fila atual para a prévia "com estes limites, hoje N estariam fora do SLA". */

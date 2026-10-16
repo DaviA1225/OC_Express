@@ -5,6 +5,7 @@ import { buildCsv, downloadCsv, type CsvColumn } from '@/lib/csv'
 import { fmtDec, fmtDur, fmtInt, fmtPct } from '@/lib/format'
 import { buscarExportacaoPagina } from '@/features/metricas/fonte'
 import { rotuloOrigem } from '@/features/metricas/rotulos'
+import { lerBalde } from '@/features/metricas/periodo'
 import { STATUS_LABELS } from '@/features/solicitacoes/status'
 import { labelPerfil } from '@/features/auth/perfis'
 import type {
@@ -48,8 +49,8 @@ function blocoLinhas(secao: string, b: ResumoBloco): LinhaResumo[] {
   ]
 }
 
-function rotuloBalde(iso: string, gran: Granularidade): string {
-  const d = new Date(iso)
+function rotuloBalde(balde: string, gran: Granularidade): string {
+  const d = lerBalde(balde)
   const p = (n: number) => String(n).padStart(2, '0')
   const dia = `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()}`
   if (gran === 'hora') return `${dia} ${p(d.getHours())}h`
@@ -148,12 +149,15 @@ const MAX_PAGINAS = 50
  * Dados (tidy): uma linha por solicitação, buscada de 1000 em 1000. Substitui o
  * drill-down do tempo por etapa (R8). Devolve quantas linhas saíram.
  */
-export async function exportarDados(f: FiltrosPeriodo): Promise<number> {
+export async function exportarDados(f: FiltrosPeriodo): Promise<{ linhas: number; truncado: boolean }> {
   const linhas: ExportLinha[] = []
+  let truncado = false
   for (let pagina = 0; pagina < MAX_PAGINAS; pagina++) {
     const lote = await buscarExportacaoPagina(f, pagina * 1000, 1000)
     linhas.push(...lote)
     if (lote.length < 1000) break
+    // Última página permitida veio cheia: há mais linhas que o teto.
+    if (pagina === MAX_PAGINAS - 1) truncado = true
   }
   const min = (v: number | null) => (v == null ? '' : Math.round(v))
   const cols: CsvColumn<ExportLinha>[] = [
@@ -173,8 +177,12 @@ export async function exportarDados(f: FiltrosPeriodo): Promise<number> {
     { header: 'Min. OC gerada', accessor: (l) => min(l.min_oc_gerada) },
     { header: 'Min. OC enviada', accessor: (l) => min(l.min_oc_enviada) },
   ]
-  downloadCsv(`solicitacoes_${f.de}_a_${f.ate}_${carimboArquivo()}.csv`, buildCsv(linhas, cols))
-  return linhas.length
+  let csv = buildCsv(linhas, cols)
+  // Aviso dentro do próprio arquivo: quem abre a planilha depois não viu o toast.
+  if (truncado) csv += `
+AVISO: arquivo truncado em ${fmtInt(linhas.length)} linhas; reduza o período para exportar tudo.`
+  downloadCsv(`solicitacoes_${f.de}_a_${f.ate}_${carimboArquivo()}.csv`, csv)
+  return { linhas: linhas.length, truncado }
 }
 
 /**

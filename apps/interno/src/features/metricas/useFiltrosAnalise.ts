@@ -9,23 +9,30 @@ export const FILTROS_PADRAO: FiltrosComuns = { origem: 'todas', clienteId: null,
 /**
  * Filtros de análise na URL (§4): `o` (todas|interno|parceiro), `cliente`
  * (uuid) e `local` (texto exato). Painel, TV e Relatórios usam o mesmo hook,
- * então um link copiado abre no mesmo recorte. Sem nada na URL, volta ao
- * último recorte da aba (`sessionStorage`, por tela). O período (`de`/`ate`)
- * fica com `useIntervaloPersistido`, que já faz o mesmo para as datas.
+ * então um link copiado abre no mesmo recorte.
+ *
+ * A URL é a fonte da verdade: o filtro é DERIVADO dos parâmetros, então
+ * voltar/avançar no navegador troca o recorte. Sem nada na URL, a montagem
+ * espelha nela o último recorte da aba (`sessionStorage`, por tela). O período
+ * (`de`/`ate`) fica com `useIntervaloPersistido`.
  */
 export function useFiltrosAnalise(chave: string) {
   const [params, setParams] = useSearchParams()
-  const [filtros, setFiltros] = React.useState<FiltrosComuns>(() => {
-    const daUrl = lerUrl(params)
-    if (daUrl) return daUrl
-    return carregar(chave) ?? FILTROS_PADRAO
-  })
+  const o = params.get('o')
+  const cliente = params.get('cliente')
+  const local = params.get('local')
 
-  const atualizar = React.useCallback(
-    (parcial: Partial<FiltrosComuns>) => {
-      const novo = { ...filtros, ...parcial }
-      setFiltros(novo)
-      salvar(chave, novo)
+  const filtros = React.useMemo<FiltrosComuns>(
+    () => ({
+      origem: (ORIGENS as string[]).includes(o ?? '') ? (o as OrigemFiltro) : 'todas',
+      clienteId: cliente || null,
+      local: local || null,
+    }),
+    [o, cliente, local],
+  )
+
+  const escrever = React.useCallback(
+    (novo: FiltrosComuns) => {
       setParams(
         (prev) => {
           const next = new URLSearchParams(prev)
@@ -40,8 +47,24 @@ export function useFiltrosAnalise(chave: string) {
         { replace: true },
       )
     },
-    [chave, filtros, setParams],
+    [setParams],
   )
+
+  // Montagem sem filtro na URL: restaura o último recorte da aba, na URL.
+  const restaurou = React.useRef(false)
+  React.useEffect(() => {
+    if (restaurou.current) return
+    restaurou.current = true
+    if (o || cliente || local) return
+    const salvo = carregar(chave)
+    if (salvo && (salvo.origem !== 'todas' || salvo.clienteId || salvo.local)) escrever(salvo)
+  }, [chave, o, cliente, local, escrever])
+
+  const atualizar = (parcial: Partial<FiltrosComuns>) => {
+    const novo = { ...filtros, ...parcial }
+    salvar(chave, novo)
+    escrever(novo)
+  }
 
   const ativos = (filtros.origem !== 'todas' ? 1 : 0) + (filtros.clienteId ? 1 : 0) + (filtros.local ? 1 : 0)
 
@@ -49,22 +72,10 @@ export function useFiltrosAnalise(chave: string) {
     filtros,
     setOrigem: (origem: OrigemFiltro) => atualizar({ origem }),
     setCliente: (clienteId: string | null) => atualizar({ clienteId }),
-    setLocal: (local: string | null) => atualizar({ local }),
+    setLocal: (l: string | null) => atualizar({ local: l }),
     limpar: () => atualizar(FILTROS_PADRAO),
     /** Quantos filtros fogem do padrão (rótulo "Filtros (n)"). */
     ativos,
-  }
-}
-
-function lerUrl(params: URLSearchParams): FiltrosComuns | null {
-  const o = params.get('o')
-  const cliente = params.get('cliente')
-  const local = params.get('local')
-  if (!o && !cliente && !local) return null
-  return {
-    origem: (ORIGENS as string[]).includes(o ?? '') ? (o as OrigemFiltro) : 'todas',
-    clienteId: cliente || null,
-    local: local || null,
   }
 }
 

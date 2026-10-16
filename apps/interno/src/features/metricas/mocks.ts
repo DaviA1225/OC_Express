@@ -160,6 +160,15 @@ function chaveDia(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
+/**
+ * Balde no formato do contrato (timestamptz com -03:00): o relógio local do
+ * gerador vira o relógio de parede de SP, como o servidor faria.
+ */
+function isoSP(d: Date): string {
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${chaveDia(d)}T${p(d.getHours())}:00:00-03:00`
+}
+
 function lerDia(s: string): Date {
   const [y, m, d] = s.split('-').map(Number)
   return new Date(y, m - 1, d)
@@ -593,7 +602,7 @@ export function mockRelatorioSerie(p: FiltrosPeriodo, gran: Granularidade, agora
       const hfa = porHora(a.finalizadas, fr, agoraPar, par)
       for (let h = 0; h < 24; h++) {
         linhas.push({
-          balde: new Date(dia.getTime() + h * 3_600_000).toISOString(),
+          balde: isoSP(new Date(dia.getFullYear(), dia.getMonth(), dia.getDate(), h)),
           entradas: he[h], finalizadas: hf[h], canceladas: hc[h], entradas_ant: hea[h], finalizadas_ant: hfa[h],
         })
       }
@@ -606,7 +615,7 @@ export function mockRelatorioSerie(p: FiltrosPeriodo, gran: Granularidade, agora
     const a = diaRecortado(somarDias(dia, -n), fr, p, cenario)
     // Semana começa na segunda-feira.
     const chave = gran === 'semana' ? somarDias(dia, -((dia.getDay() + 6) % 7)) : dia
-    const balde = chave.toISOString()
+    const balde = isoSP(chave)
     const ult = linhas[linhas.length - 1]
     const alvo = ult && ult.balde === balde ? ult : null
     if (alvo) {
@@ -875,7 +884,20 @@ export function mockMapaCalor(p: FiltrosPeriodo, agora: Date, cenario: Cenario):
 
 // ── Painel: hoje ────────────────────────────────────────────────────────────
 
-export function mockPainelHoje(f: FiltrosComuns, agora: Date, cenario: Cenario): PainelHoje {
+/**
+ * Relógio do "hoje" simulado. O preview não pode parecer vazio de manhã cedo:
+ * de madrugada (antes das 6h) mostra o dia anterior completo; até as 13h
+ * simula o dia até as 13h (8 h de curva, que começa às 5h); depois, o real.
+ */
+function relogioDoHoje(agora: Date): Date {
+  const h = agora.getHours()
+  if (h < 6) return new Date(agora.getFullYear(), agora.getMonth(), agora.getDate(), 0, 0, 0, -1)
+  if (h < 13) return new Date(agora.getFullYear(), agora.getMonth(), agora.getDate(), 13, 0, 0)
+  return agora
+}
+
+export function mockPainelHoje(f: FiltrosComuns, agoraReal: Date, cenario: Cenario): PainelHoje {
+  const agora = relogioDoHoje(agoraReal)
   const hoje = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate())
   const ontem = somarDias(hoje, -1)
   const fr = fracaoDoDia(hoje, agora)

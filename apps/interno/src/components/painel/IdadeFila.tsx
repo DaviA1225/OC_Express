@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { LinkDrill } from './LinkDrill'
 import { FAIXA_LABEL } from '@/features/metricas/rotulos'
 import { linkSolicitacoes } from '@/features/metricas/links'
 import { ETAPAS_FILA } from '@/features/metricas/sla'
@@ -37,13 +37,13 @@ export function IdadeFila({ aging, filtros, tv }: { aging: PainelAging[]; filtro
               {tv || !filtros ? (
                 barra
               ) : (
-                <Link
+                <LinkDrill
                   to={linkSolicitacoes({ status: ETAPAS_FILA.join(','), idade: a.faixa, ordem: 'antiga' }, filtros)}
                   tabIndex={-1}
                   className="flex h-full w-full flex-col items-center justify-end gap-1 rounded-[2px] transition-colors duration-fast hover:bg-row-hover"
                 >
                   {barra}
-                </Link>
+                </LinkDrill>
               )}
             </li>
           )
@@ -55,13 +55,13 @@ export function IdadeFila({ aging, filtros, tv }: { aging: PainelAging[]; filtro
             {tv || !filtros ? (
               FAIXA_LABEL[a.faixa]
             ) : (
-              <Link
+              <LinkDrill
                 to={linkSolicitacoes({ status: ETAPAS_FILA.join(','), idade: a.faixa, ordem: 'antiga' }, filtros)}
                 className="hover:text-foreground hover:underline"
                 aria-label={`${FAIXA_LABEL[a.faixa]}: ${a.qtd} na fila`}
               >
                 {FAIXA_LABEL[a.faixa]}
-              </Link>
+              </LinkDrill>
             )}
           </li>
         ))}

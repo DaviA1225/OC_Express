@@ -7,7 +7,7 @@ import { IdadeFila } from '@/components/painel/IdadeFila'
 import { MaisAtrasadas } from '@/components/painel/MaisAtrasadas'
 import { Pendencias } from '@/components/painel/Pendencias'
 import { VazaoHora } from '@/components/painel/VazaoHora'
-import { SeloSimulado } from '@/features/metricas/SeloSimulado'
+import { FaixaSimulacaoProducao, SeloSimulado } from '@/features/metricas/SeloSimulado'
 import { fmtHoraMin, projetarRitmo, rotuloHorario, rotuloOrigem } from '@/features/metricas/rotulos'
 import { useAgora } from '@/features/metricas/useAgora'
 import { useFiltrosAnalise } from '@/features/metricas/useFiltrosAnalise'
@@ -33,9 +33,11 @@ export default function TvPage() {
   const { filtros } = useFiltrosAnalise('tv')
   const estado = usePainelEstadoAtual(filtros, 'tv')
   const hoje = usePainelHoje(filtros, 'tv')
-  const metas = useMetasSla()
+  const metas = useMetasSla({ periodico: true })
   const clientes = useOpcoesClientes()
-  const agora = useAgora(1000)
+  // Painéis andam a cada 30 s (minutos na etapa, ritmo); só o relógio e o
+  // "dado de há Xs" re-renderizam por segundo, nos próprios componentes.
+  const agora = useAgora(30_000)
   const wakeLock = useWakeLock()
   const telaCheia = useTelaCheia()
 
@@ -81,8 +83,6 @@ export default function TvPage() {
 
   // "Dado de há Xs": idade do dado mais antigo entre as duas consultas.
   const atualizadoEm = Math.min(estado.dataUpdatedAt || Infinity, hoje.dataUpdatedAt || Infinity)
-  const idadeS = Number.isFinite(atualizadoEm) ? Math.max(0, Math.round((agora - atualizadoEm) / 1000)) : null
-  const nivel = idadeS == null ? 'neutro' : idadeS > 300 ? 'perigo' : idadeS > 120 ? 'aviso' : 'neutro'
 
   const recorte = [
     filtros.origem === 'todas' ? 'Todas as origens' : rotuloOrigem(filtros.origem),
@@ -95,6 +95,7 @@ export default function TvPage() {
 
   return (
     <div className="dark flex min-h-screen flex-col bg-canvas text-foreground">
+      <FaixaSimulacaoProducao />
       <header className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-b bg-header px-6 py-3 text-header-foreground">
         <div className="flex min-w-0 items-center gap-3">
           <img src="/favicon.svg" alt="" aria-hidden className="h-7 w-7 shrink-0" />
@@ -121,15 +122,8 @@ export default function TvPage() {
           ))}
         </nav>
         <div className="flex items-center gap-4">
-          <span className="tv-titulo tabular-nums">{fmtHoraMin(agora)}</span>
-          <span
-            className={cn(
-              'tv-meta tabular-nums',
-              nivel === 'perigo' ? 'font-medium text-danger' : nivel === 'aviso' ? 'text-warning' : 'text-muted-foreground',
-            )}
-          >
-            {idadeS == null ? 'carregando…' : `dado de há ${fmtIdade(idadeS)}`}
-          </span>
+          <Relogio />
+          <IdadeDado atualizadoEm={atualizadoEm} />
           <button
             type="button"
             onClick={() => setPausado((p) => !p)}
@@ -154,11 +148,7 @@ export default function TvPage() {
         </div>
       </header>
 
-      {nivel === 'perigo' && atualizadoEm !== Infinity && (
-        <div role="alert" className="tv-texto border-b border-danger-border bg-danger-subtle px-6 py-2 font-medium text-danger">
-          Sem atualização desde {fmtHoraMin(atualizadoEm)} — confira a conexão desta TV.
-        </div>
-      )}
+      <FaixaSemAtualizacao atualizadoEm={atualizadoEm} />
 
       <main key={atual} className="surgir flex-1 p-6">
         {atual === 0 && (
@@ -185,10 +175,56 @@ export default function TvPage() {
           {fixo != null ? 'Painel fixo' : pausado ? 'Rotação pausada' : `Troca a cada ${ROTACAO_MS / 1000} s`} · ← → trocam · espaço pausa
         </span>
         {wakeLock === 'sem-suporte' && <span>Mantenha a tela ligada nas configurações da TV.</span>}
+        {/* Até o PR-B1 não existe o perfil `painel_tv`: a TV roda na conta de uma
+            pessoa e cai pelo limite de inatividade. REMOVER este aviso no B1,
+            quando a conta dedicada (sessão sem expiração) entrar. */}
+        <span>Sessão pessoal: expira após 50 min sem interação</span>
         <Link to="/dashboard" className="hover:text-foreground hover:underline">
           Sair do modo TV
         </Link>
       </footer>
+    </div>
+  )
+}
+
+// ── Relógio e idade do dado (re-renderizam por segundo, isolados) ───────────
+
+function nivelIdade(idadeS: number | null): 'neutro' | 'aviso' | 'perigo' {
+  return idadeS == null ? 'neutro' : idadeS > 300 ? 'perigo' : idadeS > 120 ? 'aviso' : 'neutro'
+}
+
+function idadeEmS(atualizadoEm: number, agora: number): number | null {
+  return Number.isFinite(atualizadoEm) ? Math.max(0, Math.round((agora - atualizadoEm) / 1000)) : null
+}
+
+function Relogio() {
+  const agora = useAgora(1000)
+  return <span className="tv-titulo tabular-nums">{fmtHoraMin(agora)}</span>
+}
+
+/** Neutro até 2 min, atenção até 5 min, perigo acima. */
+function IdadeDado({ atualizadoEm }: { atualizadoEm: number }) {
+  const agora = useAgora(1000)
+  const idadeS = idadeEmS(atualizadoEm, agora)
+  const nivel = nivelIdade(idadeS)
+  return (
+    <span
+      className={cn(
+        'tv-meta tabular-nums',
+        nivel === 'perigo' ? 'font-medium text-danger' : nivel === 'aviso' ? 'text-warning' : 'text-muted-foreground',
+      )}
+    >
+      {idadeS == null ? 'carregando…' : `dado de há ${fmtIdade(idadeS)}`}
+    </span>
+  )
+}
+
+function FaixaSemAtualizacao({ atualizadoEm }: { atualizadoEm: number }) {
+  const agora = useAgora(1000)
+  if (nivelIdade(idadeEmS(atualizadoEm, agora)) !== 'perigo') return null
+  return (
+    <div role="alert" className="tv-texto border-b border-danger-border bg-danger-subtle px-6 py-2 font-medium text-danger">
+      Sem atualização desde {fmtHoraMin(atualizadoEm)} — confira a conexão desta TV.
     </div>
   )
 }
@@ -350,8 +386,14 @@ function useWakeLock(): EstadoWakeLock {
     const pedir = async () => {
       if (document.visibilityState !== 'visible') return
       try {
-        sentinela = await navigator.wakeLock.request('screen')
-        if (vivo) setEstado('ativo')
+        const s = await navigator.wakeLock.request('screen')
+        // Desmontou enquanto o pedido estava em voo: solta na hora.
+        if (!vivo) {
+          void s.release().catch(() => undefined)
+          return
+        }
+        sentinela = s
+        setEstado('ativo')
         sentinela.addEventListener('release', () => {
           if (vivo) setEstado('inativo')
         })
@@ -377,7 +419,11 @@ function useTelaCheia() {
   React.useEffect(() => {
     const onChange = () => setAtiva(!!document.fullscreenElement)
     document.addEventListener('fullscreenchange', onChange)
-    return () => document.removeEventListener('fullscreenchange', onChange)
+    return () => {
+      document.removeEventListener('fullscreenchange', onChange)
+      // Sair da TV (ou trocar de rota) não pode deixar o navegador preso em tela cheia.
+      if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined)
+    }
   }, [])
   const alternar = React.useCallback(() => {
     if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined)

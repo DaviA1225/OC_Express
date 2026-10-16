@@ -1,6 +1,6 @@
-import { Link } from 'react-router-dom'
+import { LinkDrill } from './LinkDrill'
 import { ChevronRight } from 'lucide-react'
-import { linkSolicitacoes } from '@/features/metricas/links'
+import { DRILL_ATIVO, linkSolicitacoes } from '@/features/metricas/links'
 import type { FiltrosComuns, PainelEstadoAtual } from '@/features/metricas/tipos'
 import { fmtInt } from '@/lib/format'
 import { cn } from '@/lib/utils'
@@ -67,13 +67,13 @@ export function Pendencias({ estado, filtros, tv }: { estado: PainelEstadoAtual;
             {tv ? (
               <div className="flex items-center gap-3 py-3">{conteudo}</div>
             ) : (
-              <Link
+              <LinkDrill
                 to={i.to}
                 className="group flex items-center gap-3 py-2.5 transition-colors duration-fast hover:bg-row-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
               >
                 {conteudo}
-                <ChevronRight className="h-4 w-4 shrink-0 text-tertiary group-hover:text-foreground" aria-hidden />
-              </Link>
+                {DRILL_ATIVO && <ChevronRight className="h-4 w-4 shrink-0 text-tertiary group-hover:text-foreground" aria-hidden />}
+              </LinkDrill>
             )}
           </li>
         )

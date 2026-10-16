@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { LinkDrill } from './LinkDrill'
 import { SolicitacaoStatusBadge, StatusDot } from '@/components/shared/SolicitacaoStatusBadge'
 import { STATUS_LABELS } from '@/features/solicitacoes/status'
 import { linkSolicitacao } from '@/features/metricas/links'
@@ -56,9 +56,9 @@ export function MaisAtrasadas({ atrasadas, geradoEm, agora, limite = 10, tv }: P
                   {tv ? (
                     numero(a.numero_interno)
                   ) : (
-                    <Link to={linkSolicitacao(a.id)} className="text-primary-strong hover:underline">
+                    <LinkDrill to={linkSolicitacao(a.id)} className="text-primary-strong hover:underline">
                       {numero(a.numero_interno)}
-                    </Link>
+                    </LinkDrill>
                   )}
                 </td>
                 <td className="px-3">
@@ -87,7 +87,7 @@ export function MaisAtrasadas({ atrasadas, geradoEm, agora, limite = 10, tv }: P
         <ul className="divide-y md:hidden">
           {linhas.map((a) => (
             <li key={a.id}>
-              <Link to={linkSolicitacao(a.id)} className="block py-2.5 transition-colors duration-fast hover:bg-row-hover">
+              <LinkDrill to={linkSolicitacao(a.id)} className="block py-2.5 transition-colors duration-fast hover:bg-row-hover">
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-medium tabular-nums text-primary-strong">{numero(a.numero_interno)}</span>
                   <span className="text-body-sm font-medium tabular-nums text-primary-strong">+{fmtDur(a.excesso_min)}</span>
@@ -99,7 +99,7 @@ export function MaisAtrasadas({ atrasadas, geradoEm, agora, limite = 10, tv }: P
                 <p className="mt-1 truncate text-body-sm text-foreground">
                   {a.cliente ?? '—'} <span className="text-muted-foreground">· {a.local ?? 'Sem local'} · {rotuloOrigem(a.origem)}</span>
                 </p>
-              </Link>
+              </LinkDrill>
             </li>
           ))}
         </ul>

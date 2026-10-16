@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { LinkDrill } from './LinkDrill'
 import { StatusDot } from '@/components/shared/SolicitacaoStatusBadge'
 import { STATUS_LABELS } from '@/features/solicitacoes/status'
 import { linkSolicitacoes } from '@/features/metricas/links'
@@ -61,12 +61,12 @@ export function FunilEtapas({ etapas, filtros, tv }: Props) {
               {tv || !filtros ? (
                 conteudo
               ) : (
-                <Link
+                <LinkDrill
                   to={linkSolicitacoes({ status: e.status, ordem: 'antiga' }, filtros)}
                   className="-mx-2 block rounded-md px-2 py-1 transition-[transform,background-color] duration-fast ease-out hover:-translate-y-0.5 hover:bg-row-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   {conteudo}
-                </Link>
+                </LinkDrill>
               )}
             </li>
           )
