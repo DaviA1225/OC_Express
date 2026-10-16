@@ -119,7 +119,7 @@ export function useHistoricoOperacional({
   })
   const ids = resolvidos.data
   const enabled = !!motoristaCpf && !!ids
-  return useQuery({
+  const principal = useQuery({
     enabled,
     queryKey: ['historico-operacional', motoristaCpf, veiculoPlaca, clienteId, currentId, ids],
     staleTime: 60_000,
@@ -240,6 +240,10 @@ export function useHistoricoOperacional({
       }
     },
   })
+  // Se a resolução dos ids falha, a consulta principal nunca habilita: sem
+  // isto o card ficava no esqueleto para sempre.
+  if (resolvidos.isError) return { ...principal, isError: true as const, isLoading: false as const }
+  return principal
 }
 
 export const HISTORICO_JANELA_DIAS = HISTORICO_DIAS

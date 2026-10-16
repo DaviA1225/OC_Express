@@ -80,7 +80,9 @@ export default function SolicitacoesListPage() {
   // tudo — ninguém procura uma placa só no que está em andamento. Mesma regra
   // da "Fila de trabalho" do sistema interno.
   const [escopoTodas, setEscopoTodas] = React.useState(false)
-  const buscando = debouncedSearch.trim() !== ''
+  // `search` (não o debounced): ao voltar para "Em andamento" a busca some na
+  // hora, sem o botão "Todas" piscar ativo durante os 300 ms do debounce.
+  const buscando = search.trim() !== ''
   const pedeEncerradas = statusFiltro === 'concluida' || statusFiltro === 'cancelada'
   const emAndamento = !escopoTodas && !buscando && !pedeEncerradas
   const escolherEscopo = (todas: boolean) => {

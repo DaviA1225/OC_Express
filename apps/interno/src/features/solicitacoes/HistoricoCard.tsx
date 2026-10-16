@@ -60,7 +60,9 @@ export function HistoricoCard({
         <span className="text-meta text-muted-foreground">Últimos {HISTORICO_JANELA_DIAS}d</span>
       </header>
       <div className="space-y-3 p-4">
-        {q.isLoading || !data ? (
+        {q.isError ? (
+          <p className="text-body text-muted-foreground">Não foi possível carregar o histórico agora.</p>
+        ) : q.isLoading || !data ? (
           <div className="space-y-2">
             <Skeleton className="h-12 w-full" />
             <Skeleton className="h-12 w-full" />
