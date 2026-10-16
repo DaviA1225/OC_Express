@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import { LinkDrill } from './LinkDrill'
 import { FAIXA_LABEL } from '@/features/metricas/rotulos'
 import { linkSolicitacoes } from '@/features/metricas/links'
@@ -16,7 +17,7 @@ export function IdadeFila({ aging, filtros, tv }: { aging: PainelAging[]; filtro
         Idade da fila: {aging.map((a) => `${FAIXA_LABEL[a.faixa]}: ${a.qtd}`).join('; ')}.
       </p>
       <ul className={cn('grid grid-cols-5 items-end gap-2', tv ? 'h-[220px]' : 'h-[168px]')} aria-hidden>
-        {aging.map((a) => {
+        {aging.map((a, i) => {
           const critica = a.faixa === 'gt24h'
           const barra = (
             <>
@@ -24,11 +25,14 @@ export function IdadeFila({ aging, filtros, tv }: { aging: PainelAging[]; filtro
                 {fmtInt(a.qtd)}
               </span>
               <span
-                className="w-full rounded-t-[2px]"
-                style={{
-                  height: `${Math.max(a.qtd > 0 ? 4 : 1, (a.qtd / max) * 100)}%`,
-                  backgroundColor: critica ? 'var(--chart-1)' : 'var(--chart-7)',
-                }}
+                className="barra-y w-full rounded-t-[2px]"
+                style={
+                  {
+                    height: `${Math.max(a.qtd > 0 ? 4 : 1, (a.qtd / max) * 100)}%`,
+                    backgroundColor: critica ? 'var(--chart-1)' : 'var(--chart-7)',
+                    '--ordem': i,
+                  } as CSSProperties
+                }
               />
             </>
           )

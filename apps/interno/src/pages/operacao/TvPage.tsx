@@ -319,7 +319,7 @@ function PainelRitmo({
           </div>
           {meta != null && (
             <div className="mt-4 h-4 overflow-hidden rounded-[2px] bg-muted" role="progressbar" aria-valuemin={0} aria-valuemax={meta} aria-valuenow={hoje.finalizadas} aria-label="Finalizadas em relação à meta">
-              <div className={cn('h-full', abaixo ? 'bg-primary' : 'bg-chart-7')} style={{ width: `${Math.min(100, (hoje.finalizadas / meta) * 100)}%` }} />
+              <div className={cn('barra-x h-full', abaixo ? 'bg-primary' : 'bg-chart-7')} style={{ width: `${Math.min(100, (hoje.finalizadas / meta) * 100)}%` }} />
             </div>
           )}
           <p className={cn('tv-texto mt-3 tabular-nums', abaixo ? 'font-medium text-primary-strong' : 'text-muted-foreground')}>

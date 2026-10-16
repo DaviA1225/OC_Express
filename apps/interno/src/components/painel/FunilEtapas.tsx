@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import { LinkDrill } from './LinkDrill'
 import { StatusDot } from '@/components/shared/SolicitacaoStatusBadge'
 import { STATUS_LABELS } from '@/features/solicitacoes/status'
@@ -12,6 +13,7 @@ const COR_OK = 'var(--chart-7)'
 // chart-ref ficavam indistinguíveis.
 const COR_AVISO = 'hsl(var(--warning))'
 const COR_FORA = 'var(--chart-1)'
+const SEGMENTO = 'transition-[width] duration-500 ease-out'
 
 interface Props {
   etapas: PainelEtapa[]
@@ -26,7 +28,7 @@ export function FunilEtapas({ etapas, filtros, tv }: Props) {
   return (
     <div>
       <ul className={cn('space-y-2', tv && 'space-y-4')}>
-        {etapas.map((e) => {
+        {etapas.map((e, i) => {
           const semSla = e.status === 'oc_enviada'
           const ok = e.qtd - e.aviso - e.fora_sla
           const conteudo = (
@@ -47,9 +49,12 @@ export function FunilEtapas({ etapas, filtros, tv }: Props) {
                 role="img"
                 aria-label={`${STATUS_LABELS[e.status]}: ${e.qtd} no total, ${e.aviso} em aviso, ${e.fora_sla} fora do SLA`}
               >
-                <div style={{ width: `${(ok / max) * 100}%`, backgroundColor: COR_OK }} />
-                <div style={{ width: `${(e.aviso / max) * 100}%`, backgroundColor: COR_AVISO }} />
-                <div style={{ width: `${(e.fora_sla / max) * 100}%`, backgroundColor: COR_FORA }} />
+                {/* A faixa inteira cresce junta; cada segmento desliza quando muda. */}
+                <div className="barra-x flex h-full w-full" style={{ '--ordem': i } as CSSProperties}>
+                  <div className={SEGMENTO} style={{ width: `${(ok / max) * 100}%`, backgroundColor: COR_OK }} />
+                  <div className={SEGMENTO} style={{ width: `${(e.aviso / max) * 100}%`, backgroundColor: COR_AVISO }} />
+                  <div className={SEGMENTO} style={{ width: `${(e.fora_sla / max) * 100}%`, backgroundColor: COR_FORA }} />
+                </div>
               </div>
               <p className={cn('mt-0.5 text-muted-foreground tabular-nums', tv ? 'tv-meta' : 'text-meta')}>
                 {e.mais_antiga_min == null ? 'Vazia' : `Mais antiga há ${fmtDur(e.mais_antiga_min)}`}

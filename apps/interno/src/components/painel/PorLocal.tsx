@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import { LinkDrill } from './LinkDrill'
 import { linkSolicitacoes } from '@/features/metricas/links'
 import type { FiltrosComuns, PainelPorLocal } from '@/features/metricas/tipos'
@@ -10,7 +11,7 @@ export function PorLocal({ locais, filtros }: { locais: PainelPorLocal[]; filtro
   const max = Math.max(1, ...locais.map((l) => l.qtd))
   return (
     <ul className="grid grid-cols-1 gap-x-8 gap-y-2 md:grid-cols-2">
-      {locais.map((l) => {
+      {locais.map((l, i) => {
         const linha = (
           <>
             <div className="flex items-baseline justify-between gap-2 text-body-sm">
@@ -21,8 +22,10 @@ export function PorLocal({ locais, filtros }: { locais: PainelPorLocal[]; filtro
               </span>
             </div>
             <div className="mt-1 flex h-1.5 overflow-hidden rounded-[2px] bg-muted" aria-hidden>
-              <div style={{ width: `${((l.qtd - l.fora_sla) / max) * 100}%`, backgroundColor: 'var(--chart-7)' }} />
-              <div style={{ width: `${(l.fora_sla / max) * 100}%`, backgroundColor: 'var(--chart-1)' }} />
+              <div className="barra-x flex h-full w-full" style={{ '--ordem': i } as CSSProperties}>
+                <div className="transition-[width] duration-500 ease-out" style={{ width: `${((l.qtd - l.fora_sla) / max) * 100}%`, backgroundColor: 'var(--chart-7)' }} />
+                <div className="transition-[width] duration-500 ease-out" style={{ width: `${(l.fora_sla / max) * 100}%`, backgroundColor: 'var(--chart-1)' }} />
+              </div>
             </div>
           </>
         )

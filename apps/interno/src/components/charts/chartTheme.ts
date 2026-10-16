@@ -27,6 +27,19 @@ export function seriesColor(i: number): string {
   return CHART_SERIES[((i % CHART_SERIES.length) + CHART_SERIES.length) % CHART_SERIES.length]
 }
 
+/**
+ * Animação das séries do Recharts (spread em <Bar>/<Line>). O padrão do
+ * Recharts 3 é 'auto', que DESLIGA a animação com "reduzir movimento" do
+ * sistema — o Windows do dono tem isso ligado e a decisão de produto é animar
+ * mesmo assim (ver index.css, bloco Movimento). Duração casada com a contagem
+ * dos números (useContagem).
+ */
+export const animacaoSerie = {
+  isAnimationActive: true,
+  animationDuration: 700,
+  animationEasing: 'ease-out',
+} as const
+
 /** Props padrão de eixo/grade para Recharts (spread em XAxis/YAxis/CartesianGrid). */
 export const axisProps = {
   tick: { fill: 'var(--chart-axis)', fontSize: 11 },

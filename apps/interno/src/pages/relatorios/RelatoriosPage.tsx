@@ -17,7 +17,7 @@ import { KpiTile } from '@/components/shared/KpiTile'
 import { Spinner } from '@/components/shared/Spinner'
 import { ChartTooltip } from '@/components/charts/ChartTooltip'
 import { TempoEtapaChart } from '@/components/charts/TempoEtapaChart'
-import { axisProps, gridProps } from '@/components/charts/chartTheme'
+import { animacaoSerie, axisProps, gridProps } from '@/components/charts/chartTheme'
 import { Bloco, Vazio } from '@/components/painel/Bloco'
 import { FiltrosAnalise } from '@/components/painel/FiltrosAnalise'
 import { IntervaloDatas } from '@/features/relatorios/IntervaloDatas'
@@ -444,10 +444,10 @@ function GraficoSerie({ serie, gran, p }: { serie: SerieLinha[]; gran: Granulari
             <XAxis dataKey="rotulo" {...axisProps} interval="preserveStartEnd" minTickGap={16} />
             <YAxis {...axisProps} allowDecimals={false} />
             <Tooltip cursor={{ stroke: 'var(--chart-grid)' }} content={<ChartTooltip />} />
-            <Line dataKey="entradas" name="Entradas" stroke="var(--chart-2)" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
-            <Line dataKey="finalizadas" name="Finalizadas" stroke="var(--chart-4)" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
-            <Line dataKey="entradas_ant" name="Entradas (anterior)" stroke="var(--chart-2)" strokeOpacity={0.5} strokeWidth={1.5} strokeDasharray="6 4" dot={false} activeDot={false} />
-            <Line dataKey="finalizadas_ant" name="Finalizadas (anterior)" stroke="var(--chart-4)" strokeOpacity={0.5} strokeWidth={1.5} strokeDasharray="6 4" dot={false} activeDot={false} />
+            <Line dataKey="entradas" name="Entradas" stroke="var(--chart-2)" strokeWidth={2} dot={false} activeDot={{ r: 4 }} {...animacaoSerie} />
+            <Line dataKey="finalizadas" name="Finalizadas" stroke="var(--chart-4)" strokeWidth={2} dot={false} activeDot={{ r: 4 }} {...animacaoSerie} />
+            <Line dataKey="entradas_ant" name="Entradas (anterior)" stroke="var(--chart-2)" strokeOpacity={0.5} strokeWidth={1.5} strokeDasharray="6 4" dot={false} activeDot={false} {...animacaoSerie} />
+            <Line dataKey="finalizadas_ant" name="Finalizadas (anterior)" stroke="var(--chart-4)" strokeOpacity={0.5} strokeWidth={1.5} strokeDasharray="6 4" dot={false} activeDot={false} {...animacaoSerie} />
           </LineChart>
         </ResponsiveContainer>
       </div>
@@ -474,7 +474,7 @@ function PorOrigem({ linhas, p }: { linhas: RankingLinha[]; p: FiltrosPeriodo })
   if (total === 0) return <Vazio>Sem entradas no período.</Vazio>
   return (
     <ul className="space-y-4">
-      {linhas.map((l) => (
+      {linhas.map((l, i) => (
         <li key={l.chave}>
           <LinkDrill
             to={linkSolicitacoes({ origem: l.chave, data: 'criada', de: p.de, ate: p.ate }, { ...p, origem: 'todas' })}
@@ -488,7 +488,7 @@ function PorOrigem({ linhas, p }: { linhas: RankingLinha[]; p: FiltrosPeriodo })
               </span>
             </div>
             <div className="mt-1 h-1.5 rounded-[2px] bg-muted" aria-hidden>
-              <div className="h-full rounded-[2px] bg-chart-7" style={{ width: `${(l.entradas / total) * 100}%` }} />
+              <div className="barra-x h-full rounded-[2px] bg-chart-7" style={{ width: `${(l.entradas / total) * 100}%`, '--ordem': i } as React.CSSProperties} />
             </div>
             <p className="mt-1 text-meta text-muted-foreground tabular-nums">
               {fmtInt(l.finalizadas)} finalizadas · lead P50 {fmtDur(l.lead_p50_min)}
@@ -588,7 +588,7 @@ function MapaCalor({ celulas }: { celulas: MapaCalorCelula[] }) {
                 const v = valor(dow, h)
                 return (
                   <td key={h} className="h-6 rounded-[2px] bg-muted p-0" title={`${DIAS_SEMANA[dow]} ${h}h: ${fmtInt(v)} entradas`}>
-                    <div className="h-full w-full rounded-[2px] bg-chart-2" style={{ opacity: v === 0 ? 0 : 0.12 + 0.88 * (v / max) }} />
+                    <div className="celula-surgir h-full w-full rounded-[2px] bg-chart-2" style={{ opacity: v === 0 ? 0 : 0.12 + 0.88 * (v / max), '--ordem': h - horas[0] } as React.CSSProperties} />
                     <span className="sr-only">{fmtInt(v)}</span>
                   </td>
                 )

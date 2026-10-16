@@ -402,6 +402,13 @@ body.density-compact ul.divide-y > li {
 @keyframes etapa-da-esquerda {
   from { opacity: 0; transform: translateX(-16px); }
 }
+/* Gráficos: barras crescem da base (escala, não largura — não força layout). */
+@keyframes crescer-x {
+  from { transform: scaleX(0); }
+}
+@keyframes crescer-y {
+  from { transform: scaleY(0); }
+}
 
 @layer components {
   /* Login: entrada coreografada. Atraso por `--ordem` × 40ms (inline style). */
@@ -412,6 +419,29 @@ body.density-compact ul.divide-y > li {
   /* Login: troca de etapa (1 → 2 entra da direita; voltar entra da esquerda). */
   .etapa-avanca { animation: etapa-da-direita 200ms var(--ease-firme) backwards; }
   .etapa-volta  { animation: etapa-da-esquerda 200ms var(--ease-firme) backwards; }
+
+  /* Gráficos: entrada em cascata (`--ordem` × 40ms) com a mesma duração da
+     contagem dos números (useContagem, 600–700ms); quando o dado muda depois,
+     a largura/altura desliza em vez de pular. */
+  .barra-x {
+    transform-origin: left;
+    animation: crescer-x 700ms var(--ease-firme) backwards;
+    animation-delay: calc(var(--ordem, 0) * 40ms);
+    transition: width 500ms var(--ease-firme);
+  }
+  .barra-y {
+    transform-origin: bottom;
+    animation: crescer-y 700ms var(--ease-firme) backwards;
+    animation-delay: calc(var(--ordem, 0) * 40ms);
+    transition: height 500ms var(--ease-firme);
+  }
+  /* Marcas sobre a barra (P90, alerta) e células do mapa de calor: fade. */
+  .marca-tardia { animation: surgir 300ms ease-out 450ms backwards; }
+  .celula-surgir {
+    animation: surgir 500ms ease-out backwards;
+    animation-delay: calc(var(--ordem, 0) * 20ms);
+    transition: opacity 500ms ease-out;
+  }
 
   /* Valor não numérico do KPI ("3 h 40 min", "—"): só fade. */
   .surgir { animation: surgir 200ms ease-out backwards; }

@@ -285,7 +285,7 @@ function Ritmo({ finalizadas, projecao, meta, fim }: { finalizadas: number; proj
         aria-label="Finalizadas em relação à meta do dia"
       >
         <div
-          className={cn('h-full', abaixo ? 'bg-primary' : 'bg-chart-7')}
+          className={cn('barra-x h-full', abaixo ? 'bg-primary' : 'bg-chart-7')}
           style={{ width: `${Math.min(100, (finalizadas / meta) * 100)}%` }}
         />
       </div>

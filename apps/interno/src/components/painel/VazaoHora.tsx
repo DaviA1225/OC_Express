@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { Bar, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { ChartTooltip } from '@/components/charts/ChartTooltip'
-import { axisProps, gridProps } from '@/components/charts/chartTheme'
+import { animacaoSerie, axisProps, gridProps } from '@/components/charts/chartTheme'
 import { DRILL_ATIVO, linkSolicitacoes } from '@/features/metricas/links'
 import { hojeOperacao } from '@/lib/datasOperacao'
 import type { FiltrosComuns, PainelHora } from '@/features/metricas/tipos'
@@ -77,9 +77,9 @@ export function VazaoHora({ porHora, filtros, tv }: Props) {
                   const hora = (d as { payload?: { hora?: number } }).payload?.hora
                   if (typeof hora === 'number') abrirHora(hora)
                 }}
-                isAnimationActive={!tv}
+                {...animacaoSerie}
               />
-              <Line dataKey="entradas" name="Entradas" stroke={COR_ENTRADAS} strokeWidth={1.5} dot={false} isAnimationActive={!tv} />
+              <Line dataKey="entradas" name="Entradas" stroke={COR_ENTRADAS} strokeWidth={1.5} dot={false} {...animacaoSerie} />
               <Line
                 dataKey="media"
                 name="Média 4 semanas"
@@ -87,7 +87,7 @@ export function VazaoHora({ porHora, filtros, tv }: Props) {
                 strokeWidth={tv ? 2.5 : 1.5}
                 strokeDasharray="4 3"
                 dot={false}
-                isAnimationActive={!tv}
+                {...animacaoSerie}
               />
             </ComposedChart>
           </ResponsiveContainer>
