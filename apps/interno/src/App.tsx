@@ -64,7 +64,7 @@ export default function App() {
             <Route path="/login" element={<LoginPage />} />
 
             <Route element={<ProtectedRoute />}>
-{/* Modo TV: fora do AppLayout (sem menu, sem Realtime; só polling). A conta
+              {/* Modo TV: fora do AppLayout (sem menu, sem Realtime; só polling). A conta
                   `painel_tv` só chega aqui — o ProtectedRoute a manda para cá. */}
               <Route path="/operacao/tv" element={<TvPage />} />
               <Route element={<AppLayout />}>

@@ -564,7 +564,7 @@ export function SolicitacoesListPage() {
         <div className="flex flex-wrap items-center gap-1.5">
           <div className="mr-1 flex items-center gap-0.5 rounded-surface border bg-card p-0.5" role="group" aria-label="Escopo da lista">
             {[
-              { todas: false, label: 'Fila de trabalho', qtd: emFila ? contagemFila.data?.total : undefined },
+              { todas: false, label: 'Fila de trabalho', qtd: emFila && !recorte ? contagemFila.data?.total : undefined },
               { todas: true, label: 'Todas', qtd: undefined },
             ].map((o) => {
               const ativo = o.todas ? !emFila : emFila
@@ -607,7 +607,7 @@ export function SolicitacoesListPage() {
           </button>
           {(emFila ? FILA_CHIPS : VALID_STATUSES).map((s) => {
             const active = statuses.includes(s)
-            const qtd = emFila ? contagemFila.data?.porEtapa[s] : undefined
+            const qtd = emFila && !recorte ? contagemFila.data?.porEtapa[s] : undefined
             return (
               <button
                 key={s}
