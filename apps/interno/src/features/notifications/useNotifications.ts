@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { SLA_ALERT_HOURS } from '@/features/solicitacoes/status'
-import { hojeOperacao } from '@/features/solicitacoes/useSolicitacoes'
+import { hojeOperacao } from '@/lib/datasOperacao'
 
 export type NotificationKind = 'pendencia_resolvida' | 'pendente' | 'sem_oc' | 'oc_nao_enviada' | 'validade_vencendo'
 

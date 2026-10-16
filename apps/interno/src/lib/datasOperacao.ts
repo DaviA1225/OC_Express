@@ -12,9 +12,23 @@ export function diaOperacao(d: Date | number = new Date()): string {
   return fmtDia.format(new Date(d))
 }
 
-/** `yyyy-mm-dd` de hoje em Mato Grosso do Sul. */
-export function hojeOperacao(): string {
-  return diaOperacao(new Date())
+/** `yyyy-mm-dd` de hoje em Mato Grosso do Sul (ou do instante `agora`). */
+export function hojeOperacao(agora: Date = new Date()): string {
+  return diaOperacao(agora)
+}
+
+/**
+ * Início (00:00) do dia `yyyy-mm-dd` em MS, como ISO em UTC — limite dos
+ * filtros De/Até da lista. MS é UTC−4 fixo (sem horário de verão desde 2019).
+ * Retorna null se a data for inválida (ex.: 2026-02-30).
+ */
+export function inicioDoDiaOperacao(dia: string, somarDias = 0): string | null {
+  const [y, m, d] = dia.split('-').map(Number)
+  if (!y || !m || !d || m > 12) return null
+  const base = new Date(Date.UTC(y, m - 1, d))
+  if (base.getUTCMonth() !== m - 1 || base.getUTCDate() !== d) return null
+  // 00:00 em MS = 04:00 UTC; Date.UTC normaliza a virada de mês/ano.
+  return new Date(Date.UTC(y, m - 1, d + somarDias, 4, 0, 0, 0)).toISOString()
 }
 
 /** Soma `n` dias a uma data `yyyy-mm-dd` (aritmética de calendário, sem fuso). */
