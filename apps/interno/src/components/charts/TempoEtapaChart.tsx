@@ -24,6 +24,9 @@ export function TempoEtapaChart({ linhas, sla }: Props) {
     ...linhas.map((l) => (sla && sla[l.status]?.ativo ? sla[l.status].alerta_min : 0)),
   ) * 1.05
   const pos = (min: number) => `${Math.min(100, (min / escala) * 100)}%`
+  // Régua: passo "redondo" com no máximo ~6 marcas até o fim da escala.
+  const passo = [15, 30, 60, 120, 240, 480, 960, 1440].find((p) => escala / p <= 6) ?? 2880
+  const marcas = Array.from({ length: Math.floor(escala / passo) + 1 }, (_v, k) => k * passo)
   return (
     <div>
       <ul className="space-y-3">
@@ -71,6 +74,20 @@ export function TempoEtapaChart({ linhas, sla }: Props) {
           )
         })}
       </ul>
+      <div className="mt-1 hidden md:grid md:grid-cols-[11rem_minmax(0,1fr)_15rem] md:gap-x-4" aria-hidden>
+        <span />
+        <div className="relative h-4 border-t">
+          {marcas.map((m) => (
+            <span
+              key={m}
+              className="absolute top-0.5 -translate-x-1/2 text-meta tabular-nums text-muted-foreground first:translate-x-0"
+              style={{ left: pos(m) }}
+            >
+              {m === 0 ? '0' : fmtDur(m)}
+            </span>
+          ))}
+        </div>
+      </div>
       <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-meta text-muted-foreground">
         <span className="flex items-center gap-1.5"><span aria-hidden className="h-2 w-3 rounded-[1px] bg-chart-7" /> P50 (mediana)</span>
         <span className="flex items-center gap-1.5"><span aria-hidden className="h-3 w-[2px] bg-foreground" /> P90</span>

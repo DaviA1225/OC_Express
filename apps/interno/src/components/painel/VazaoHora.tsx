@@ -4,7 +4,7 @@ import { Bar, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, 
 import { ChartTooltip } from '@/components/charts/ChartTooltip'
 import { animacaoSerie, axisProps, gridProps } from '@/components/charts/chartTheme'
 import { DRILL_ATIVO, linkSolicitacoes } from '@/features/metricas/links'
-import { hojeOperacao } from '@/lib/datasOperacao'
+import { hojeOperacao, relogioOperacao } from '@/lib/datasOperacao'
 import type { FiltrosComuns, PainelHora } from '@/features/metricas/tipos'
 import { fmtDec, fmtInt } from '@/lib/format'
 import { cn } from '@/lib/utils'
@@ -29,6 +29,9 @@ export const VazaoHora = memo(function VazaoHora({ porHora, filtros, tv }: Props
   const navigate = useNavigate()
   // Dados e clique estáveis: o Recharts reinicia a animação quando a referência
   // muda, e a página re-renderiza a cada 30 s pelo relógio.
+  // Horas que ainda não chegaram ficam sem valor (null): a linha de entradas
+  // para na hora atual em vez de despencar a zero; a média segue até o fim.
+  const horaAtual = relogioOperacao(new Date()).getHours()
   const dados = useMemo(() => {
     const comDado = porHora.filter((h) => h.finalizadas > 0 || h.entradas > 0 || h.ref > 0).map((h) => h.hora)
     const ini = Math.min(6, ...comDado)
@@ -37,8 +40,17 @@ export const VazaoHora = memo(function VazaoHora({ porHora, filtros, tv }: Props
     // ponto nas props do <path> da barra, e `ref` numérico derruba o React.
     return porHora
       .filter((h) => h.hora >= ini && h.hora <= fim)
-      .map((h) => ({ hora: h.hora, finalizadas: h.finalizadas, entradas: h.entradas, media: h.ref, rotulo: `${h.hora}h` }))
-  }, [porHora])
+      .map((h) => {
+        const futura = h.hora > horaAtual
+        return {
+          hora: h.hora,
+          finalizadas: futura ? null : h.finalizadas,
+          entradas: futura ? null : h.entradas,
+          media: h.ref,
+          rotulo: `${h.hora}h`,
+        }
+      })
+  }, [porHora, horaAtual])
   const altura = tv ? 360 : 240
   const abrirHora = useCallback((hora: number) => {
     if (!filtros || !DRILL_ATIVO) return
@@ -55,7 +67,7 @@ export const VazaoHora = memo(function VazaoHora({ porHora, filtros, tv }: Props
   return (
     <div>
       <p className="sr-only">
-        Finalizadas por hora hoje: {dados.filter((d) => d.finalizadas > 0).map((d) => `${d.hora}h ${d.finalizadas}`).join('; ') || 'nenhuma'}.
+        Finalizadas por hora hoje: {dados.filter((d) => (d.finalizadas ?? 0) > 0).map((d) => `${d.hora}h ${d.finalizadas}`).join('; ') || 'nenhuma'}.
       </p>
       {/* No celular a rolagem fica dentro do gráfico, nunca na página. */}
       <div className="-mx-1 overflow-x-auto px-1">
@@ -88,7 +100,17 @@ export const VazaoHora = memo(function VazaoHora({ porHora, filtros, tv }: Props
                 onClick={aoClicarBarra}
                 {...animacaoSerie}
               />
-              <Line dataKey="entradas" name="Entradas" stroke={COR_ENTRADAS} strokeWidth={1.5} dot={false} {...animacaoSerie} />
+              {/* Entradas com marcador: grafite-azulado perto do grafite das barras,
+                  o ponto separa a linha do topo das colunas. */}
+              <Line
+                dataKey="entradas"
+                name="Entradas"
+                stroke={COR_ENTRADAS}
+                strokeWidth={tv ? 3 : 2}
+                dot={{ r: tv ? 4 : 2.5, fill: 'hsl(var(--card))', stroke: COR_ENTRADAS, strokeWidth: tv ? 2 : 1.5 }}
+                activeDot={!tv && { r: 4 }}
+                {...animacaoSerie}
+              />
               <Line
                 dataKey="media"
                 name="Média 4 semanas"

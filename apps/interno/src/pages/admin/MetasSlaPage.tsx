@@ -288,7 +288,7 @@ function TabelaEtapas({
                   <span className="flex items-center gap-1.5 whitespace-nowrap text-foreground">
                     <StatusDot status={e.status} /> {STATUS_LABELS[e.status]}
                   </span>
-                  {e.status === 'oc_enviada' && <span className="text-meta text-muted-foreground">Fora do SLA por decisão (D1)</span>}
+                  {e.status === 'oc_enviada' && <span className="text-meta text-muted-foreground">Sem SLA: a OC já está com o motorista</span>}
                 </td>
                 <td className="px-4 py-2.5">
                   <Switch
@@ -300,7 +300,7 @@ function TabelaEtapas({
                 </td>
                 <td className="px-4 py-2">
                   <Input
-                    className={cn('h-8 w-24', errAv && 'border-destructive')}
+                    className={cn('h-8 w-24', errAv && 'border-destructive', !e.ativo && 'opacity-60')}
                     inputMode="decimal"
                     value={e.aviso}
                     disabled={somenteLeitura}
@@ -312,7 +312,7 @@ function TabelaEtapas({
                 </td>
                 <td className="px-4 py-2">
                   <Input
-                    className={cn('h-8 w-24', errAl && 'border-destructive')}
+                    className={cn('h-8 w-24', errAl && 'border-destructive', !e.ativo && 'opacity-60')}
                     inputMode="decimal"
                     value={e.alerta}
                     disabled={somenteLeitura}

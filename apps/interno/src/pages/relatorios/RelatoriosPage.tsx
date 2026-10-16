@@ -217,7 +217,7 @@ export default function RelatoriosPage() {
       <div
         role="tablist"
         aria-label="Seções do relatório"
-        className="flex gap-1 overflow-x-auto border-b"
+        className="flex gap-1 overflow-x-auto overflow-y-hidden border-b"
         onKeyDown={(ev) => {
           // Padrão de abas (WAI-ARIA): setas, Home e End movem o foco e ativam.
           const ids = abasVisiveis.map((a) => a.id)
@@ -571,7 +571,7 @@ function MapaCalor({ celulas }: { celulas: MapaCalorCelula[] }) {
   const ordem = [1, 2, 3, 4, 5, 6, 0]
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[560px] border-separate border-spacing-[2px] text-meta" aria-label="Entradas por dia da semana e hora">
+      <table className="w-full min-w-[560px] table-fixed border-separate border-spacing-[2px] text-meta" aria-label="Entradas por dia da semana e hora">
         <thead>
           <tr>
             <th scope="col" className="w-10" />
