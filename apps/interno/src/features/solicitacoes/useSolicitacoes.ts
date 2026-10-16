@@ -246,7 +246,10 @@ function applyOrigemPamcardFilters<T>(
  */
 export function inicioDoDiaSP(dia: string, somarDias = 0): string | null {
   const [y, m, d] = dia.split('-').map(Number)
-  if (!y || !m || !d) return null
+  if (!y || !m || !d || m > 12) return null
+  // Rejeita dia inexistente (ex.: 2026-02-30) antes de somar dias.
+  const base = new Date(Date.UTC(y, m - 1, d))
+  if (base.getUTCMonth() !== m - 1 || base.getUTCDate() !== d) return null
   // 00:00 em SP = 03:00 UTC; Date.UTC normaliza a virada de mês/ano.
   return new Date(Date.UTC(y, m - 1, d + somarDias, 3, 0, 0, 0)).toISOString()
 }

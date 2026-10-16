@@ -158,10 +158,13 @@ export function useNotifications() {
         })
       }
 
+      // Validade primeiro (mesma ordem do KIND_ORDER do sininho): a dedupe por id
+      // mantém só o primeiro alerta, e uma OC gerada há mais de 4h também cai em
+      // "não enviada"/"atrasada" — sem isso ela sumiria do grupo mais urgente.
+      push('validade_vencendo', validade.data)
       push('sem_oc', semOc.data)
       push('oc_nao_enviada', ocNaoEnviada.data)
       push('pendente', atrasadas.data)
-      push('validade_vencendo', validade.data)
       return out
     },
   })
@@ -172,5 +175,5 @@ export const NOTIFICATION_LABELS: Record<NotificationKind, string> = {
   pendente: `Atrasada (mais de ${SLA_ALERT_HOURS}h)`,
   sem_oc: 'Instrução emitida sem OC',
   oc_nao_enviada: 'OC gerada · não enviada',
-  validade_vencendo: 'OC sem CT-e · validade vencendo',
+  validade_vencendo: 'Validade da OC vence até amanhã',
 }
