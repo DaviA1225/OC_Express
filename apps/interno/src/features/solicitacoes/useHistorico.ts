@@ -28,46 +28,69 @@ export interface HistoricoSummary {
   recentes: HistoricoRecent[]
 }
 
+/** Ids que a própria solicitação já aponta — entram sempre, então o histórico
+ *  nunca fica menor do que era quando casava só por `motorista_id`. */
+export interface IdsProprios {
+  motoristaId: string | null
+  parceiroMotoristaId: string | null
+  veiculoId: string | null
+  parceiroVeiculoId: string | null
+}
+
 interface Params {
   /** CPF do motorista (cadastro interno OU do parceiro — o mesmo motorista
    *  pode estar nos dois, com ids diferentes). */
   motoristaCpf: string | null
   /** Placa do cavalo, idem. */
   veiculoPlaca: string | null
+  idsProprios: IdsProprios
   clienteId: string | null
   currentId: string
 }
 
-/** Variantes do CPF como pode estar gravado: formatado e só dígitos. */
+/** CPF como pode estar gravado: o valor exato e, só se tiver 11 dígitos,
+ *  também formatado e só dígitos (um id anonimizado "ANON-…" não vira CPF). */
 function variantesCpf(cpf: string): string[] {
-  const digitos = cpf.replace(/\D/g, '')
-  const formatado =
-    digitos.length === 11 ? `${digitos.slice(0, 3)}.${digitos.slice(3, 6)}.${digitos.slice(6, 9)}-${digitos.slice(9)}` : cpf
-  return Array.from(new Set([cpf, digitos, formatado].filter(Boolean)))
+  const exato = cpf.trim()
+  const digitos = exato.replace(/\D/g, '')
+  if (digitos.length !== 11 || !/^[\d.\-\s]+$/.test(exato)) return [exato]
+  const formatado = `${digitos.slice(0, 3)}.${digitos.slice(3, 6)}.${digitos.slice(6, 9)}-${digitos.slice(9)}`
+  return Array.from(new Set([exato, digitos, formatado]))
 }
 
-const lista = (vals: string[]) => vals.map((v) => `"${v.replace(/"/g, '')}"`).join(',')
+/** Placa com e sem hífen, em maiúsculas. */
+function variantesPlaca(placa: string): string[] {
+  const limpa = placa.trim().toUpperCase().replace(/\s/g, '')
+  const sem = limpa.replace(/-/g, '')
+  const com = /^[A-Z]{3}\d[A-Z\d]\d{2}$/.test(sem) ? `${sem.slice(0, 3)}-${sem.slice(3)}` : sem
+  return Array.from(new Set([placa.trim(), limpa, sem, com]))
+}
+
+const uniq = (...listas: (string | null)[][]) => Array.from(new Set(listas.flat().filter((x): x is string => !!x)))
 
 /**
  * Ids do motorista e do cavalo nos dois cadastros (interno e parceiros). Sem
  * isso, solicitação vinda do portal (que só tem parceiro_motorista_id) ficava
  * sem histórico, e o histórico do interno ignorava o que veio pelo portal.
+ * `.in()` do postgrest-js codifica os valores (nada de filtro montado à mão
+ * com texto digitado pelo parceiro).
  */
 async function resolverIds(motoristaCpf: string, veiculoPlaca: string | null) {
-  const cpfs = lista(variantesCpf(motoristaCpf))
-  const placa = veiculoPlaca?.trim().toUpperCase() || null
+  const cpfs = variantesCpf(motoristaCpf)
+  const placas = veiculoPlaca ? variantesPlaca(veiculoPlaca) : []
+  const vazio = Promise.resolve({ data: [] as { id: string }[], error: null })
   const [mot, parcMot, veic, parcVeic] = await Promise.all([
-    supabase.from('motoristas').select('id').or(`cpf.in.(${cpfs})`).limit(20),
-    supabase.from('parceiro_motoristas').select('id').or(`cpf.in.(${cpfs})`).limit(50),
-    placa ? supabase.from('veiculos').select('id').eq('placa', placa).limit(20) : Promise.resolve({ data: [], error: null }),
-    placa ? supabase.from('parceiro_veiculos').select('id').eq('placa', placa).limit(50) : Promise.resolve({ data: [], error: null }),
+    supabase.from('motoristas').select('id').in('cpf', cpfs).limit(20),
+    supabase.from('parceiro_motoristas').select('id').in('cpf', cpfs).limit(50),
+    placas.length ? supabase.from('veiculos').select('id').in('placa', placas).limit(20) : vazio,
+    placas.length ? supabase.from('parceiro_veiculos').select('id').in('placa', placas).limit(50) : vazio,
   ])
   for (const r of [mot, parcMot, veic, parcVeic]) if (r.error) throw r.error
   const ids = (r: { data: unknown }) => ((r.data ?? []) as { id: string }[]).map((x) => x.id)
   return { motoristaIds: ids(mot), parceiroMotoristaIds: ids(parcMot), veiculoIds: ids(veic), parceiroVeiculoIds: ids(parcVeic) }
 }
 
-/** Filtro `or` do PostgREST: qualquer um dos ids, em qualquer dos dois campos. */
+/** Filtro `or` do PostgREST: qualquer um dos ids (UUIDs), em qualquer dos dois campos. */
 function orIds(campo: string, idsInternos: string[], campoParceiro: string, idsParceiro: string[]): string | null {
   const partes: string[] = []
   if (idsInternos.length) partes.push(`${campo}.in.(${idsInternos.join(',')})`)
@@ -82,19 +105,38 @@ function orIds(campo: string, idsInternos: string[], campoParceiro: string, idsP
 export function useHistoricoOperacional({
   motoristaCpf,
   veiculoPlaca,
+  idsProprios,
   clienteId,
   currentId,
 }: Params) {
-  const enabled = !!motoristaCpf
+  // Ids por CPF/placa em cache próprio: percorrendo a fila com "Próxima", o
+  // mesmo motorista não refaz as 4 buscas a cada solicitação.
+  const resolvidos = useQuery({
+    enabled: !!motoristaCpf,
+    queryKey: ['historico-ids', motoristaCpf, veiculoPlaca],
+    staleTime: 10 * 60_000,
+    queryFn: () => resolverIds(motoristaCpf!, veiculoPlaca),
+  })
+  const ids = resolvidos.data
+  const enabled = !!motoristaCpf && !!ids
   return useQuery({
     enabled,
-    queryKey: ['historico-operacional', motoristaCpf, veiculoPlaca, clienteId, currentId],
+    queryKey: ['historico-operacional', motoristaCpf, veiculoPlaca, clienteId, currentId, ids],
     staleTime: 60_000,
     queryFn: async (): Promise<HistoricoSummary> => {
       const desde = new Date(Date.now() - HISTORICO_DIAS * 24 * 3_600_000).toISOString()
-      const ids = await resolverIds(motoristaCpf!, veiculoPlaca)
-      const filtroMotorista = orIds('motorista_id', ids.motoristaIds, 'parceiro_motorista_id', ids.parceiroMotoristaIds)
-      const filtroVeiculo = orIds('veiculo_id', ids.veiculoIds, 'parceiro_veiculo_id', ids.parceiroVeiculoIds)
+      const filtroMotorista = orIds(
+        'motorista_id',
+        uniq(ids!.motoristaIds, [idsProprios.motoristaId]),
+        'parceiro_motorista_id',
+        uniq(ids!.parceiroMotoristaIds, [idsProprios.parceiroMotoristaId]),
+      )
+      const filtroVeiculo = orIds(
+        'veiculo_id',
+        uniq(ids!.veiculoIds, [idsProprios.veiculoId]),
+        'parceiro_veiculo_id',
+        uniq(ids!.parceiroVeiculoIds, [idsProprios.parceiroVeiculoId]),
+      )
       if (!filtroMotorista) {
         return { totalMotorista: 0, totalVeiculo: 0, totalParaCliente: 0, ultimaParaCliente: null, topRota: null, recentes: [] }
       }

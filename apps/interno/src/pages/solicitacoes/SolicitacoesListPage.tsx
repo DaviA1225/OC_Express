@@ -92,9 +92,9 @@ export function SolicitacoesListPage() {
     return VALID_PAMCARD.includes(raw as PamcardFiltro) ? (raw as PamcardFiltro) : 'todos'
   })()
   const apenasAtrasadas = params.get('atrasadas') === '1'
-  // Escopo: "Fila de trabalho" (padrão) mostra só o que ainda não terminou, da
-  // mais antiga para a mais nova — quem abre a tela vê primeiro o que espera
-  // há mais tempo. "Todas" é o histórico completo, mais recentes primeiro.
+  // Escopo: "Fila de trabalho" (padrão) mostra só o que ainda não terminou;
+  // "Todas" é o histórico completo. As duas na mesma ordem de sempre, mais
+  // recentes no topo (a equipe está acostumada a ela — Davi, 2026-10-16).
   // Busca e filtro por etapa encerrada (ex.: drill-down de "Finalizadas")
   // sempre olham o histórico inteiro: ninguém procura uma placa só na fila.
   const escopoTodas = params.get('ver') === 'todas'
@@ -201,6 +201,8 @@ export function SolicitacoesListPage() {
   const setEscopo = (todas: boolean) =>
     updateParams((n) => {
       if (todas) n.set('ver', 'todas'); else n.delete('ver')
+      // A busca sempre olha o histórico inteiro: voltar à fila a encerra.
+      if (!todas) n.delete('search')
       // Etapas encerradas não existem na fila: sair delas ao voltar para a fila.
       if (!todas) {
         const abertas = statuses.filter((st) => FILA_STATUSES.includes(st))
@@ -225,11 +227,12 @@ export function SolicitacoesListPage() {
     apenasAtrasadas,
     page,
     pageSize,
-    ordem: emFila ? 'antigas' : 'recentes',
   }
 
   const list = useSolicitacoesList(filters)
-  const contagemFila = useContagemFila()
+  // Só os filtros que valem para a contagem: busca, etapa e página ficam de
+  // fora (senão cada página nova refaria a contagem).
+  const contagemFila = useContagemFila({ periodo, materialId, tipo, origem, pamcard, apenasAtrasadas }, emFila)
   const pendenciaSinais = usePendenciasSinais()
   // Cascata só no 1º paint com dados; refetch/realtime/filtro não re-animam.
   const cascata = useCascataInicial(!list.isLoading && !list.isError && (list.data?.data.length ?? 0) > 0)
@@ -323,8 +326,10 @@ export function SolicitacoesListPage() {
       const csv = buildCsv(rows, cols)
       const ts = new Date()
       const stamp = `${ts.getFullYear()}${String(ts.getMonth() + 1).padStart(2, '0')}${String(ts.getDate()).padStart(2, '0')}_${String(ts.getHours()).padStart(2, '0')}${String(ts.getMinutes()).padStart(2, '0')}`
-      downloadCsv(`solicitacoes_${stamp}.csv`, csv)
-      toast.success(`${rows.length} ${rows.length === 1 ? 'registro exportado' : 'registros exportados'}`)
+      downloadCsv(`solicitacoes_${emFila ? 'fila_' : ''}${stamp}.csv`, csv)
+      toast.success(
+        `${rows.length} ${rows.length === 1 ? 'registro exportado' : 'registros exportados'}${emFila ? ' (só a fila de trabalho)' : ''}`,
+      )
     } catch (err) {
       toast.error('Falha ao exportar. Tente novamente.')
       console.error('export csv error', err)
@@ -515,7 +520,7 @@ export function SolicitacoesListPage() {
         <div className="flex flex-wrap items-center gap-1.5">
           <div className="mr-1 flex items-center gap-0.5 rounded-surface border bg-card p-0.5" role="group" aria-label="Escopo da lista">
             {[
-              { todas: false, label: 'Fila de trabalho', qtd: contagemFila.data?.total },
+              { todas: false, label: 'Fila de trabalho', qtd: emFila ? contagemFila.data?.total : undefined },
               { todas: true, label: 'Todas', qtd: undefined },
             ].map((o) => {
               const ativo = o.todas ? !emFila : emFila
@@ -531,7 +536,12 @@ export function SolicitacoesListPage() {
                   )}
                 >
                   {o.label}
-                  {o.qtd != null && <span className="ml-1.5 tabular-nums">{fmtInt(o.qtd)}</span>}
+                  {o.qtd != null && (
+                    <span className="ml-1.5 tabular-nums">
+                      {fmtInt(o.qtd)}
+                      {contagemFila.data?.truncado ? '+' : ''}
+                    </span>
+                  )}
                 </button>
               )
             })}
@@ -565,11 +575,12 @@ export function SolicitacoesListPage() {
                   active
                     ? `status-${s} border-transparent font-semibold`
                     : 'border-border bg-card text-muted-foreground hover:bg-row-hover',
-                  !active && qtd === 0 && 'opacity-50',
                 )}
               >
                 {STATUS_LABELS[s]}
-                {qtd != null && <span className="ml-1 tabular-nums opacity-80">{fmtInt(qtd)}</span>}
+                {qtd != null && (
+                  <span className={cn('ml-1 tabular-nums', qtd === 0 && !active && 'text-tertiary')}>{fmtInt(qtd)}</span>
+                )}
               </button>
             )
           })}

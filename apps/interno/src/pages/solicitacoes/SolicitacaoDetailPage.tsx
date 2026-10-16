@@ -124,7 +124,7 @@ export function SolicitacaoDetailPage({ embutido }: SolicitacaoDetailPageProps =
     try {
       const prox = await fetchProximaDaFila(detail.data)
       if (prox) navigate(`/solicitacoes/${prox}`)
-      else toast.info('A fila de trabalho está vazia.')
+      else toast.info('Não há outra solicitação na fila de trabalho.')
     } catch {
       toast.error('Não foi possível buscar a próxima da fila.')
     } finally {
@@ -301,8 +301,9 @@ export function SolicitacaoDetailPage({ embutido }: SolicitacaoDetailPageProps =
           // iguais ao padding dele cobrem a faixa de cima sem deslocar nada (`!`
           // vence a margem do space-y-4 do pai).
           !embutido &&
-            'sticky -top-3 z-20 -mx-3 !-mt-3 bg-canvas px-3 pt-3 sm:-top-4 sm:-mx-4 sm:!-mt-4 sm:px-4 sm:pt-4 md:-top-5 md:-mx-6 md:!-mt-5 md:px-6 md:pt-5',
-          !embutido && cabecalhoFixo && 'border-b pb-2 shadow-sm',
+            'sticky -top-3 z-20 -mx-3 !-mt-3 border-b border-transparent bg-canvas px-3 pb-2 pt-3 sm:-top-4 sm:-mx-4 sm:!-mt-4 sm:px-4 sm:pt-4 md:-top-5 md:-mx-6 md:!-mt-5 md:px-6 md:pt-5 print:static print:!m-0 print:border-0 print:p-0',
+          // Só cor da borda e sombra mudam ao grudar: nada de salto de layout.
+          !embutido && cabecalhoFixo && 'border-border shadow-sm',
         )}
       >
       <PageHeader
@@ -414,7 +415,7 @@ export function SolicitacaoDetailPage({ embutido }: SolicitacaoDetailPageProps =
               size="sm"
               onClick={abrirProximaDaFila}
               disabled={buscandoProxima}
-              title="Abrir a próxima solicitação da fila de trabalho (ordem de chegada)"
+              title="Abrir a próxima solicitação da fila de trabalho, na ordem da lista (sem os filtros da lista)"
             >
               {buscandoProxima ? <Spinner /> : <ChevronRight className="h-4 w-4" />}
               Próxima da fila
@@ -474,6 +475,12 @@ export function SolicitacaoDetailPage({ embutido }: SolicitacaoDetailPageProps =
           <HistoricoCard
             solicitacaoId={s.id}
             motoristaCpf={s.motorista?.cpf ?? null}
+            idsProprios={{
+              motoristaId: s.motorista_id,
+              parceiroMotoristaId: s.parceiro_motorista_id,
+              veiculoId: s.veiculo_id,
+              parceiroVeiculoId: s.parceiro_veiculo_id,
+            }}
             clienteId={s.cliente_id}
             motoristaNome={s.motorista?.nome_completo ?? null}
             veiculoPlaca={s.veiculo?.placa ?? null}

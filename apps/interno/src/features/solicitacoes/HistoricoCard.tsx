@@ -5,13 +5,14 @@ import { History, MapPin, ArrowRight, User, Truck } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { SolicitacaoStatusBadge } from '@/components/shared/SolicitacaoStatusBadge'
 import { formatNumeroOC } from '@/lib/utils'
-import { HISTORICO_JANELA_DIAS, useHistoricoOperacional } from './useHistorico'
+import { HISTORICO_JANELA_DIAS, useHistoricoOperacional, type IdsProprios } from './useHistorico'
 
 interface Props {
   solicitacaoId: string
   /** CPF e placa, não ids: o mesmo motorista/cavalo pode estar no cadastro
    *  interno e no do parceiro (ver useHistoricoOperacional). */
   motoristaCpf: string | null
+  idsProprios: IdsProprios
   clienteId: string | null
   motoristaNome?: string | null
   veiculoPlaca?: string | null
@@ -20,6 +21,7 @@ interface Props {
 export function HistoricoCard({
   solicitacaoId,
   motoristaCpf,
+  idsProprios,
   clienteId,
   motoristaNome,
   veiculoPlaca,
@@ -27,6 +29,7 @@ export function HistoricoCard({
   const q = useHistoricoOperacional({
     motoristaCpf,
     veiculoPlaca: veiculoPlaca ?? null,
+    idsProprios,
     clienteId,
     currentId: solicitacaoId,
   })

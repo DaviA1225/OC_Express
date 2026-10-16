@@ -75,6 +75,21 @@ export default function SolicitacoesListPage() {
     setMinDataMs(next === 'todo' ? null : Date.now() - Number(next) * 24 * 60 * 60 * 1000)
   }
   const debouncedSearch = useDebounce(search, 300)
+  // "Em andamento" (padrão) esconde o que já terminou (concluída/cancelada);
+  // "Todas" é o histórico. Busca ou filtro por concluída/cancelada sempre olham
+  // tudo — ninguém procura uma placa só no que está em andamento. Mesma regra
+  // da "Fila de trabalho" do sistema interno.
+  const [escopoTodas, setEscopoTodas] = React.useState(false)
+  const buscando = debouncedSearch.trim() !== ''
+  const pedeEncerradas = statusFiltro === 'concluida' || statusFiltro === 'cancelada'
+  const emAndamento = !escopoTodas && !buscando && !pedeEncerradas
+  const escolherEscopo = (todas: boolean) => {
+    setEscopoTodas(todas)
+    if (!todas) {
+      setSearch('')
+      if (pedeEncerradas) setStatusFiltro('todas')
+    }
+  }
 
   // Mapas de resolução: a view só traz IDs.
   const views = React.useMemo<SolicitacaoView[]>(() => {
@@ -95,6 +110,7 @@ export default function SolicitacoesListPage() {
     const termo = debouncedSearch.trim().toLowerCase()
     return views.filter(({ sol, motorista, cavalo, carreta, cliente }) => {
       if (!matchStatusFiltro(sol.status, statusFiltro)) return false
+      if (emAndamento && (sol.status === 'finalizada' || sol.status === 'cancelada')) return false
       if (minDataMs && sol.created_at && new Date(sol.created_at).getTime() < minDataMs) {
         return false
       }
@@ -110,7 +126,7 @@ export default function SolicitacoesListPage() {
       }
       return true
     })
-  }, [views, debouncedSearch, statusFiltro, minDataMs])
+  }, [views, debouncedSearch, statusFiltro, minDataMs, emAndamento])
 
   const carregando =
     lista.isLoading || motoristas.isLoading || veiculos.isLoading ||
@@ -119,6 +135,9 @@ export default function SolicitacoesListPage() {
   // Cascata só no 1º paint com dados; refetch/realtime/filtro não re-animam.
   const cascata = useCascataInicial(!carregando && filtradas.length > 0)
   const temFiltro = !!debouncedSearch.trim() || statusFiltro !== 'todas' || periodo !== 'todo'
+  const qtdEmAndamento = (lista.data ?? []).filter(
+    (sol) => sol.status !== 'finalizada' && sol.status !== 'cancelada',
+  ).length
 
   return (
     <div className="space-y-4">
@@ -163,6 +182,29 @@ export default function SolicitacoesListPage() {
       )}
 
       <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-card p-3">
+        <div className="flex items-center gap-0.5 rounded-surface border bg-card p-0.5" role="group" aria-label="Escopo da lista">
+          {[
+            { todas: false, label: 'Em andamento', qtd: qtdEmAndamento as number | undefined },
+            { todas: true, label: 'Todas', qtd: undefined },
+          ].map((o) => {
+            const ativo = o.todas ? !emAndamento : emAndamento
+            return (
+              <button
+                key={o.label}
+                type="button"
+                onClick={() => escolherEscopo(o.todas)}
+                aria-pressed={ativo}
+                className={cn(
+                  'rounded-control px-2.5 py-1 text-body-sm font-medium transition-colors duration-fast',
+                  ativo ? 'bg-primary/[0.08] text-primary-strong' : 'text-muted-foreground hover:bg-row-hover hover:text-foreground',
+                )}
+              >
+                {o.label}
+                {o.qtd != null && !carregando && <span className="ml-1.5 tabular-nums">{o.qtd}</span>}
+              </button>
+            )
+          })}
+        </div>
         <div className="relative min-w-[220px] flex-1">
           <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -202,11 +244,19 @@ export default function SolicitacoesListPage() {
         <div className="rounded-lg border bg-card">
           <EmptyState
             icon={ClipboardList}
-            title={temFiltro ? 'Nenhuma solicitação encontrada' : 'Nenhuma solicitação enviada'}
+            title={
+              temFiltro
+                ? 'Nenhuma solicitação encontrada'
+                : emAndamento && total > 0
+                  ? 'Nada em andamento'
+                  : 'Nenhuma solicitação enviada'
+            }
             description={
               temFiltro
                 ? 'Ajuste os filtros para ver outras solicitações.'
-                : 'Novas solicitações de carregamento vão direto para a equipe da LHG.'
+                : emAndamento && total > 0
+                  ? 'As concluídas e canceladas ficam em "Todas".'
+                  : 'Novas solicitações de carregamento vão direto para a equipe da LHG.'
             }
             action={
               !temFiltro && !bloqueado && (
