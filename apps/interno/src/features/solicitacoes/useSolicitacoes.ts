@@ -409,6 +409,7 @@ export async function fetchProximaDaFila(atual: { id: string; created_at: string
     .in('status', FILA_STATUSES)
     .lt('created_at', atual.created_at)
     .order('created_at', { ascending: false })
+    .order('id', { ascending: false })
     .limit(1)
   if (depois.error) throw depois.error
   const prox = (depois.data ?? []) as { id: string }[]
@@ -434,7 +435,9 @@ export async function fetchProximaDaFila(atual: { id: string; created_at: string
  * O PostgREST corta em 1000 linhas: acima disso o total vira "1000+".
  */
 export function useContagemFila(
-  filters: Pick<ListFilters, 'periodo' | 'materialId' | 'tipo' | 'origem' | 'pamcard' | 'apenasAtrasadas' | 'dataInicio' | 'dataFim'>,
+  // Sem De/Até de propósito: a lista não os usa, e quando usar, a contagem tem
+  // que cortar o dia igual a ela (aplicarIntervaloDias, PR #110).
+  filters: Pick<ListFilters, 'periodo' | 'materialId' | 'tipo' | 'origem' | 'pamcard' | 'apenasAtrasadas'>,
   ativo: boolean,
 ) {
   return useQuery({
@@ -448,8 +451,6 @@ export function useContagemFila(
       if (filters.apenasAtrasadas) query = query.in('status', SLA_PENDING_STATUSES).lt('created_at', slaThresholdISO())
       const since = periodoToISO(filters.periodo)
       if (since) query = query.gte('created_at', since)
-      if (filters.dataInicio) query = query.gte('created_at', filters.dataInicio)
-      if (filters.dataFim) query = query.lte('created_at', filters.dataFim)
       const { data, error } = await query.range(0, 999)
       if (error) throw error
       const porEtapa = Object.fromEntries(FILA_CHIPS.map((st) => [st, 0])) as Record<SolicitacaoStatus, number>
