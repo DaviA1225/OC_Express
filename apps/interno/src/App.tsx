@@ -40,6 +40,7 @@ const RelatoriosInternosPage = lazy(() => import('@/pages/relatorios/RelatoriosI
 const AtividadeEquipePage = lazy(() => import('@/pages/atividade/AtividadeEquipePage'))
 const PerfilPage = lazy(() => import('@/pages/perfil/PerfilPage'))
 const NotFoundPage = lazy(() => import('@/pages/errors/NotFoundPage'))
+const TvPage = lazy(() => import('@/pages/operacao/TvPage'))
 
 function PageFallback() {
   return (
@@ -62,6 +63,11 @@ export default function App() {
             <Route path="/login" element={<LoginPage />} />
 
             <Route element={<ProtectedRoute />}>
+              {/* Modo TV: fora do AppLayout (sem menu, sem Realtime; só polling).
+                  Por ora usa a guarda comum de interno. No PR-B1 entra o perfil
+                  `painel_tv`: o ProtectedRoute manda esse perfil para cá e
+                  bloqueia qualquer outra rota (plano §2.4). */}
+              <Route path="/operacao/tv" element={<TvPage />} />
               <Route element={<AppLayout />}>
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
                 <Route path="/dashboard" element={<DashboardPage />} />

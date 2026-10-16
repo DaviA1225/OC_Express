@@ -1,519 +1,291 @@
 import * as React from 'react'
 import { Link } from 'react-router-dom'
-import {
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  PieChart,
-  Pie,
-  Cell,
-} from 'recharts'
-import {
-  ClipboardList,
-  ClipboardCheck,
-  Hourglass,
-  AlertTriangle,
-  Inbox,
-  ArrowRight,
-  RefreshCw,
-} from 'lucide-react'
-import { format } from 'date-fns'
-import { ptBR } from 'date-fns/locale'
+import { AlertTriangle, Clock, Inbox, MonitorPlay, PackageCheck, Timer, TriangleAlert } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { KpiTile } from '@/components/shared/KpiTile'
-import { ChartTooltip } from '@/components/charts/ChartTooltip'
-import { axisProps, gridProps, seriesColor } from '@/components/charts/chartTheme'
-import {
-  useRelatorioDataset,
-  calcKPIs,
-  calcPorDia,
-  parseDayKey,
-  topClientes,
-  topMotoristas,
-  topSubcontratadas,
-  periodoDeIntervalo,
-  intervaloPadrao,
-  previousPeriod,
-  type PeriodoRelatorio,
-  type TopItem,
-} from '@/features/relatorios/useRelatorios'
-import { IntervaloDatas } from '@/features/relatorios/IntervaloDatas'
-import { useIntervaloPersistido } from '@/features/relatorios/useIntervaloPersistido'
-import { useEstadoAtual, useStatusBreakdown, type StatusBreakdownItem } from '@/features/dashboard/useDashboard'
-import { STATUS_LABELS, STATUS_COLOR_VAR } from '@/features/solicitacoes/status'
-import { fmtDelta, fmtDurHoras, fmtInt, fmtPct } from '@/lib/format'
-import type { SolicitacaoStatus } from '@/types/database.types'
+import { AtualizadoAs } from '@/components/painel/AtualizadoAs'
+import { Bloco } from '@/components/painel/Bloco'
+import { FiltrosAnalise } from '@/components/painel/FiltrosAnalise'
+import { FunilEtapas } from '@/components/painel/FunilEtapas'
+import { IdadeFila } from '@/components/painel/IdadeFila'
+import { MaisAtrasadas } from '@/components/painel/MaisAtrasadas'
+import { Pendencias } from '@/components/painel/Pendencias'
+import { PorLocal } from '@/components/painel/PorLocal'
+import { VazaoHora } from '@/components/painel/VazaoHora'
+import { SeloSimulado } from '@/features/metricas/SeloSimulado'
+import { linkSolicitacoes } from '@/features/metricas/links'
+import { fmtHoraMin, projetarRitmo, rotuloHorario } from '@/features/metricas/rotulos'
+import { ETAPAS_FILA } from '@/features/metricas/sla'
+import { useAgora } from '@/features/metricas/useAgora'
+import { useFiltrosAnalise } from '@/features/metricas/useFiltrosAnalise'
+import { useMetasSla } from '@/features/metricas/useMetasSla'
+import { usePainelEstadoAtual, usePainelHoje } from '@/features/metricas/usePainel'
+import type { FiltrosComuns, Percentis } from '@/features/metricas/tipos'
+import { fmtDelta, fmtDur, fmtInt } from '@/lib/format'
+import { cn } from '@/lib/utils'
 
-// Intervalo inicial: só o dia de hoje, o mesmo recorte que o preset padrão
-// anterior mostrava. "Limpar" volta para cá.
-const INTERVALO_PADRAO = intervaloPadrao(1)
+const EXPEDIENTE_PADRAO = { expediente_inicio: '07:00', expediente_fim: '18:00' }
 
-// Séries do volume: criadas no acento (chart-1), finalizadas em aço (chart-2).
-const COR_CRIADAS = seriesColor(0)
-const COR_FINALIZADAS = seriesColor(1)
-
-// Ordem fixa do fluxo — a legenda do donut lista todos os status, mesmo os zerados.
-const ORDEM_STATUS: SolicitacaoStatus[] = [
-  'recebida',
-  'em_cadastro',
-  'instrucao_emitida',
-  'oc_gerada',
-  'oc_enviada',
-  'finalizada',
-  'cancelada',
-]
-
+/**
+ * Painel "Sala de Controle" (§3.1): o estado da operação AGORA — fila, SLA por
+ * etapa, ritmo do dia e o que precisa de atenção. Cada número abre a lista de
+ * Solicitações já filtrada (drill-down). Os números históricos vivem em
+ * Relatórios.
+ */
 export default function DashboardPage() {
-  const { de, ate, deCampo, ateCampo, setIntervalo, limpar, noPadrao } = useIntervaloPersistido(
-    'dashboard',
-    INTERVALO_PADRAO,
-  )
-  const periodo = React.useMemo<PeriodoRelatorio>(() => periodoDeIntervalo(de, ate), [de, ate])
-  const periodoAnterior = React.useMemo(() => previousPeriod(periodo), [periodo])
+  const f = useFiltrosAnalise('painel')
+  const filtros = f.filtros
+  const estado = usePainelEstadoAtual(filtros)
+  const hoje = usePainelHoje(filtros)
+  const metas = useMetasSla()
+  const agora = useAgora(30_000)
 
-  const ds = useRelatorioDataset(periodo)
-  const dsAnterior = useRelatorioDataset(periodoAnterior)
-  const estado = useEstadoAtual()
-  const breakdown = useStatusBreakdown()
+  const e = estado.data
+  const h = hoje.data
+  const expediente = metas.data?.metas ?? EXPEDIENTE_PADRAO
+  const atualizar = () => {
+    void estado.refetch()
+    void hoje.refetch()
+  }
 
-
-  const kpis = ds.data ? calcKPIs(ds.data.rows) : null
-  const kpisAnt = dsAnterior.data ? calcKPIs(dsAnterior.data.rows) : null
-  const porDia = ds.data ? calcPorDia(ds.data.rows, periodo) : []
-  const topClientesItems = ds.data ? topClientes(ds.data, 5) : []
-  const topMotoristasItems = ds.data ? topMotoristas(ds.data, 5) : []
-  const topSubcontratadasItems = ds.data ? topSubcontratadas(ds.data, 5) : []
-
-  const atrasadas = estado.data?.atrasadas ?? 0
-  const pendentesAtuais = estado.data?.pendentes ?? 0
+  const tvHref = React.useMemo(() => {
+    const q = new URLSearchParams()
+    if (filtros.origem !== 'todas') q.set('o', filtros.origem)
+    if (filtros.clienteId) q.set('cliente', filtros.clienteId)
+    if (filtros.local) q.set('local', filtros.local)
+    const s = q.toString()
+    return s ? `/operacao/tv?${s}` : '/operacao/tv'
+  }, [filtros])
 
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Visão geral"
-        description={periodo.label}
+        title="Painel"
+        meta={<SeloSimulado />}
         actions={
-          <IntervaloDatas
-            idPrefix="dash"
-            de={deCampo}
-            ate={ateCampo}
-            onChange={setIntervalo}
-            mostrarLimpar={!noPadrao}
-            onLimpar={limpar}
-          />
+          <>
+            <AtualizadoAs
+              atualizadoEm={estado.dataUpdatedAt}
+              atualizando={estado.isFetching || hoje.isFetching}
+              erro={estado.isError || hoje.isError}
+              onAtualizar={atualizar}
+            />
+            <Button asChild variant="outline" size="sm">
+              <Link to={tvHref} target="_blank" rel="noopener" title="Abrir o Modo TV em outra aba">
+                <MonitorPlay className="h-4 w-4" /> Modo TV
+              </Link>
+            </Button>
+          </>
         }
+        className="mb-2"
       />
 
-      {/* Estado operacional — "agora" */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Kpi
-          label="Pendentes em aberto"
-          hint="Na fila: recebida, em emissão ou instrução emitida"
-          value={pendentesAtuais}
+      <FiltrosAnalise {...f} />
+
+      {/* KPIs: 2 colunas no celular (o 5º ocupa a linha), 5 no desktop. */}
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+        <KpiTile
+          label="Na fila"
           icon={Inbox}
-          isLoading={estado.isLoading}
-          isError={estado.isError}
-          onRetry={() => { void estado.refetch() }}
-          to="/solicitacoes?status=recebida,em_cadastro,instrucao_emitida"
+          value={valor(estado.isLoading, estado.isError, e?.fila.total)}
+          hint={e && <span className="tabular-nums">{fmtInt(e.fila.aguardando_finalizacao)} aguardando finalização</span>}
+          to={e ? linkSolicitacoes({ status: ETAPAS_FILA.join(','), ordem: 'antiga' }, filtros) : undefined}
         />
-        <Kpi
-          label="Atrasadas"
-          hint={atrasadas > 0 ? 'Pendentes há mais de 8 horas, prioridade' : 'Nenhuma fora do prazo de 8 horas'}
-          value={atrasadas}
+        <KpiTile
+          label="Fora do SLA"
           icon={AlertTriangle}
-          isLoading={estado.isLoading}
-          isError={estado.isError}
-          onRetry={() => { void estado.refetch() }}
-          to="/solicitacoes?atrasadas=1"
-          alerta={atrasadas > 0}
+          tone={e && e.fila.fora_sla > 0 ? 'alert' : 'default'}
+          value={valor(estado.isLoading, estado.isError, e?.fila.fora_sla)}
+          hint={e && <span className="tabular-nums">{fmtInt(e.fila.aviso)} em aviso</span>}
+          to={e ? linkSolicitacoes({ sla: 'fora', ordem: 'antiga' }, filtros) : undefined}
+        />
+        <KpiTile
+          label="Finalizadas hoje"
+          icon={PackageCheck}
+          value={valor(hoje.isLoading, hoje.isError, h?.finalizadas)}
+          delta={h ? deltaPct(h.finalizadas, h.finalizadas_ref, `vs. ontem até ${fmtHoraMin(agora).replace(':', 'h')}`, true) : undefined}
+          hint={h && <Ritmo finalizadas={h.finalizadas} projecao={projetarRitmo(h, expediente, new Date(agora))} meta={metaVisivel(h.meta, filtros)} fim={expediente.expediente_fim} />}
+          to={h ? linkSolicitacoes({ status: 'finalizada', data: 'finalizada', de: diaIso(agora), ate: diaIso(agora) }, filtros) : undefined}
+        />
+        <KpiTile
+          label="Lead time 7 dias"
+          icon={Timer}
+          value={hoje.isLoading ? <Esqueleto /> : hoje.isError ? '—' : <Lead p={h?.lead7d} />}
+          delta={h && amostraOk(h.lead7d) && amostraOk(h.lead7d_ant) ? deltaPct(h.lead7d.p50 as number, h.lead7d_ant.p50 as number, 'vs. 7 dias anteriores', false) : undefined}
+          hint={h && (amostraOk(h.lead7d) ? <span className="tabular-nums">P90 {fmtDur(h.lead7d.p90)} · n={fmtInt(h.lead7d.n)}</span> : 'amostra pequena')}
+          to="/relatorios?aba=fluxo"
+        />
+        <KpiTile
+          label="OCs vencendo"
+          icon={Clock}
+          className="col-span-2 md:col-span-1"
+          value={valor(estado.isLoading, estado.isError, e?.validade.vencendo)}
+          hint={
+            e && (
+              <span className={cn('tabular-nums', e.validade.vencidas > 0 && 'text-danger')}>
+                {e.validade.vencidas > 0 && <TriangleAlert className="mr-1 inline h-3.5 w-3.5 align-[-2px]" aria-hidden />}
+                {fmtInt(e.validade.vencidas)} já {e.validade.vencidas === 1 ? 'vencida' : 'vencidas'}
+              </span>
+            )
+          }
+          to={e ? linkSolicitacoes({ validade: 'vencendo' }, filtros) : undefined}
         />
       </div>
 
-      {/* Volume no período (contexto histórico) */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <Kpi
-          label="Total de OCs"
-          hint="Solicitações criadas no período"
-          value={kpis?.total}
-          previous={kpisAnt?.total}
-          icon={ClipboardList}
-          isLoading={ds.isLoading}
-          isError={ds.isError}
-          onRetry={() => { void ds.refetch() }}
-          to="/solicitacoes"
-          higherIsBetter
-        />
-        <Kpi
-          label="Finalizadas"
-          hint={kpis ? `${fmtPct(kpis.taxaFinalizacao, { casas: 0 })} de conclusão` : undefined}
-          value={kpis?.finalizadas}
-          previous={kpisAnt?.finalizadas}
-          icon={ClipboardCheck}
-          isLoading={ds.isLoading}
-          isError={ds.isError}
-          onRetry={() => { void ds.refetch() }}
-          to="/solicitacoes?status=finalizada"
-          higherIsBetter
-        />
-        <Kpi
-          label="Tempo médio"
-          hint="Da criação até a finalização"
-          value={kpis?.tempoMedioHoras ?? null}
-          formatar={fmtDurHoras}
-          previous={kpisAnt?.tempoMedioHoras ?? null}
-          icon={Hourglass}
-          isLoading={ds.isLoading}
-          isError={ds.isError}
-          onRetry={() => { void ds.refetch() }}
-          to="/relatorios"
-          higherIsBetter={false}
-        />
-      </div>
-
-      <Card title="Volume de OCs" subtitle={periodo.label}>
-        <VolumeChart data={porDia} isLoading={ds.isLoading} isError={ds.isError} onRetry={() => { void ds.refetch() }} />
-      </Card>
-
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Card title="Solicitações por status" subtitle="Total acumulado">
-          <StatusDonut data={breakdown.data ?? []} isLoading={breakdown.isLoading} isError={breakdown.isError} onRetry={() => { void breakdown.refetch() }} />
-        </Card>
-        <Card
-          title="Top clientes"
-          subtitle={periodo.label}
-          action={<VerRelatoriosLink />}
+      {/* Blocos: no desktop a grade do wireframe; no celular a ordem da §3.1. */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
+        <Bloco
+          titulo="Funil por etapa"
+          subtitulo="Quantas em cada etapa e quantas passaram do SLA dela"
+          className="order-1 lg:order-none lg:col-span-3"
+          carregando={estado.isLoading}
+          erro={estado.isError}
+          onRetry={() => void estado.refetch()}
+          alturaEsqueleto={260}
         >
-          <TopList items={topClientesItems} isLoading={ds.isLoading} isError={ds.isError} onRetry={() => { void ds.refetch() }} emptyMessage="Sem clientes no período." />
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Card title="Top motoristas" subtitle={periodo.label} action={<VerRelatoriosLink />}>
-          <TopList items={topMotoristasItems} isLoading={ds.isLoading} isError={ds.isError} onRetry={() => { void ds.refetch() }} emptyMessage="Sem motoristas no período." />
-        </Card>
-        <Card title="Top subcontratadas" subtitle={periodo.label} action={<VerRelatoriosLink />}>
-          <TopList items={topSubcontratadasItems} isLoading={ds.isLoading} isError={ds.isError} onRetry={() => { void ds.refetch() }} emptyMessage="Sem subcontratadas no período." />
-        </Card>
+          {e && <FunilEtapas etapas={e.etapas} filtros={filtros} />}
+        </Bloco>
+        <Bloco
+          titulo="Idade da fila"
+          subtitulo="Tempo desde a entrada, de Recebida até OC gerada"
+          className="order-5 lg:order-none lg:col-span-2"
+          carregando={estado.isLoading}
+          erro={estado.isError}
+          onRetry={() => void estado.refetch()}
+          alturaEsqueleto={220}
+        >
+          {e && <IdadeFila aging={e.aging} filtros={filtros} />}
+        </Bloco>
+        <Bloco
+          titulo="Vazão por hora"
+          subtitulo="Finalizadas hoje × média da mesma hora nas 4 últimas semanas"
+          className="order-4 lg:order-none lg:col-span-3"
+          carregando={hoje.isLoading}
+          erro={hoje.isError}
+          onRetry={() => void hoje.refetch()}
+          alturaEsqueleto={260}
+        >
+          {h && <VazaoHora porHora={h.por_hora} filtros={filtros} />}
+        </Bloco>
+        <Bloco
+          titulo="Pendências"
+          subtitulo="O que depende de alguém agir"
+          className="order-3 lg:order-none lg:col-span-2"
+          carregando={estado.isLoading}
+          erro={estado.isError}
+          onRetry={() => void estado.refetch()}
+        >
+          {e && <Pendencias estado={e} filtros={filtros} />}
+        </Bloco>
+        <Bloco
+          titulo="Mais atrasadas"
+          subtitulo="As 10 com maior excesso sobre o SLA da etapa"
+          className="order-2 lg:order-none lg:col-span-5"
+          acao={
+            e && e.fila.fora_sla > 0 ? (
+              <Link to={linkSolicitacoes({ sla: 'fora', ordem: 'antiga' }, filtros)} className="shrink-0 text-body-sm font-medium text-primary-strong hover:underline">
+                Ver todas ({fmtInt(e.fila.fora_sla)})
+              </Link>
+            ) : undefined
+          }
+          carregando={estado.isLoading}
+          erro={estado.isError}
+          onRetry={() => void estado.refetch()}
+        >
+          {e && <MaisAtrasadas atrasadas={e.atrasadas} geradoEm={e.gerado_em} agora={agora} limite={10} />}
+        </Bloco>
+        <Bloco
+          titulo="Por local de carregamento"
+          subtitulo="Fila e fora do SLA nos 6 maiores locais"
+          className="order-6 lg:order-none lg:col-span-5"
+          carregando={estado.isLoading}
+          erro={estado.isError}
+          onRetry={() => void estado.refetch()}
+          alturaEsqueleto={120}
+        >
+          {e && <PorLocal locais={e.por_local} filtros={filtros} />}
+        </Bloco>
       </div>
     </div>
   )
 }
 
-function VerRelatoriosLink() {
+function Esqueleto() {
+  return <Skeleton className="inline-block h-8 w-20 align-middle" />
+}
+
+function valor(carregando: boolean, erro: boolean, n: number | undefined): React.ReactNode {
+  if (carregando) return <Esqueleto />
+  if (erro || n == null) return '—'
+  return fmtInt(n)
+}
+
+function amostraOk(p: Percentis | undefined): boolean {
+  return !!p && p.n >= 5 && p.p50 != null
+}
+
+function Lead({ p }: { p: Percentis | undefined }) {
+  if (!amostraOk(p)) return <>—</>
   return (
-    <Link
-      to="/relatorios"
-      className="inline-flex items-center gap-1 text-body-sm font-medium text-primary-strong hover:underline"
-    >
-      Ver relatórios
-      <ArrowRight className="h-3 w-3" />
-    </Link>
+    <span>
+      <span className="mr-1.5 text-body font-normal text-muted-foreground">P50</span>
+      {fmtDur(p?.p50)}
+    </span>
   )
 }
 
-
-interface KpiProps {
-  label: string
-  value: number | null | undefined
-  /** Formatação do valor (padrão fmtInt). */
-  formatar?: (n: number) => string
-  hint?: string
-  previous?: number | null | undefined
-  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>
-  isLoading: boolean
-  isError?: boolean
-  onRetry?: () => void
-  higherIsBetter?: boolean
-  to?: string
-  alerta?: boolean
-}
-
-// Adaptador do <KpiTile> para o Painel: carregamento, erro com retry, delta vs.
-// período anterior e drill-down para a lista filtrada.
-function Kpi({
-  label, value, formatar = fmtInt, hint, previous, icon, isLoading,
-  isError, onRetry, higherIsBetter, to, alerta,
-}: KpiProps) {
-  const delta = computeDelta(value, previous)
-  const pronto = !isLoading && !isError
-  const interativo = !!to && pronto
-
-  return (
-    <KpiTile
-      label={label}
-      icon={icon}
-      tone={alerta && pronto ? 'alert' : 'default'}
-      value={
-        isLoading ? (
-          <Skeleton className="inline-block h-8 w-24 align-middle" />
-        ) : isError || value == null ? (
-          '—'
-        ) : (
-          formatar(value)
-        )
-      }
-      delta={
-        pronto && delta != null && higherIsBetter !== undefined
-          ? {
-              valor: delta.flat ? 'Sem variação' : fmtDelta(delta.pct / 100),
-              comparador: 'vs. período anterior',
-              direcao: delta.flat ? 'flat' : delta.pct > 0 ? 'up' : 'down',
-              subirEhBom: higherIsBetter,
-            }
-          : undefined
-      }
-      hint={isError ? <KpiError onRetry={onRetry} /> : pronto ? hint : undefined}
-      to={interativo ? to : undefined}
-    />
-  )
-}
-
-function KpiError({ onRetry }: { onRetry?: () => void }) {
-  return (
-    <div>
-      <p className="flex items-center gap-1.5 font-medium text-danger">
-        <AlertTriangle className="h-3.5 w-3.5 shrink-0" /> Erro ao carregar
-      </p>
-      {onRetry && (
-        <button
-          type="button"
-          onClick={(e) => { e.preventDefault(); onRetry() }}
-          className="mt-1 inline-flex items-center gap-1 text-meta font-medium text-primary-strong hover:underline"
-        >
-          <RefreshCw className="h-3 w-3" /> Tentar novamente
-        </button>
-      )}
-    </div>
-  )
-}
-
-function ChartError({ onRetry, height }: { onRetry?: () => void; height: number }) {
-  return (
-    <div
-      className="flex flex-col items-center justify-center gap-2 text-center"
-      style={{ height }}
-    >
-      <AlertTriangle className="h-5 w-5 text-danger" />
-      <p className="text-body font-medium text-foreground">Não foi possível carregar</p>
-      {onRetry && (
-        <button
-          type="button"
-          onClick={onRetry}
-          className="inline-flex items-center gap-1 text-body-sm font-medium text-primary-strong hover:underline"
-        >
-          <RefreshCw className="h-3 w-3" /> Tentar novamente
-        </button>
-      )}
-    </div>
-  )
-}
-
-function computeDelta(current: number | null | undefined, previous: number | null | undefined): {
-  pct: number
-  flat: boolean
-} | null {
-  if (current == null || previous == null) return null
-  if (!Number.isFinite(current) || !Number.isFinite(previous)) return null
-  const pct = previous === 0 ? (current === 0 ? 0 : 100) : ((current - previous) / previous) * 100
-  return { pct, flat: pct <= 0.5 && pct >= -0.5 }
-}
-
-interface CardProps {
-  title: string
-  subtitle?: string
-  action?: React.ReactNode
-  children: React.ReactNode
-}
-
-function Card({ title, subtitle, action, children }: CardProps) {
-  return (
-    <section className="rounded-lg border bg-card">
-      <header className="flex items-center justify-between border-b px-4 py-3">
-        <div>
-          <h2 className="text-body-lg font-medium text-foreground">{title}</h2>
-          {subtitle && <p className="text-meta text-muted-foreground">{subtitle}</p>}
-        </div>
-        {action}
-      </header>
-      <div className="p-4">{children}</div>
-    </section>
-  )
-}
-
-interface VolumeChartProps {
-  data: { dia: string; total: number; finalizadas: number }[]
-  isLoading: boolean
-  isError?: boolean
-  onRetry?: () => void
-}
-
-function VolumeChart({ data, isLoading, isError, onRetry }: VolumeChartProps) {
-  if (isLoading) return <Skeleton className="h-[260px] w-full" />
-  if (isError) return <ChartError onRetry={onRetry} height={260} />
-  if (data.length === 0) {
-    return (
-      <div className="flex h-[240px] items-center justify-center text-body text-muted-foreground">
-        Sem dados no período.
-      </div>
-    )
+function deltaPct(atual: number, anterior: number, comparador: string, subirEhBom: boolean) {
+  if (!Number.isFinite(atual) || !Number.isFinite(anterior)) return undefined
+  const pct = anterior === 0 ? (atual === 0 ? 0 : 1) : (atual - anterior) / anterior
+  const flat = Math.abs(pct) < 0.005
+  return {
+    valor: flat ? 'Sem variação' : fmtDelta(pct),
+    comparador,
+    direcao: flat ? ('flat' as const) : pct > 0 ? ('up' as const) : ('down' as const),
+    subirEhBom,
   }
-  const formatted = data.map((d) => ({
-    ...d,
-    label: format(parseDayKey(d.dia), 'dd/MM', { locale: ptBR }),
-  }))
+}
+
+/** A meta é da operação inteira: com recorte de origem/cliente/local ela não se aplica. */
+function metaVisivel(meta: number | null, f: FiltrosComuns): number | null {
+  return f.origem === 'todas' && !f.clienteId && !f.local ? meta : null
+}
+
+function diaIso(ms: number): string {
+  const d = new Date(ms)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+/** P4/P5: sem meta, só "≈ N até 18h"; com meta, "31/45" + barra (laranja se o ritmo não chega). */
+function Ritmo({ finalizadas, projecao, meta, fim }: { finalizadas: number; projecao: number; meta: number | null; fim: string }) {
+  const ate = rotuloHorario(fim)
+  if (meta == null || meta <= 0) {
+    return <span className="tabular-nums">≈ {fmtInt(projecao)} até {ate}</span>
+  }
+  const abaixo = projecao < meta
   return (
-    <div className="h-[260px] w-full" role="group" aria-label="Volume de OCs por dia no período">
-      <p className="sr-only">
-        Gráfico de linha com o número de OCs criadas e finalizadas por dia no período selecionado.
-      </p>
-      <ResponsiveContainer>
-        <LineChart accessibilityLayer data={formatted} margin={{ top: 8, right: 16, left: -10, bottom: 0 }}>
-          <CartesianGrid {...gridProps} />
-          <XAxis dataKey="label" {...axisProps} interval="preserveStartEnd" />
-          <YAxis {...axisProps} allowDecimals={false} />
-          <Tooltip
-            cursor={{ stroke: 'var(--chart-grid)' }}
-            content={(p) => (
-              <ChartTooltip
-                {...p}
-                formatLabel={() => {
-                  const item = p.payload?.[0]?.payload as { dia: string } | undefined
-                  return item?.dia ? format(parseDayKey(item.dia), "dd 'de' MMMM", { locale: ptBR }) : ''
-                }}
-              />
-            )}
-          />
-          <Line type="monotone" dataKey="total" name="Criadas" stroke={COR_CRIADAS} strokeWidth={2} dot={{ r: 2 }} activeDot={{ r: 4 }} />
-          <Line type="monotone" dataKey="finalizadas" name="Finalizadas" stroke={COR_FINALIZADAS} strokeWidth={2} dot={{ r: 2 }} activeDot={{ r: 4 }} />
-        </LineChart>
-      </ResponsiveContainer>
-      <div className="mt-2 flex items-center justify-center gap-4 text-meta text-muted-foreground">
-        <span className="flex items-center gap-1.5">
-          <span className="h-0.5 w-3" style={{ backgroundColor: COR_CRIADAS }} /> Criadas
+    <div className="space-y-1">
+      <div className="flex items-baseline justify-between gap-2 tabular-nums">
+        <span>
+          {fmtInt(finalizadas)}/{fmtInt(meta)} da meta
         </span>
-        <span className="flex items-center gap-1.5">
-          <span className="h-0.5 w-3" style={{ backgroundColor: COR_FINALIZADAS }} /> Finalizadas
-        </span>
+        <span className={cn(abaixo && 'font-medium text-primary-strong')}>≈ {fmtInt(projecao)} até {ate}</span>
+      </div>
+      <div
+        className="h-1.5 overflow-hidden rounded-[2px] bg-muted"
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={meta}
+        aria-valuenow={finalizadas}
+        aria-label="Finalizadas em relação à meta do dia"
+      >
+        <div
+          className={cn('h-full', abaixo ? 'bg-primary' : 'bg-chart-7')}
+          style={{ width: `${Math.min(100, (finalizadas / meta) * 100)}%` }}
+        />
       </div>
     </div>
-  )
-}
-
-function StatusDonut({ data, isLoading, isError, onRetry }: { data: StatusBreakdownItem[]; isLoading: boolean; isError?: boolean; onRetry?: () => void }) {
-  if (isLoading) return <Skeleton className="h-[220px] w-full" />
-  if (isError) return <ChartError onRetry={onRetry} height={220} />
-  if (data.length === 0) {
-    return (
-      <div className="flex h-[220px] items-center justify-center text-body text-muted-foreground">
-        Sem solicitações ainda.
-      </div>
-    )
-  }
-  const total = data.reduce((acc, d) => acc + d.count, 0)
-  const porStatus = new Map(data.map((d) => [d.status, d.count]))
-  // Todos os status na ordem do fluxo (zerados inclusive) — a legenda não esconde nenhum.
-  const legenda = ORDEM_STATUS.map((s) => ({ name: STATUS_LABELS[s], value: porStatus.get(s) ?? 0, status: s }))
-  const fatias = legenda.filter((d) => d.value > 0)
-  return (
-    <div className="grid grid-cols-1 items-center gap-4 sm:grid-cols-[180px_1fr]">
-      <div className="relative h-[180px]" role="img" aria-label="Distribuição de solicitações por status; detalhada na legenda">
-        <ResponsiveContainer>
-          <PieChart>
-            <Pie
-              data={fatias}
-              dataKey="value"
-              nameKey="name"
-              innerRadius={50}
-              outerRadius={75}
-              paddingAngle={1}
-              stroke="hsl(var(--card))"
-            >
-              {fatias.map((entry) => (
-                <Cell key={entry.status} fill={STATUS_COLOR_VAR[entry.status]} />
-              ))}
-            </Pie>
-            <Tooltip content={<ChartTooltip />} />
-          </PieChart>
-        </ResponsiveContainer>
-        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-meta text-muted-foreground">Total</span>
-          <span className="font-display text-title font-medium tabular-nums text-foreground">{fmtInt(total)}</span>
-        </div>
-      </div>
-      <ul className="space-y-1">
-        {legenda.map((d) => (
-          <li key={d.status} className="flex items-center justify-between text-body-sm">
-            <div className="flex min-w-0 items-center gap-2">
-              <span className="h-2 w-2 shrink-0 rounded-[1px]" style={{ backgroundColor: STATUS_COLOR_VAR[d.status] }} />
-              <span className="truncate text-foreground">{d.name}</span>
-            </div>
-            <span className="ml-2 shrink-0 tabular-nums text-muted-foreground">
-              {fmtInt(d.value)} <span className="text-meta">({fmtPct(total > 0 ? d.value / total : 0, { casas: 0 })})</span>
-            </span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  )
-}
-
-
-function TopList({
-  items,
-  isLoading,
-  isError,
-  onRetry,
-  emptyMessage,
-}: {
-  items: TopItem[]
-  isLoading: boolean
-  isError?: boolean
-  onRetry?: () => void
-  emptyMessage: string
-}) {
-  if (isLoading) {
-    return (
-      <div className="space-y-2">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <Skeleton key={i} className="h-7 w-full" />
-        ))}
-      </div>
-    )
-  }
-  if (isError) return <ChartError onRetry={onRetry} height={180} />
-  if (items.length === 0) {
-    return (
-      <div className="flex h-[180px] items-center justify-center text-body text-muted-foreground">
-        {emptyMessage}
-      </div>
-    )
-  }
-  const max = items[0]?.total ?? 1
-  return (
-    <ul className="space-y-2">
-      {items.map((it, i) => (
-        <RankRow key={it.id} posicao={i + 1} label={it.label} valor={fmtInt(it.total)} pct={(it.total / max) * 100} />
-      ))}
-    </ul>
-  )
-}
-
-// Linha de ranking: posição tabular, rótulo, valor e barra sólida fina (chart-1,
-// cantos 2px) — sem gradiente, sem troféu.
-function RankRow({ posicao, label, valor, pct }: { posicao: number; label: string; valor: string; pct: number }) {
-  return (
-    <li className="grid grid-cols-[1.25rem_minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1 text-body-sm">
-      <span className="text-right tabular-nums text-muted-foreground">{posicao}</span>
-      <span className="truncate text-foreground">{label}</span>
-      <span className="text-right font-medium tabular-nums text-foreground">{valor}</span>
-      <div className="col-start-2 h-1.5 rounded-[2px] bg-muted">
-        <div className="h-full rounded-[2px] bg-chart-1" style={{ width: `${pct}%` }} />
-      </div>
-    </li>
   )
 }
