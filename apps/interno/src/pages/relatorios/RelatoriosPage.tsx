@@ -409,16 +409,16 @@ function GraficoSerie({ serie, gran, p }: { serie: SerieLinha[]; gran: Granulari
             <YAxis {...axisProps} allowDecimals={false} />
             <Tooltip cursor={{ stroke: 'var(--chart-grid)' }} content={<ChartTooltip />} />
             <Line dataKey="entradas" name="Entradas" stroke="var(--chart-2)" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
-            <Line dataKey="finalizadas" name="Finalizadas" stroke="var(--chart-7)" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
-            <Line dataKey="entradas_ant" name="Entradas (anterior)" stroke="var(--chart-2)" strokeOpacity={0.55} strokeWidth={1.5} strokeDasharray="4 3" dot={false} />
-            <Line dataKey="finalizadas_ant" name="Finalizadas (anterior)" stroke="var(--chart-ref)" strokeWidth={1.5} strokeDasharray="4 3" dot={false} />
+            <Line dataKey="finalizadas" name="Finalizadas" stroke="var(--chart-4)" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+            <Line dataKey="entradas_ant" name="Entradas (anterior)" stroke="var(--chart-2)" strokeOpacity={0.5} strokeWidth={1.5} strokeDasharray="6 4" dot={false} activeDot={false} />
+            <Line dataKey="finalizadas_ant" name="Finalizadas (anterior)" stroke="var(--chart-4)" strokeOpacity={0.5} strokeWidth={1.5} strokeDasharray="6 4" dot={false} activeDot={false} />
           </LineChart>
         </ResponsiveContainer>
       </div>
       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-meta text-muted-foreground">
         <Legenda cor="var(--chart-2)" rotulo="Entradas" />
-        <Legenda cor="var(--chart-7)" rotulo="Finalizadas" />
-        <Legenda cor="var(--chart-ref)" rotulo="Período anterior" tracejado />
+        <Legenda cor="var(--chart-4)" rotulo="Finalizadas" />
+        <Legenda cor="var(--chart-ref)" rotulo="Período anterior (mesma cor, tracejado)" tracejado />
       </div>
     </div>
   )
@@ -561,7 +561,7 @@ function MapaCalor({ celulas }: { celulas: MapaCalorCelula[] }) {
           ))}
         </tbody>
       </table>
-      <p className="mt-2 text-meta text-muted-foreground">Mais escuro = mais entradas (máximo {fmtInt(max)} numa célula).</p>
+      <p className="mt-2 text-meta text-muted-foreground">Cor mais intensa = mais entradas (máximo {fmtInt(max)} numa célula).</p>
     </div>
   )
 }

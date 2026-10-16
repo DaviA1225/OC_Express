@@ -25,5 +25,5 @@ export function textoComparador(p: Periodo, agora: Date): string {
   const parcial = fim > agora.getTime() && lerDia(p.de).getTime() <= agora.getTime()
   const hora = `${agora.getHours()}h${String(agora.getMinutes()).padStart(2, '0')}`
   if (n === 1) return parcial ? `vs. ontem até ${hora}` : 'vs. dia anterior'
-  return parcial ? `vs. ${n} dias anteriores (mesmo horário)` : `vs. ${n} dias anteriores`
+  return `vs. ${n} dias anteriores`
 }

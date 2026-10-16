@@ -8,7 +8,9 @@ import { cn } from '@/lib/utils'
 
 // Cores do funil: etapas em grafite; laranja SÓ no que estourou o SLA.
 const COR_OK = 'var(--chart-7)'
-const COR_AVISO = 'var(--chart-ref)'
+// Aviso no tom semântico de atenção (não é o acento): no escuro, chart-7 e
+// chart-ref ficavam indistinguíveis.
+const COR_AVISO = 'hsl(var(--warning))'
 const COR_FORA = 'var(--chart-1)'
 
 interface Props {
@@ -33,7 +35,7 @@ export function FunilEtapas({ etapas, filtros, tv }: Props) {
                 <span className={cn('flex min-w-0 items-center gap-1.5 text-foreground', tv ? 'tv-texto' : 'text-body-sm')}>
                   <StatusDot status={e.status} />
                   <span className="truncate">{STATUS_LABELS[e.status]}</span>
-                  {semSla && <span className="shrink-0 text-meta text-muted-foreground">sem SLA</span>}
+                  {semSla && <span className={cn('shrink-0 text-muted-foreground', tv ? 'tv-meta' : 'text-meta')}>sem SLA</span>}
                 </span>
                 <span className={cn('shrink-0 tabular-nums', tv ? 'tv-texto' : 'text-body-sm')}>
                   <span className="font-medium text-foreground">{fmtInt(e.qtd)}</span>

@@ -15,7 +15,7 @@ const ORIGENS: { value: OrigemFiltro; label: string; title?: string }[] = [
   { value: 'parceiro', label: 'Parceiros' },
 ]
 
-const TODOS = '__todos'
+const QUALQUER_LOCAL = '__todos'
 
 // Opções de local: os locais com movimento nos últimos 90 dias (relatorio_locais).
 function ultimos90(): { de: string; ate: string } {
@@ -92,12 +92,12 @@ function Controles({ filtros, setOrigem, setCliente, setLocal, limpar, ativos, s
         />
       </div>
       <div className={cn(empilhado ? 'w-full' : 'w-48')}>
-        <Select value={filtros.local ?? TODOS} onValueChange={(v) => setLocal(v === TODOS ? null : v)}>
+        <Select value={filtros.local ?? QUALQUER_LOCAL} onValueChange={(v) => setLocal(v === QUALQUER_LOCAL ? null : v)}>
           <SelectTrigger aria-label="Filtrar por local de carregamento">
             <SelectValue placeholder="Todos os locais" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value={TODOS}>Todos os locais</SelectItem>
+            <SelectItem value={QUALQUER_LOCAL}>Todos os locais</SelectItem>
             {(locais.data ?? []).map((l) => (
               <SelectItem key={l.local} value={l.local}>
                 {l.local}
