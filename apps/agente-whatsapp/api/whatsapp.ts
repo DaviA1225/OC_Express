@@ -4,15 +4,18 @@
  * - GET  /api/whatsapp  → handshake de verificação (Meta envia `hub.challenge`)
  * - POST /api/whatsapp  → entrega de mensagens (com assinatura HMAC no header)
  *
- * O POST está propositalmente em "stub": apenas valida a assinatura e responde
- * 200 (Meta exige resposta < 5s ou retenta). O processamento real
- * (parse → Claude tool use → INSERT idempotente em `solicitacoes`) entra em
- * iterações seguintes.
+ * O POST faz só o mínimo dentro dos 5 s que a Meta espera: valida a
+ * assinatura, grava cada mensagem (idempotente pelo `wamid`) e responde 200.
+ * O atendimento em si roda depois da resposta, em `waitUntil`.
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
+import { waitUntil } from '@vercel/functions'
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import { config } from '../src/config'
+import { lerWebhook, marcarLida, type MensagemEntrada } from '../src/meta'
+import { getAgentClient } from '../src/supabase'
+import { processarConversa } from '../src/processar'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'GET') return handleVerify(req, res)
@@ -22,8 +25,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 }
 
 // ── GET: handshake de verificação ───────────────────────────────────────────
-// Meta chama com ?hub.mode=subscribe&hub.verify_token=<TOKEN>&hub.challenge=<X>.
-// Se o token bate com o nosso, devolvemos o challenge cru (text/plain).
 function handleVerify(req: VercelRequest, res: VercelResponse) {
   const mode = req.query['hub.mode']
   const token = req.query['hub.verify_token']
@@ -38,11 +39,6 @@ function handleVerify(req: VercelRequest, res: VercelResponse) {
 }
 
 // ── POST: entrega de eventos ────────────────────────────────────────────────
-// 1. Lê o corpo RAW (precisamos do bytes exatos pra validar HMAC).
-// 2. Compara X-Hub-Signature-256 com sha256(APP_SECRET, body) — rejeita se bate
-//    não bate.
-// 3. ACK 200 imediatamente — Meta retenta se demorar > 5s.
-// 4. (próxima iteração) extrai mensagens, dispara processamento async.
 async function handleInbound(req: VercelRequest, res: VercelResponse) {
   const raw = await readRawBody(req)
 
@@ -50,9 +46,63 @@ async function handleInbound(req: VercelRequest, res: VercelResponse) {
     return res.status(401).send('Invalid signature')
   }
 
-  // TODO(próxima iteração): parse do payload + dispatch para o pipeline
-  // (Claude → resolver IDs → INSERT idempotente com external_msg_id).
+  let mensagens: MensagemEntrada[]
+  try {
+    mensagens = lerWebhook(JSON.parse(raw.toString('utf8')))
+  } catch {
+    return res.status(200).json({ ok: true, ignorado: 'payload ilegível' })
+  }
+  if (mensagens.length === 0) return res.status(200).json({ ok: true })
+
+  // Se gravar falhar, devolvemos 500 para a Meta reentregar: perder mensagem é
+  // pior que recebê-la duas vezes (o `wamid` único segura a duplicata).
+  let conversas: Set<string>
+  try {
+    conversas = await gravarEntradas(mensagens)
+  } catch (e) {
+    console.error('[webhook] falha ao gravar', e)
+    return res.status(500).json({ ok: false })
+  }
+
+  for (const id of conversas) waitUntil(processarConversa(id).catch((e) => console.error('[agente]', id, e)))
+  for (const m of mensagens) waitUntil(marcarLida(m.wamid))
+
   return res.status(200).json({ ok: true })
+}
+
+async function gravarEntradas(mensagens: MensagemEntrada[]): Promise<Set<string>> {
+  const db = await getAgentClient()
+  const conversas = new Set<string>()
+  for (const m of mensagens) {
+    const agora = new Date().toISOString()
+    const { data: conversa, error: eC } = await db
+      .from('agente_conversas')
+      .upsert(
+        // Sem nome no payload, não apaga o nome que já temos.
+        { telefone: m.telefone, ...(m.nome ? { nome_contato: m.nome } : {}), ultima_entrada_em: agora, ultima_atividade_em: agora },
+        { onConflict: 'telefone' },
+      )
+      .select('id, sessao')
+      .single()
+    if (eC || !conversa) throw new Error(`conversa ${m.telefone}: ${eC?.message}`)
+
+    const { error: eM } = await db.from('agente_mensagens').insert({
+      conversa_id: conversa.id,
+      sessao: conversa.sessao,
+      direcao: 'entrada',
+      autor: 'contato',
+      wamid: m.wamid,
+      tipo: m.tipo,
+      texto: m.texto,
+      meta_media_id: m.midia?.id ?? null,
+      midia_mime: m.midia?.mime ?? null,
+      midia_nome: m.midia?.nome ?? null,
+    })
+    // 23505 = a Meta reentregou uma mensagem que já temos. Tudo certo.
+    if (eM && eM.code !== '23505') throw new Error(`mensagem ${m.wamid}: ${eM.message}`)
+    conversas.add(conversa.id)
+  }
+  return conversas
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────

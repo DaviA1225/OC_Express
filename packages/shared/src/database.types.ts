@@ -16,6 +16,11 @@ export type PerfilUsuario = 'admin' | 'gerente' | 'supervisor' | 'analista' | 'a
 /** 0074 — layout do sistema interno escolhido pelo usuário (modo ERP opt-in). */
 export type LayoutPreferido = 'classico' | 'erp'
 
+/** 0078 — agente de IA do WhatsApp. */
+export type AgenteModo = 'desligado' | 'sombra' | 'autonomo'
+export type AgenteTipoMensagem = 'texto' | 'audio' | 'documento' | 'imagem' | 'outro'
+export type AgenteStatusAcao = 'executada' | 'rascunho' | 'aprovada' | 'rejeitada' | 'erro'
+
 export type SolicitacaoStatus =
   | 'recebida'
   | 'em_cadastro'
@@ -591,6 +596,153 @@ export interface Database {
           motivo_reagendamento?: string | null
         }
       }
+      // 0078 — agente de IA do WhatsApp (docs/SPEC-AGENTE-IA.md).
+      agente_config: {
+        Row: {
+          id: number
+          modo: AgenteModo
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: { id?: number; modo?: AgenteModo; updated_by?: string | null }
+        Update: { modo?: AgenteModo; updated_at?: string; updated_by?: string | null }
+      }
+      agente_conversas: {
+        Row: {
+          id: string
+          telefone: string
+          nome_contato: string | null
+          estado: 'agente' | 'humano'
+          assumida_por: string | null
+          assumida_em: string | null
+          sessao: number
+          ultima_entrada_em: string | null
+          ultima_atividade_em: string
+          processando_ate: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          telefone: string
+          nome_contato?: string | null
+          estado?: 'agente' | 'humano'
+          sessao?: number
+          ultima_entrada_em?: string | null
+          ultima_atividade_em?: string
+        }
+        Update: {
+          nome_contato?: string | null
+          estado?: 'agente' | 'humano'
+          assumida_por?: string | null
+          assumida_em?: string | null
+          sessao?: number
+          ultima_entrada_em?: string | null
+          ultima_atividade_em?: string
+          processando_ate?: string | null
+          updated_at?: string
+        }
+      }
+      agente_mensagens: {
+        Row: {
+          id: string
+          conversa_id: string
+          sessao: number
+          direcao: 'entrada' | 'saida'
+          autor: 'contato' | 'agente' | 'humano'
+          wamid: string | null
+          tipo: AgenteTipoMensagem
+          texto: string | null
+          meta_media_id: string | null
+          midia_path: string | null
+          midia_mime: string | null
+          midia_nome: string | null
+          transcricao: string | null
+          anthropic_file_id: string | null
+          processada: boolean
+          envio: 'enviada' | 'sombra' | 'falhou' | null
+          enviada_por: string | null
+          erro: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          conversa_id: string
+          sessao: number
+          direcao: 'entrada' | 'saida'
+          autor: 'contato' | 'agente' | 'humano'
+          wamid?: string | null
+          tipo: AgenteTipoMensagem
+          texto?: string | null
+          meta_media_id?: string | null
+          midia_path?: string | null
+          midia_mime?: string | null
+          midia_nome?: string | null
+          transcricao?: string | null
+          anthropic_file_id?: string | null
+          processada?: boolean
+          envio?: 'enviada' | 'sombra' | 'falhou' | null
+          enviada_por?: string | null
+          erro?: string | null
+        }
+        Update: {
+          wamid?: string | null
+          midia_path?: string | null
+          midia_mime?: string | null
+          transcricao?: string | null
+          anthropic_file_id?: string | null
+          processada?: boolean
+          envio?: 'enviada' | 'sombra' | 'falhou' | null
+          erro?: string | null
+        }
+      }
+      agente_historico: {
+        Row: {
+          id: number
+          conversa_id: string
+          sessao: number
+          seq: number
+          role: 'user' | 'assistant'
+          content: Json
+          created_at: string
+        }
+        Insert: {
+          conversa_id: string
+          sessao: number
+          seq: number
+          role: 'user' | 'assistant'
+          content: Json
+        }
+        // Append-only: sem UPDATE pela RLS.
+        Update: Record<string, never>
+      }
+      agente_acoes: {
+        Row: {
+          id: string
+          conversa_id: string
+          ferramenta: string
+          entrada: Json
+          resultado: Json | null
+          status: AgenteStatusAcao
+          decidido_por: string | null
+          decidido_em: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          conversa_id: string
+          ferramenta: string
+          entrada: Json
+          resultado?: Json | null
+          status: AgenteStatusAcao
+        }
+        Update: {
+          resultado?: Json | null
+          status?: AgenteStatusAcao
+          decidido_por?: string | null
+          decidido_em?: string | null
+        }
+      }
       // 0070 — aceite do Termo de Uso e Confidencialidade. Escrita só pela RPC
       // `registrar_aceite_termos`; o app lê a própria linha para saber se ainda
       // precisa mostrar o modal.
@@ -973,6 +1125,11 @@ export interface Database {
       definir_meu_layout: {
         Args: { p_layout: LayoutPreferido }
         Returns: undefined
+      }
+      // 0078 — cadeado de processamento de uma conversa do agente.
+      agente_reivindicar_conversa: {
+        Args: { p_conversa_id: string; p_segundos: number }
+        Returns: boolean
       }
       // 0077 — batimento de atividade; a sessão vem do JWT.
       registrar_atividade_sessao: {
