@@ -1110,14 +1110,9 @@ export interface Database {
           atualizado_em: string
           atualizado_por: string | null
         }
-        Insert: {
-          id?: string
-          status: SlaEtapaStatus
-          aviso_min: number
-          alerta_min: number
-          ativo?: boolean
-        }
-        Update: Partial<Database['public']['Tables']['sla_etapas']['Insert']>
+        // Sem GRANT de INSERT; UPDATE só nestas colunas (e só pela RPC).
+        Insert: never
+        Update: { aviso_min?: number; alerta_min?: number; ativo?: boolean }
         Relationships: []
       }
       // 0079 — linha única com as metas do dia e o expediente.
@@ -1134,15 +1129,15 @@ export interface Database {
           atualizado_em: string
           atualizado_por: string | null
         }
-        Insert: {
-          id?: string
+        // Sem GRANT de INSERT; UPDATE só nestas colunas (e só pela RPC).
+        Insert: never
+        Update: {
           meta_finalizadas_dia?: number | null
           meta_lead_time_p90_min?: number | null
           alerta_validade_h?: number
           expediente_inicio?: string
           expediente_fim?: string
         }
-        Update: Partial<Database['public']['Tables']['metas_operacao']['Insert']>
         Relationships: []
       }
       // 0079 — uma linha por mudança de status (trigger), mais o backfill do
@@ -1154,7 +1149,8 @@ export interface Database {
           de_status: SolicitacaoStatus | null
           para_status: SolicitacaoStatus
           em: string
-          usuario_id: string | null
+          // usuario_id existe, mas o GRANT de SELECT da 0079 não o inclui:
+          // só as RPCs SECURITY DEFINER (produtividade) leem quem mudou.
           fonte: 'trigger' | 'backfill'
         }
         Insert: never
@@ -1413,7 +1409,8 @@ export interface Database {
       relatorio_ranking: {
         Args: DashPeriodo & DashFiltros & { p_dimensao?: string; p_limite?: number }
         Returns: {
-          chave: string | null
+          /** 'sem' quando a dimensão está vazia. */
+          chave: string
           rotulo: string
           entradas: number
           finalizadas: number
@@ -1424,7 +1421,8 @@ export interface Database {
       }
       relatorio_locais: {
         Args: DashPeriodo
-        Returns: { local: string | null; qtd: number }[]
+        /** Local vazio vem como 'Sem local'. */
+        Returns: { local: string; qtd: number }[]
       }
       relatorio_mapa_calor: {
         Args: DashPeriodo & DashFiltros

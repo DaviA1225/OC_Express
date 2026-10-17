@@ -121,17 +121,17 @@ export async function buscarConfigMetasSla(): Promise<ConfigMetasSla> {
   ])
   if (et.error) throw et.error
   if (me.error) throw me.error
-  const etapas = (et.data as ConfigMetasSla['etapas'] | null) ?? []
+  const etapas: ConfigMetasSla['etapas'] = et.data ?? []
   // Singleton ausente (seed não rodou) não pode derrubar a tela: cai nos
   // valores do seed (D3: sem meta) e a primeira gravação revela o problema.
-  const metas = (me.data as ConfigMetasSla['metas'][] | null)?.[0] ?? METAS_PADRAO
+  const metas: ConfigMetasSla['metas'] = me.data?.[0] ?? METAS_PADRAO
   const ultima = [metas, ...etapas]
     // Sem autor = valores do seed da 0079 (nunca alterados pela tela).
     .filter((x) => x !== METAS_PADRAO && x.atualizado_por).sort((a, b) => b.atualizado_em.localeCompare(a.atualizado_em))[0]
   let porNome: string | null = null
   if (ultima?.atualizado_por) {
     const { data } = await supabase.from('perfis_usuarios').select('nome_completo').eq('user_id', ultima.atualizado_por).maybeSingle()
-    porNome = (data as { nome_completo: string } | null)?.nome_completo ?? null
+    porNome = data?.nome_completo ?? null
   }
   return { etapas, metas, ultima_alteracao: ultima ? { em: ultima.atualizado_em, por_nome: porNome } : null }
 }
@@ -152,5 +152,6 @@ export async function buscarFilaPrevia(): Promise<ItemFilaPrevia[]> {
     .in('status', ['recebida', 'em_cadastro', 'instrucao_emitida', 'oc_gerada', 'oc_enviada'])
     .range(0, 999)
   if (error) throw error
+  // O .in() acima garante que só vêm etapas da fila (EtapaSla).
   return data as ItemFilaPrevia[]
 }
