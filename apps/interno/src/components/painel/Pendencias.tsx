@@ -73,7 +73,7 @@ export function Pendencias({ estado, filtros, tv }: { estado: PainelEstadoAtual;
                 className="group flex items-center gap-3 py-2.5 transition-colors duration-fast hover:bg-row-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
               >
                 {conteudo}
-                {<ChevronRight className="h-4 w-4 shrink-0 text-tertiary group-hover:text-foreground" aria-hidden />}
+                <ChevronRight className="h-4 w-4 shrink-0 text-tertiary group-hover:text-foreground" aria-hidden />
               </LinkDrill>
             )}
           </li>

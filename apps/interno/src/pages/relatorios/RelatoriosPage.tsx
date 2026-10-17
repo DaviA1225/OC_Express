@@ -177,9 +177,6 @@ export default function RelatoriosPage() {
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                {/* Com dados simulados, nada de CSV: o arquivo sairia do sistema
-                    sem a faixa de aviso e ainda registraria export_csv no log de
-                    acesso (LGPD) por uma exportação falsa. */}
                 <Button type="button" variant="outline" disabled={exportando}>
                   {exportando ? <Spinner /> : <Download className="h-4 w-4" />}
                   <span className="hidden sm:inline">Exportar</span>

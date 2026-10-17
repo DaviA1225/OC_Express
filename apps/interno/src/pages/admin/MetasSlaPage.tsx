@@ -240,7 +240,6 @@ function Formulario({ config, podeEditar }: { config: ConfigMetasSla; podeEditar
             <Button type="button" variant="outline" disabled={!alterado || salvar.isPending} onClick={() => descartar.onOpenChange(false)}>
               <Undo2 className="h-4 w-4" /> Descartar
             </Button>
-            {/* Simulado: a config vive só na memória da aba — "salvou" seria mentira. */}
             <Button
               type="submit"
               disabled={!alterado || salvar.isPending}

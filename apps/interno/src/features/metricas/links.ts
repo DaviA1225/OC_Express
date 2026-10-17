@@ -13,7 +13,6 @@ import type { FiltrosComuns, OrigemFiltro } from './tipos'
 
 type Valor = string | number | null | undefined
 
-
 /** Recorte de origem das telas → valor do parâmetro `origem` da lista. */
 export function origemParaLista(o: OrigemFiltro | string): string | null {
   if (o === 'todas') return null
