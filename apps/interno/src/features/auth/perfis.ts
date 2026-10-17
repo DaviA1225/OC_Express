@@ -8,6 +8,7 @@ export const PERFIL_LABELS: Record<string, string> = {
   supervisor: 'Supervisor',
   analista: 'Analista',
   assistente: 'Assistente',
+  painel_tv: 'Painel TV (só leitura do painel)',
 }
 
 /** Rótulo do perfil; desconhecido volta como veio, ausente vira "—". */

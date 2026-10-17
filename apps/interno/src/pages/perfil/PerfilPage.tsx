@@ -31,6 +31,7 @@ const PERFIL_CLASSES: Record<PerfilUsuario, string> = {
   supervisor: 'cat-steel',
   analista: 'cat-brass',
   assistente: 'bg-muted text-muted-foreground',
+  painel_tv: 'bg-muted text-muted-foreground',
 }
 
 const nomeSchema = z.object({

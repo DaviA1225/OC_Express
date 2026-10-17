@@ -1,7 +1,9 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
-import { SLA_ALERT_HOURS } from '@/features/solicitacoes/status'
-import { hojeOperacao } from '@/features/solicitacoes/useSolicitacoes'
+import { clausulaSla } from '@/features/solicitacoes/recorteLista'
+import { buscarConfigMetasSla } from '@/features/metricas/fonte'
+import { mapaSla } from '@/features/metricas/sla'
+import { hojeOperacao } from '@/lib/datasOperacao'
 
 export type NotificationKind = 'pendencia_resolvida' | 'pendente' | 'sem_oc' | 'oc_nao_enviada' | 'validade_vencendo'
 
@@ -43,11 +45,12 @@ interface RawRow {
   status: string
   created_at: string
   updated_at: string
+  status_desde?: string | null
   validade_fim: string | null
   cliente: { razao_social: string } | null
 }
 
-const SELECT = 'id, numero_interno, solicitante_nome, status, created_at, updated_at, validade_fim, cliente:cliente_id(razao_social)'
+const SELECT = 'id, numero_interno, solicitante_nome, status, created_at, updated_at, status_desde, validade_fim, cliente:cliente_id(razao_social)'
 
 interface RawPendencia {
   id: string
@@ -63,13 +66,19 @@ interface RawPendencia {
 }
 
 export function useNotifications() {
+  const qc = useQueryClient()
   return useQuery({
     queryKey: ['notifications'],
     refetchInterval: 120_000,
     refetchIntervalInBackground: false,
     staleTime: 30_000,
     queryFn: async (): Promise<NotificationItem[]> => {
-      const cutoffSlaAtraso = isoNowMinusHours(SLA_ALERT_HOURS)
+      // "Atrasada" = fora do SLA da etapa (mesma regra do Painel e da lista).
+      // A config vem do cache de Metas e SLA (10 min); falhou, usa os padrões.
+      const cfg = await qc
+        .fetchQuery({ queryKey: ['metas-operacao'], queryFn: buscarConfigMetasSla, staleTime: 10 * 60_000 })
+        .catch(() => null)
+      const foraSla = clausulaSla(mapaSla(cfg?.etapas), 'fora')
       const cutoffStuck = isoNowMinusHours(STUCK_THRESHOLD_H)
       // Validade é DATE: compara com o "hoje" da operação (MS), não com o dia UTC.
       const validadeLimit = hojeOperacao(new Date(Date.now() + VALIDADE_LIMIT_H * 3_600_000))
@@ -79,9 +88,8 @@ export function useNotifications() {
         supabase
           .from('solicitacoes')
           .select(SELECT)
-          .in('status', ['recebida', 'em_cadastro', 'instrucao_emitida', 'oc_gerada'])
-          .lt('created_at', cutoffSlaAtraso)
-          .order('created_at', { ascending: true })
+          .or(foraSla ?? 'id.eq.00000000-0000-0000-0000-000000000000')
+          .order('status_desde', { ascending: true })
           .limit(40),
         supabase
           .from('solicitacoes')
@@ -124,7 +132,8 @@ export function useNotifications() {
         for (const r of (rows ?? []) as RawRow[]) {
           if (seen.has(r.id)) continue
           seen.add(r.id)
-          const refDate = kind === 'pendente' || kind === 'validade_vencendo' ? r.created_at : r.updated_at
+          // Atrasada: tempo na etapa atual (status_desde, 0079).
+          const refDate = kind === 'pendente' ? (r.status_desde ?? r.created_at) : kind === 'validade_vencendo' ? r.created_at : r.updated_at
           out.push({
             id: r.id,
             kind,
@@ -172,7 +181,7 @@ export function useNotifications() {
 
 export const NOTIFICATION_LABELS: Record<NotificationKind, string> = {
   pendencia_resolvida: 'Parceiro resolveu a pendência',
-  pendente: `Atrasada (mais de ${SLA_ALERT_HOURS}h)`,
+  pendente: 'Fora do SLA da etapa',
   sem_oc: 'Instrução emitida sem OC',
   oc_nao_enviada: 'OC gerada · não enviada',
   validade_vencendo: 'Validade da OC vence até amanhã',

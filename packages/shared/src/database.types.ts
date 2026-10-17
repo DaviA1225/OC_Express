@@ -11,7 +11,8 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
-export type PerfilUsuario = 'admin' | 'gerente' | 'supervisor' | 'analista' | 'assistente'
+/** `painel_tv` (0079): conta da TV da sala, que só lê o Painel. */
+export type PerfilUsuario = 'admin' | 'gerente' | 'supervisor' | 'analista' | 'assistente' | 'painel_tv'
 
 /** 0074 — layout do sistema interno escolhido pelo usuário (modo ERP opt-in). */
 export type LayoutPreferido = 'classico' | 'erp'
@@ -332,6 +333,8 @@ export interface Database {
           pdf_url: string | null
           enviada_em: string | null
           finalizada_em: string | null
+          /** 0079: quando entrou na etapa atual (carimbo do servidor). */
+          status_desde: string
           cte_emitido: boolean
           mdfe_emitido: boolean
           vale_pedagio: boolean
@@ -381,6 +384,7 @@ export interface Database {
           pdf_url?: string | null
           enviada_em?: string | null
           finalizada_em?: string | null
+          status_desde?: string
           cte_emitido?: boolean
           mdfe_emitido?: boolean
           vale_pedagio?: boolean

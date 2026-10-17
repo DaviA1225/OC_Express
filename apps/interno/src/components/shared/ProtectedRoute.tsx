@@ -38,6 +38,12 @@ export function ProtectedRoute() {
     return <DeactivatedAccount />
   }
 
+  // Conta da TV (0079): só o Modo TV. Qualquer outra rota volta para ele — o
+  // banco já nega o resto (is_interno() exclui o perfil), isto evita telas vazias.
+  if (profile.perfil === 'painel_tv' && location.pathname !== '/operacao/tv') {
+    return <Navigate to="/operacao/tv" replace />
+  }
+
   return <Outlet />
 }
 

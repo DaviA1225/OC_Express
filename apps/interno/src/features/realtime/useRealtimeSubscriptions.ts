@@ -45,9 +45,8 @@ export function useRealtimeSubscriptions(): RealtimeStatus {
         agendar(
           k('solicitacoes'),
           k('recebidas-count'),
-          // `dashboard-estado-atual` alimenta os KPIs herói (pendentes/atrasadas).
-          k('dashboard-estado-atual'),
-          k('dashboard-status-breakdown'),
+          // Painel "Sala de Controle" (estado atual + hoje): §3.5 do plano.
+          k('painel'),
         )
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'cargas_retorno' }, () => {

@@ -1,3 +1,5 @@
+import { classificarSla, SLA_FALLBACK, type SlaCfg } from '@/features/metricas/sla'
+import type { EtapaSla } from '@/features/metricas/tipos'
 import type { SolicitacaoStatus } from '@/types/database.types'
 
 export const STATUS_ORDER: SolicitacaoStatus[] = [
@@ -58,9 +60,6 @@ export const SLA_PENDING_STATUSES: SolicitacaoStatus[] = [
   'oc_gerada',
 ]
 
-export const SLA_WARNING_HOURS = 2
-export const SLA_ALERT_HOURS = 8
-
 export type SlaSeverity = 'warning' | 'alert'
 
 export interface SlaInfo {
@@ -69,18 +68,25 @@ export interface SlaInfo {
   label: string
 }
 
+/**
+ * Selo de SLA da linha: tempo NA ETAPA ATUAL (status_desde, 0079) contra o
+ * limite configurado da etapa (Metas e SLA). Aviso → 'warning'; fora → 'alert';
+ * dentro do prazo ou etapa sem SLA → null. Sem config, os padrões 2 h / 8 h.
+ */
 export function getSlaInfo(
   status: SolicitacaoStatus,
-  createdAt: string | null,
+  statusDesde: string | null | undefined,
+  cfg?: Record<EtapaSla, SlaCfg> | null,
 ): SlaInfo | null {
-  if (!createdAt) return null
+  if (!statusDesde) return null
+  // Só a fila tem SLA (OC enviada fica fora, mesmo que alguém ative em Metas):
+  // selo, chip "Atrasadas", notificação e Painel contam as mesmas etapas.
   if (!SLA_PENDING_STATUSES.includes(status)) return null
-  const ms = Date.now() - new Date(createdAt).getTime()
-  const hours = ms / 3_600_000
-  if (hours < SLA_WARNING_HOURS) return null
-  const severity: SlaSeverity = hours >= SLA_ALERT_HOURS ? 'alert' : 'warning'
-  const label = formatSlaLabel(hours)
-  return { severity, hours, label }
+  const c = (cfg ?? SLA_FALLBACK)[status as EtapaSla]
+  const classe = classificarSla(status, statusDesde, Date.now(), c ?? null)
+  if (classe !== 'aviso' && classe !== 'fora') return null
+  const hours = (Date.now() - new Date(statusDesde).getTime()) / 3_600_000
+  return { severity: classe === 'fora' ? 'alert' : 'warning', hours, label: formatSlaLabel(hours) }
 }
 
 function formatSlaLabel(hours: number): string {

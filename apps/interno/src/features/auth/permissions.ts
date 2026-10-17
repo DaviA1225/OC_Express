@@ -51,6 +51,15 @@ export function canViewPrivacidade(p: PerfilRow | null): boolean {
   return is(p, 'admin', 'gerente', 'supervisor')
 }
 
+/** Metas e SLA (/admin/metas): a gestão vê; só o admin edita (RLS de UPDATE da 0079). */
+export function canViewMetasSla(p: PerfilRow | null): boolean {
+  return is(p, 'admin', 'gerente', 'supervisor')
+}
+
+export function canEditMetasSla(p: PerfilRow | null): boolean {
+  return is(p, 'admin')
+}
+
 /** Pedido do titular — exportar: admin e gerente (checado também na 0057). */
 export function canExportarTitular(p: PerfilRow | null): boolean {
   return is(p, 'admin', 'gerente')

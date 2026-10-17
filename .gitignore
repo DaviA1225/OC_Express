@@ -49,3 +49,6 @@ backfill/
 # Impeccable — cache de runtime do hook (não versionar)
 **/.impeccable/hook.cache.json
 .impeccable/config.local.json
+
+# Estado local do oh-my-claudecode em qualquer pasta (nunca versionar).
+**/.omc/

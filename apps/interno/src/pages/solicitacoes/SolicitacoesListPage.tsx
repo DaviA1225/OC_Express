@@ -43,6 +43,10 @@ import { STATUS_LABELS, getSlaInfo, type SlaInfo } from '@/features/solicitacoes
 import { usePendenciasSinais, type PendenciaSinal } from '@/features/solicitacoes/usePendencias'
 import { formatNumeroOC } from '@/lib/utils'
 import { cn } from '@/lib/utils'
+import { descreverRecorte, lerRecorte, PARAMS_RECORTE, recorteDefineEtapas } from '@/features/solicitacoes/recorteLista'
+import { useMetasSla } from '@/features/metricas/useMetasSla'
+import { mapaSla, VALIDADE_ALERTA_H_FALLBACK, type SlaCfg } from '@/features/metricas/sla'
+import type { EtapaSla } from '@/features/metricas/tipos'
 import type { SolicitacaoStatus, SolicitacaoTipo, SolicitacaoOrigem, Tables } from '@/types/database.types'
 
 type MaterialOpt = Pick<Tables<'materiais'>, 'id' | 'nome'>
@@ -101,7 +105,11 @@ export function SolicitacoesListPage() {
   const escopoTodas = params.get('ver') === 'todas'
   const buscando = debouncedSearch.trim() !== ''
   const pedeEncerradas = statuses.some((s) => !FILA_CHIPS.includes(s))
-  const emFila = !escopoTodas && !buscando && !pedeEncerradas
+  // Recorte de um drill-down do Painel/Relatórios: já traz as etapas certas
+  // (ex.: validade inclui OC enviada, que está fora da fila), então a fila
+  // padrão não se aplica por cima dele.
+  const recorte = React.useMemo(() => lerRecorte(params), [params])
+  const emFila = !escopoTodas && !buscando && !pedeEncerradas && !(recorte && recorteDefineEtapas(recorte))
   const statusesEfetivos = emFila && statuses.length === 0 ? FILA_STATUSES : statuses
   const view: 'grade' | 'lista' = params.get('view') === 'lista' ? 'lista' : 'grade'
   // Modo ERP (fase 2): grade densa + detalhe ao lado. A linha aberta no painel
@@ -216,6 +224,16 @@ export function SolicitacoesListPage() {
       if (v === 'lista') n.set('view', 'lista'); else n.delete('view')
     })
 
+  // SLA por etapa e alerta de validade vigentes (só pesam quando há recorte).
+  const metas = useMetasSla()
+  const recorteCtx = React.useMemo(
+    () => ({
+      sla: mapaSla(metas.data?.etapas),
+      alertaValidadeH: metas.data?.metas.alerta_validade_h ?? VALIDADE_ALERTA_H_FALLBACK,
+    }),
+    [metas.data],
+  )
+
   const filters: ListFilters = {
     search: debouncedSearch,
     statuses: statusesEfetivos,
@@ -226,6 +244,10 @@ export function SolicitacoesListPage() {
     pamcard,
     atendenteId: null,
     apenasAtrasadas,
+    recorte,
+    // Só entra na chave quando pesa: sem isso a lista refazia a busca (e
+    // piscava o esqueleto) quando a config de SLA chegava.
+    recorteCtx: recorte || apenasAtrasadas ? recorteCtx : undefined,
     page,
     pageSize,
   }
@@ -233,7 +255,11 @@ export function SolicitacoesListPage() {
   const list = useSolicitacoesList(filters)
   // Só os filtros que valem para a contagem: busca, etapa e página ficam de
   // fora (senão cada página nova refaria a contagem).
-  const contagemFila = useContagemFila({ periodo, materialId, tipo, origem, pamcard, apenasAtrasadas }, emFila)
+  // Com recorte do painel, as contagens por etapa (que não o aplicam) somem.
+  const contagemFila = useContagemFila(
+    { periodo, materialId, tipo, origem, pamcard, apenasAtrasadas, recorteCtx: apenasAtrasadas ? recorteCtx : undefined },
+    emFila && !recorte,
+  )
   const pendenciaSinais = usePendenciasSinais()
   // Cascata só no 1º paint com dados; refetch/realtime/filtro não re-animam.
   const cascata = useCascataInicial(!list.isLoading && !list.isError && (list.data?.data.length ?? 0) > 0)
@@ -378,7 +404,7 @@ export function SolicitacoesListPage() {
   const totalPages = Math.max(1, Math.ceil((list.data?.count ?? 0) / pageSize))
   const hasFilters =
     search.trim() !== '' || statuses.length > 0 || periodo !== 'todos' || !!materialId ||
-    tipo !== 'todos' || origem !== 'todos' || pamcard !== 'todos' || apenasAtrasadas
+    tipo !== 'todos' || origem !== 'todos' || pamcard !== 'todos' || apenasAtrasadas || !!recorte
 
   // UMA chamada só, de propósito. Antes eram oito setters em sequência
   // (setSearch(''), setStatuses([])…) e o botão simplesmente NÃO limpava nada:
@@ -389,7 +415,7 @@ export function SolicitacoesListPage() {
   // `view` fica de fora: é preferência de exibição, não filtro.
   const clearFilters = () =>
     updateParams((n) => {
-      for (const p of ['search', 'status', 'periodo', 'material', 'tipo', 'origem', 'pamcard', 'atrasadas', 'page']) {
+      for (const p of ['search', 'status', 'periodo', 'material', 'tipo', 'origem', 'pamcard', 'atrasadas', 'page', ...PARAMS_RECORTE]) {
         n.delete(p)
       }
     })
@@ -456,6 +482,23 @@ export function SolicitacoesListPage() {
         }
       />
 
+      {recorte && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-info-border bg-info-subtle px-3 py-2 text-body-sm text-info">
+          <p>
+            <span className="font-medium">Recorte do painel:</span> {descreverRecorte(recorte).join(' · ')}
+            <span className="ml-2 text-meta opacity-80">· mais recentes no topo</span>
+          </p>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => updateParams((n) => { for (const k of [...PARAMS_RECORTE, 'status', 'page']) n.delete(k); if (n.get('origem') === 'nao_parceiro') n.delete('origem') })}
+          >
+            <X className="h-3.5 w-3.5" />
+            Limpar recorte
+          </Button>
+        </div>
+      )}
+
       <div className="space-y-3 rounded-lg border bg-card p-3">
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative flex-1 min-w-[220px]" data-page-search>
@@ -521,7 +564,7 @@ export function SolicitacoesListPage() {
         <div className="flex flex-wrap items-center gap-1.5">
           <div className="mr-1 flex items-center gap-0.5 rounded-surface border bg-card p-0.5" role="group" aria-label="Escopo da lista">
             {[
-              { todas: false, label: 'Fila de trabalho', qtd: emFila ? contagemFila.data?.total : undefined },
+              { todas: false, label: 'Fila de trabalho', qtd: emFila && !recorte ? contagemFila.data?.total : undefined },
               { todas: true, label: 'Todas', qtd: undefined },
             ].map((o) => {
               const ativo = o.todas ? !emFila : emFila
@@ -557,14 +600,14 @@ export function SolicitacoesListPage() {
                 ? 'border-danger-border bg-danger-subtle font-semibold text-danger'
                 : 'border-border bg-card text-danger hover:bg-row-hover',
             )}
-            title="Pendentes há mais de 8 h"
+            title="Fora do SLA da etapa (limites em Metas e SLA)"
           >
             <Clock className="h-3 w-3" />
             Atrasadas
           </button>
           {(emFila ? FILA_CHIPS : VALID_STATUSES).map((s) => {
             const active = statuses.includes(s)
-            const qtd = emFila ? contagemFila.data?.porEtapa[s] : undefined
+            const qtd = emFila && !recorte ? contagemFila.data?.porEtapa[s] : undefined
             return (
               <button
                 key={s}
@@ -700,6 +743,7 @@ export function SolicitacoesListPage() {
             <div className={cn('grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3', cascata && 'cascata')}>
               {list.data!.data.map((row) => (
                 <SolicitacaoCard
+                  slaCfg={recorteCtx.sla}
                   key={row.id}
                   row={row}
                   sinalPendencia={pendenciaSinais.data?.get(row.id) ?? null}
@@ -714,6 +758,7 @@ export function SolicitacoesListPage() {
             <div className={cn('divide-y rounded-lg border bg-card', cascata && 'cascata')}>
               {list.data!.data.map((row) => (
                 <SolicitacaoListaRow
+                  slaCfg={recorteCtx.sla}
                   key={row.id}
                   row={row}
                   sinalPendencia={pendenciaSinais.data?.get(row.id) ?? null}
@@ -780,11 +825,13 @@ interface CardProps {
   selected: boolean
   onToggleSelect: () => void
   onOpen: () => void
+  /** Limites de SLA por etapa vigentes (Metas e SLA). */
+  slaCfg?: Record<EtapaSla, SlaCfg>
 }
 
-function SolicitacaoCard({ row, sinalPendencia, selectable, selected, onToggleSelect, onOpen }: CardProps) {
+function SolicitacaoCard({ row, sinalPendencia, selectable, selected, onToggleSelect, onOpen, slaCfg }: CardProps) {
   const created = row.created_at ? new Date(row.created_at) : null
-  const sla = getSlaInfo(row.status, row.created_at)
+  const sla = getSlaInfo(row.status, row.status_desde, slaCfg)
   const ativa = row.status !== 'finalizada' && row.status !== 'cancelada'
   const sinal = ativa ? sinalPendencia : null
   return (
@@ -891,9 +938,9 @@ function SolicitacaoCard({ row, sinalPendencia, selectable, selected, onToggleSe
 
 // Linha compacta da visualização em lista — mesma informação essencial dos
 // cards, numa densidade maior e sem estouro lateral em telas pequenas.
-function SolicitacaoListaRow({ row, sinalPendencia, selectable, selected, onToggleSelect, onOpen }: CardProps) {
+function SolicitacaoListaRow({ row, sinalPendencia, selectable, selected, onToggleSelect, onOpen, slaCfg }: CardProps) {
   const created = row.created_at ? new Date(row.created_at) : null
-  const sla = getSlaInfo(row.status, row.created_at)
+  const sla = getSlaInfo(row.status, row.status_desde, slaCfg)
   const ativa = row.status !== 'finalizada' && row.status !== 'cancelada'
   const sinal = ativa ? sinalPendencia : null
   const motorista = row.motorista?.nome_completo

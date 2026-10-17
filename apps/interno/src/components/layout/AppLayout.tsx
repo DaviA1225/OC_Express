@@ -118,7 +118,7 @@ export function AppLayout() {
         {modoErp && <JanelasErp />}
         {/* A página assenta direto no canvas; cada seção é uma superfície
             (bg-card + borda) de UM nível — sem o painel-dentro-do-painel. */}
-        <main className="flex-1 overflow-y-auto bg-canvas p-3 print:overflow-visible print:bg-transparent print:p-0 sm:p-4 md:px-6 md:py-5">
+        <main className="flex-1 overflow-y-auto bg-canvas p-3 [scrollbar-gutter:stable] print:overflow-visible print:bg-transparent print:p-0 sm:p-4 md:px-6 md:py-5">
           <div ref={conteudoRef} className="min-h-full">
             <NovaSolicitacaoProvider>
               {modoErp && <AtalhosErp />}

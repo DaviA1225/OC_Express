@@ -57,13 +57,13 @@ const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}
 const schema = z.object({
   user_id: z.string().refine((v) => uuidRegex.test(v.trim()), 'Identificador inválido'),
   nome_completo: z.string().min(2, 'Informe o nome completo'),
-  perfil: z.enum(['admin', 'gerente', 'supervisor', 'analista', 'assistente']),
+  perfil: z.enum(['admin', 'gerente', 'supervisor', 'analista', 'assistente', 'painel_tv']),
 })
 type FormValues = z.infer<typeof schema>
 
 const editSchema = z.object({
   nome_completo: z.string().min(2, 'Informe o nome completo'),
-  perfil: z.enum(['admin', 'gerente', 'supervisor', 'analista', 'assistente']),
+  perfil: z.enum(['admin', 'gerente', 'supervisor', 'analista', 'assistente', 'painel_tv']),
 })
 type EditFormValues = z.infer<typeof editSchema>
 
@@ -405,7 +405,14 @@ function UsuarioForm({ open, onOpenChange, editing, onCreate, onUpdate }: FormPr
               />
             </CadastroField>
 
-            <CadastroField label="Perfil" required id="perfil_usuario">
+            <CadastroField
+              label="Perfil"
+              required
+              id="perfil_usuario"
+              hint={(isEditing ? editForm.watch('perfil') : createForm.watch('perfil')) === 'painel_tv'
+                ? 'Só abre o Modo TV e não vê cadastros nem solicitações. A sessão não expira por inatividade. Use uma conta por TV: sair em qualquer lugar desconecta todas as telas dessa conta.'
+                : undefined}
+            >
               {(a11y) => (
               <Select
                 value={isEditing ? editForm.watch('perfil') : createForm.watch('perfil')}

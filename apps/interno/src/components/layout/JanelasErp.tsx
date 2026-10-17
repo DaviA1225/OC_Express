@@ -35,6 +35,8 @@ const MODULOS: [prefixo: string, nome: string][] = [
   ['/auditoria', 'Auditoria'],
   ['/seguranca', 'Segurança'],
   ['/privacidade', 'Privacidade'],
+  ['/admin/metas', 'Metas e SLA'],
+  ['/operacao/tv', 'Modo TV'],
   ['/perfil', 'Meu perfil'],
 ]
 

@@ -8,6 +8,8 @@ import { SolicitacaoStatusBadge } from '@/components/shared/SolicitacaoStatusBad
 import { ErrorBoundary, ErroDaTela } from '@/components/shared/ErrorBoundary'
 import { SolicitacaoDetailPage } from '@/pages/solicitacoes/SolicitacaoDetailPage'
 import { getSlaInfo } from '@/features/solicitacoes/status'
+import { useMetasSla } from '@/features/metricas/useMetasSla'
+import { mapaSla } from '@/features/metricas/sla'
 import { cn, formatNumeroOC } from '@/lib/utils'
 import type { SolicitacaoListRow } from '@/features/solicitacoes/useSolicitacoes'
 
@@ -43,6 +45,9 @@ export function SolicitacoesGradeErp({
   rows, selecionada, onSelecionar, onAbrir,
   selectable, selectedIds, onToggleSelect, onToggleAll, allVisibleSelected,
 }: Props) {
+  // SLA por etapa vigente (Metas e SLA); sem a config, os padrões 2 h / 8 h.
+  const metas = useMetasSla()
+  const slaCfg = React.useMemo(() => mapaSla(metas.data?.etapas), [metas.data])
   const tabelaRef = React.useRef<HTMLTableSectionElement>(null)
 
   const escolher = (id: string) => {
@@ -104,7 +109,7 @@ export function SolicitacoesGradeErp({
           <tbody ref={tabelaRef} onKeyDown={onKeyDown}>
             {rows.map((row) => {
               const ativa = row.id === selecionada
-              const sla = getSlaInfo(row.status, row.created_at)
+              const sla = getSlaInfo(row.status, row.status_desde, slaCfg)
               const created = row.created_at ? new Date(row.created_at) : null
               return (
                 <tr

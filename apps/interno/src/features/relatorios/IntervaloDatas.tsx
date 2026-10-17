@@ -1,7 +1,7 @@
 import { Eraser } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { diasDoIntervalo } from '@/features/relatorios/useRelatorios'
+import { diasDoIntervalo } from '@/features/relatorios/intervalo'
 
 /** A partir daqui o relatório varre muitos meses de solicitações e o gráfico
  *  por dia passa de 180 pontos. Não é limite — é aviso: antes, o preset máximo
