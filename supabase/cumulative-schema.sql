@@ -1,5 +1,5 @@
 -- =====================================================================
--- OC Express / SisLog LHG — Schema cumulativo (migrations 0001 → 0077)
+-- OC Express / SisLog LHG — Schema cumulativo (migrations 0001 → 0080)
 -- =====================================================================
 --
 -- Este arquivo agrega TODAS as migrations num único script IDEMPOTENTE.
@@ -398,7 +398,7 @@ UPDATE perfis_usuarios SET perfil = 'assistente' WHERE perfil = 'atendente';
 UPDATE perfis_usuarios SET perfil = 'analista'   WHERE perfil = 'documentacao';
 ALTER TABLE perfis_usuarios
   ADD CONSTRAINT perfis_usuarios_perfil_check
-  CHECK (perfil IN ('admin', 'gerente', 'supervisor', 'analista', 'assistente'));
+  CHECK (perfil IN ('admin', 'gerente', 'supervisor', 'analista', 'assistente', 'painel_tv'));  -- lista FINAL (0079)
 
 -- 0015 — materiais.requer_instrucao
 ALTER TABLE materiais
@@ -4340,6 +4340,453 @@ NOTIFY pgrst, 'reload schema';
 
 
 -- =====================================================================
+-- 0078 — Agente de IA do WhatsApp: conversas, mensagens, historico, acoes
+-- =====================================================================
+-- Fica ANTES da varredura da 0051 porque cria policy.
+
+CREATE TABLE IF NOT EXISTS public.agente_config (
+  id          integer PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+  modo        text NOT NULL DEFAULT 'desligado'
+              CHECK (modo IN ('desligado', 'sombra', 'autonomo')),
+  updated_at  timestamptz NOT NULL DEFAULT now(),
+  updated_by  uuid REFERENCES auth.users(id) ON DELETE SET NULL
+);
+
+INSERT INTO public.agente_config (id, modo) VALUES (1, 'desligado')
+ON CONFLICT (id) DO NOTHING;
+
+COMMENT ON TABLE public.agente_config IS
+  'Modo do agente de WhatsApp (0078). desligado = ignora mensagens; sombra = '
+  'le e monta rascunhos sem responder nem gravar; autonomo = atende sozinho.';
+
+-- ============================================================
+-- Conversas
+-- ============================================================
+CREATE TABLE IF NOT EXISTS public.agente_conversas (
+  id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  telefone            text NOT NULL UNIQUE CHECK (telefone ~ '^[0-9]{10,15}$'),
+  nome_contato        text,
+  estado              text NOT NULL DEFAULT 'agente' CHECK (estado IN ('agente', 'humano')),
+  assumida_por        uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  assumida_em         timestamptz,
+  sessao              integer NOT NULL DEFAULT 1,
+  -- Última mensagem RECEBIDA: a Meta só deixa responder em texto livre até 24 h
+  -- depois dela. Fora disso, só modelo de mensagem aprovado.
+  ultima_entrada_em   timestamptz,
+  ultima_atividade_em timestamptz NOT NULL DEFAULT now(),
+  -- Cadeado de processamento: uma conversa é processada por uma execução de
+  -- cada vez, e as mensagens saem na ordem em que chegaram.
+  processando_ate     timestamptz,
+  created_at          timestamptz NOT NULL DEFAULT now(),
+  updated_at          timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS agente_conversas_atividade_idx
+  ON public.agente_conversas (ultima_atividade_em DESC);
+
+-- ============================================================
+-- Mensagens
+-- ============================================================
+CREATE TABLE IF NOT EXISTS public.agente_mensagens (
+  id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  conversa_id       uuid NOT NULL REFERENCES public.agente_conversas(id) ON DELETE CASCADE,
+  sessao            integer NOT NULL,
+  direcao           text NOT NULL CHECK (direcao IN ('entrada', 'saida')),
+  autor             text NOT NULL CHECK (autor IN ('contato', 'agente', 'humano')),
+  wamid             text UNIQUE,
+  tipo              text NOT NULL CHECK (tipo IN ('texto', 'audio', 'documento', 'imagem', 'outro')),
+  texto             text,
+  -- Id da mídia na Meta. O download acontece no processamento, fora dos 5 s
+  -- que a Meta dá para o webhook responder.
+  meta_media_id     text,
+  midia_path        text,
+  midia_mime        text,
+  midia_nome        text,
+  transcricao       text,
+  -- Arquivo na Files API da Anthropic (PDF/imagem), para o histórico citar o
+  -- documento por id em vez de carregar o base64 a cada turno.
+  anthropic_file_id text,
+  -- Só para entrada: já foi entregue ao agente?
+  processada        boolean NOT NULL DEFAULT false,
+  -- Só para saída: o que aconteceu com o envio. 'sombra' = o agente escreveu,
+  -- mas o modo sombra não deixa mandar.
+  envio             text CHECK (envio IN ('enviada', 'sombra', 'falhou')),
+  enviada_por       uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  erro              text,
+  created_at        timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS agente_mensagens_conversa_idx
+  ON public.agente_mensagens (conversa_id, created_at);
+CREATE INDEX IF NOT EXISTS agente_mensagens_pendentes_idx
+  ON public.agente_mensagens (conversa_id)
+  WHERE direcao = 'entrada' AND processada = false;
+
+-- ============================================================
+-- Histórico no formato da API (append-only)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS public.agente_historico (
+  id          bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  conversa_id uuid NOT NULL REFERENCES public.agente_conversas(id) ON DELETE CASCADE,
+  sessao      integer NOT NULL,
+  seq         integer NOT NULL,
+  role        text NOT NULL CHECK (role IN ('user', 'assistant')),
+  content     jsonb NOT NULL,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (conversa_id, sessao, seq)
+);
+
+-- ============================================================
+-- Ações (auditoria das ferramentas + rascunhos do modo sombra)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS public.agente_acoes (
+  id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  conversa_id  uuid NOT NULL REFERENCES public.agente_conversas(id) ON DELETE CASCADE,
+  ferramenta   text NOT NULL,
+  entrada      jsonb NOT NULL,
+  resultado    jsonb,
+  status       text NOT NULL
+               CHECK (status IN ('executada', 'rascunho', 'aprovada', 'rejeitada', 'erro')),
+  decidido_por uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  decidido_em  timestamptz,
+  created_at   timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS agente_acoes_conversa_idx
+  ON public.agente_acoes (conversa_id, created_at);
+CREATE INDEX IF NOT EXISTS agente_acoes_rascunhos_idx
+  ON public.agente_acoes (created_at) WHERE status = 'rascunho';
+
+-- ============================================================
+-- RLS: interno lê e escreve (o agente é um usuário interno); só admin muda
+-- o modo do agente.
+-- ============================================================
+ALTER TABLE public.agente_config    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.agente_conversas ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.agente_mensagens ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.agente_historico ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.agente_acoes     ENABLE ROW LEVEL SECURITY;
+
+REVOKE ALL ON public.agente_config, public.agente_conversas, public.agente_mensagens,
+              public.agente_historico, public.agente_acoes FROM anon;
+
+DROP POLICY IF EXISTS agente_config_select ON public.agente_config;
+CREATE POLICY agente_config_select ON public.agente_config FOR SELECT TO authenticated
+  USING ((SELECT is_interno()));
+DROP POLICY IF EXISTS agente_config_update ON public.agente_config;
+CREATE POLICY agente_config_update ON public.agente_config FOR UPDATE TO authenticated
+  USING ((SELECT meu_perfil_interno()) = 'admin')
+  WITH CHECK ((SELECT meu_perfil_interno()) = 'admin');
+
+DROP POLICY IF EXISTS agente_conversas_interno_all ON public.agente_conversas;
+CREATE POLICY agente_conversas_interno_all ON public.agente_conversas FOR ALL TO authenticated
+  USING ((SELECT is_interno())) WITH CHECK ((SELECT is_interno()));
+
+DROP POLICY IF EXISTS agente_mensagens_interno_all ON public.agente_mensagens;
+CREATE POLICY agente_mensagens_interno_all ON public.agente_mensagens FOR ALL TO authenticated
+  USING ((SELECT is_interno())) WITH CHECK ((SELECT is_interno()));
+
+-- Histórico: só leitura e inserção. Sem UPDATE/DELETE de propósito.
+DROP POLICY IF EXISTS agente_historico_select ON public.agente_historico;
+CREATE POLICY agente_historico_select ON public.agente_historico FOR SELECT TO authenticated
+  USING ((SELECT is_interno()));
+DROP POLICY IF EXISTS agente_historico_insert ON public.agente_historico;
+CREATE POLICY agente_historico_insert ON public.agente_historico FOR INSERT TO authenticated
+  WITH CHECK ((SELECT is_interno()));
+
+DROP POLICY IF EXISTS agente_acoes_interno_all ON public.agente_acoes;
+CREATE POLICY agente_acoes_interno_all ON public.agente_acoes FOR ALL TO authenticated
+  USING ((SELECT is_interno())) WITH CHECK ((SELECT is_interno()));
+
+-- ============================================================
+-- Cadeado de processamento
+-- ============================================================
+-- Um UPDATE condicional só: duas execuções concorrentes não conseguem pegar a
+-- mesma conversa. Devolve true para quem pegou.
+CREATE OR REPLACE FUNCTION public.agente_reivindicar_conversa(p_conversa_id uuid, p_segundos integer)
+RETURNS boolean
+LANGUAGE plpgsql SECURITY INVOKER SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_ok boolean;
+BEGIN
+  UPDATE agente_conversas
+     SET processando_ate = now() + make_interval(secs => greatest(p_segundos, 10))
+   WHERE id = p_conversa_id
+     AND (processando_ate IS NULL OR processando_ate < now())
+  RETURNING true INTO v_ok;
+  RETURN coalesce(v_ok, false);
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.agente_reivindicar_conversa(uuid, integer) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.agente_reivindicar_conversa(uuid, integer) TO authenticated;
+
+-- ============================================================
+-- Storage: mídia recebida (áudio, PDF, foto) — privado, só interno
+-- ============================================================
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('agente-midia', 'agente-midia', false)
+ON CONFLICT (id) DO NOTHING;
+
+DROP POLICY IF EXISTS "agente_midia_select" ON storage.objects;
+DROP POLICY IF EXISTS "agente_midia_insert" ON storage.objects;
+CREATE POLICY "agente_midia_select" ON storage.objects FOR SELECT TO authenticated
+  USING (bucket_id = 'agente-midia' AND (SELECT is_interno()));
+CREATE POLICY "agente_midia_insert" ON storage.objects FOR INSERT TO authenticated
+  WITH CHECK (bucket_id = 'agente-midia' AND (SELECT is_interno()));
+
+NOTIFY pgrst, 'reload schema';
+
+
+-- =====================================================================
+-- 0079 (parte A) — perfil painel_tv, metas/SLA, transições: estrutura e policies.
+-- ANTES da 0051 porque cria policies. A parte B (backfill, triggers, hook e as
+-- funções que sobrescrevem as antigas) está no fim do arquivo.
+-- =====================================================================
+
+-- ═════════════════════════════════════════════════════════════════════════════
+-- PARTE A — estrutura e policies (no cumulative-schema: ANTES da seção 0051)
+-- ═════════════════════════════════════════════════════════════════════════════
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 1. Perfil painel_tv
+-- ─────────────────────────────────────────────────────────────────────────────
+
+ALTER TABLE public.perfis_usuarios DROP CONSTRAINT IF EXISTS perfis_usuarios_perfil_check;
+ALTER TABLE public.perfis_usuarios ADD CONSTRAINT perfis_usuarios_perfil_check
+  CHECK (perfil IN ('admin', 'gerente', 'supervisor', 'analista', 'assistente', 'painel_tv'));
+
+-- is_interno(): qualquer perfil ativo, MENOS o da TV. As ~10 policies que
+-- liberam dados pessoais por is_interno() passam a negar para a TV sem precisar
+-- tocar em nenhuma delas.
+CREATE OR REPLACE FUNCTION public.is_interno()
+RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM perfis_usuarios
+    WHERE user_id = auth.uid() AND ativo = true AND perfil <> 'painel_tv'
+  );
+$$;
+
+CREATE OR REPLACE FUNCTION public.is_painel_tv()
+RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM perfis_usuarios
+    WHERE user_id = auth.uid() AND ativo = true AND perfil = 'painel_tv'
+  );
+$$;
+REVOKE ALL ON FUNCTION public.is_painel_tv() FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.is_painel_tv() TO authenticated;
+
+-- Para o hook de inatividade, que roda como supabase_auth_admin (sem auth.uid()).
+CREATE OR REPLACE FUNCTION public.usuario_e_painel_tv(p_user uuid)
+RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM perfis_usuarios
+    WHERE user_id = p_user AND ativo = true AND perfil = 'painel_tv'
+  );
+$$;
+REVOKE ALL ON FUNCTION public.usuario_e_painel_tv(uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.usuario_e_painel_tv(uuid) TO supabase_auth_admin;
+
+-- Cada usuário lê o PRÓPRIO perfil. A TV não é is_interno() e sem isto o app
+-- não sabe que ela é a TV (ficaria em "Aguardando liberação"). Só a própria linha.
+DROP POLICY IF EXISTS perfis_usuarios_select_proprio ON public.perfis_usuarios;
+CREATE POLICY perfis_usuarios_select_proprio ON public.perfis_usuarios FOR SELECT TO authenticated
+  USING (user_id = (SELECT auth.uid()));
+
+-- log_auditoria: ninguém insere direto pela API. Quem grava é o audit_trigger
+-- (SECURITY DEFINER desde a 0049); a policy WITH CHECK (true) da 0025 deixava
+-- qualquer autenticado — parceiro inclusive — forjar linhas, e o backfill
+-- abaixo transforma esse log em histórico de etapas. Fechar ANTES do backfill.
+DROP POLICY IF EXISTS log_auditoria_insert ON public.log_auditoria;
+REVOKE INSERT ON public.log_auditoria FROM PUBLIC, anon, authenticated;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 2. Configuração: SLA por etapa e metas da operação
+-- ─────────────────────────────────────────────────────────────────────────────
+
+-- `id uuid` em ambas: o audit_trigger grava registro_id = NEW.id numa coluna uuid.
+CREATE TABLE IF NOT EXISTS public.sla_etapas (
+  id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  status         text NOT NULL UNIQUE
+                 CHECK (status IN ('recebida', 'em_cadastro', 'instrucao_emitida', 'oc_gerada', 'oc_enviada')),
+  aviso_min      integer NOT NULL CHECK (aviso_min > 0),
+  alerta_min     integer NOT NULL,
+  ativo          boolean NOT NULL DEFAULT true,
+  atualizado_em  timestamptz NOT NULL DEFAULT now(),
+  atualizado_por uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  CONSTRAINT sla_etapas_alerta_maior CHECK (alerta_min > aviso_min)
+);
+COMMENT ON TABLE public.sla_etapas IS
+  'Limites de SLA por etapa (0079), em minutos de horas corridas. aviso = começa a pedir atenção; '
+  'alerta = fora do SLA. OC enviada fica com ativo=false (decisão D1).';
+
+INSERT INTO public.sla_etapas (status, aviso_min, alerta_min, ativo) VALUES
+  ('recebida', 120, 480, true),
+  ('em_cadastro', 120, 480, true),
+  ('instrucao_emitida', 120, 480, true),
+  ('oc_gerada', 120, 480, true),
+  ('oc_enviada', 120, 480, false)
+ON CONFLICT (status) DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS public.metas_operacao (
+  id                     uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  singleton              boolean NOT NULL UNIQUE DEFAULT true CHECK (singleton),
+  meta_finalizadas_dia   integer CHECK (meta_finalizadas_dia >= 0),
+  meta_lead_time_p90_min integer CHECK (meta_lead_time_p90_min > 0),
+  alerta_validade_h      integer NOT NULL DEFAULT 24 CHECK (alerta_validade_h BETWEEN 1 AND 168),
+  expediente_inicio      time NOT NULL DEFAULT '07:00',
+  expediente_fim         time NOT NULL DEFAULT '18:00',
+  atualizado_em          timestamptz NOT NULL DEFAULT now(),
+  atualizado_por         uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  CONSTRAINT metas_operacao_expediente CHECK (expediente_fim > expediente_inicio)
+);
+COMMENT ON TABLE public.metas_operacao IS
+  'Metas da operação (0079), linha única. meta_finalizadas_dia NULL = sem meta (D3): '
+  'Painel e TV mostram só o realizado.';
+
+INSERT INTO public.metas_operacao (singleton) VALUES (true)
+ON CONFLICT (singleton) DO NOTHING;
+
+-- Carimbo de quem alterou (o front não precisa mandar).
+CREATE OR REPLACE FUNCTION public.carimbar_config_metas()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  NEW.atualizado_em := now();
+  BEGIN
+    NEW.atualizado_por := auth.uid();
+  EXCEPTION WHEN OTHERS THEN
+    NEW.atualizado_por := NULL;
+  END;
+  RETURN NEW;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.carimbar_config_metas() FROM PUBLIC, anon, authenticated;
+
+DROP TRIGGER IF EXISTS trg_sla_etapas_carimbo ON public.sla_etapas;
+CREATE TRIGGER trg_sla_etapas_carimbo BEFORE UPDATE ON public.sla_etapas
+  FOR EACH ROW EXECUTE FUNCTION public.carimbar_config_metas();
+DROP TRIGGER IF EXISTS trg_metas_operacao_carimbo ON public.metas_operacao;
+CREATE TRIGGER trg_metas_operacao_carimbo BEFORE UPDATE ON public.metas_operacao
+  FOR EACH ROW EXECUTE FUNCTION public.carimbar_config_metas();
+
+DROP TRIGGER IF EXISTS aud_sla_etapas ON public.sla_etapas;
+CREATE TRIGGER aud_sla_etapas AFTER INSERT OR UPDATE OR DELETE ON public.sla_etapas
+  FOR EACH ROW EXECUTE FUNCTION public.audit_trigger();
+DROP TRIGGER IF EXISTS aud_metas_operacao ON public.metas_operacao;
+CREATE TRIGGER aud_metas_operacao AFTER INSERT OR UPDATE OR DELETE ON public.metas_operacao
+  FOR EACH ROW EXECUTE FUNCTION public.audit_trigger();
+
+ALTER TABLE public.sla_etapas ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.metas_operacao ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.sla_etapas, public.metas_operacao FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.sla_etapas, public.metas_operacao TO authenticated;
+-- Só as colunas de valor: etapa, id e carimbos não se editam pela API.
+GRANT UPDATE (aviso_min, alerta_min, ativo) ON public.sla_etapas TO authenticated;
+GRANT UPDATE (meta_finalizadas_dia, meta_lead_time_p90_min, alerta_validade_h, expediente_inicio, expediente_fim)
+  ON public.metas_operacao TO authenticated;
+
+-- Leitura: equipe interna e a TV (sem dado pessoal). Escrita: só admin. Sem
+-- INSERT/DELETE — as linhas são fixas (seed acima).
+DROP POLICY IF EXISTS sla_etapas_select ON public.sla_etapas;
+CREATE POLICY sla_etapas_select ON public.sla_etapas FOR SELECT TO authenticated
+  USING ((SELECT public.is_interno()) OR (SELECT public.is_painel_tv()));
+DROP POLICY IF EXISTS sla_etapas_update ON public.sla_etapas;
+CREATE POLICY sla_etapas_update ON public.sla_etapas FOR UPDATE TO authenticated
+  USING ((SELECT public.meu_perfil_interno()) = 'admin')
+  WITH CHECK ((SELECT public.meu_perfil_interno()) = 'admin');
+
+DROP POLICY IF EXISTS metas_operacao_select ON public.metas_operacao;
+CREATE POLICY metas_operacao_select ON public.metas_operacao FOR SELECT TO authenticated
+  USING ((SELECT public.is_interno()) OR (SELECT public.is_painel_tv()));
+DROP POLICY IF EXISTS metas_operacao_update ON public.metas_operacao;
+CREATE POLICY metas_operacao_update ON public.metas_operacao FOR UPDATE TO authenticated
+  USING ((SELECT public.meu_perfil_interno()) = 'admin')
+  WITH CHECK ((SELECT public.meu_perfil_interno()) = 'admin');
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 3. Função pura do SLA (espelhada em apps/interno/src/features/metricas/sla.ts)
+-- ─────────────────────────────────────────────────────────────────────────────
+
+-- null = etapa sem SLA (inativa ou fora da fila); 'ok' | 'aviso' | 'fora'.
+-- Minutos na etapa < aviso → 'ok'; aviso ≤ minutos ≤ alerta → 'aviso';
+-- minutos > alerta → 'fora' (mesma regra e vetores de sla.ts).
+CREATE OR REPLACE FUNCTION public.sla_classificar(
+  p_status text, p_desde timestamptz, p_agora timestamptz,
+  p_aviso integer, p_alerta integer, p_ativo boolean
+)
+RETURNS text
+LANGUAGE sql IMMUTABLE PARALLEL SAFE
+SET search_path = public, pg_temp
+AS $$
+  SELECT CASE
+    WHEN p_ativo IS NOT TRUE OR p_desde IS NULL OR p_agora IS NULL
+      OR p_aviso IS NULL OR p_alerta IS NULL
+      OR p_status NOT IN ('recebida', 'em_cadastro', 'instrucao_emitida', 'oc_gerada', 'oc_enviada')
+      THEN NULL
+    WHEN extract(epoch FROM (p_agora - p_desde)) / 60 > p_alerta THEN 'fora'
+    WHEN extract(epoch FROM (p_agora - p_desde)) / 60 >= p_aviso THEN 'aviso'
+    ELSE 'ok'
+  END;
+$$;
+REVOKE ALL ON FUNCTION public.sla_classificar(text, timestamptz, timestamptz, integer, integer, boolean) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.sla_classificar(text, timestamptz, timestamptz, integer, integer, boolean) TO authenticated;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 4. Histórico de etapas e status_desde
+-- ─────────────────────────────────────────────────────────────────────────────
+
+ALTER TABLE public.solicitacoes ADD COLUMN IF NOT EXISTS status_desde timestamptz;
+COMMENT ON COLUMN public.solicitacoes.status_desde IS
+  'Quando a solicitação entrou na etapa atual (0079). Carimbado pelo servidor; '
+  'base do SLA por etapa.';
+
+CREATE TABLE IF NOT EXISTS public.solicitacao_transicoes (
+  id             bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  solicitacao_id uuid NOT NULL REFERENCES public.solicitacoes(id) ON DELETE CASCADE,
+  de_status      text,
+  para_status    text NOT NULL,
+  em             timestamptz NOT NULL,
+  usuario_id     uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  fonte          text NOT NULL DEFAULT 'trigger' CHECK (fonte IN ('trigger', 'backfill'))
+);
+COMMENT ON TABLE public.solicitacao_transicoes IS
+  'Cada mudança de etapa de uma solicitação (0079). Antes da 0079: reconstruído do '
+  'log_auditoria (fonte=backfill). usuario_id só é legível por funções SECURITY '
+  'DEFINER (Produtividade, só gestão) — privilégio de coluna.';
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_solicitacao_transicao
+  ON public.solicitacao_transicoes (solicitacao_id, em, para_status);
+CREATE INDEX IF NOT EXISTS idx_transicoes_para_em ON public.solicitacao_transicoes (para_status, em);
+CREATE INDEX IF NOT EXISTS idx_transicoes_em ON public.solicitacao_transicoes (em);
+CREATE INDEX IF NOT EXISTS idx_transicoes_usuario_em ON public.solicitacao_transicoes (usuario_id, em)
+  WHERE usuario_id IS NOT NULL;
+
+ALTER TABLE public.solicitacao_transicoes ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.solicitacao_transicoes FROM PUBLIC, anon, authenticated;
+GRANT SELECT (id, solicitacao_id, de_status, para_status, em, fonte)
+  ON public.solicitacao_transicoes TO authenticated;
+DROP POLICY IF EXISTS solicitacao_transicoes_select ON public.solicitacao_transicoes;
+CREATE POLICY solicitacao_transicoes_select ON public.solicitacao_transicoes FOR SELECT TO authenticated
+  USING ((SELECT public.is_interno()));
+
+RESET lock_timeout;
+
+-- =====================================================================
 -- 0051 (+0052/0053) — RLS: helpers avaliados UMA vez por query
 -- =====================================================================
 -- PRECISA SER O ULTIMO BLOCO QUE TOCA POLICY. Nao e uma lista de policies: e uma
@@ -4796,6 +5243,1338 @@ END $$;
 
 NOTIFY pgrst, 'reload schema';
 
+
+-- =====================================================================
+-- 0079 (parte B) e 0080 — Dashboards: backfill, carimbos, hook com o painel_tv,
+-- fuso America/Campo_Grande, origem LGPD da TV e RPCs. NO FIM: redefine funções
+-- que blocos acima recriam (hook 0077, limite diário 0022, agendamento 0068/0069,
+-- registrar_acesso 0059, registrar_aceite_termos 0070).
+-- =====================================================================
+
+SET lock_timeout = '5s';
+
+-- ═════════════════════════════════════════════════════════════════════════════
+-- PARTE B — dados, triggers e funções que sobrescrevem as antigas
+-- (no cumulative-schema: no FIM, para vencer as versões antigas recriadas lá)
+-- ═════════════════════════════════════════════════════════════════════════════
+
+-- Qual login é o agente de WhatsApp (0078). Só existe se a 0078 já rodou.
+DO $$
+BEGIN
+  IF to_regclass('public.agente_config') IS NOT NULL THEN
+    ALTER TABLE public.agente_config
+      ADD COLUMN IF NOT EXISTS usuario_id uuid REFERENCES auth.users(id) ON DELETE SET NULL;
+    COMMENT ON COLUMN public.agente_config.usuario_id IS
+      'Login (auth.users) que o agente usa (0079). A Produtividade mostra esse usuário '
+      'numa linha separada, fora dos totais da equipe. Preencher uma vez (admin).';
+  END IF;
+END $$;
+
+-- 4a. Backfill das transições a partir do log (antes dos triggers novos).
+--     Recorte: só o log anterior à primeira transição gravada por trigger, para
+--     uma reexecução não duplicar o que o trigger já escreveu.
+WITH corte AS (
+  SELECT coalesce(min(em), 'infinity'::timestamptz) AS t
+  FROM public.solicitacao_transicoes WHERE fonte = 'trigger'
+),
+criacao AS (
+  SELECT DISTINCT ON (s.id)
+         s.id AS solicitacao_id,
+         -- Sem NENHUM log (anonimizadas pela 0057, escritas com replica): a única
+         -- transição é a criação já no status atual (lacuna declarada no plano).
+         coalesce(l.dados_depois ->> 'status',
+                  CASE WHEN NOT EXISTS (SELECT 1 FROM public.log_auditoria x
+                                         WHERE x.tabela = 'solicitacoes' AND x.registro_id = s.id)
+                       THEN s.status END,
+                  'recebida') AS para_status,
+         s.created_at AS em,
+         coalesce(l.usuario_id, s.created_by) AS usuario_id
+  FROM public.solicitacoes s
+  LEFT JOIN public.log_auditoria l
+    ON l.tabela = 'solicitacoes' AND l.acao = 'INSERT' AND l.registro_id = s.id
+  ORDER BY s.id, l.created_at
+)
+INSERT INTO public.solicitacao_transicoes (solicitacao_id, de_status, para_status, em, usuario_id, fonte)
+SELECT c.solicitacao_id, NULL, c.para_status, c.em,
+       CASE WHEN EXISTS (SELECT 1 FROM auth.users u WHERE u.id = c.usuario_id) THEN c.usuario_id END,
+       'backfill'
+FROM criacao c, corte
+WHERE c.em < corte.t
+ON CONFLICT (solicitacao_id, em, para_status) DO NOTHING;
+
+WITH corte AS (
+  SELECT coalesce(min(em), 'infinity'::timestamptz) AS t
+  FROM public.solicitacao_transicoes WHERE fonte = 'trigger'
+)
+INSERT INTO public.solicitacao_transicoes (solicitacao_id, de_status, para_status, em, usuario_id, fonte)
+SELECT l.registro_id, l.dados_antes ->> 'status', l.dados_depois ->> 'status', l.created_at,
+       CASE WHEN EXISTS (SELECT 1 FROM auth.users u WHERE u.id = l.usuario_id) THEN l.usuario_id END,
+       'backfill'
+FROM public.log_auditoria l
+JOIN public.solicitacoes s ON s.id = l.registro_id
+CROSS JOIN corte
+WHERE l.tabela = 'solicitacoes'
+  AND l.acao = 'UPDATE'
+  AND l.dados_depois ? 'status'
+  AND (l.dados_antes ->> 'status') IS DISTINCT FROM (l.dados_depois ->> 'status')
+  AND l.created_at < corte.t
+ON CONFLICT (solicitacao_id, em, para_status) DO NOTHING;
+
+-- 4b. Backfill de status_desde: a última entrada no status atual; na falta,
+--     updated_at; na falta, created_at. Sem mexer em updated_at nem gerar log.
+ALTER TABLE public.solicitacoes DISABLE TRIGGER trg_solicitacoes_updated;
+ALTER TABLE public.solicitacoes DISABLE TRIGGER aud_solicitacoes;
+
+UPDATE public.solicitacoes s
+SET status_desde = coalesce(
+  (SELECT max(t.em) FROM public.solicitacao_transicoes t
+    WHERE t.solicitacao_id = s.id AND t.para_status = s.status),
+  s.updated_at, s.created_at)
+WHERE s.status_desde IS NULL;
+
+ALTER TABLE public.solicitacoes ENABLE TRIGGER trg_solicitacoes_updated;
+ALTER TABLE public.solicitacoes ENABLE TRIGGER aud_solicitacoes;
+
+ALTER TABLE public.solicitacoes ALTER COLUMN status_desde SET DEFAULT now();
+ALTER TABLE public.solicitacoes ALTER COLUMN status_desde SET NOT NULL;
+
+-- 4c. Carimbos no servidor. BEFORE INSERT OR UPDATE sem `OF status`: o valor que
+--     o cliente mandar para status_desde/finalizada_em é sempre ignorado.
+--     O nome "zz" faz este trigger rodar DEPOIS dos outros BEFORE INSERT
+--     (sanitizador do parceiro, rate limit), que podem reescrever o status.
+CREATE OR REPLACE FUNCTION public.solicitacao_carimbos()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    NEW.status_desde := now();
+    NEW.finalizada_em := CASE WHEN NEW.status = 'finalizada' THEN now() END;
+  ELSIF NEW.status IS DISTINCT FROM OLD.status THEN
+    NEW.status_desde := now();
+    NEW.finalizada_em := CASE WHEN NEW.status = 'finalizada' THEN now() END;
+    -- Entrou em "OC enviada": o servidor carimba (reenvio sem mudar de etapa
+    -- continua podendo atualizar enviada_em, como hoje).
+    IF NEW.status = 'oc_enviada' THEN
+      NEW.enviada_em := now();
+    END IF;
+  ELSE
+    NEW.status_desde := OLD.status_desde;
+    NEW.finalizada_em := OLD.finalizada_em;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.solicitacao_carimbos() FROM PUBLIC, anon, authenticated;
+
+DROP TRIGGER IF EXISTS trg_solicitacoes_zz_carimbos ON public.solicitacoes;
+CREATE TRIGGER trg_solicitacoes_zz_carimbos BEFORE INSERT OR UPDATE ON public.solicitacoes
+  FOR EACH ROW EXECUTE FUNCTION public.solicitacao_carimbos();
+
+-- 4d. Uma linha de transição por mudança de etapa (e na criação).
+--     SECURITY DEFINER: authenticated não tem INSERT na tabela.
+--     Emergência (bug em produção): ALTER TABLE solicitacoes DISABLE TRIGGER trg_registra_transicao;
+CREATE OR REPLACE FUNCTION public.registra_transicao()
+RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_user uuid;
+BEGIN
+  BEGIN
+    v_user := auth.uid();
+  EXCEPTION WHEN OTHERS THEN
+    v_user := NULL;
+  END;
+  IF TG_OP = 'INSERT' OR NEW.status IS DISTINCT FROM OLD.status THEN
+    INSERT INTO solicitacao_transicoes (solicitacao_id, de_status, para_status, em, usuario_id, fonte)
+    VALUES (NEW.id, CASE WHEN TG_OP = 'UPDATE' THEN OLD.status END, NEW.status, now(), v_user, 'trigger')
+    ON CONFLICT (solicitacao_id, em, para_status) DO NOTHING;
+  END IF;
+  RETURN NULL;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.registra_transicao() FROM PUBLIC, anon, authenticated;
+
+DROP TRIGGER IF EXISTS trg_registra_transicao ON public.solicitacoes;
+CREATE TRIGGER trg_registra_transicao AFTER INSERT OR UPDATE OF status ON public.solicitacoes
+  FOR EACH ROW EXECUTE FUNCTION public.registra_transicao();
+
+-- 4e. Índices dos painéis.
+CREATE INDEX IF NOT EXISTS idx_solicitacoes_finalizada_em ON public.solicitacoes (finalizada_em)
+  WHERE finalizada_em IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_solicitacoes_fila ON public.solicitacoes (status, status_desde)
+  WHERE status IN ('recebida', 'em_cadastro', 'instrucao_emitida', 'oc_gerada', 'oc_enviada');
+CREATE INDEX IF NOT EXISTS idx_solicitacoes_validade_aberta ON public.solicitacoes (validade_fim)
+  WHERE status IN ('oc_gerada', 'oc_enviada');
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 5. Hook de inatividade (0077) com o ramo do painel_tv
+-- ─────────────────────────────────────────────────────────────────────────────
+
+-- Corpo idêntico ao da 0077, mais o ramo do painel_tv no início: a conta da TV
+-- não sofre o limite de 50/60 min (decisão D4). Só ela — o acesso dela é mínimo.
+CREATE OR REPLACE FUNCTION public.hook_limite_inatividade(event jsonb)
+RETURNS jsonb
+LANGUAGE plpgsql VOLATILE SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_sessao  uuid;
+  v_user    uuid;
+  v_ultima  timestamptz;
+BEGIN
+  v_sessao := nullif(event -> 'claims' ->> 'session_id', '')::uuid;
+  v_user   := nullif(event ->> 'user_id', '')::uuid;
+
+  IF v_sessao IS NULL OR v_user IS NULL THEN
+    RETURN event;
+  END IF;
+
+  -- 0079: a conta da TV renova sempre.
+  IF public.usuario_e_painel_tv(v_user) THEN
+    RETURN event;
+  END IF;
+
+  IF event ->> 'authentication_method' IS DISTINCT FROM 'token_refresh' THEN
+    INSERT INTO sessao_atividade (session_id, user_id, ultima_atividade)
+    VALUES (v_sessao, v_user, now())
+    ON CONFLICT (session_id) DO UPDATE SET ultima_atividade = now();
+
+    -- Faxina barata, pelo índice de user_id: sessões antigas do mesmo usuário.
+    DELETE FROM sessao_atividade
+     WHERE user_id = v_user
+       AND session_id <> v_sessao
+       AND ultima_atividade < now() - interval '1 day';
+
+    RETURN event;
+  END IF;
+
+  SELECT ultima_atividade INTO v_ultima
+    FROM sessao_atividade
+   WHERE session_id = v_sessao;
+
+  IF NOT FOUND THEN
+    INSERT INTO sessao_atividade (session_id, user_id, ultima_atividade)
+    VALUES (v_sessao, v_user, now())
+    ON CONFLICT (session_id) DO NOTHING;
+    RETURN event;
+  END IF;
+
+  IF v_ultima < now() - interval '60 minutes' THEN
+    RETURN jsonb_build_object(
+      'error', jsonb_build_object(
+        'http_code', 401,
+        'message', 'Sessao encerrada por inatividade.'
+      )
+    );
+  END IF;
+
+  RETURN event;
+EXCEPTION WHEN OTHERS THEN
+  RAISE WARNING 'hook_limite_inatividade: % (%) — token liberado', SQLERRM, SQLSTATE;
+  RETURN event;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.hook_limite_inatividade(jsonb) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.hook_limite_inatividade(jsonb) TO supabase_auth_admin;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 6. Fuso da operação: America/Campo_Grande (corpos iguais aos vigentes, só o fuso muda)
+-- ─────────────────────────────────────────────────────────────────────────────
+
+CREATE OR REPLACE FUNCTION public.check_portal_rate_limit_diario()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+  v_count integer;
+  v_limite constant integer := 50;
+BEGIN
+  IF NEW.origem <> 'parceiro' OR NEW.parceiro_usuario_id IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  SELECT count(*)::int INTO v_count
+  FROM solicitacoes
+  WHERE parceiro_usuario_id = NEW.parceiro_usuario_id
+    AND (created_at AT TIME ZONE 'America/Campo_Grande')::date
+        = (now()        AT TIME ZONE 'America/Campo_Grande')::date;
+
+  IF v_count >= v_limite THEN
+    RAISE EXCEPTION
+      'Limite diario de % solicitacoes por usuario atingido. Tente novamente amanha.',
+      v_limite
+      USING ERRCODE = 'PT429';
+  END IF;
+
+  RETURN NEW;
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.portal_solicitar_agendamento(p_solicitacao_id uuid, p_data_preferida date, p_hora_preferida time without time zone, p_observacoes text, p_nota_fiscal text DEFAULT NULL::text, p_tipo_veiculo text DEFAULT NULL::text)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+  v_parceiro uuid := get_current_parceiro_id();
+  v_status text; v_cliente uuid; v_requer boolean; v_antecedencia integer;
+  v_min_data date; v_slots integer; v_separa boolean; v_tipo text;
+  v_nota text; v_id uuid;
+BEGIN
+  IF v_parceiro IS NULL THEN
+    RAISE EXCEPTION 'Sessao de parceiro nao identificada.' USING ERRCODE = '42501';
+  END IF;
+  SELECT s.status, s.cliente_id, c.requer_agendamento, c.antecedencia_minima_horas
+    INTO v_status, v_cliente, v_requer, v_antecedencia
+    FROM solicitacoes s LEFT JOIN clientes c ON c.id = s.cliente_id
+   WHERE s.id = p_solicitacao_id AND s.origem = 'parceiro' AND s.parceiro_id = v_parceiro;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Solicitacao nao encontrada.' USING ERRCODE = 'PT404';
+  END IF;
+  IF v_requer IS NOT TRUE THEN
+    RAISE EXCEPTION 'Esta rota nao exige agendamento.' USING ERRCODE = 'PT409';
+  END IF;
+  -- A NF nasce no carregamento: antes da OC enviada o pedido chega cedo demais.
+  IF v_status NOT IN ('oc_enviada','finalizada') THEN
+    RAISE EXCEPTION 'O agendamento so pode ser pedido depois que a carga sai (OC enviada).'
+      USING ERRCODE = 'PT409';
+  END IF;
+  IF p_data_preferida IS NULL THEN
+    RAISE EXCEPTION 'Informe a data desejada.' USING ERRCODE = '22004';
+  END IF;
+  -- Fuso explicito: o servidor roda em UTC e o front calcula a data minima no
+  -- relogio local. Sem isto, das 21h em diante o SisLog recusaria uma data que
+  -- a propria tela acabou de oferecer (mesmo motivo do dia-calendario da 0022).
+  v_min_data := ((now() AT TIME ZONE 'America/Campo_Grande')
+                 + make_interval(hours => COALESCE(v_antecedencia, 0)))::date;
+  IF p_data_preferida < v_min_data THEN
+    RAISE EXCEPTION 'Este terminal exige % h de antecedencia.', COALESCE(v_antecedencia, 0)
+      USING ERRCODE = 'PT422';
+  END IF;
+  -- 0069 — o tipo de veiculo decide QUAL grade vale. Terminal que separa exige
+  -- o tipo mesmo sem hora escolhida: quem vai agendar precisa saber em qual
+  -- fila entrar.
+  v_tipo := NULLIF(btrim(lower(p_tipo_veiculo)), '');
+  IF v_tipo IS NOT NULL AND v_tipo NOT IN ('cacamba','graneleiro') THEN
+    RAISE EXCEPTION 'Tipo de veiculo invalido: % (use cacamba ou graneleiro).', v_tipo
+      USING ERRCODE = '22023';
+  END IF;
+  SELECT EXISTS (SELECT 1 FROM terminal_janelas
+                  WHERE cliente_id = v_cliente AND ativo = true
+                    AND tipo_veiculo <> 'todos') INTO v_separa;
+  IF v_separa AND v_tipo IS NULL THEN
+    RAISE EXCEPTION 'Informe o tipo de veiculo: este terminal tem horarios diferentes por tipo.'
+      USING ERRCODE = 'PT422';
+  END IF;
+  IF p_hora_preferida IS NOT NULL THEN
+    SELECT count(*) INTO v_slots FROM terminal_janelas
+     WHERE cliente_id = v_cliente AND ativo = true;
+    IF v_slots > 0 AND NOT EXISTS (
+      SELECT 1 FROM terminal_janelas
+       WHERE cliente_id = v_cliente AND ativo = true AND hora = p_hora_preferida
+         AND (tipo_veiculo = 'todos' OR v_tipo IS NULL OR tipo_veiculo = v_tipo)) THEN
+      RAISE EXCEPTION 'Horario indisponivel na grade deste terminal para este tipo de veiculo.'
+        USING ERRCODE = 'PT422';
+    END IF;
+  END IF;
+  IF EXISTS (SELECT 1 FROM agendamentos
+              WHERE solicitacao_id = p_solicitacao_id
+                AND status IN ('solicitado','em_andamento','agendado')) THEN
+    RAISE EXCEPTION 'Ja existe um agendamento em aberto para esta solicitacao.'
+      USING ERRCODE = 'PT409';
+  END IF;
+  -- Teto de tamanho: numero de nota nao passa disso, e o campo e livre.
+  v_nota := NULLIF(left(btrim(p_nota_fiscal), 40), '');
+  INSERT INTO agendamentos (solicitacao_id, data_preferida, hora_preferida, observacoes,
+                            nota_fiscal, nota_fiscal_origem, tipo_veiculo)
+  VALUES (p_solicitacao_id, p_data_preferida, p_hora_preferida, NULLIF(btrim(p_observacoes), ''),
+          v_nota, CASE WHEN v_nota IS NULL THEN NULL ELSE 'manual' END, v_tipo)
+  RETURNING id INTO v_id;
+  RETURN v_id;
+END; $function$;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 6b. LGPD: aceite do termo e registro de acesso da conta da TV contam como
+--     'interno' (corpos iguais aos vigentes, só a origem muda)
+-- ─────────────────────────────────────────────────────────────────────────────
+
+CREATE OR REPLACE FUNCTION public.registrar_aceite_termos(p_versao text)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+  v_user   uuid := auth.uid();
+  v_versao text := NULLIF(btrim(left(p_versao, 40)), '');
+  v_origem text;
+  v_id     uuid;
+BEGIN
+  IF v_user IS NULL THEN
+    RAISE EXCEPTION 'Sessao nao identificada.' USING ERRCODE = '42501';
+  END IF;
+  IF v_versao IS NULL THEN
+    RAISE EXCEPTION 'Versao do termo nao informada.' USING ERRCODE = '22004';
+  END IF;
+
+  -- 0079: a conta da TV não é is_interno(), mas também não é do portal.
+  v_origem := CASE WHEN is_interno() OR is_painel_tv() THEN 'interno' ELSE 'portal' END;
+
+  INSERT INTO termos_aceite (user_id, versao, origem)
+  VALUES (v_user, v_versao, v_origem)
+  ON CONFLICT (user_id, versao) DO NOTHING
+  RETURNING id INTO v_id;
+
+  IF v_id IS NULL THEN
+    SELECT id INTO v_id FROM termos_aceite
+     WHERE user_id = v_user AND versao = v_versao;
+  END IF;
+
+  RETURN v_id;
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.registrar_acesso(p_acao text, p_recurso text DEFAULT NULL::text, p_detalhe jsonb DEFAULT NULL::jsonb)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+  v_user uuid := auth.uid(); v_headers json; v_ip text; v_ua text;
+  v_origem text; v_detalhe jsonb; v_id uuid;
+BEGIN
+  IF v_user IS NULL THEN RETURN NULL; END IF;
+  IF p_acao NOT IN ('export_csv', 'download_oc_pdf', 'abrir_anexo',
+                    'abrir_documento_agendamento', 'copiar_cpf') THEN
+    RETURN NULL;  -- entrada invalida nao derruba o fluxo do usuario
+  END IF;
+  BEGIN v_headers := current_setting('request.headers', true)::json;
+  EXCEPTION WHEN OTHERS THEN v_headers := NULL; END;
+  IF v_headers IS NOT NULL THEN
+    v_ip := NULLIF(btrim(split_part(v_headers ->> 'x-forwarded-for', ',', 1)), '');
+    v_ua := left(v_headers ->> 'user-agent', 500);
+  END IF;
+  -- 0079: a conta da TV não é is_interno(), mas também não é do portal.
+  v_origem := CASE WHEN is_interno() OR is_painel_tv() THEN 'interno' ELSE 'portal' END;
+  v_detalhe := p_detalhe;
+  IF v_detalhe IS NOT NULL AND length(v_detalhe::text) > 1024 THEN
+    v_detalhe := jsonb_build_object('truncado', true);
+  END IF;
+  INSERT INTO log_acesso (usuario_id, acao, recurso, detalhe, ip, user_agent, origem)
+  VALUES (v_user, p_acao, left(p_recurso, 120), v_detalhe, v_ip, v_ua, v_origem)
+  RETURNING id INTO v_id;
+  RETURN v_id;
+END; $function$;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 7. Consulta de consistência (rodar depois de aplicar; tudo deve dar 0)
+-- ─────────────────────────────────────────────────────────────────────────────
+-- SELECT
+--   (SELECT count(*) FROM solicitacoes WHERE status_desde IS NULL) AS sem_status_desde,
+--   (SELECT count(*) FROM solicitacoes WHERE status = 'finalizada' AND finalizada_em IS NULL) AS finalizada_sem_carimbo,
+--   (SELECT count(*) FROM solicitacoes s WHERE s.status IS DISTINCT FROM (
+--      SELECT t.para_status FROM solicitacao_transicoes t WHERE t.solicitacao_id = s.id
+--      ORDER BY t.em DESC, t.id DESC LIMIT 1)) AS ultima_transicao_diferente;
+
+RESET lock_timeout;
+
+NOTIFY pgrst, 'reload schema';
+
+-- 0080 — Dashboards operacionais: funções de leitura (RPCs) do Painel, do Modo
+-- TV, dos Relatórios e da Produtividade, e o salvamento atômico de Metas e SLA.
+--
+-- Plano: .omc/plans/dashboards-operacionais.md (v2), §1 e §2.5. Contrato dos
+-- retornos: apps/interno/src/features/metricas/tipos.ts (mesmos nomes de campo).
+--
+-- Convenções:
+--   * fuso da operação: America/Campo_Grande (dia e hora sempre cortados aqui);
+--   * p_de/p_ate são DATAS inclusivas; o intervalo efetivo é
+--     [p_de 00:00 MS, least(p_ate+1 00:00 MS, now())) e o período anterior é o
+--     mesmo intervalo deslocado para trás pelo tamanho do período;
+--   * durações em MINUTOS, percentis com o n junto, frações 0–1 em *_pct;
+--   * filtros comuns F: p_origem ('todas' | 'interno' = tudo que não é parceiro
+--     | 'parceiro'), p_cliente_id, p_local ('Sem local' = local vazio).
+--   * painel_* e relatorio_produtividade são SECURITY DEFINER com checagem
+--     explícita de perfil; as demais são INVOKER (a RLS de solicitacoes vale) e
+--     também recusam quem não é da equipe interna.
+--
+-- Idempotente (CREATE OR REPLACE). Só funções: entra no fim do cumulative-schema.
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Auxiliares
+-- ─────────────────────────────────────────────────────────────────────────────
+
+CREATE OR REPLACE FUNCTION public.dash_filtro(
+  s_origem text, s_cliente uuid, s_local text,
+  p_origem text, p_cliente_id uuid, p_local text
+)
+RETURNS boolean
+LANGUAGE sql IMMUTABLE PARALLEL SAFE
+SET search_path = public, pg_temp
+AS $$
+  SELECT (coalesce(p_origem, 'todas') = 'todas'
+          OR (p_origem = 'parceiro' AND s_origem = 'parceiro')
+          OR (p_origem = 'interno'  AND s_origem IS DISTINCT FROM 'parceiro'))
+     AND (p_cliente_id IS NULL OR s_cliente = p_cliente_id)
+     AND (p_local IS NULL OR coalesce(nullif(btrim(s_local), ''), 'Sem local') = p_local);
+$$;
+
+-- Percentis em minutos de uma lista de durações (em minutos).
+CREATE OR REPLACE FUNCTION public.dash_percentis(p_min double precision[])
+RETURNS jsonb
+LANGUAGE sql IMMUTABLE
+SET search_path = public, pg_temp
+AS $$
+  SELECT jsonb_build_object(
+    'p50', round((percentile_cont(0.5) WITHIN GROUP (ORDER BY x))::numeric, 1),
+    'p90', round((percentile_cont(0.9) WITHIN GROUP (ORDER BY x))::numeric, 1),
+    'n', count(x))
+  FROM unnest(coalesce(p_min, '{}')) AS x;
+$$;
+
+-- Limites efetivos de um período (ver convenções).
+CREATE OR REPLACE FUNCTION public.dash_limites(p_de date, p_ate date)
+RETURNS TABLE (ini timestamptz, fim timestamptz, ini_ant timestamptz, fim_ant timestamptz)
+LANGUAGE plpgsql STABLE
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_len interval;
+BEGIN
+  IF p_de IS NULL OR p_ate IS NULL OR p_ate < p_de THEN
+    RAISE EXCEPTION 'Período inválido.' USING ERRCODE = '22023';
+  END IF;
+  IF p_ate - p_de > 400 THEN
+    RAISE EXCEPTION 'Período máximo: 400 dias.' USING ERRCODE = '22023';
+  END IF;
+  v_len := make_interval(days => p_ate - p_de + 1);
+  ini := p_de::timestamp AT TIME ZONE 'America/Campo_Grande';
+  fim := least((p_ate + 1)::timestamp AT TIME ZONE 'America/Campo_Grande', now());
+  ini_ant := ini - v_len;
+  fim_ant := fim - v_len;
+  RETURN NEXT;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.dash_exigir_interno()
+RETURNS void
+LANGUAGE plpgsql STABLE
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  IF NOT coalesce((SELECT public.is_interno()), false) THEN
+    RAISE EXCEPTION 'forbidden' USING ERRCODE = '42501';
+  END IF;
+END;
+$$;
+
+-- Passagens por etapa (entrou → saiu) de um conjunto de solicitações, a partir
+-- das transições. A passagem aberta (etapa atual) sai com `saiu` = NULL.
+CREATE OR REPLACE FUNCTION public.dash_passagens(p_ids uuid[])
+RETURNS TABLE (solicitacao_id uuid, etapa text, entrou timestamptz, saiu timestamptz)
+LANGUAGE sql STABLE
+SET search_path = public, pg_temp
+AS $$
+  SELECT t.solicitacao_id, t.para_status, t.em,
+         lead(t.em) OVER (PARTITION BY t.solicitacao_id ORDER BY t.em, t.id)
+  FROM solicitacao_transicoes t
+  WHERE t.solicitacao_id = ANY (p_ids);
+$$;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Painel e TV (SECURITY DEFINER: a TV não lê solicitacoes; payload sem PII)
+-- ─────────────────────────────────────────────────────────────────────────────
+
+CREATE OR REPLACE FUNCTION public.painel_estado_atual(
+  p_origem text DEFAULT 'todas', p_cliente_id uuid DEFAULT NULL, p_local text DEFAULT NULL
+)
+RETURNS jsonb
+LANGUAGE plpgsql STABLE SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_agora timestamptz := now();
+  v_hoje  date := (now() AT TIME ZONE 'America/Campo_Grande')::date;
+  v_lim_validade date;
+  v_out   jsonb;
+  v_interno boolean := coalesce(is_interno(), false);
+BEGIN
+  IF NOT (v_interno OR coalesce(is_painel_tv(), false)) THEN
+    RAISE EXCEPTION 'forbidden' USING ERRCODE = '42501';
+  END IF;
+
+  SELECT ((v_agora AT TIME ZONE 'America/Campo_Grande') + make_interval(hours => m.alerta_validade_h))::date
+    INTO v_lim_validade FROM metas_operacao m WHERE m.singleton;
+  v_lim_validade := coalesce(v_lim_validade, v_hoje + 1);
+
+  WITH abertas AS (
+    SELECT s.id, s.numero_interno, s.status, s.origem, s.created_at, s.status_desde,
+           s.cliente_id, nullif(btrim(s.local_carregamento), '') AS local,
+           extract(epoch FROM (v_agora - s.status_desde)) / 60 AS min_na_etapa,
+           e.alerta_min,
+           sla_classificar(s.status, s.status_desde, v_agora, e.aviso_min, e.alerta_min, e.ativo) AS cls
+    FROM solicitacoes s
+    LEFT JOIN sla_etapas e ON e.status = s.status
+    WHERE s.status IN ('recebida', 'em_cadastro', 'instrucao_emitida', 'oc_gerada', 'oc_enviada')
+      AND dash_filtro(s.origem, s.cliente_id, s.local_carregamento, p_origem, p_cliente_id, p_local)
+  ),
+  fila AS (SELECT * FROM abertas WHERE status <> 'oc_enviada'),
+  etapas AS (
+    SELECT st.status, st.ordem,
+           count(a.id) AS qtd,
+           count(a.id) FILTER (WHERE a.cls = 'fora') AS fora_sla,
+           count(a.id) FILTER (WHERE a.cls = 'aviso') AS aviso,
+           round(max(a.min_na_etapa)) AS mais_antiga_min
+    FROM (VALUES ('recebida', 1), ('em_cadastro', 2), ('instrucao_emitida', 3), ('oc_gerada', 4), ('oc_enviada', 5))
+         AS st(status, ordem)
+    LEFT JOIN abertas a ON a.status = st.status
+    GROUP BY st.status, st.ordem
+  ),
+  aging AS (
+    SELECT f.faixa, f.ordem, count(q.id) AS qtd
+    FROM (VALUES ('lt1h', 1, 0, 60), ('1a4h', 2, 60, 240), ('4a8h', 3, 240, 480),
+                 ('8a24h', 4, 480, 1440), ('gt24h', 5, 1440, NULL)) AS f(faixa, ordem, de_min, ate_min)
+    LEFT JOIN fila q
+      ON extract(epoch FROM (v_agora - q.created_at)) / 60 >= f.de_min
+     AND (f.ate_min IS NULL OR extract(epoch FROM (v_agora - q.created_at)) / 60 < f.ate_min)
+    GROUP BY f.faixa, f.ordem
+  ),
+  locais AS (
+    SELECT coalesce(local, 'Sem local') AS local, count(*) AS qtd,
+           count(*) FILTER (WHERE cls = 'fora') AS fora_sla,
+           row_number() OVER (ORDER BY count(*) DESC, coalesce(local, 'Sem local')) AS rk
+    FROM fila GROUP BY coalesce(local, 'Sem local')
+  ),
+  por_local AS (
+    SELECT local, qtd, fora_sla, rk FROM locais WHERE rk <= 6
+    UNION ALL
+    SELECT 'Outros', sum(qtd), sum(fora_sla), 7 FROM locais WHERE rk > 6 HAVING count(*) > 0
+  ),
+  atrasadas AS (
+    SELECT a.id, a.numero_interno, a.status, c.razao_social AS cliente, a.local, a.origem,
+           round(a.min_na_etapa) AS min_na_etapa, round(a.min_na_etapa - a.alerta_min) AS excesso_min
+    FROM fila a LEFT JOIN clientes c ON c.id = a.cliente_id
+    WHERE a.cls = 'fora'
+    ORDER BY a.min_na_etapa - a.alerta_min DESC
+    LIMIT 12
+  )
+  SELECT jsonb_build_object(
+    'gerado_em', v_agora,
+    'fila', jsonb_build_object(
+      'total', (SELECT count(*) FROM fila),
+      'aguardando_finalizacao', (SELECT count(*) FROM abertas WHERE status = 'oc_enviada'),
+      'fora_sla', (SELECT count(*) FROM fila WHERE cls = 'fora'),
+      'aviso', (SELECT count(*) FROM fila WHERE cls = 'aviso')),
+    'etapas', (SELECT jsonb_agg(jsonb_build_object('status', status, 'qtd', qtd, 'fora_sla', fora_sla,
+                                                   'aviso', aviso, 'mais_antiga_min', mais_antiga_min) ORDER BY ordem)
+               FROM etapas),
+    'aging', (SELECT jsonb_agg(jsonb_build_object('faixa', faixa, 'qtd', qtd) ORDER BY ordem) FROM aging),
+    'validade', jsonb_build_object(
+      'vencendo', (SELECT count(*) FROM abertas a JOIN solicitacoes s ON s.id = a.id
+                    WHERE a.status IN ('oc_gerada', 'oc_enviada') AND s.validade_fim BETWEEN v_hoje AND v_lim_validade),
+      'vencidas', (SELECT count(*) FROM abertas a JOIN solicitacoes s ON s.id = a.id
+                    WHERE a.status IN ('oc_gerada', 'oc_enviada') AND s.validade_fim < v_hoje)),
+    'pamcard_pendente', (SELECT count(*) FROM solicitacoes s
+                          WHERE s.origem = 'parceiro' AND s.pamcard_status = 'nao_tem_cartao'
+                            AND s.pamcard_providenciado_em IS NULL
+                            AND s.status NOT IN ('finalizada', 'cancelada')
+                            AND dash_filtro(s.origem, s.cliente_id, s.local_carregamento, p_origem, p_cliente_id, p_local)),
+    -- Solicitações distintas (uma com 2 pendências conta 1, como na lista).
+    'pendencias_parceiro', (SELECT count(DISTINCT p.solicitacao_id) FROM solicitacao_pendencias p JOIN solicitacoes s ON s.id = p.solicitacao_id
+                             WHERE p.status = 'aberta' AND p.parceiro_id IS NOT NULL
+                               AND dash_filtro(s.origem, s.cliente_id, s.local_carregamento, p_origem, p_cliente_id, p_local)),
+    'por_local', coalesce((SELECT jsonb_agg(jsonb_build_object('local', local, 'qtd', qtd, 'fora_sla', fora_sla) ORDER BY rk)
+                           FROM por_local), '[]'::jsonb),
+    -- A TV não recebe o id (nada a abrir na parede, e o id abriria o PDF da OC
+    -- por outras portas). A equipe interna recebe, para o link da linha.
+    'atrasadas', coalesce((SELECT jsonb_agg(CASE WHEN v_interno THEN to_jsonb(x) ELSE to_jsonb(x) - 'id' END
+                                            ORDER BY x.excesso_min DESC) FROM atrasadas x), '[]'::jsonb)
+  ) INTO v_out;
+  RETURN v_out;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.painel_hoje(
+  p_origem text DEFAULT 'todas', p_cliente_id uuid DEFAULT NULL, p_local text DEFAULT NULL
+)
+RETURNS jsonb
+LANGUAGE plpgsql STABLE SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_agora timestamptz := now();
+  v_hoje  date := (now() AT TIME ZONE 'America/Campo_Grande')::date;
+  v_ini   timestamptz := (now() AT TIME ZONE 'America/Campo_Grande')::date::timestamp AT TIME ZONE 'America/Campo_Grande';
+  v_m     metas_operacao%ROWTYPE;
+  v_out   jsonb;
+BEGIN
+  IF NOT (coalesce(is_interno(), false) OR coalesce(is_painel_tv(), false)) THEN
+    RAISE EXCEPTION 'forbidden' USING ERRCODE = '42501';
+  END IF;
+  SELECT * INTO v_m FROM metas_operacao WHERE singleton;
+
+  WITH s AS (
+    SELECT s.status, s.created_at, s.finalizada_em
+    FROM solicitacoes s
+    WHERE dash_filtro(s.origem, s.cliente_id, s.local_carregamento, p_origem, p_cliente_id, p_local)
+      AND (s.created_at >= v_ini - interval '29 days' OR s.finalizada_em >= v_ini - interval '29 days')
+  ),
+  fin AS (SELECT finalizada_em FROM s WHERE status = 'finalizada' AND finalizada_em IS NOT NULL),
+  horas AS (SELECT generate_series(0, 23) AS hora)
+  SELECT jsonb_build_object(
+    'finalizadas', (SELECT count(*) FROM fin WHERE finalizada_em >= v_ini),
+    'finalizadas_ref', (SELECT count(*) FROM fin WHERE finalizada_em >= v_ini - interval '1 day'
+                                                  AND finalizada_em < v_agora - interval '1 day'),
+    'meta', v_m.meta_finalizadas_dia,
+    'finalizadas_2h', (SELECT count(*) FROM fin WHERE finalizada_em >= v_agora - interval '2 hours'),
+    'lead7d', dash_percentis((SELECT array_agg(extract(epoch FROM (finalizada_em - created_at)) / 60)
+                               FROM s WHERE status = 'finalizada' AND finalizada_em >= v_agora - interval '7 days')),
+    'lead7d_ant', (SELECT dash_percentis(array_agg(extract(epoch FROM (x.finalizada_em - x.created_at)) / 60))
+                   FROM solicitacoes x
+                   WHERE x.status = 'finalizada'
+                     AND x.finalizada_em >= v_agora - interval '14 days' AND x.finalizada_em < v_agora - interval '7 days'
+                     AND dash_filtro(x.origem, x.cliente_id, x.local_carregamento, p_origem, p_cliente_id, p_local)),
+    'por_hora', (SELECT jsonb_agg(jsonb_build_object(
+                    'hora', h.hora,
+                    'finalizadas', (SELECT count(*) FROM fin
+                                     WHERE finalizada_em >= v_ini
+                                       AND extract(hour FROM finalizada_em AT TIME ZONE 'America/Campo_Grande') = h.hora),
+                    'entradas', (SELECT count(*) FROM s
+                                  WHERE created_at >= v_ini
+                                    AND extract(hour FROM created_at AT TIME ZONE 'America/Campo_Grande') = h.hora),
+                    'ref', (SELECT round(count(*) / 4.0, 2) FROM fin
+                             WHERE (finalizada_em AT TIME ZONE 'America/Campo_Grande')::date
+                                   IN (v_hoje - 7, v_hoje - 14, v_hoje - 21, v_hoje - 28)
+                               AND extract(hour FROM finalizada_em AT TIME ZONE 'America/Campo_Grande') = h.hora))
+                  ORDER BY h.hora) FROM horas h),
+    'expediente_inicio', to_char(coalesce(v_m.expediente_inicio, '07:00'::time), 'HH24:MI'),
+    'expediente_fim', to_char(coalesce(v_m.expediente_fim, '18:00'::time), 'HH24:MI')
+  ) INTO v_out;
+  RETURN v_out;
+END;
+$$;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Relatórios (INVOKER: a RLS de solicitacoes vale; só equipe interna)
+-- ─────────────────────────────────────────────────────────────────────────────
+
+-- Um bloco de indicadores para [ini, fim).
+CREATE OR REPLACE FUNCTION public.dash_bloco_resumo(
+  p_ini timestamptz, p_fim timestamptz, p_origem text, p_cliente_id uuid, p_local text
+)
+RETURNS jsonb
+LANGUAGE plpgsql STABLE
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_ent int; v_canc_coorte int; v_fin int; v_canc int;
+  v_c48_num int; v_c48_den int;
+  v_ids uuid[];
+  v_dentro numeric;
+BEGIN
+  PERFORM dash_exigir_interno();
+  IF p_fim - p_ini > interval '401 days' THEN
+    RAISE EXCEPTION 'Período máximo: 400 dias.' USING ERRCODE = '22023';
+  END IF;
+  SELECT count(*), count(*) FILTER (WHERE s.status = 'cancelada')
+    INTO v_ent, v_canc_coorte
+  FROM solicitacoes s
+  WHERE s.created_at >= p_ini AND s.created_at < p_fim
+    AND dash_filtro(s.origem, s.cliente_id, s.local_carregamento, p_origem, p_cliente_id, p_local);
+
+  SELECT count(*), array_agg(s.id) INTO v_fin, v_ids
+  FROM solicitacoes s
+  WHERE s.status = 'finalizada' AND s.finalizada_em >= p_ini AND s.finalizada_em < p_fim
+    AND dash_filtro(s.origem, s.cliente_id, s.local_carregamento, p_origem, p_cliente_id, p_local);
+
+  SELECT count(DISTINCT t.solicitacao_id) INTO v_canc
+  FROM solicitacao_transicoes t JOIN solicitacoes s ON s.id = t.solicitacao_id
+  WHERE t.para_status = 'cancelada' AND t.em >= p_ini AND t.em < p_fim
+    AND dash_filtro(s.origem, s.cliente_id, s.local_carregamento, p_origem, p_cliente_id, p_local);
+
+  -- R4: entradas com 48 h+ de idade; canceladas fora do denominador (D8).
+  SELECT count(*) FILTER (WHERE s.status = 'finalizada' AND s.finalizada_em - s.created_at <= interval '48 hours'),
+         count(*) FILTER (WHERE s.status <> 'cancelada')
+    INTO v_c48_num, v_c48_den
+  FROM solicitacoes s
+  WHERE s.created_at >= p_ini AND s.created_at < least(p_fim, now() - interval '48 hours')
+    AND dash_filtro(s.origem, s.cliente_id, s.local_carregamento, p_origem, p_cliente_id, p_local);
+
+  -- R7: das finalizadas, quantas sem nenhuma passagem acima do alerta da etapa.
+  SELECT CASE WHEN count(*) = 0 THEN NULL
+              ELSE round(count(*) FILTER (WHERE NOT x.estourou)::numeric / count(*), 4) END
+    INTO v_dentro
+  FROM (
+    SELECT p.solicitacao_id,
+           bool_or(coalesce(sla_classificar(p.etapa, p.entrou, p.saiu, e.aviso_min, e.alerta_min, e.ativo) = 'fora', false))
+             AS estourou
+    FROM dash_passagens(v_ids) p
+    LEFT JOIN sla_etapas e ON e.status = p.etapa
+    WHERE p.saiu IS NOT NULL
+    GROUP BY p.solicitacao_id
+  ) x;
+
+  RETURN jsonb_build_object(
+    'entradas', v_ent,
+    'finalizadas', v_fin,
+    'canceladas', v_canc,
+    'conclusao48_pct', CASE WHEN v_c48_den > 0 THEN round(v_c48_num::numeric / v_c48_den, 4) END,
+    'conclusao48_n', v_c48_den,
+    'cancelamento_pct', CASE WHEN v_ent > 0 THEN round(v_canc_coorte::numeric / v_ent, 4) END,
+    'lead', (SELECT dash_percentis(array_agg(extract(epoch FROM (s.finalizada_em - s.created_at)) / 60))
+             FROM solicitacoes s WHERE s.id = ANY (v_ids)),
+    'dentro_sla_pct', v_dentro
+  );
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.relatorio_resumo(
+  p_de date, p_ate date,
+  p_origem text DEFAULT 'todas', p_cliente_id uuid DEFAULT NULL, p_local text DEFAULT NULL
+)
+RETURNS jsonb
+LANGUAGE plpgsql STABLE
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  l record;
+BEGIN
+  PERFORM dash_exigir_interno();
+  SELECT * INTO l FROM dash_limites(p_de, p_ate);
+  RETURN jsonb_build_object(
+    'atual', dash_bloco_resumo(l.ini, l.fim, p_origem, p_cliente_id, p_local),
+    'anterior', dash_bloco_resumo(l.ini_ant, l.fim_ant, p_origem, p_cliente_id, p_local),
+    'limites', jsonb_build_object('ini', l.ini, 'fim', l.fim, 'ini_ant', l.ini_ant, 'fim_ant', l.fim_ant)
+  );
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.relatorio_serie(
+  p_de date, p_ate date,
+  p_origem text DEFAULT 'todas', p_cliente_id uuid DEFAULT NULL, p_local text DEFAULT NULL,
+  p_granularidade text DEFAULT 'dia'
+)
+RETURNS TABLE (balde timestamptz, entradas int, finalizadas int, canceladas int, entradas_ant int, finalizadas_ant int)
+LANGUAGE plpgsql STABLE
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  l record;
+  v_passo interval;
+  v_unid text;
+  v_len interval := make_interval(days => p_ate - p_de + 1);
+  v_inicio timestamp;
+BEGIN
+  PERFORM dash_exigir_interno();
+  SELECT * INTO l FROM dash_limites(p_de, p_ate);
+  IF p_granularidade = 'hora' THEN v_passo := interval '1 hour'; v_unid := 'hour';
+  ELSIF p_granularidade = 'semana' THEN v_passo := interval '7 days'; v_unid := 'week';
+  ELSIF p_granularidade = 'dia' THEN v_passo := interval '1 day'; v_unid := 'day';
+  ELSE RAISE EXCEPTION 'Granularidade inválida: %', p_granularidade USING ERRCODE = '22023';
+  END IF;
+  IF v_unid = 'hour' AND p_ate - p_de > 6 THEN
+    RAISE EXCEPTION 'Série por hora: no máximo 7 dias.' USING ERRCODE = '22023';
+  END IF;
+  v_inicio := date_trunc(v_unid, p_de::timestamp);
+
+  -- Agrega uma vez por balde (nada de subconsulta por balde: 400 dias × 12 mil linhas).
+  RETURN QUERY
+  WITH baldes AS (
+    SELECT g AS b FROM generate_series(v_inicio, p_ate::timestamp + interval '23 hours', v_passo) g
+  ),
+  s AS (
+    SELECT x.id, x.status, x.created_at, x.finalizada_em
+    FROM solicitacoes x
+    WHERE dash_filtro(x.origem, x.cliente_id, x.local_carregamento, p_origem, p_cliente_id, p_local)
+      AND ((x.created_at >= l.ini_ant AND x.created_at < l.fim)
+        OR (x.finalizada_em >= l.ini_ant AND x.finalizada_em < l.fim))
+  ),
+  ent AS (
+    SELECT date_trunc(v_unid, s.created_at AT TIME ZONE 'America/Campo_Grande') AS b, count(*)::int AS n
+    FROM s WHERE s.created_at >= l.ini AND s.created_at < l.fim GROUP BY 1
+  ),
+  fin AS (
+    SELECT date_trunc(v_unid, s.finalizada_em AT TIME ZONE 'America/Campo_Grande') AS b, count(*)::int AS n
+    FROM s WHERE s.status = 'finalizada' AND s.finalizada_em >= l.ini AND s.finalizada_em < l.fim GROUP BY 1
+  ),
+  canc AS (
+    SELECT date_trunc(v_unid, t.em AT TIME ZONE 'America/Campo_Grande') AS b, count(DISTINCT t.solicitacao_id)::int AS n
+    FROM solicitacao_transicoes t
+    JOIN solicitacoes x ON x.id = t.solicitacao_id
+    WHERE t.para_status = 'cancelada' AND t.em >= l.ini AND t.em < l.fim
+      AND dash_filtro(x.origem, x.cliente_id, x.local_carregamento, p_origem, p_cliente_id, p_local)
+    GROUP BY 1
+  ),
+  ent_ant AS (
+    SELECT date_trunc(v_unid, (s.created_at + v_len) AT TIME ZONE 'America/Campo_Grande') AS b, count(*)::int AS n
+    FROM s WHERE s.created_at >= l.ini_ant AND s.created_at < l.fim_ant GROUP BY 1
+  ),
+  fin_ant AS (
+    SELECT date_trunc(v_unid, (s.finalizada_em + v_len) AT TIME ZONE 'America/Campo_Grande') AS b, count(*)::int AS n
+    FROM s WHERE s.status = 'finalizada' AND s.finalizada_em >= l.ini_ant AND s.finalizada_em < l.fim_ant GROUP BY 1
+  )
+  SELECT (bb.b AT TIME ZONE 'America/Campo_Grande'),
+         coalesce(ent.n, 0), coalesce(fin.n, 0), coalesce(canc.n, 0),
+         coalesce(ent_ant.n, 0), coalesce(fin_ant.n, 0)
+  FROM baldes bb
+  LEFT JOIN ent ON ent.b = bb.b
+  LEFT JOIN fin ON fin.b = bb.b
+  LEFT JOIN canc ON canc.b = bb.b
+  LEFT JOIN ent_ant ON ent_ant.b = bb.b
+  LEFT JOIN fin_ant ON fin_ant.b = bb.b
+  ORDER BY bb.b;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.relatorio_tempo_etapas(
+  p_de date, p_ate date,
+  p_origem text DEFAULT 'todas', p_cliente_id uuid DEFAULT NULL, p_local text DEFAULT NULL
+)
+RETURNS TABLE (status text, n int, p50_min numeric, p90_min numeric, acima_alerta_pct numeric)
+LANGUAGE plpgsql STABLE
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  l record;
+  v_ids uuid[];
+BEGIN
+  PERFORM dash_exigir_interno();
+  SELECT * INTO l FROM dash_limites(p_de, p_ate);
+  -- Solicitações com alguma SAÍDA de etapa no período (todas as transições delas entram no lead()).
+  SELECT array_agg(DISTINCT t.solicitacao_id) INTO v_ids
+  FROM solicitacao_transicoes t JOIN solicitacoes s ON s.id = t.solicitacao_id
+  WHERE t.em >= l.ini AND t.em < l.fim AND t.de_status IS NOT NULL
+    AND dash_filtro(s.origem, s.cliente_id, s.local_carregamento, p_origem, p_cliente_id, p_local);
+
+  RETURN QUERY
+  WITH pas AS (
+    SELECT p.etapa, extract(epoch FROM (p.saiu - p.entrou)) / 60 AS dur,
+           sla_classificar(p.etapa, p.entrou, p.saiu, e.aviso_min, e.alerta_min, e.ativo) AS cls
+    FROM dash_passagens(v_ids) p
+    LEFT JOIN sla_etapas e ON e.status = p.etapa
+    WHERE p.saiu >= l.ini AND p.saiu < l.fim
+  )
+  SELECT st.s, count(pas.dur)::int,
+         round((percentile_cont(0.5) WITHIN GROUP (ORDER BY pas.dur))::numeric, 1),
+         round((percentile_cont(0.9) WITHIN GROUP (ORDER BY pas.dur))::numeric, 1),
+         CASE WHEN count(pas.dur) = 0 OR bool_and(pas.cls IS NULL) THEN NULL
+              ELSE round(avg((pas.cls = 'fora')::int)::numeric, 4) END
+  FROM (VALUES ('recebida', 1), ('em_cadastro', 2), ('instrucao_emitida', 3), ('oc_gerada', 4), ('oc_enviada', 5)) st(s, o)
+  LEFT JOIN pas ON pas.etapa = st.s
+  GROUP BY st.s, st.o
+  ORDER BY st.o;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.relatorio_ranking(
+  p_de date, p_ate date,
+  p_origem text DEFAULT 'todas', p_cliente_id uuid DEFAULT NULL, p_local text DEFAULT NULL,
+  p_dimensao text DEFAULT 'cliente', p_limite int DEFAULT 50
+)
+RETURNS TABLE (chave text, rotulo text, entradas int, finalizadas int,
+               lead_p50_min numeric, emissao_p50_min numeric, emissao_p90_min numeric)
+LANGUAGE plpgsql STABLE
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  l record;
+BEGIN
+  PERFORM dash_exigir_interno();
+  IF p_dimensao NOT IN ('cliente', 'material', 'local', 'motorista', 'veiculo', 'subcontratada', 'parceiro', 'origem') THEN
+    RAISE EXCEPTION 'Dimensão inválida: %', p_dimensao USING ERRCODE = '22023';
+  END IF;
+  SELECT * INTO l FROM dash_limites(p_de, p_ate);
+
+  RETURN QUERY
+  WITH base AS (
+    SELECT s.id, s.status, s.created_at, s.finalizada_em,
+      CASE p_dimensao
+        WHEN 'cliente' THEN s.cliente_id::text
+        WHEN 'material' THEN s.material_id::text
+        WHEN 'local' THEN coalesce(nullif(btrim(s.local_carregamento), ''), 'Sem local')
+        WHEN 'motorista' THEN coalesce(s.motorista_id, s.parceiro_motorista_id)::text
+        WHEN 'veiculo' THEN coalesce(s.veiculo_id, s.parceiro_veiculo_id)::text
+        WHEN 'subcontratada' THEN coalesce(s.subcontratada_id, s.parceiro_subcontratada_id)::text
+        WHEN 'parceiro' THEN s.parceiro_id::text
+        WHEN 'origem' THEN CASE WHEN s.origem = 'parceiro' THEN 'parceiro' ELSE 'interno' END
+      END AS k,
+      CASE p_dimensao
+        WHEN 'cliente' THEN (SELECT c.razao_social FROM clientes c WHERE c.id = s.cliente_id)
+        WHEN 'material' THEN (SELECT m.nome FROM materiais m WHERE m.id = s.material_id)
+        WHEN 'local' THEN coalesce(nullif(btrim(s.local_carregamento), ''), 'Sem local')
+        WHEN 'motorista' THEN coalesce((SELECT m.nome_completo FROM motoristas m WHERE m.id = s.motorista_id),
+                                       (SELECT m.nome_completo FROM parceiro_motoristas m WHERE m.id = s.parceiro_motorista_id))
+        WHEN 'veiculo' THEN coalesce((SELECT v.placa FROM veiculos v WHERE v.id = s.veiculo_id),
+                                     (SELECT v.placa FROM parceiro_veiculos v WHERE v.id = s.parceiro_veiculo_id))
+        WHEN 'subcontratada' THEN coalesce((SELECT x.razao_social FROM subcontratadas x WHERE x.id = s.subcontratada_id),
+                                           (SELECT x.razao_social FROM parceiro_subcontratadas x WHERE x.id = s.parceiro_subcontratada_id))
+        WHEN 'parceiro' THEN (SELECT p.razao_social FROM parceiros p WHERE p.id = s.parceiro_id)
+        WHEN 'origem' THEN CASE WHEN s.origem = 'parceiro' THEN 'Parceiros' ELSE 'Interno' END
+      END AS r,
+      (s.created_at >= l.ini AND s.created_at < l.fim) AS entrou,
+      (s.status = 'finalizada' AND s.finalizada_em >= l.ini AND s.finalizada_em < l.fim) AS finalizou
+    FROM solicitacoes s
+    WHERE dash_filtro(s.origem, s.cliente_id, s.local_carregamento, p_origem, p_cliente_id, p_local)
+      AND ((s.created_at >= l.ini AND s.created_at < l.fim) OR (s.finalizada_em >= l.ini AND s.finalizada_em < l.fim))
+      AND (p_dimensao <> 'parceiro' OR s.origem = 'parceiro')
+  ),
+  emissao AS (
+    SELECT b.id, extract(epoch FROM (b.finalizada_em - min(t.em))) / 60 AS min_emissao
+    FROM base b JOIN solicitacao_transicoes t ON t.solicitacao_id = b.id AND t.para_status = 'em_cadastro'
+    WHERE b.finalizou
+    GROUP BY b.id, b.finalizada_em
+  )
+  SELECT coalesce(b.k, 'sem'), coalesce(max(b.r), 'Não informado'),
+         count(*) FILTER (WHERE b.entrou)::int,
+         count(*) FILTER (WHERE b.finalizou)::int,
+         round((percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM (b.finalizada_em - b.created_at)) / 60)
+                FILTER (WHERE b.finalizou))::numeric, 1),
+         round((percentile_cont(0.5) WITHIN GROUP (ORDER BY e.min_emissao))::numeric, 1),
+         round((percentile_cont(0.9) WITHIN GROUP (ORDER BY e.min_emissao))::numeric, 1)
+  FROM base b LEFT JOIN emissao e ON e.id = b.id
+  GROUP BY coalesce(b.k, 'sem')
+  ORDER BY count(*) FILTER (WHERE b.entrou) DESC, count(*) FILTER (WHERE b.finalizou) DESC
+  LIMIT greatest(1, least(coalesce(p_limite, 50), 500));
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.relatorio_locais(p_de date, p_ate date)
+RETURNS TABLE (local text, qtd int)
+LANGUAGE plpgsql STABLE
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  l record;
+BEGIN
+  PERFORM dash_exigir_interno();
+  SELECT * INTO l FROM dash_limites(p_de, p_ate);
+  RETURN QUERY
+  SELECT coalesce(nullif(btrim(s.local_carregamento), ''), 'Sem local'), count(*)::int
+  FROM solicitacoes s
+  WHERE s.created_at >= l.ini AND s.created_at < l.fim
+  GROUP BY 1 ORDER BY 2 DESC, 1;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.relatorio_mapa_calor(
+  p_de date, p_ate date,
+  p_origem text DEFAULT 'todas', p_cliente_id uuid DEFAULT NULL, p_local text DEFAULT NULL
+)
+RETURNS TABLE (dow int, hora int, entradas int)
+LANGUAGE plpgsql STABLE
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  l record;
+BEGIN
+  PERFORM dash_exigir_interno();
+  SELECT * INTO l FROM dash_limites(p_de, p_ate);
+  RETURN QUERY
+  SELECT extract(dow FROM s.created_at AT TIME ZONE 'America/Campo_Grande')::int,
+         extract(hour FROM s.created_at AT TIME ZONE 'America/Campo_Grande')::int,
+         count(*)::int
+  FROM solicitacoes s
+  WHERE s.created_at >= l.ini AND s.created_at < l.fim
+    AND dash_filtro(s.origem, s.cliente_id, s.local_carregamento, p_origem, p_cliente_id, p_local)
+  GROUP BY 1, 2 ORDER BY 1, 2;
+END;
+$$;
+
+-- Ids por trás de um indicador (drill-down), no máximo 1000, mais antiga primeiro.
+CREATE OR REPLACE FUNCTION public.ids_para_drill(
+  p_tipo text, p_de date, p_ate date,
+  p_origem text DEFAULT 'todas', p_cliente_id uuid DEFAULT NULL, p_local text DEFAULT NULL
+)
+RETURNS SETOF uuid
+LANGUAGE plpgsql STABLE
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  l record;
+  v_ids uuid[];
+BEGIN
+  PERFORM dash_exigir_interno();
+  SELECT * INTO l FROM dash_limites(p_de, p_ate);
+  IF p_tipo = 'conclusao48' THEN
+    RETURN QUERY
+    SELECT s.id FROM solicitacoes s
+    WHERE s.created_at >= l.ini AND s.created_at < least(l.fim, now() - interval '48 hours')
+      AND s.status = 'finalizada' AND s.finalizada_em - s.created_at <= interval '48 hours'
+      AND dash_filtro(s.origem, s.cliente_id, s.local_carregamento, p_origem, p_cliente_id, p_local)
+    ORDER BY s.created_at LIMIT 1000;
+  ELSIF p_tipo = 'cancelada' THEN
+    RETURN QUERY
+    SELECT s.id FROM solicitacoes s
+    WHERE EXISTS (SELECT 1 FROM solicitacao_transicoes t WHERE t.solicitacao_id = s.id
+                   AND t.para_status = 'cancelada' AND t.em >= l.ini AND t.em < l.fim)
+      AND dash_filtro(s.origem, s.cliente_id, s.local_carregamento, p_origem, p_cliente_id, p_local)
+    ORDER BY s.created_at LIMIT 1000;
+  ELSIF p_tipo = 'sla_estourou' THEN
+    SELECT array_agg(s.id) INTO v_ids FROM solicitacoes s
+    WHERE s.status = 'finalizada' AND s.finalizada_em >= l.ini AND s.finalizada_em < l.fim
+      AND dash_filtro(s.origem, s.cliente_id, s.local_carregamento, p_origem, p_cliente_id, p_local);
+    RETURN QUERY
+    SELECT p.solicitacao_id FROM dash_passagens(v_ids) p
+    JOIN sla_etapas e ON e.status = p.etapa
+    JOIN solicitacoes s ON s.id = p.solicitacao_id
+    WHERE p.saiu IS NOT NULL
+      AND sla_classificar(p.etapa, p.entrou, p.saiu, e.aviso_min, e.alerta_min, e.ativo) = 'fora'
+    GROUP BY p.solicitacao_id, s.created_at
+    ORDER BY s.created_at LIMIT 1000;
+  ELSE
+    RAISE EXCEPTION 'Tipo de drill inválido: %', p_tipo USING ERRCODE = '22023';
+  END IF;
+END;
+$$;
+
+-- As solicitações por trás de um drill-down, como linhas da própria tabela: a
+-- lista chama via PostgREST com select/embed/count/range/order normais (nada de
+-- mandar 1000 ids na URL). INVOKER: a RLS de solicitacoes vale.
+CREATE OR REPLACE FUNCTION public.solicitacoes_drill(
+  p_tipo text, p_de date, p_ate date,
+  p_origem text DEFAULT 'todas', p_cliente_id uuid DEFAULT NULL, p_local text DEFAULT NULL
+)
+RETURNS SETOF public.solicitacoes
+LANGUAGE sql STABLE
+SET search_path = public, pg_temp
+AS $$
+  SELECT s.* FROM solicitacoes s
+  WHERE s.id IN (SELECT ids_para_drill(p_tipo, p_de, p_ate, p_origem, p_cliente_id, p_local));
+$$;
+
+-- Linhas "tidy" para o CSV de dados (uma por solicitação criada no período).
+CREATE OR REPLACE FUNCTION public.exportar_solicitacoes_periodo(
+  p_de date, p_ate date,
+  p_origem text DEFAULT 'todas', p_cliente_id uuid DEFAULT NULL, p_local text DEFAULT NULL,
+  p_offset int DEFAULT 0, p_limite int DEFAULT 1000
+)
+RETURNS TABLE (numero_interno int, origem text, parceiro text, cliente text, material text, local text,
+               status text, criada_em timestamptz, finalizada_em timestamptz, lead_min numeric,
+               min_recebida numeric, min_em_cadastro numeric, min_instrucao_emitida numeric,
+               min_oc_gerada numeric, min_oc_enviada numeric)
+LANGUAGE plpgsql STABLE
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  l record;
+  v_ids uuid[];
+BEGIN
+  PERFORM dash_exigir_interno();
+  SELECT * INTO l FROM dash_limites(p_de, p_ate);
+  SELECT array_agg(x.id ORDER BY x.created_at, x.numero_interno) INTO v_ids FROM (
+    SELECT s.id, s.created_at, s.numero_interno FROM solicitacoes s
+    WHERE s.created_at >= l.ini AND s.created_at < l.fim
+      AND dash_filtro(s.origem, s.cliente_id, s.local_carregamento, p_origem, p_cliente_id, p_local)
+    ORDER BY s.created_at, s.numero_interno
+    OFFSET greatest(coalesce(p_offset, 0), 0)
+    LIMIT greatest(1, least(coalesce(p_limite, 1000), 1000))
+  ) x;
+
+  -- Minutos por etapa: um GROUP BY por solicitação (pivot), não uma subconsulta por célula.
+  RETURN QUERY
+  WITH pas AS (
+    SELECT p.solicitacao_id,
+           sum(d) FILTER (WHERE p.etapa = 'recebida') AS m_rec,
+           sum(d) FILTER (WHERE p.etapa = 'em_cadastro') AS m_cad,
+           sum(d) FILTER (WHERE p.etapa = 'instrucao_emitida') AS m_ins,
+           sum(d) FILTER (WHERE p.etapa = 'oc_gerada') AS m_ger,
+           sum(d) FILTER (WHERE p.etapa = 'oc_enviada') AS m_env
+    FROM dash_passagens(v_ids) p,
+         LATERAL (SELECT extract(epoch FROM (coalesce(p.saiu, now()) - p.entrou)) / 60 AS d) dd
+    GROUP BY p.solicitacao_id
+  )
+  SELECT s.numero_interno::int, s.origem, pa.razao_social, c.razao_social, m.nome,
+         nullif(btrim(s.local_carregamento), ''),
+         s.status, s.created_at, s.finalizada_em,
+         CASE WHEN s.status = 'finalizada' THEN round((extract(epoch FROM (s.finalizada_em - s.created_at)) / 60)::numeric, 1) END,
+         round(pas.m_rec::numeric, 1), round(pas.m_cad::numeric, 1), round(pas.m_ins::numeric, 1),
+         round(pas.m_ger::numeric, 1), round(pas.m_env::numeric, 1)
+  FROM unnest(v_ids) WITH ORDINALITY u(id, ord)
+  JOIN solicitacoes s ON s.id = u.id
+  LEFT JOIN pas ON pas.solicitacao_id = s.id
+  LEFT JOIN parceiros pa ON pa.id = s.parceiro_id
+  LEFT JOIN clientes c ON c.id = s.cliente_id
+  LEFT JOIN materiais m ON m.id = s.material_id
+  ORDER BY u.ord;
+END;
+$$;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Produtividade da equipe (SECURITY DEFINER: lê usuario_id das transições; só gestão)
+-- ─────────────────────────────────────────────────────────────────────────────
+
+CREATE OR REPLACE FUNCTION public.relatorio_produtividade(p_de date, p_ate date)
+RETURNS jsonb
+LANGUAGE plpgsql STABLE SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  l record;
+  v_agente uuid;
+  v_out jsonb;
+BEGIN
+  IF coalesce(meu_perfil_interno(), '') NOT IN ('admin', 'gerente', 'supervisor') THEN
+    RAISE EXCEPTION 'forbidden' USING ERRCODE = '42501';
+  END IF;
+  SELECT * INTO l FROM dash_limites(p_de, p_ate);
+  -- agente_config vem da 0078 e usuario_id da 0079: só lê se os dois existirem.
+  IF EXISTS (SELECT 1 FROM pg_attribute
+              WHERE attrelid = to_regclass('public.agente_config')
+                AND attname = 'usuario_id' AND NOT attisdropped) THEN
+    EXECUTE 'SELECT usuario_id FROM public.agente_config WHERE id = 1' INTO v_agente;
+  END IF;
+
+  WITH tr AS (
+    SELECT t.* FROM solicitacao_transicoes t WHERE t.em >= l.ini AND t.em < l.fim AND t.usuario_id IS NOT NULL
+  ),
+  -- responsável atual: quem fez a ÚLTIMA entrada em "Em emissão" das abertas
+  resp AS (
+    SELECT DISTINCT ON (t.solicitacao_id) t.solicitacao_id, t.usuario_id
+    FROM solicitacao_transicoes t
+    JOIN solicitacoes s ON s.id = t.solicitacao_id
+    WHERE t.para_status = 'em_cadastro'
+      AND s.status IN ('em_cadastro', 'instrucao_emitida', 'oc_gerada', 'oc_enviada')
+    ORDER BY t.solicitacao_id, t.em DESC, t.id DESC
+  ),
+  conclusao AS (
+    SELECT f.usuario_id,
+           extract(epoch FROM (f.em - (SELECT min(t2.em) FROM solicitacao_transicoes t2
+                                        WHERE t2.solicitacao_id = f.solicitacao_id AND t2.para_status = 'em_cadastro'
+                                          AND t2.em <= f.em))) / 60 AS m
+    FROM tr f WHERE f.para_status = 'finalizada'
+  ),
+  por_usuario AS (
+    SELECT p.user_id AS usuario_id, p.nome_completo AS nome, p.perfil, p.ativo,
+      (SELECT count(DISTINCT solicitacao_id) FROM tr WHERE tr.usuario_id = p.user_id AND tr.de_status IS NULL) AS criou,
+      (SELECT count(DISTINCT solicitacao_id) FROM tr WHERE tr.usuario_id = p.user_id AND tr.para_status = 'em_cadastro') AS em_emissao,
+      (SELECT count(DISTINCT solicitacao_id) FROM tr WHERE tr.usuario_id = p.user_id AND tr.para_status = 'oc_gerada') AS gerou_oc,
+      (SELECT count(DISTINCT solicitacao_id) FROM tr WHERE tr.usuario_id = p.user_id AND tr.para_status = 'oc_enviada') AS enviou_oc,
+      (SELECT count(DISTINCT solicitacao_id) FROM tr WHERE tr.usuario_id = p.user_id AND tr.para_status = 'finalizada') AS finalizou,
+      (SELECT round((percentile_cont(0.5) WITHIN GROUP (ORDER BY c.m))::numeric, 1)
+         FROM conclusao c WHERE c.usuario_id = p.user_id AND c.m IS NOT NULL) AS conclusao_p50_min,
+      (SELECT count(*) FROM resp r WHERE r.usuario_id = p.user_id) AS em_aberto,
+      (SELECT round(max(extract(epoch FROM (now() - s.status_desde)) / 60))
+         FROM resp r JOIN solicitacoes s ON s.id = r.solicitacao_id WHERE r.usuario_id = p.user_id) AS parada_mais_longa_min
+    FROM perfis_usuarios p
+    WHERE p.perfil <> 'painel_tv'
+  ),
+  ativos AS (
+    SELECT * FROM por_usuario
+    WHERE ativo OR criou + em_emissao + gerou_oc + enviou_oc + finalizou + em_aberto > 0
+  )
+  SELECT jsonb_build_object(
+    'usuarios', coalesce((SELECT jsonb_agg(to_jsonb(a) ORDER BY a.finalizou DESC, a.nome)
+                          FROM ativos a WHERE a.usuario_id IS DISTINCT FROM v_agente), '[]'::jsonb),
+    'agente', (SELECT to_jsonb(a) FROM ativos a WHERE a.usuario_id = v_agente),
+    'abertas_paradas', coalesce((
+      SELECT jsonb_agg(x ORDER BY (x ->> 'min_na_etapa')::numeric DESC) FROM (
+        SELECT jsonb_build_object(
+          'id', s.id, 'numero_interno', s.numero_interno, 'status', s.status,
+          'parceiro', (SELECT pa.razao_social FROM parceiros pa WHERE pa.id = s.parceiro_id),
+          'responsavel', coalesce((SELECT pu.nome_completo FROM resp r JOIN perfis_usuarios pu ON pu.user_id = r.usuario_id
+                                    WHERE r.solicitacao_id = s.id), '—'),
+          'min_na_etapa', round(extract(epoch FROM (now() - s.status_desde)) / 60)) AS x
+        FROM solicitacoes s
+        WHERE s.origem = 'parceiro' AND s.status IN ('em_cadastro', 'instrucao_emitida', 'oc_gerada', 'oc_enviada')
+        ORDER BY s.status_desde
+        LIMIT 20) q), '[]'::jsonb),
+    'totais', jsonb_build_object(
+      'entradas', (SELECT count(*) FROM solicitacoes s WHERE s.created_at >= l.ini AND s.created_at < l.fim),
+      'de_parceiro', (SELECT count(*) FROM solicitacoes s WHERE s.created_at >= l.ini AND s.created_at < l.fim AND s.origem = 'parceiro'),
+      'finalizadas', (SELECT count(*) FROM solicitacoes s WHERE s.status = 'finalizada' AND s.finalizada_em >= l.ini AND s.finalizada_em < l.fim),
+      'abertas', (SELECT count(*) FROM solicitacoes s WHERE s.status IN ('recebida', 'em_cadastro', 'instrucao_emitida', 'oc_gerada')),
+      'recebidas_sem_responsavel', (SELECT count(*) FROM solicitacoes s WHERE s.status = 'recebida' AND s.atendente_id IS NULL))
+  ) INTO v_out;
+  RETURN v_out;
+END;
+$$;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Metas e SLA: salvar tudo numa transação (só admin; a RLS também exige)
+-- ─────────────────────────────────────────────────────────────────────────────
+
+-- p: { "etapas": [{status, aviso_min, alerta_min, ativo}], "metas": {meta_finalizadas_dia,
+--      meta_lead_time_p90_min, alerta_validade_h, expediente_inicio, expediente_fim} }
+CREATE OR REPLACE FUNCTION public.salvar_metas_sla(p jsonb)
+RETURNS void
+LANGUAGE plpgsql
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  e jsonb;
+  v_n int;
+BEGIN
+  IF coalesce(meu_perfil_interno(), '') <> 'admin' THEN
+    RAISE EXCEPTION 'forbidden' USING ERRCODE = '42501';
+  END IF;
+  FOR e IN SELECT * FROM jsonb_array_elements(coalesce(p -> 'etapas', '[]'::jsonb)) LOOP
+    UPDATE sla_etapas SET
+      aviso_min  = (e ->> 'aviso_min')::int,
+      alerta_min = (e ->> 'alerta_min')::int,
+      ativo      = coalesce((e ->> 'ativo')::boolean, ativo)
+    WHERE status = e ->> 'status';
+    GET DIAGNOSTICS v_n = ROW_COUNT;
+    IF v_n = 0 THEN
+      RAISE EXCEPTION 'Etapa inválida: %', e ->> 'status' USING ERRCODE = '22023';
+    END IF;
+  END LOOP;
+  IF p ? 'metas' THEN
+    UPDATE metas_operacao SET
+      -- chave presente com null = "sem meta"; chave ausente = não mexe
+      meta_finalizadas_dia   = CASE WHEN p -> 'metas' ? 'meta_finalizadas_dia'
+                                    THEN (p -> 'metas' ->> 'meta_finalizadas_dia')::int ELSE meta_finalizadas_dia END,
+      meta_lead_time_p90_min = CASE WHEN p -> 'metas' ? 'meta_lead_time_p90_min'
+                                    THEN (p -> 'metas' ->> 'meta_lead_time_p90_min')::int ELSE meta_lead_time_p90_min END,
+      alerta_validade_h      = coalesce((p -> 'metas' ->> 'alerta_validade_h')::int, alerta_validade_h),
+      expediente_inicio      = coalesce((p -> 'metas' ->> 'expediente_inicio')::time, expediente_inicio),
+      expediente_fim         = coalesce((p -> 'metas' ->> 'expediente_fim')::time, expediente_fim)
+    WHERE singleton;
+  END IF;
+END;
+$$;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Privilégios: nada para anon; authenticated executa (cada função checa o perfil)
+-- ─────────────────────────────────────────────────────────────────────────────
+
+DO $$
+DECLARE
+  f text;
+BEGIN
+  FOREACH f IN ARRAY ARRAY[
+    'public.dash_filtro(text, uuid, text, text, uuid, text)',
+    'public.dash_percentis(double precision[])',
+    'public.dash_limites(date, date)',
+    'public.dash_exigir_interno()',
+    'public.dash_passagens(uuid[])',
+    'public.dash_bloco_resumo(timestamptz, timestamptz, text, uuid, text)',
+    'public.painel_estado_atual(text, uuid, text)',
+    'public.painel_hoje(text, uuid, text)',
+    'public.relatorio_resumo(date, date, text, uuid, text)',
+    'public.relatorio_serie(date, date, text, uuid, text, text)',
+    'public.relatorio_tempo_etapas(date, date, text, uuid, text)',
+    'public.relatorio_ranking(date, date, text, uuid, text, text, int)',
+    'public.relatorio_locais(date, date)',
+    'public.relatorio_mapa_calor(date, date, text, uuid, text)',
+    'public.ids_para_drill(text, date, date, text, uuid, text)',
+    'public.solicitacoes_drill(text, date, date, text, uuid, text)',
+    'public.exportar_solicitacoes_periodo(date, date, text, uuid, text, int, int)',
+    'public.relatorio_produtividade(date, date)',
+    'public.salvar_metas_sla(jsonb)'
+  ] LOOP
+    EXECUTE format('REVOKE ALL ON FUNCTION %s FROM PUBLIC, anon', f);
+    EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO authenticated', f);
+  END LOOP;
+END $$;
+
+NOTIFY pgrst, 'reload schema';
 
 -- =====================================================================
 -- 12. Operacional / vinculos de usuario (one-time setup)
