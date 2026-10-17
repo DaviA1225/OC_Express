@@ -122,7 +122,7 @@ Deno.serve(async (req) => {
   const [{ data: interno }, { data: pu }] = await Promise.all([
     admin
       .from('perfis_usuarios')
-      .select('id, ativo')
+      .select('id, ativo, perfil')
       .eq('user_id', callerId)
       .eq('ativo', true)
       .maybeSingle(),
@@ -134,7 +134,9 @@ Deno.serve(async (req) => {
       .maybeSingle(),
   ])
 
-  const isInterno = !!interno
+  // painel_tv (0079) tem linha em perfis_usuarios mas NÃO é equipe interna:
+  // a conta da TV só lê o Painel e nunca baixa OC (mesma regra de is_interno()).
+  const isInterno = !!interno && interno.perfil !== 'painel_tv'
   if (!isInterno && !pu) {
     return json({ error: 'forbidden' }, 403)
   }

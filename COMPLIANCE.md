@@ -29,6 +29,7 @@ pendentes e estão listados no fim.
 | Usuário, versão e data do aceite | `termos_aceite` | Aceite do termo no primeiro acesso (0070) | Prova de que quem maneja dado pessoal foi instruído (art. 46/50) |
 | Documentos anexados | bucket `solicitacoes-anexos` | Upload na solicitação | CRLV, comprovantes, prints |
 | Comprovante do terminal e PDF da NF | bucket `agendamentos-docs` | Conclusão do agendamento (0061) | Prova da janela confirmada; devolvido ao parceiro |
+| Quem moveu cada solicitação de etapa, e quando | `solicitacao_transicoes.usuario_id` | Automático por trigger (0079); histórico anterior reconstruído do `log_auditoria` | Tempo por etapa (SLA) e Produtividade da equipe. `usuario_id` só é lido por função restrita a admin/gerente/supervisor (privilégio de coluna) |
 
 **O sistema NÃO trata** dado sensível do art. 11 (saúde, biometria, religião,
 opinião política, filiação sindical, origem racial) nem dado de criança e
@@ -55,6 +56,7 @@ Decidido em 2026-08-09. Implementado em `supabase/migrations/0056` e `0059`.
 | `eventos_portal` | **1 ano** | Log de acesso. O Marco Civil (art. 15) exige 6 meses; 1 ano dá margem para investigar incidente descoberto tarde. |
 | `log_acesso` | **1 ano** | Mesma natureza da `eventos_portal`. |
 | `termos_aceite` | **enquanto a conta existir** | `ON DELETE CASCADE`: o aceite regula um acesso que deixou de existir. Guardá-lo depois seria reter dado de quem saiu sem finalidade. |
+| `solicitacao_transicoes` | **acompanha a solicitação** | É parte da trilha da operação (mesma natureza do `log_auditoria`); sai com a solicitação (`ON DELETE CASCADE`). `usuario_id` vira NULL se o usuário for excluído. |
 | Cadastros e solicitações | **sem prazo automático** | São a operação em si. Saem por pedido do titular (seção 3) ou por decisão de negócio. |
 | `agendamentos` + bucket `agendamentos-docs` | **acompanha a solicitação** | O comprovante do terminal é prova de que a descarga foi agendada; segue a mesma guarda fiscal do transporte (proposta: 5 anos). Nenhuma categoria nova de dado — nome, CPF e placas já estavam mapeados —, mas **aumenta o volume de documentos armazenados**. |
 
@@ -216,6 +218,7 @@ lote, admin), e foi assim que os primeiros órfãos apareceram, em 2026-10-06.
 | ~~6~~ | ~~Tela para `log_acesso` e para a fila de órfãos do storage~~ — feito em `/privacidade` | Técnica |
 | ~~7~~ | ~~Tela para os pedidos de titular~~ — feito em `/privacidade` | Técnica |
 | 8 | **Expiração de sessão no servidor** — código na 0077; falta **ligar o hook** no Dashboard (Auth → Hooks → Customize Access Token → `public.hook_limite_inatividade`) | Técnica |
+| 9 | **Conta "Painel TV" (perfil `painel_tv`, 0079)**: só executa as funções do Painel, cujo retorno não tem nome de motorista nem de solicitante; `is_interno()` a exclui, então não lê cadastros nem solicitações. A sessão dela não expira por inatividade (decisão D4). Uma conta por TV, senha forte; desativar em Usuários se a TV sair da sala | Técnica (registro) |
 
 As pendências 1 a 3 são as que um pedido da ANPD cobraria primeiro, e nenhuma
 delas se resolve em código.
