@@ -39,12 +39,12 @@ export function HistoricoCard({
 
   if (!parceiroMotoristaId) {
     return (
-      <section className="rounded-lg border bg-background">
+      <section className="rounded-lg border bg-card">
         <header className="flex items-center gap-2 border-b px-4 py-2">
-          <History className="h-4 w-4 text-muted-foreground" />
-          <h2 className="text-[14px] font-medium text-foreground">Histórico operacional</h2>
+          <History className="h-4 w-4 text-tertiary" aria-hidden />
+          <h2 className="text-body-lg font-medium text-foreground">Histórico operacional</h2>
         </header>
-        <div className="p-4 text-[13px] text-muted-foreground">
+        <div className="p-4 text-body text-muted-foreground">
           Sem motorista definido para levantar o histórico.
         </div>
       </section>
@@ -54,13 +54,13 @@ export function HistoricoCard({
   const data = q.data
 
   return (
-    <section className="rounded-lg border bg-background">
+    <section className="rounded-lg border bg-card">
       <header className="flex items-center justify-between border-b px-4 py-2">
         <div className="flex items-center gap-2">
-          <History className="h-4 w-4 text-muted-foreground" />
-          <h2 className="text-[14px] font-medium text-foreground">Histórico operacional</h2>
+          <History className="h-4 w-4 text-tertiary" aria-hidden />
+          <h2 className="text-body-lg font-medium text-foreground">Histórico operacional</h2>
         </div>
-        <span className="text-[11px] text-muted-foreground">Últimos {HISTORICO_JANELA_DIAS}d</span>
+        <span className="text-meta text-muted-foreground">Últimos {HISTORICO_JANELA_DIAS}d</span>
       </header>
       <div className="space-y-3 p-4">
         {q.isLoading || !data ? (
@@ -92,7 +92,7 @@ export function HistoricoCard({
             </div>
 
             {data.topRota && (
-              <p className="rounded-md bg-muted/50 px-3 py-2 text-[12px] text-foreground">
+              <p className="rounded-md bg-muted px-3 py-2 text-body-sm text-foreground">
                 Rota mais frequente:{' '}
                 <span className="font-medium">{clienteNomePorId(data.topRota.clienteId)}</span>
                 <span className="text-muted-foreground"> ({data.topRota.count}× nos últimos {HISTORICO_JANELA_DIAS}d)</span>
@@ -102,7 +102,7 @@ export function HistoricoCard({
             {data.ultimaParaCliente && (
               <Link
                 to={`/solicitacoes/${data.ultimaParaCliente.id}`}
-                className="flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-[12px] transition-colors hover:bg-muted"
+                className="flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-body-sm transition-colors duration-fast hover:bg-row-hover"
               >
                 <div className="min-w-0">
                   <p className="text-muted-foreground">Última solicitação desse motorista para este cliente</p>
@@ -112,13 +112,13 @@ export function HistoricoCard({
                     {format(new Date(data.ultimaParaCliente.created_at), 'dd/MM/yyyy', { locale: ptBR })}
                   </p>
                 </div>
-                <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
+                <ArrowRight className="h-3.5 w-3.5 text-tertiary" aria-hidden />
               </Link>
             )}
 
             {data.recentes.length > 0 ? (
               <div>
-                <p className="mb-1.5 text-[10px] uppercase tracking-[0.5px] text-muted-foreground">
+                <p className="mb-1.5 text-meta font-medium text-muted-foreground">
                   Recentes ({data.recentes.length})
                 </p>
                 <ul className="divide-y">
@@ -126,14 +126,14 @@ export function HistoricoCard({
                     <li key={r.id}>
                       <Link
                         to={`/solicitacoes/${r.id}`}
-                        className="flex items-center gap-2 py-2 text-[12px] hover:bg-muted/50"
+                        className="flex items-center gap-2 py-2 text-body-sm transition-colors duration-fast hover:bg-row-hover"
                       >
                         <span className="w-12 shrink-0 tabular-nums text-muted-foreground">
                           {formatNumeroOC(r.numero_interno)}
                         </span>
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-foreground">{clienteNomePorId(r.cliente_id)}</p>
-                          <p className="truncate text-[11px] text-muted-foreground">
+                          <p className="truncate text-meta text-muted-foreground">
                             {r.tipo === 'retorno' ? 'Retorno' : 'Carregamento'}
                             {r.parceiro_veiculo_id ? ` · ${veiculoPlacaPorId(r.parceiro_veiculo_id)}` : ''}
                             {' · '}
@@ -147,7 +147,7 @@ export function HistoricoCard({
                 </ul>
               </div>
             ) : (
-              <p className="text-[12px] text-muted-foreground">
+              <p className="text-body-sm text-muted-foreground">
                 Nenhuma solicitação anterior nos últimos {HISTORICO_JANELA_DIAS} dias.
               </p>
             )}
@@ -168,12 +168,12 @@ interface StatProps {
 function Stat({ icon, label, hint, value }: StatProps) {
   return (
     <div className="rounded-md border px-2.5 py-2">
-      <div className="flex items-center gap-1 text-[10px] uppercase tracking-[0.5px] text-muted-foreground">
+      <div className="label-uppercase flex items-center gap-1">
         {icon}
         {label}
       </div>
-      <p className="mt-0.5 text-[18px] font-medium tabular-nums leading-none text-foreground">{value}</p>
-      <p className="mt-0.5 truncate text-[10px] text-muted-foreground" title={hint}>{hint}</p>
+      <p className="mt-0.5 font-display text-title font-medium tabular-nums text-foreground">{value}</p>
+      <p className="mt-0.5 truncate text-meta text-muted-foreground" title={hint}>{hint}</p>
     </div>
   )
 }

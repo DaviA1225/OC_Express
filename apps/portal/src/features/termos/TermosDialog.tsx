@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Loader2, ShieldCheck } from 'lucide-react'
+import { ShieldCheck } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -17,6 +17,7 @@ import { TERMOS_VERSAO, termosDeUso } from '@sislog/shared/termos'
 import { SISLOG_VERSAO } from '@sislog/shared/versao'
 import { useAceiteDeTermos, useAceitarTermos } from './useTermos'
 import { TermosTexto } from './TermosTexto'
+import { Spinner } from '@/components/shared/Spinner'
 
 /**
  * Gêmeo de `apps/interno/src/features/termos/TermosDialog.tsx`, com o texto do
@@ -62,7 +63,7 @@ export function TermosDialog() {
       >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <ShieldCheck className="h-4 w-4 text-muted-foreground" />
+            <ShieldCheck className="h-4 w-4 text-tertiary" aria-hidden />
             {termo.titulo}
           </DialogTitle>
           <DialogDescription>{termo.resumo}</DialogDescription>
@@ -71,14 +72,14 @@ export function TermosDialog() {
         <DialogBody className="space-y-4">
           <TermosTexto termo={termo} />
 
-          <div className="flex items-start gap-2 rounded-md border bg-muted/40 p-3">
+          <div className="flex items-start gap-2 rounded-md border bg-muted p-3">
             <Checkbox
               id="concordo_termos"
               checked={concordo}
               onCheckedChange={(v) => setConcordo(v === true)}
               className="mt-0.5"
             />
-            <Label htmlFor="concordo_termos" className="text-[13px] font-normal leading-relaxed">
+            <Label htmlFor="concordo_termos" className="text-body font-normal leading-relaxed">
               Li e concordo com o Termo de Uso e Confidencialidade, e assumo o compromisso de
               tratar os dados pessoais deste portal apenas para a operação contratada.
             </Label>
@@ -90,7 +91,7 @@ export function TermosDialog() {
               cada release; a do termo, só quando o texto muda — e é ELA que
               fica gravada no aceite. Quem for conferir uma linha de
               `termos_aceite` precisa achar na tela o número que está lá. */}
-          <span className="text-[11px] text-muted-foreground/80">
+          <span className="text-meta text-muted-foreground">
             SisLog v{SISLOG_VERSAO} · termo {TERMOS_VERSAO}
           </span>
           <div className="flex items-center gap-2">
@@ -108,7 +109,7 @@ export function TermosDialog() {
               title={concordo ? undefined : 'Role até o fim e marque a caixa para continuar.'}
               onClick={() => aceitar.mutate()}
             >
-              {aceitar.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              {aceitar.isPending && <Spinner />}
               Aceitar e continuar
             </Button>
           </div>

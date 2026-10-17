@@ -1,6 +1,6 @@
 import * as React from 'react'
-import { useNavigate, useParams, Link } from 'react-router-dom'
-import { AlertCircle, ArrowLeft, Check, CheckCircle2, ChevronLeft, ChevronRight, Copy, CreditCard, Loader2, Mail, MessageCircle, MoreHorizontal, Pencil, RotateCcw, Undo2, X } from 'lucide-react'
+import { useNavigate, useParams } from 'react-router-dom'
+import { AlertCircle, ArrowLeft, Check, CheckCircle2, ChevronLeft, ChevronRight, Copy, CreditCard, Mail, MessageCircle, MoreHorizontal, Pencil, RotateCcw, Undo2, X } from 'lucide-react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { toast } from 'sonner'
@@ -22,6 +22,8 @@ import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
 } from '@/components/ui/dropdown-menu'
 import { SolicitacaoStatusBadge } from '@/components/shared/SolicitacaoStatusBadge'
+import { Spinner } from '@/components/shared/Spinner'
+import { PageHeader } from '@/components/layout/PageHeader'
 import {
   useSolicitacao,
   useUpdateSolicitacao,
@@ -36,6 +38,8 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { AnexosCard } from '@/features/anexos/AnexosCard'
 import { HistoricoCard } from '@/features/solicitacoes/HistoricoCard'
+import { fetchProximaDaFila } from '@/features/solicitacoes/useSolicitacoes'
+import { useCabecalhoFixo } from '@/hooks/useCabecalhoFixo'
 import { AgendamentoCard } from '@/features/agendamentos/AgendamentoCard'
 import { usePendencias, useDevolverParceiro, useMarcarPendenciaVista, useMarcarPendencia, useResolverPendenciaInterna, type Pendencia } from '@/features/solicitacoes/usePendencias'
 const GerarOCDialog = React.lazy(() =>
@@ -112,6 +116,22 @@ export function SolicitacaoDetailPage({ embutido }: SolicitacaoDetailPageProps =
     },
   })
 
+  const [sentinelaCabecalho, cabecalhoFixo] = useCabecalhoFixo()
+  const [buscandoProxima, setBuscandoProxima] = React.useState(false)
+  const abrirProximaDaFila = async () => {
+    if (!detail.data) return
+    setBuscandoProxima(true)
+    try {
+      const prox = await fetchProximaDaFila(detail.data)
+      if (prox) navigate(`/solicitacoes/${prox}`)
+      else toast.info('Não há outra solicitação na fila de trabalho.')
+    } catch {
+      toast.error('Não foi possível buscar a próxima da fila.')
+    } finally {
+      setBuscandoProxima(false)
+    }
+  }
+
   if (detail.isLoading) {
     return (
       <div className="space-y-4">
@@ -124,13 +144,13 @@ export function SolicitacaoDetailPage({ embutido }: SolicitacaoDetailPageProps =
 
   if (detail.isError) {
     return (
-      <div className="rounded-lg border bg-card p-6 text-center text-[13px] text-muted-foreground">
-        <AlertCircle className="mx-auto mb-2 h-6 w-6 text-red-500" />
+      <div className="rounded-lg border bg-card p-6 text-center text-body text-muted-foreground">
+        <AlertCircle className="mx-auto mb-2 h-6 w-6 text-danger" />
         <p className="font-medium text-foreground">Não foi possível carregar a solicitação.</p>
         <p className="mt-1">Verifique a conexão e tente novamente.</p>
         <div className="mt-3 flex items-center justify-center gap-2">
           <Button variant="outline" onClick={() => { void detail.refetch() }}>
-            <RotateCcw className="h-4 w-4" /> Tentar de novo
+            <RotateCcw className="h-4 w-4" /> Tentar novamente
           </Button>
           {!embutido && (
             <Button variant="ghost" onClick={() => navigate('/solicitacoes')}>Voltar</Button>
@@ -142,7 +162,7 @@ export function SolicitacaoDetailPage({ embutido }: SolicitacaoDetailPageProps =
 
   if (!detail.data) {
     return (
-      <div className="rounded-lg border bg-card p-6 text-center text-[13px] text-muted-foreground">
+      <div className="rounded-lg border bg-card p-6 text-center text-body text-muted-foreground">
         Solicitação não encontrada.
         {/* No painel a lista já está ao lado: "voltar" só a recarregaria. */}
         {!embutido && (
@@ -165,7 +185,7 @@ export function SolicitacaoDetailPage({ embutido }: SolicitacaoDetailPageProps =
   // sair de "recebida" (constraint solicitacoes_material_obrigatorio_apos_cadastro).
   // Vale também para o retorno (0075): é o material que diz se a OC exige
   // instrução — Pedra, Milho e Areia dispensam. Sem material, o botão cairia em
-  // "+ Adicionar instrução".
+  // "Informar instrução".
   const materialPendente = s.origem === 'parceiro' && !s.material_id
   // "Devolver ao parceiro" só faz sentido em solicitação de parceiro ainda em
   // andamento e sem outra pendência aberta.
@@ -180,22 +200,14 @@ export function SolicitacaoDetailPage({ embutido }: SolicitacaoDetailPageProps =
 
   return (
     <div className="space-y-4">
-      {!embutido && (
-        <nav className="flex items-center gap-1 text-[12px] text-muted-foreground">
-          <Link to="/solicitacoes" className="hover:text-foreground">Solicitações</Link>
-          <ChevronRight className="h-3 w-3" />
-          <span className="text-foreground">{formatNumeroOC(s.numero_interno)}</span>
-        </nav>
-      )}
-
       {s.status === 'cancelada' && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3">
-          <div className="flex items-start gap-2 text-[13px] text-red-900">
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-danger-border bg-danger-subtle px-4 py-3">
+          <div className="flex items-start gap-2 text-body text-danger">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
             <div>
-              <p className="font-medium">Esta solicitação está cancelada.</p>
-              <p className="text-[12px] text-red-800">
-                Você ainda pode editar os dados, mas ela não aparece no fluxo ativo. Reative para voltar ao status "Recebida".
+              <p className="font-medium">Solicitação cancelada.</p>
+              <p className="text-body-sm">
+                Os dados continuam editáveis, mas a solicitação fica fora do fluxo ativo. Reative para voltar ao status "Recebida".
               </p>
             </div>
           </div>
@@ -205,7 +217,6 @@ export function SolicitacaoDetailPage({ embutido }: SolicitacaoDetailPageProps =
               variant="outline"
               onClick={() => setConfirmReativar(true)}
               disabled={transit.isPending}
-              className="border-red-300 bg-background hover:bg-red-100"
             >
               <RotateCcw className="h-4 w-4" />
               Reativar
@@ -215,30 +226,30 @@ export function SolicitacaoDetailPage({ embutido }: SolicitacaoDetailPageProps =
       )}
 
       {materialPendente && s.status === 'recebida' && (
-        <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 dark:border-amber-900/60 dark:bg-amber-950/40">
-          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
-          <div className="text-[13px] text-amber-900 dark:text-amber-200">
-            <p className="font-medium">Material ainda não definido.</p>
-            <p className="text-[12px] text-amber-800 dark:text-amber-300">
-              Esta solicitação veio do parceiro sem material. Defina o material no
-              card "Destino e material" antes de avançar para emissão.
+        <div className="flex items-start gap-2 rounded-lg border border-warning-border bg-warning-subtle px-4 py-3">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+          <div className="text-body text-warning">
+            <p className="font-medium">Material não definido.</p>
+            <p className="text-body-sm">
+              Solicitação enviada pelo parceiro sem material. Defina o material no
+              bloco "Destino e material" antes de avançar para emissão.
             </p>
           </div>
         </div>
       )}
 
       {pendenciaAberta && isParceiro && (
-        <div className="flex items-start gap-2 rounded-lg border border-orange-300 bg-orange-50 px-4 py-3 dark:border-orange-900/60 dark:bg-orange-950/40">
-          <Undo2 className="mt-0.5 h-4 w-4 shrink-0 text-orange-600 dark:text-orange-400" />
-          <div className="text-[13px] text-orange-900 dark:text-orange-200">
+        <div className="flex items-start gap-2 rounded-lg border border-warning-border bg-warning-subtle px-4 py-3">
+          <Undo2 className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+          <div className="text-body text-warning">
             <p className="font-medium">
               Devolvida ao parceiro, aguardando resolução
-              <span className="font-normal text-orange-800 dark:text-orange-300">
+              <span className="font-normal">
                 {' · desde '}
                 {format(new Date(pendenciaAberta.created_at), "dd/MM 'às' HH:mm", { locale: ptBR })}
               </span>
             </p>
-            <p className="mt-0.5 text-[12px] text-orange-800 dark:text-orange-300">
+            <p className="mt-0.5 text-body-sm">
               Motivo: {pendenciaAberta.motivo}
             </p>
           </div>
@@ -246,18 +257,18 @@ export function SolicitacaoDetailPage({ embutido }: SolicitacaoDetailPageProps =
       )}
 
       {pendenciaAberta && !isParceiro && (
-        <div className="flex items-start justify-between gap-3 rounded-lg border border-red-300 bg-red-50 px-4 py-3 dark:border-red-900/60 dark:bg-red-950/40">
+        <div className="flex items-start justify-between gap-3 rounded-lg border border-danger-border bg-danger-subtle px-4 py-3">
           <div className="flex items-start gap-2">
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-600 dark:text-red-400" />
-            <div className="text-[13px] text-red-900 dark:text-red-200">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-danger" />
+            <div className="text-body text-danger">
               <p className="font-medium">
                 Pendência aberta
-                <span className="font-normal text-red-800 dark:text-red-300">
+                <span className="font-normal">
                   {' · desde '}
                   {format(new Date(pendenciaAberta.created_at), "dd/MM 'às' HH:mm", { locale: ptBR })}
                 </span>
               </p>
-              <p className="mt-0.5 text-[12px] text-red-800 dark:text-red-300">
+              <p className="mt-0.5 text-body-sm">
                 Motivo: {pendenciaAberta.motivo}
               </p>
             </div>
@@ -270,7 +281,7 @@ export function SolicitacaoDetailPage({ embutido }: SolicitacaoDetailPageProps =
             onClick={() => resolverPendenciaInterna.mutate(pendenciaAberta.id)}
           >
             {resolverPendenciaInterna.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <Spinner />
             ) : (
               <CheckCircle2 className="h-4 w-4" />
             )}
@@ -279,18 +290,38 @@ export function SolicitacaoDetailPage({ embutido }: SolicitacaoDetailPageProps =
         </div>
       )}
 
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-[22px] font-semibold tracking-tight text-foreground">{formatNumeroOC(s.numero_interno)}</h1>
+      {/* Cabeçalho fixo: número, status e a ação da etapa ficam à mão enquanto
+          o atendente rola para preencher os blocos (antes era preciso voltar ao
+          topo para avançar). Só na página inteira — o painel do modo ERP já
+          tem o próprio cabeçalho. */}
+      {!embutido && <div ref={sentinelaCabecalho} aria-hidden className="h-0" />}
+      <div
+        className={cn(
+          // O sticky para no padding do <main>: topo negativo + margem/padding
+          // iguais ao padding dele cobrem a faixa de cima sem deslocar nada (`!`
+          // vence a margem do space-y-4 do pai).
+          !embutido &&
+            'sticky -top-3 z-20 -mx-3 !-mt-3 border-b border-transparent bg-canvas px-3 pb-2 pt-3 sm:-top-4 sm:-mx-4 sm:!-mt-4 sm:px-4 sm:pt-4 md:-top-5 md:-mx-6 md:!-mt-5 md:px-6 md:pt-5 print:static print:!m-0 print:border-0 print:p-0',
+          // Só cor da borda e sombra mudam ao grudar: nada de salto de layout.
+          !embutido && cabecalhoFixo && 'border-border shadow-sm',
+        )}
+      >
+      <PageHeader
+        className="mb-0"
+        breadcrumb={embutido ? undefined : [
+          { label: 'Solicitações', to: '/solicitacoes' },
+          { label: formatNumeroOC(s.numero_interno) },
+        ]}
+        title={formatNumeroOC(s.numero_interno)}
+        meta={
+          <>
             <SolicitacaoStatusBadge status={s.status} />
-            <span className="text-[12px] uppercase tracking-[0.5px] text-muted-foreground">{s.tipo}</span>
-          </div>
-          <p className="text-[12px] text-muted-foreground">
-            Criada em {format(new Date(s.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
+            <span className="text-body-sm text-muted-foreground">{s.tipo === 'retorno' ? 'Retorno' : 'Carregamento'}</span>
+          </>
+        }
+        description={`Criada em ${format(new Date(s.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}`}
+        actions={
+        <>
           {canEdit && (
             <StatusActions
               status={s.status}
@@ -329,7 +360,7 @@ export function SolicitacaoDetailPage({ embutido }: SolicitacaoDetailPageProps =
           {canEdit && canCancel(s.status) && (
             <Button variant="ghost" size="sm" onClick={() => setConfirmCancel(true)} className="text-destructive hover:text-destructive">
               <X className="h-4 w-4" />
-              Cancelar
+              Cancelar solicitação
             </Button>
           )}
           {canEdit && (
@@ -378,7 +409,21 @@ export function SolicitacaoDetailPage({ embutido }: SolicitacaoDetailPageProps =
               Voltar
             </Button>
           )}
-        </div>
+          {!embutido && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={abrirProximaDaFila}
+              disabled={buscandoProxima}
+              title="Abrir a próxima solicitação da fila de trabalho, na ordem da lista (sem os filtros da lista)"
+            >
+              {buscandoProxima ? <Spinner /> : <ChevronRight className="h-4 w-4" />}
+              Próxima da fila
+            </Button>
+          )}
+        </>
+        }
+      />
       </div>
 
       <div className={cn('grid grid-cols-1 gap-4', !embutido && 'lg:grid-cols-3')}>
@@ -429,8 +474,13 @@ export function SolicitacaoDetailPage({ embutido }: SolicitacaoDetailPageProps =
           <AgendamentoCard solicitacaoId={s.id} clienteId={s.cliente_id} status={s.status} />
           <HistoricoCard
             solicitacaoId={s.id}
-            motoristaId={s.motorista_id}
-            veiculoId={s.veiculo_id}
+            motoristaCpf={s.motorista?.cpf ?? null}
+            idsProprios={{
+              motoristaId: s.motorista_id,
+              parceiroMotoristaId: s.parceiro_motorista_id,
+              veiculoId: s.veiculo_id,
+              parceiroVeiculoId: s.parceiro_veiculo_id,
+            }}
             clienteId={s.cliente_id}
             motoristaNome={s.motorista?.nome_completo ?? null}
             veiculoPlaca={s.veiculo?.placa ?? null}
@@ -444,8 +494,8 @@ export function SolicitacaoDetailPage({ embutido }: SolicitacaoDetailPageProps =
         open={confirmCancel}
         onOpenChange={setConfirmCancel}
         title="Cancelar solicitação?"
-        description={`A solicitação ${formatNumeroOC(s.numero_interno)} será marcada como cancelada. Você pode duplicá-la depois caso precise refazer.`}
-        confirmLabel="Sim, cancelar"
+        description={`A solicitação ${formatNumeroOC(s.numero_interno)} será marcada como cancelada. Para refazer, duplique a solicitação depois.`}
+        confirmLabel="Cancelar solicitação"
         destructive
         onConfirm={async () => {
           await transit.mutateAsync({ id: s.id, status: 'cancelada' })
@@ -458,7 +508,7 @@ export function SolicitacaoDetailPage({ embutido }: SolicitacaoDetailPageProps =
         onOpenChange={setConfirmReabrir}
         title="Reabrir solicitação para correção?"
         description={`A solicitação ${formatNumeroOC(s.numero_interno)} volta para o status "Em emissão" para permitir ajustes. O PDF e o número da instrução ficam preservados. Após corrigir, finalize novamente.`}
-        confirmLabel="Sim, reabrir"
+        confirmLabel="Reabrir"
         onConfirm={async () => {
           await transit.mutateAsync({
             id: s.id,
@@ -475,7 +525,7 @@ export function SolicitacaoDetailPage({ embutido }: SolicitacaoDetailPageProps =
         onOpenChange={setConfirmReativar}
         title="Reativar solicitação?"
         description={`A solicitação ${formatNumeroOC(s.numero_interno)} volta para o status "Recebida" e retorna ao fluxo normal.`}
-        confirmLabel="Sim, reativar"
+        confirmLabel="Reativar"
         onConfirm={async () => {
           await transit.mutateAsync({ id: s.id, status: 'recebida' })
           setConfirmReativar(false)
@@ -488,7 +538,7 @@ export function SolicitacaoDetailPage({ embutido }: SolicitacaoDetailPageProps =
         onOpenChange={setConfirmDuplicate}
         title="Duplicar solicitação?"
         description={`Será criada uma nova solicitação com os mesmos dados de ${formatNumeroOC(s.numero_interno)} (motorista, veículo, cliente, material e observações). O status volta para "Recebida" e o número da instrução, PDF e datas de envio são limpos.`}
-        confirmLabel="Sim, duplicar"
+        confirmLabel="Duplicar"
         onConfirm={async () => {
           const created = await duplicate.mutateAsync({ sourceId: s.id })
           setConfirmDuplicate(false)
@@ -526,7 +576,7 @@ export function SolicitacaoDetailPage({ embutido }: SolicitacaoDetailPageProps =
             solicitacao={s}
             material={materialDetalhe.data ?? null}
             onSaved={() => {
-              toast.success('OC salva no Storage', {
+              toast.success('OC gerada.', {
                 action: {
                   label: 'Enviar WhatsApp',
                   onClick: () => setOpenWhats(true),
@@ -589,12 +639,12 @@ function StatusActions({ status, hasInstrucao, requerInstrucao, onAdvanceInstruc
         {/* Sem material não se sabe se a OC exige instrução: nem instrução nem OC
             até o material ser definido (o banco já impede chegar aqui — 0076). */}
         {bloquearAvanco ? (
-          <Button size="sm" disabled title={'Defina o material no card "Destino e material"'}>
+          <Button size="sm" disabled title={'Defina o material no bloco "Destino e material"'}>
             Defina o material
           </Button>
         ) : requerInstrucao ? (
           <Button size="sm" onClick={onAdvanceInstrucao} disabled={disabled}>
-            + Adicionar instrução
+            Informar instrução
           </Button>
         ) : (
           <Button size="sm" onClick={onGerarOC} disabled={disabled} title="Material dispensa nº de instrução">
@@ -652,7 +702,7 @@ function StatusActions({ status, hasInstrucao, requerInstrucao, onAdvanceInstruc
   if (!hasInstrucao && requerInstrucao && !bloquearAvanco && status !== 'cancelada' && status !== 'finalizada') {
     return (
       <Button size="sm" onClick={onAdvanceInstrucao} disabled={disabled}>
-        + Adicionar instrução
+        Informar instrução
       </Button>
     )
   }
@@ -674,10 +724,10 @@ function CardShell({
     <section className="rounded-lg border bg-card">
       <header className="flex items-center justify-between border-b px-4 py-2">
         <div className="flex items-center gap-2">
-          <h2 className="text-[14px] font-medium text-foreground">{title}</h2>
+          <h2 className="text-body-lg font-medium text-foreground">{title}</h2>
           {saving && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-              <Loader2 className="h-2.5 w-2.5 animate-spin" />
+            <span className="inline-flex items-center gap-1 text-meta text-muted-foreground">
+              <Spinner className="h-3 w-3" />
               Salvando…
             </span>
           )}
@@ -689,7 +739,7 @@ function CardShell({
         )}
         {isEditing && (
           <Button variant="ghost" size="sm" onClick={onCancel}>
-            Cancelar
+            Descartar
           </Button>
         )}
       </header>
@@ -740,11 +790,11 @@ function SolicitanteCard({ solicitacao, editable, onSave, lockedHint }: CardProp
     <CardShell title="Solicitante" editable={editable} isEditing={editing} onEdit={() => setEditing(true)} onCancel={() => setEditing(false)} saving={saving}>
       {!editing ? (
         <>
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-[13px]">
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-body">
             <Field label="Nome" value={solicitacao.solicitante_nome} />
             <Field label="Telefone" value={solicitacao.solicitante_telefone} />
           </dl>
-          {lockedHint && <p className="mt-3 text-[11px] text-muted-foreground">{lockedHint}</p>}
+          {lockedHint && <p className="mt-3 text-meta text-muted-foreground">{lockedHint}</p>}
         </>
       ) : (
         <div className="space-y-3">
@@ -761,13 +811,13 @@ function SolicitanteCard({ solicitacao, editable, onSave, lockedHint }: CardProp
                 onChange={(e) => setTel(formatTelefone(e.target.value))}
                 placeholder="(00) 00000-0000"
               />
-              {erroTel && <p className="text-[11px] text-destructive">{erroTel}</p>}
+              {erroTel && <p className="text-meta text-destructive">{erroTel}</p>}
             </div>
           </div>
           <div className="flex justify-end gap-2">
-            <Button variant="outline" size="sm" onClick={() => setEditing(false)} disabled={saving}>Cancelar</Button>
+            <Button variant="outline" size="sm" onClick={() => setEditing(false)} disabled={saving}>Descartar</Button>
             <Button size="sm" onClick={submit} disabled={saving}>
-              {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              {saving && <Spinner className="h-3.5 w-3.5" />}
               Salvar
             </Button>
           </div>
@@ -853,7 +903,7 @@ function MotoristaVeiculoCard({ solicitacao, editable, onSave, lockedHint }: Car
     <CardShell title="Motorista e veículo" editable={editable} isEditing={editing} onEdit={() => setEditing(true)} onCancel={() => setEditing(false)} saving={saving}>
       {!editing ? (
         <>
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-[13px]">
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-body">
             <Field
               label="Motorista"
               value={solicitacao.motorista?.nome_completo}
@@ -869,7 +919,7 @@ function MotoristaVeiculoCard({ solicitacao, editable, onSave, lockedHint }: Car
             <Field label="Dolly" value={solicitacao.dolly?.placa} />
             <Field label="Última Carreta" value={solicitacao.carreta?.placa} />
           </dl>
-          {lockedHint && <p className="mt-3 text-[11px] text-muted-foreground">{lockedHint}</p>}
+          {lockedHint && <p className="mt-3 text-meta text-muted-foreground">{lockedHint}</p>}
         </>
       ) : (
         <div className="space-y-3">
@@ -902,19 +952,19 @@ function MotoristaVeiculoCard({ solicitacao, editable, onSave, lockedHint }: Car
                 placeholder="Opcional" loading={carretas.isLoading} />
             </div>
           </div>
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-meta text-muted-foreground">
             1ª Carreta e Dolly são opcionais, preencha conforme a composição (ANTT).
           </p>
           <div className="space-y-1.5">
             <Label>Subcontratada *</Label>
             <Combobox options={subOpts} value={subcontratada} onChange={setSubcontratada}
               placeholder="Pré-preenchida pelo cavalo" loading={subcontratadas.isLoading} />
-            <p className="text-[11px] text-muted-foreground">Por padrão usa a subcontratada do cavalo.</p>
+            <p className="text-meta text-muted-foreground">Por padrão usa a subcontratada do cavalo.</p>
           </div>
           <div className="flex justify-end gap-2">
-            <Button variant="outline" size="sm" onClick={() => setEditing(false)} disabled={saving}>Cancelar</Button>
+            <Button variant="outline" size="sm" onClick={() => setEditing(false)} disabled={saving}>Descartar</Button>
             <Button size="sm" onClick={submit} disabled={saving}>
-              {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              {saving && <Spinner className="h-3.5 w-3.5" />}
               Salvar
             </Button>
           </div>
@@ -1035,12 +1085,12 @@ function DestinoMaterialCard({ solicitacao, editable, onSave }: CardProps) {
   return (
     <CardShell title="Destino e material" editable={editable} isEditing={editing} onEdit={() => setEditing(true)} onCancel={() => setEditing(false)} saving={saving}>
       {!editing ? (
-        <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-[13px]">
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-body">
           <Field label="Cliente" value={solicitacao.cliente?.razao_social} />
           {solicitacao.origem === 'parceiro' && !solicitacao.material_id ? (
             <div>
-              <dt className="text-[10px] uppercase tracking-[0.5px] text-muted-foreground">Material</dt>
-              <dd className="font-medium text-amber-700 dark:text-amber-400">Material a definir</dd>
+              <dt className="text-meta text-muted-foreground">Material</dt>
+              <dd className="font-medium text-warning">Material a definir</dd>
             </div>
           ) : (
             <Field label="Material" value={materialDisplay} />
@@ -1056,7 +1106,7 @@ function DestinoMaterialCard({ solicitacao, editable, onSave }: CardProps) {
               placeholder="Selecionar cliente" loading={clientes.isLoading}
               disabled={isRetorno} />
             {isRetorno && (
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-meta text-muted-foreground">
                 Definido pela carga de retorno, não pode ser alterado aqui.
               </p>
             )}
@@ -1083,8 +1133,8 @@ function DestinoMaterialCard({ solicitacao, editable, onSave }: CardProps) {
                 </SelectContent>
               </Select>
               {!materialMinerio && !solicitacao.material_id && (
-                <p className="text-[11px] text-amber-700">
-                  Nenhum material "MINÉRIO" cadastrado, verifique o cadastro de materiais.
+                <p className="text-meta text-warning">
+                  Nenhum material "MINÉRIO" cadastrado. Verifique o cadastro de materiais.
                 </p>
               )}
             </div>
@@ -1104,7 +1154,7 @@ function DestinoMaterialCard({ solicitacao, editable, onSave }: CardProps) {
               </SelectContent>
             </Select>
             {isRetorno && (
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-meta text-muted-foreground">
                 Definido pela carga de retorno, não pode ser alterado aqui.
               </p>
             )}
@@ -1135,16 +1185,16 @@ function DestinoMaterialCard({ solicitacao, editable, onSave }: CardProps) {
             </div>
           </div>
           {datasInvalidas && (
-            <p className="text-[11px] text-destructive">Validade fim deve ser igual ou posterior ao início.</p>
+            <p className="text-meta text-destructive">Validade fim deve ser igual ou posterior ao início.</p>
           )}
           <div className="flex justify-end gap-2">
-            <Button variant="outline" size="sm" onClick={() => setEditing(false)} disabled={saving}>Cancelar</Button>
+            <Button variant="outline" size="sm" onClick={() => setEditing(false)} disabled={saving}>Descartar</Button>
             {/* Espera a lista de materiais: numa solicitação de parceiro sem
                 material, o submit resolve "MINÉRIO" a partir dela. Como a busca
                 só começa ao entrar em edição, salvar antes de carregar cairia no
                 erro "Material MINÉRIO não encontrado" sem ser verdade. */}
             <Button size="sm" onClick={submit} disabled={saving || datasInvalidas || materiais.isLoading}>
-              {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              {saving && <Spinner className="h-3.5 w-3.5" />}
               Salvar
             </Button>
           </div>
@@ -1159,10 +1209,10 @@ function InstrucaoPdfCard({ solicitacao }: { solicitacao: CardProps['solicitacao
   const instrucaoValor = solicitacao.numero_instrucao ?? (dispensa ? 'Não exigido' : null)
   return (
     <CardShell title="Instrução e PDF" editable={false} isEditing={false} onEdit={() => {}} onCancel={() => {}}>
-      <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-[13px]">
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-body">
         <Field label="Nº Instrução" value={instrucaoValor} />
         <div>
-          <dt className="text-[10px] uppercase tracking-[0.5px] text-muted-foreground">PDF</dt>
+          <dt className="text-meta text-muted-foreground">PDF</dt>
           <dd>
             {solicitacao.pdf_url ? (
               <AbrirPdfLink stored={solicitacao.pdf_url} />
@@ -1195,7 +1245,7 @@ function AbrirPdfLink({ stored }: { stored: string }) {
       type="button"
       onClick={abrir}
       disabled={loading}
-      className="text-primary-strong hover:underline disabled:opacity-60"
+      className="text-primary-strong hover:underline disabled:text-tertiary"
     >
       {loading ? 'Abrindo…' : 'Abrir PDF'}
     </button>
@@ -1206,10 +1256,10 @@ function InstrucaoForm({ initial, onCancel, onSave }: { initial: string; onCance
   const [valor, setValor] = React.useState(initial)
   const [saving, setSaving] = React.useState(false)
   return (
-    <section className="rounded-lg border border-amber-300 bg-amber-50 p-4">
-      <h2 className="mb-2 text-[14px] font-medium text-amber-900">Adicionar número de instrução</h2>
-      <p className="mb-3 text-[12px] text-amber-800">
-        Cole aqui o número da instrução emitida no ERP. Ao salvar, o status muda para "Instrução emitida".
+    <section className="rounded-lg border border-warning-border bg-warning-subtle p-4">
+      <h2 className="mb-2 text-body-lg font-medium text-foreground">Informar número de instrução</h2>
+      <p className="mb-3 text-body-sm text-muted-foreground">
+        Informe o número da instrução emitida no ERP. Ao salvar, o status muda para "Instrução emitida".
       </p>
       <div className="flex flex-wrap items-end gap-3">
         <div className="flex-1 min-w-[200px] space-y-1.5">
@@ -1217,13 +1267,13 @@ function InstrucaoForm({ initial, onCancel, onSave }: { initial: string; onCance
           <Input id="instr" autoFocus value={valor} onChange={(e) => setValor(e.target.value)} />
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={onCancel} disabled={saving}>Cancelar</Button>
+          <Button variant="outline" size="sm" onClick={onCancel} disabled={saving}>Descartar</Button>
           <Button
             size="sm"
             disabled={saving || valor.trim().length === 0}
             onClick={async () => { setSaving(true); try { await onSave(valor.trim()) } finally { setSaving(false) } }}
           >
-            {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            {saving && <Spinner className="h-3.5 w-3.5" />}
             Salvar instrução
           </Button>
         </div>
@@ -1331,7 +1381,7 @@ function PamcardNumeroForm({
           maxLength={16}
           placeholder="Ex: 441781209999"
         />
-        {erro && <p className="text-[11px] text-destructive">{erro}</p>}
+        {erro && <p className="text-meta text-destructive">{erro}</p>}
       </DialogBody>
       <DialogFooter>
         <div className="flex items-center gap-2">
@@ -1339,7 +1389,7 @@ function PamcardNumeroForm({
             Cancelar
           </Button>
           <Button onClick={submit} disabled={saving}>
-            {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+            {saving && <Spinner />}
             Confirmar
           </Button>
         </div>
@@ -1457,15 +1507,15 @@ function PamcardEditarForm({
             }}
             className="flex flex-col gap-2 pt-1"
           >
-            <label className="flex items-center gap-2 text-[13px]">
+            <label className="flex items-center gap-2 text-body">
               <RadioGroupItem value="tem_cartao" />
               Tem cartão
             </label>
-            <label className="flex items-center gap-2 text-[13px]">
+            <label className="flex items-center gap-2 text-body">
               <RadioGroupItem value="nao_tem_cartao" />
               Não tem cartão (solicitar)
             </label>
-            <label className="flex items-center gap-2 text-[13px]">
+            <label className="flex items-center gap-2 text-body">
               <RadioGroupItem value="nao_necessario" />
               Não necessário (pagamento por outro meio)
             </label>
@@ -1488,7 +1538,7 @@ function PamcardEditarForm({
               maxLength={16}
               placeholder="Ex: 441781209999"
             />
-            {erro && <p className="text-[11px] text-destructive">{erro}</p>}
+            {erro && <p className="text-meta text-destructive">{erro}</p>}
           </div>
         )}
       </DialogBody>
@@ -1498,7 +1548,7 @@ function PamcardEditarForm({
             Cancelar
           </Button>
           <Button onClick={submit} disabled={saving}>
-            {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+            {saving && <Spinner />}
             Salvar
           </Button>
         </div>
@@ -1535,7 +1585,7 @@ function PamcardCard({ solicitacao, editable, onSave }: CardProps) {
       <header className="flex items-center justify-between border-b px-4 py-2">
         <div className="flex items-center gap-2">
           <CreditCard className="h-4 w-4 text-muted-foreground" />
-          <h2 className="text-[14px] font-medium text-foreground">Pamcard</h2>
+          <h2 className="text-body-lg font-medium text-foreground">Pamcard</h2>
         </div>
         {podeAlterar && (
           <Button variant="ghost" size="sm" onClick={() => setEditarOpen(true)} aria-label="Editar Pamcard">
@@ -1545,13 +1595,13 @@ function PamcardCard({ solicitacao, editable, onSave }: CardProps) {
       </header>
       <div className="p-4">
         {temCartao && !providenciado && (
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-[13px]">
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-body">
             <div>
-              <dt className="text-[10px] uppercase tracking-[0.5px] text-muted-foreground">Status</dt>
-              <dd className="font-medium text-green-700 dark:text-green-400">Informado pelo solicitante</dd>
+              <dt className="text-meta text-muted-foreground">Status</dt>
+              <dd className="font-medium text-success">Informado pelo solicitante</dd>
             </div>
             <div>
-              <dt className="text-[10px] uppercase tracking-[0.5px] text-muted-foreground">Número</dt>
+              <dt className="text-meta text-muted-foreground">Número</dt>
               <dd className="text-foreground">{formatarPamcardParaExibicao(solicitacao.pamcard_numero) || '—'}</dd>
             </div>
           </dl>
@@ -1559,7 +1609,7 @@ function PamcardCard({ solicitacao, editable, onSave }: CardProps) {
 
         {naoNecessario && (
           <div>
-            <dt className="text-[10px] uppercase tracking-[0.5px] text-muted-foreground">Status</dt>
+            <dt className="text-meta text-muted-foreground">Status</dt>
             <dd className="font-medium text-muted-foreground">
               Não necessário, pagamento por outro meio
             </dd>
@@ -1568,7 +1618,7 @@ function PamcardCard({ solicitacao, editable, onSave }: CardProps) {
 
         {!temCartao && !naoNecessario && !providenciado && (
           <div className="space-y-3">
-            <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-[12px] text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-300">
+            <div className="rounded-md border border-warning-border bg-warning-subtle px-3 py-2 text-body-sm text-warning">
               Aguardando providência da equipe interna.
             </div>
             {podeAlterar && (
@@ -1580,17 +1630,17 @@ function PamcardCard({ solicitacao, editable, onSave }: CardProps) {
         )}
 
         {temCartao && providenciado && (
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-[13px]">
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-body">
             <div>
-              <dt className="text-[10px] uppercase tracking-[0.5px] text-muted-foreground">Status</dt>
-              <dd className="font-medium text-blue-700 dark:text-blue-400">Providenciado pela equipe</dd>
+              <dt className="text-meta text-muted-foreground">Status</dt>
+              <dd className="font-medium text-info">Providenciado pela equipe</dd>
             </div>
             <div>
-              <dt className="text-[10px] uppercase tracking-[0.5px] text-muted-foreground">Número</dt>
+              <dt className="text-meta text-muted-foreground">Número</dt>
               <dd className="text-foreground">{formatarPamcardParaExibicao(solicitacao.pamcard_numero) || '—'}</dd>
             </div>
             <div className="col-span-2">
-              <dt className="text-[10px] uppercase tracking-[0.5px] text-muted-foreground">Providenciado por</dt>
+              <dt className="text-meta text-muted-foreground">Providenciado por</dt>
               <dd className="text-foreground">
                 {providenciadoPor.data ?? '—'}
                 {solicitacao.pamcard_providenciado_em && (
@@ -1627,7 +1677,7 @@ function PamcardCard({ solicitacao, editable, onSave }: CardProps) {
             pamcard_providenciado_por: profile?.user_id ?? null,
             pamcard_providenciado_em: new Date().toISOString(),
           })
-          toast.success('Cartão registrado com sucesso')
+          toast.success('Cartão registrado.')
         }}
       />
     </section>
@@ -1648,14 +1698,14 @@ function ObservacoesCard({ solicitacao, editable, onSave }: CardProps) {
   return (
     <CardShell title="Observações" editable={editable} isEditing={editing} onEdit={() => setEditing(true)} onCancel={() => setEditing(false)} saving={saving}>
       {!editing ? (
-        <p className="whitespace-pre-wrap text-[13px] text-foreground">
+        <p className="whitespace-pre-wrap text-body text-foreground">
           {solicitacao.observacoes ?? <span className="text-muted-foreground">Sem observações.</span>}
         </p>
       ) : (
         <div className="space-y-3">
           <Textarea rows={4} value={valor} onChange={(e) => setValor(e.target.value)} />
           <div className="flex justify-end gap-2">
-            <Button variant="outline" size="sm" onClick={() => setEditing(false)} disabled={saving}>Cancelar</Button>
+            <Button variant="outline" size="sm" onClick={() => setEditing(false)} disabled={saving}>Descartar</Button>
             <Button
               size="sm"
               disabled={saving}
@@ -1667,7 +1717,7 @@ function ObservacoesCard({ solicitacao, editable, onSave }: CardProps) {
                 } finally { setSaving(false) }
               }}
             >
-              {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              {saving && <Spinner className="h-3.5 w-3.5" />}
               Salvar
             </Button>
           </div>
@@ -1692,7 +1742,7 @@ function TimelineCard({ solicitacao }: { solicitacao: CardProps['solicitacao'] }
   return (
     <section className="rounded-lg border bg-card">
       <header className="flex items-center justify-between border-b px-4 py-2">
-        <h2 className="text-[14px] font-medium text-foreground">Linha do tempo</h2>
+        <h2 className="text-body-lg font-medium text-foreground">Linha do tempo</h2>
       </header>
       <ol className="space-y-0 p-4">
         {items.map((it, i) => {
@@ -1702,11 +1752,8 @@ function TimelineCard({ solicitacao }: { solicitacao: CardProps['solicitacao'] }
               <div className="flex flex-col items-center">
                 <span
                   className={cn(
-                    'flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-black/5',
+                    'flex h-6 w-6 shrink-0 items-center justify-center rounded-full',
                     STATUS_CLASSES[it.status],
-                    // Nó mais recente (estado atual) ganha um glow do acento — chama
-                    // atenção pro "agora" (DESIGN.md §7); terminal cancelada não brilha.
-                    last && it.status !== 'cancelada' && 'shadow-[0_0_12px_-1px_rgba(255,81,0,0.55)]',
                   )}
                 >
                   {it.status === 'cancelada' ? <X className="h-3.5 w-3.5" aria-hidden /> : <Check className="h-3.5 w-3.5" aria-hidden />}
@@ -1714,8 +1761,9 @@ function TimelineCard({ solicitacao }: { solicitacao: CardProps['solicitacao'] }
                 {!last && <span className="w-px flex-1 bg-border" />}
               </div>
               <div className={cn('pb-4', last && 'pb-0')}>
-                <p className="text-[13px] font-medium text-foreground">{it.label}</p>
-                <p className="text-[12px] text-muted-foreground">
+                {/* O nó atual se destaca pelo peso do rótulo, sem brilho (DESIGN.md §7 emendado). */}
+                <p className={cn('text-body text-foreground', last ? 'font-semibold' : 'font-medium')}>{it.label}</p>
+                <p className="text-body-sm text-muted-foreground">
                   {it.when ? format(new Date(it.when), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR }) : '—'}
                 </p>
               </div>
@@ -1769,7 +1817,7 @@ function DevolverParceiroForm({
         <DialogTitle>Devolver {numero} ao parceiro</DialogTitle>
         <DialogDescription>
           Descreva a pendência que impede a finalização. O parceiro recebe um
-          aviso no portal e responde quando resolver, você é notificado de volta.
+          aviso no portal e responde quando resolver; a equipe recebe o retorno.
         </DialogDescription>
       </DialogHeader>
       <DialogBody className="space-y-1.5">
@@ -1789,9 +1837,8 @@ function DevolverParceiroForm({
           <Button
             onClick={() => onConfirm(motivo.trim())}
             disabled={saving || motivo.trim().length === 0}
-            className="bg-orange-600 text-white hover:bg-orange-700"
           >
-            {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+            {saving && <Spinner />}
             <Undo2 className="h-4 w-4" />
             Devolver ao parceiro
           </Button>
@@ -1864,9 +1911,9 @@ function MarcarPendenciaForm({
           <Button
             onClick={() => onConfirm(motivo.trim())}
             disabled={saving || motivo.trim().length === 0}
-            className="bg-red-600 text-white hover:bg-red-700"
+            variant="destructive"
           >
-            {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+            {saving && <Spinner />}
             <AlertCircle className="h-4 w-4" />
             Marcar pendência
           </Button>
@@ -1883,7 +1930,7 @@ function PendenciasCard({ pendencias, isParceiro }: { pendencias: Pendencia[]; i
   return (
     <section className="rounded-lg border bg-card">
       <header className="flex items-center justify-between border-b px-4 py-2">
-        <h2 className="text-[14px] font-medium text-foreground">
+        <h2 className="text-body-lg font-medium text-foreground">
           {isParceiro ? 'Pendências com o parceiro' : 'Pendências internas'}
         </h2>
       </header>
@@ -1898,36 +1945,36 @@ function PendenciasCard({ pendencias, isParceiro }: { pendencias: Pendencia[]; i
               key={p.id}
               className={cn(
                 'space-y-1.5 px-4 py-3',
-                respondidaNaoVista && 'bg-emerald-50/60 dark:bg-emerald-950/20',
+                respondidaNaoVista && 'bg-success-subtle',
               )}
             >
               <div className="flex items-center gap-2">
                 <span
                   className={cn(
-                    'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium',
+                    'inline-flex items-center gap-1 rounded-[2px] px-1.5 py-0.5 text-meta font-medium',
                     aberta
-                      ? 'bg-orange-100 text-orange-800 dark:bg-orange-950/60 dark:text-orange-300'
-                      : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300',
+                      ? 'bg-warning-subtle text-warning'
+                      : 'bg-success-subtle text-success',
                   )}
                 >
                   {aberta ? <Undo2 className="h-3 w-3" /> : <CheckCircle2 className="h-3 w-3" />}
                   {aberta ? (dePendenciaParceiro ? 'Aguardando parceiro' : 'Pendência aberta') : 'Resolvida'}
                 </span>
-                <span className="text-[11px] text-muted-foreground">
+                <span className="text-meta text-muted-foreground">
                   {format(new Date(p.created_at), "dd/MM 'às' HH:mm", { locale: ptBR })}
                 </span>
               </div>
-              <p className="text-[12px] text-foreground">
+              <p className="text-body-sm text-foreground">
                 <span className="text-muted-foreground">Motivo: </span>{p.motivo}
               </p>
               {p.resposta_parceiro && (
-                <p className="rounded-md bg-muted/60 px-2.5 py-1.5 text-[12px] text-foreground">
+                <p className="rounded-md bg-muted px-2.5 py-1.5 text-body-sm text-foreground">
                   <span className="text-muted-foreground">Resposta do parceiro: </span>
                   {p.resposta_parceiro}
                 </p>
               )}
               {!aberta && p.resolvida_em && (
-                <p className="text-[11px] text-emerald-700 dark:text-emerald-400">
+                <p className="text-meta text-success">
                   Resolvida em {format(new Date(p.resolvida_em), "dd/MM 'às' HH:mm", { locale: ptBR })}
                 </p>
               )}
@@ -1935,17 +1982,17 @@ function PendenciasCard({ pendencias, isParceiro }: { pendencias: Pendencia[]; i
                 <Button
                   size="sm"
                   variant="outline"
-                  className="mt-1 h-7 border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-950/40"
+                  className="mt-1 h-7 border-success-border text-success"
                   disabled={marcarVista.isPending}
                   onClick={() => marcarVista.mutate(p.id)}
                   title="Marca a resposta como vista, remove o aviso do card para toda a equipe"
                 >
-                  {marcarVista.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+                  {marcarVista.isPending ? <Spinner className="h-3.5 w-3.5" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
                   Marcar como visto
                 </Button>
               )}
               {!aberta && p.vista_equipe_em && (
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-meta text-muted-foreground">
                   Visto pela equipe em {format(new Date(p.vista_equipe_em), "dd/MM 'às' HH:mm", { locale: ptBR })}
                 </p>
               )}
@@ -1980,10 +2027,10 @@ function AvisarParceiroCard({ solicitacao }: { solicitacao: CardProps['solicitac
   return (
     <section className="rounded-lg border bg-card">
       <header className="border-b px-4 py-2">
-        <h2 className="text-[14px] font-medium text-foreground">Avisar o parceiro</h2>
+        <h2 className="text-body-lg font-medium text-foreground">Avisar o parceiro</h2>
       </header>
       <div className="space-y-3 p-4">
-        <p className="text-[12px] text-muted-foreground">
+        <p className="text-body-sm text-muted-foreground">
           A OC já foi gerada. Avise {parceiro?.razao_social ?? 'o parceiro'} de que a
           ordem está disponível.
         </p>
@@ -2025,7 +2072,7 @@ function Field({
 }) {
   return (
     <div>
-      <dt className="text-[10px] uppercase tracking-[0.5px] text-muted-foreground">{label}</dt>
+      <dt className="text-meta text-muted-foreground">{label}</dt>
       <dd className="text-foreground">
         {value ?? '—'}
         {value && extra ? (

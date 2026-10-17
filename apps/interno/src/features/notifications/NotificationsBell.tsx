@@ -48,11 +48,11 @@ function saveDismissed(m: DismissalMap) {
 const KIND_ORDER: NotificationKind[] = ['pendencia_resolvida', 'validade_vencendo', 'sem_oc', 'oc_nao_enviada', 'pendente']
 
 const KIND_STYLES: Record<NotificationKind, { dot: string; icon: React.ComponentType<{ className?: string }> }> = {
-  pendencia_resolvida: { dot: 'bg-emerald-500', icon: CheckCircle2 },
-  validade_vencendo: { dot: 'bg-red-500', icon: CalendarClock },
-  sem_oc: { dot: 'bg-orange-500', icon: FileX },
-  oc_nao_enviada: { dot: 'bg-orange-400', icon: Send },
-  pendente: { dot: 'bg-amber-500', icon: Hourglass },
+  pendencia_resolvida: { dot: 'bg-success', icon: CheckCircle2 },
+  validade_vencendo: { dot: 'bg-danger', icon: CalendarClock },
+  sem_oc: { dot: 'bg-warning', icon: FileX },
+  oc_nao_enviada: { dot: 'bg-warning', icon: Send },
+  pendente: { dot: 'bg-warning', icon: Hourglass },
 }
 
 export function NotificationsBell() {
@@ -95,13 +95,13 @@ export function NotificationsBell() {
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="relative rounded-md p-1.5 text-white transition-colors hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+          className="relative rounded-md p-1.5 text-header-foreground transition-colors duration-fast hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
           aria-label={total > 0 ? `${total} notificações` : 'Notificações'}
           title={total > 0 ? `${total} alerta${total === 1 ? '' : 's'} operacional${total === 1 ? '' : 'is'}` : 'Sem alertas'}
         >
           <Bell className="h-5 w-5" />
           {total > 0 && (
-            <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-white px-1 text-[10px] font-semibold text-primary-strong ring-1 ring-primary">
+            <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-[2px] bg-primary px-1 text-meta font-semibold tabular-nums text-primary-foreground">
               {total > 99 ? '99+' : total}
             </span>
           )}
@@ -110,15 +110,15 @@ export function NotificationsBell() {
       <PopoverContent align="end" className="w-[360px] p-0">
         <header className="flex items-center justify-between gap-2 border-b px-3 py-2">
           <div className="min-w-0">
-            <p className="text-[13px] font-medium text-foreground">Alertas operacionais</p>
-            <p className="text-[10px] text-muted-foreground">Atualiza a cada minuto · {total} {total === 1 ? 'item' : 'itens'}</p>
+            <p className="text-body font-medium text-foreground">Alertas operacionais</p>
+            <p className="text-meta text-muted-foreground">Atualiza a cada minuto · {total} {total === 1 ? 'item' : 'itens'}</p>
           </div>
           {total > 0 && (
             <Button
               type="button"
               variant="ghost"
               size="sm"
-              className="h-7 shrink-0 text-[11px]"
+              className="h-7 shrink-0 text-meta"
               onClick={handleDismissAll}
               title="Marcar todos como lidos e ocultar"
             >
@@ -130,12 +130,12 @@ export function NotificationsBell() {
 
         <div className="max-h-[400px] overflow-y-auto">
           {isLoading && (
-            <div className="px-3 py-8 text-center text-[12px] text-muted-foreground">Carregando…</div>
+            <div className="px-3 py-8 text-center text-body-sm text-muted-foreground">Carregando…</div>
           )}
           {!isLoading && total === 0 && (
-            <div className="px-3 py-10 text-center text-[13px] text-muted-foreground">
-              Nada pendente. 🎉
-              <p className="mt-1 text-[11px]">Todas as solicitações estão em dia.</p>
+            <div className="px-3 py-10 text-center text-body text-muted-foreground">
+              Sem pendências.
+              <p className="mt-1 text-meta">Todas as solicitações estão em dia.</p>
             </div>
           )}
           {!isLoading && total > 0 && KIND_ORDER.map((kind) => {
@@ -144,10 +144,10 @@ export function NotificationsBell() {
             const Icon = KIND_STYLES[kind].icon
             return (
               <section key={kind}>
-                <div className="flex items-center gap-2 bg-muted/50 px-3 py-1.5 text-[10px] uppercase tracking-[0.5px] text-muted-foreground">
+                <div className="flex items-center gap-2 bg-accent/60 px-3 py-1.5 text-meta font-medium text-muted-foreground">
                   <span className={cn('h-1.5 w-1.5 rounded-full', KIND_STYLES[kind].dot)} />
                   {NOTIFICATION_LABELS[kind]}
-                  <span className="ml-auto">{items.length}</span>
+                  <span className="ml-auto tabular-nums">{items.length}</span>
                 </div>
                 <ul className="divide-y">
                   {items.map((item) => (
@@ -155,17 +155,17 @@ export function NotificationsBell() {
                       <button
                         type="button"
                         onClick={() => handleSelect(item.id)}
-                        className="flex w-full items-start gap-3 px-3 py-2 text-left hover:bg-muted/60"
+                        className="flex w-full items-start gap-3 px-3 py-2 text-left transition-colors duration-fast hover:bg-accent"
                       >
                         <Icon className={cn('mt-0.5 h-4 w-4 shrink-0', kindIconColor(kind))} />
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
-                            <span className="text-[12px] font-medium tabular-nums text-primary-strong">
+                            <span className="text-body-sm font-medium tabular-nums text-primary-strong">
                               {formatNumeroOC(item.numero_interno)}
                             </span>
-                            <span className="text-[11px] text-muted-foreground">{item.age_label}</span>
+                            <span className="text-meta text-muted-foreground">{item.age_label}</span>
                           </div>
-                          <p className="truncate text-[12px] text-foreground">
+                          <p className="truncate text-body-sm text-foreground">
                             {item.cliente_nome ?? item.solicitante_nome ?? 'Sem destino'}
                           </p>
                         </div>
@@ -184,10 +184,10 @@ export function NotificationsBell() {
 
 function kindIconColor(kind: NotificationKind): string {
   switch (kind) {
-    case 'pendencia_resolvida': return 'text-emerald-500'
-    case 'validade_vencendo': return 'text-red-500'
-    case 'sem_oc': return 'text-orange-500'
-    case 'oc_nao_enviada': return 'text-orange-400'
-    case 'pendente': return 'text-amber-500'
+    case 'pendencia_resolvida': return 'text-success'
+    case 'validade_vencendo': return 'text-danger'
+    case 'sem_oc': return 'text-warning'
+    case 'oc_nao_enviada': return 'text-warning'
+    case 'pendente': return 'text-warning'
   }
 }

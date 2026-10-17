@@ -18,7 +18,7 @@ export function GlobalProgressBar() {
       <div
         className={
           active
-            ? 'h-full w-1/3 origin-left animate-progress bg-primary shadow-[0_0_8px_hsl(var(--primary)/0.6)]'
+            ? 'h-full w-1/3 origin-left animate-progress bg-primary'
             : 'h-full w-0 bg-transparent'
         }
       />

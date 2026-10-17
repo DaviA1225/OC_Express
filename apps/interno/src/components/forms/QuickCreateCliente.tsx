@@ -2,7 +2,7 @@ import * as React from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Loader2 } from 'lucide-react'
+import { Spinner } from '@/components/shared/Spinner'
 import { useUpsertRow } from '@/features/crud/useCrudQueries'
 import {
   Dialog,
@@ -15,8 +15,9 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import type { Tables } from '@/types/database.types'
+import { CadastroField } from '@/components/forms/CadastroField'
+import { useDescartarAlteracoes } from '@/features/crud/useDescartarAlteracoes'
 
 type Row = Tables<'clientes'>
 
@@ -35,14 +36,14 @@ interface Props {
 }
 
 export function QuickCreateCliente({ open, onOpenChange, initialNome, onCreated }: Props) {
-  const upsert = useUpsertRow('clientes', 'Cliente')
+  const upsert = useUpsertRow('clientes', { singular: 'Cliente', plural: 'Clientes', genero: 'm' })
   const {
     register,
     handleSubmit,
     reset,
     setValue,
     watch,
-    formState: { errors, isSubmitting },
+    formState: { errors, isSubmitting, isDirty },
   } = useForm<FormValues>({ resolver: zodResolver(schema) })
 
   React.useEffect(() => {
@@ -65,8 +66,11 @@ export function QuickCreateCliente({ open, onOpenChange, initialNome, onCreated 
     onOpenChange(false)
   }
 
+  const guarda = useDescartarAlteracoes(isDirty, onOpenChange, isSubmitting)
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <>
+    <Dialog open={open} onOpenChange={guarda.onOpenChange}>
       <DialogContent>
         <form onSubmit={handleSubmit(onSubmit)} noValidate>
           <DialogHeader>
@@ -76,39 +80,29 @@ export function QuickCreateCliente({ open, onOpenChange, initialNome, onCreated 
             </DialogDescription>
           </DialogHeader>
           <DialogBody className="space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="qc-cli-razao">Razão social *</Label>
-              <Input id="qc-cli-razao" autoFocus {...register('razao_social')} />
-              {errors.razao_social && (
-                <p className="text-[11px] text-destructive">{errors.razao_social.message}</p>
-              )}
-            </div>
+            <CadastroField label="Razão social" required id="qc-cli-razao" error={errors.razao_social?.message}>
+              <Input autoFocus {...register('razao_social')} />
+            </CadastroField>
             <div className="grid grid-cols-[1fr_120px] gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="qc-cli-cidade">Cidade</Label>
-                <Input id="qc-cli-cidade" {...register('cidade')} />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="qc-cli-uf">UF</Label>
+              <CadastroField label="Cidade" id="qc-cli-cidade">
+                <Input {...register('cidade')} />
+              </CadastroField>
+              <CadastroField label="UF" id="qc-cli-uf">
                 <Input
-                  id="qc-cli-uf"
                   value={uf}
-                  onChange={(e) => setValue('uf', e.target.value.toUpperCase().slice(0, 2), { shouldValidate: true })}
+                  onChange={(e) => setValue('uf', e.target.value.toUpperCase().slice(0, 2), { shouldValidate: true, shouldDirty: true })}
                   maxLength={2}
                 />
-              </div>
+              </CadastroField>
             </div>
           </DialogBody>
-          <DialogFooter>
-            <span className="text-[11px] text-muted-foreground/80">
-              Enter para salvar · Esc para cancelar
-            </span>
+          <DialogFooter className="justify-end">
             <div className="flex items-center gap-2">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
+              <Button type="button" variant="outline" onClick={() => guarda.onOpenChange(false)} disabled={isSubmitting}>
                 Cancelar
               </Button>
               <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                {isSubmitting && <Spinner />}
                 Salvar
               </Button>
             </div>
@@ -116,5 +110,7 @@ export function QuickCreateCliente({ open, onOpenChange, initialNome, onCreated 
         </form>
       </DialogContent>
     </Dialog>
+    {guarda.dialog}
+    </>
   )
 }

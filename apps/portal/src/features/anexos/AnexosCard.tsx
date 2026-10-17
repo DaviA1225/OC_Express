@@ -2,7 +2,6 @@ import * as React from 'react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import {
-  Loader2,
   Paperclip,
   Trash2,
   Upload,
@@ -15,6 +14,8 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { cn } from '@/lib/utils'
+import { Spinner } from '@/components/shared/Spinner'
+import { fmtDec, fmtInt } from '@/lib/format'
 import {
   useAnexos,
   useUploadAnexo,
@@ -69,19 +70,19 @@ export function AnexosCard({ solicitacaoId, editable }: Props) {
   const items = list.data ?? []
 
   return (
-    <section className="rounded-lg border bg-background">
+    <section className="rounded-lg border bg-card">
       <header className="flex items-center justify-between border-b px-4 py-2">
         <div className="flex items-center gap-2">
-          <Paperclip className="h-4 w-4 text-muted-foreground" />
-          <h2 className="text-[14px] font-medium text-foreground">Anexos</h2>
+          <Paperclip className="h-4 w-4 text-tertiary" aria-hidden />
+          <h2 className="text-body-lg font-medium text-foreground">Anexos</h2>
           {items.length > 0 && (
-            <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
+            <span className="rounded-[2px] bg-muted px-1.5 py-0.5 text-meta font-medium tabular-nums text-muted-foreground">
               {items.length}
             </span>
           )}
           {upload.isPending && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-800 dark:bg-blue-950/50 dark:text-blue-300">
-              <Loader2 className="h-2.5 w-2.5 animate-spin" />
+            <span className="inline-flex items-center gap-1 text-meta font-medium text-muted-foreground">
+              <Spinner className="h-3 w-3" />
               Enviando…
             </span>
           )}
@@ -111,8 +112,8 @@ export function AnexosCard({ solicitacaoId, editable }: Props) {
       <div
         className={cn(
           'p-4',
-          editable && 'transition-colors',
-          editable && dragOver && 'bg-primary/5',
+          editable && 'transition-colors duration-fast',
+          editable && dragOver && 'bg-primary/[0.08]',
         )}
         onDragOver={(e) => {
           if (!editable) return
@@ -131,15 +132,15 @@ export function AnexosCard({ solicitacaoId, editable }: Props) {
 
         {!list.isLoading && items.length === 0 && (
           <div className="rounded-md border border-dashed p-6 text-center">
-            <Paperclip className="mx-auto mb-2 h-5 w-5 text-muted-foreground" />
-            <p className="text-[13px] text-foreground">Nenhum anexo ainda.</p>
-            <p className="text-[11px] text-muted-foreground">
+            <Paperclip className="mx-auto mb-2 h-5 w-5 text-tertiary" aria-hidden />
+            <p className="text-body text-foreground">Nenhum anexo.</p>
+            <p className="text-meta text-muted-foreground">
               {editable
                 ? 'Arraste imagens ou PDF aqui, ou clique em "Adicionar".'
                 : 'Sem permissão para anexar.'}
             </p>
-            <p className="mt-2 text-[11px] text-muted-foreground">
-              Limite {(MAX_FILE_BYTES / 1024 / 1024).toFixed(0)}MB · imagens e PDF
+            <p className="mt-2 text-meta text-muted-foreground">
+              Limite de {fmtInt(MAX_FILE_BYTES / 1024 / 1024)} MB · imagens e PDF
             </p>
           </div>
         )}
@@ -164,7 +165,7 @@ export function AnexosCard({ solicitacaoId, editable }: Props) {
           onOpenChange={(o) => !o && setConfirmRemove(null)}
           title="Remover anexo?"
           description={`O arquivo "${confirmRemove.filename}" será excluído. Esta ação é irreversível.`}
-          confirmLabel="Sim, remover"
+          confirmLabel="Remover"
           destructive
           onConfirm={async () => {
             await remove.mutateAsync({ anexo: confirmRemove })
@@ -203,18 +204,18 @@ function AnexoRow({ anexo, canDelete, onRequestDelete }: RowProps) {
 
   return (
     <li className="flex items-center gap-3 py-2">
-      <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+      <Icon className="h-4 w-4 shrink-0 text-tertiary" aria-hidden />
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[13px] text-foreground" title={anexo.filename}>
+        <p className="truncate text-body text-foreground" title={anexo.filename}>
           {anexo.filename}
         </p>
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-meta text-muted-foreground">
           {dateLabel}
           {sizeLabel ? ` · ${sizeLabel}` : ''}
         </p>
       </div>
       <Button type="button" variant="ghost" size="sm" onClick={open} disabled={opening}>
-        {opening ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ExternalLink className="h-3.5 w-3.5" />}
+        {opening ? <Spinner className="h-3.5 w-3.5" /> : <ExternalLink className="h-3.5 w-3.5" />}
         Abrir
       </Button>
       {canDelete && (
@@ -223,7 +224,7 @@ function AnexoRow({ anexo, canDelete, onRequestDelete }: RowProps) {
           variant="ghost"
           size="sm"
           onClick={onRequestDelete}
-          className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+          className="text-destructive hover:bg-danger-subtle hover:text-destructive"
           aria-label={`Remover ${anexo.filename}`}
         >
           <Trash2 className="h-3.5 w-3.5" />
@@ -235,6 +236,6 @@ function AnexoRow({ anexo, canDelete, onRequestDelete }: RowProps) {
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+  if (bytes < 1024 * 1024) return `${fmtDec(bytes / 1024)} KB`
+  return `${fmtDec(bytes / 1024 / 1024)} MB`
 }

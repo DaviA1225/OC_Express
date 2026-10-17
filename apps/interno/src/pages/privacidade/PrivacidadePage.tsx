@@ -4,8 +4,9 @@ import { useQueryClient } from '@tanstack/react-query'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import {
-  ChevronDown, ChevronLeft, ChevronRight, Download, Eraser, Inbox, Loader2, Search,
+  ChevronDown, ChevronLeft, ChevronRight, Download, Eraser, Inbox, Search,
 } from 'lucide-react'
+import { Spinner } from '@/components/shared/Spinner'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -18,6 +19,7 @@ import {
   Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
 } from '@/components/ui/table'
 import { EmptyState } from '@/components/shared/EmptyState'
+import { PageHeader } from '@/components/layout/PageHeader'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { cn, formatCpf } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
@@ -85,14 +87,13 @@ export default function PrivacidadePage() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-[22px] font-semibold tracking-tight text-foreground">Privacidade</h1>
-        <p className="text-[12px] text-muted-foreground">
-          Quem tirou dado pessoal do sistema, arquivos que ficaram para trás e pedidos de titulares (LGPD).
-        </p>
-      </div>
+      <PageHeader
+        className="mb-0"
+        title="Privacidade"
+        description="Quem tirou dado pessoal do sistema, arquivos que ficaram para trás e pedidos de titulares (LGPD)."
+      />
 
-      <div className="inline-flex rounded-lg border bg-card p-1" role="tablist" aria-label="Seções de privacidade">
+      <div className="flex gap-1 border-b" role="tablist" aria-label="Seções de privacidade">
         {abas.map((a) => (
           <button
             key={a.value}
@@ -101,10 +102,10 @@ export default function PrivacidadePage() {
             aria-selected={aba === a.value}
             onClick={() => setAba(a.value)}
             className={cn(
-              'rounded-md px-2.5 py-1 text-[12px] font-medium transition-colors',
+              '-mb-px border-b-2 px-3 py-2 text-body font-medium transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
               aba === a.value
-                ? 'bg-primary text-primary-foreground'
-                : 'text-foreground/70 hover:bg-muted hover:text-foreground',
+                ? 'border-primary text-foreground'
+                : 'border-transparent text-muted-foreground hover:text-foreground',
             )}
           >
             {a.label}
@@ -141,13 +142,13 @@ function AbaAcessos() {
       <div className="space-y-3 rounded-lg border bg-card p-3">
         <div className="flex flex-wrap items-end gap-3">
           <div className="space-y-1">
-            <Label htmlFor="privacidade-periodo" className="text-[12px] text-muted-foreground">Período</Label>
+            <Label htmlFor="privacidade-periodo" className="text-body-sm text-muted-foreground">Período</Label>
             <div className="relative">
               <select
                 id="privacidade-periodo"
                 value={periodo}
                 onChange={(e) => { setPeriodo(e.target.value as Periodo); setPage(1) }}
-                className="h-9 appearance-none rounded-md border bg-card pl-3 pr-8 text-[13px] focus:outline-none focus:ring-2 focus:ring-ring"
+                className="h-9 appearance-none rounded-md border border-input bg-card pl-3 pr-8 text-body text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 {(Object.keys(PERIODO_LABELS) as Periodo[]).map((p) => (
                   <option key={p} value={p}>{PERIODO_LABELS[p]}</option>
@@ -167,7 +168,7 @@ function AbaAcessos() {
         </div>
 
         <div className="space-y-1.5">
-          <p className="text-[12px] text-muted-foreground">Tipo de acesso</p>
+          <p className="text-body-sm text-muted-foreground">Tipo de acesso</p>
           <div className="flex flex-wrap gap-1.5">
             {ACOES_ACESSO.map((a) => {
               const active = acoes.includes(a)
@@ -178,10 +179,10 @@ function AbaAcessos() {
                   aria-pressed={active}
                   onClick={() => toggleAcao(a)}
                   className={cn(
-                    'rounded-md border px-3 py-1 text-[12px] transition-colors',
+                    'rounded-[2px] border px-2.5 py-1 text-body-sm transition-colors duration-fast',
                     active
-                      ? 'border-primary bg-primary text-primary-foreground'
-                      : 'border-border bg-card text-foreground/80 hover:bg-muted',
+                      ? 'border-primary bg-primary/[0.08] font-medium text-foreground'
+                      : 'border-input bg-card text-foreground hover:bg-row-hover',
                   )}
                 >
                   {ACAO_ACESSO_LABELS[a]}
@@ -211,7 +212,7 @@ function AbaAcessos() {
             ))}
             {list.isError && (
               <TableRow>
-                <TableCell colSpan={5} className="py-8 text-center text-[13px] text-destructive">
+                <TableCell colSpan={5} className="py-8 text-center text-body text-destructive">
                   Não foi possível carregar o registro de acesso.
                 </TableCell>
               </TableRow>
@@ -229,26 +230,26 @@ function AbaAcessos() {
             )}
             {(list.data?.data ?? []).map((r) => (
               <TableRow key={r.id}>
-                <TableCell className="text-[12px] text-muted-foreground tabular-nums">{dataHora(r.created_at)}</TableCell>
-                <TableCell className="text-[12px]">
+                <TableCell className="text-body-sm text-muted-foreground tabular-nums">{dataHora(r.created_at)}</TableCell>
+                <TableCell className="text-body-sm">
                   {ACAO_ACESSO_LABELS[r.acao as AcaoAcessoLog] ?? r.acao}
                 </TableCell>
-                <TableCell className="text-[12px]">
+                <TableCell className="text-body-sm">
                   {r.usuario_nome ?? <span className="text-muted-foreground">Usuário removido</span>}
                 </TableCell>
-                <TableCell className="text-[12px] text-muted-foreground">
+                <TableCell className="text-body-sm text-muted-foreground">
                   <span className="line-clamp-1 break-all" title={r.recurso ?? undefined}>
                     {resumoAcesso(r.recurso, r.detalhe)}
                   </span>
                 </TableCell>
-                <TableCell className="text-[12px] text-muted-foreground tabular-nums">{r.ip ?? '—'}</TableCell>
+                <TableCell className="text-body-sm text-muted-foreground tabular-nums">{r.ip ?? '—'}</TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
 
         {total > PAGE_SIZE && (
-          <div className="flex items-center justify-between border-t px-4 py-3 text-[12px] text-muted-foreground">
+          <div className="flex items-center justify-between border-t px-4 py-3 text-body-sm text-muted-foreground">
             <span>Página {page} de {totalPages} · {total} registros</span>
             <div className="flex items-center gap-2">
               <Button variant="outline" size="sm" onClick={() => setPage(page - 1)} disabled={page <= 1}>
@@ -298,7 +299,7 @@ function AbaOrfaos() {
   return (
     <>
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card p-3">
-        <p className="max-w-[640px] text-[12px] text-muted-foreground">
+        <p className="max-w-[640px] text-body-sm text-muted-foreground">
           Anexos que foram apagados do sistema mas cujo arquivo pode ter ficado no storage. São CRLV, CNH e
           prints com dado pessoal: o arquivo precisa sair do bucket junto com o registro.
         </p>
@@ -308,7 +309,7 @@ function AbaOrfaos() {
           onClick={() => setConfirmar(true)}
           disabled={lista.length === 0 || remover.isPending}
         >
-          {remover.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+          {remover.isPending && <Spinner />}
           Remover do storage
         </Button>
       </div>
@@ -330,7 +331,7 @@ function AbaOrfaos() {
             ))}
             {orfaos.isError && (
               <TableRow>
-                <TableCell colSpan={3} className="py-8 text-center text-[13px] text-destructive">
+                <TableCell colSpan={3} className="py-8 text-center text-body text-destructive">
                   Não foi possível carregar a fila de remoção.
                 </TableCell>
               </TableRow>
@@ -348,11 +349,11 @@ function AbaOrfaos() {
             )}
             {lista.map((o) => (
               <TableRow key={o.id}>
-                <TableCell className="text-[12px] text-muted-foreground tabular-nums">{dataHora(o.created_at)}</TableCell>
-                <TableCell className="text-[12px]">
+                <TableCell className="text-body-sm text-muted-foreground tabular-nums">{dataHora(o.created_at)}</TableCell>
+                <TableCell className="text-body-sm">
                   <span className="line-clamp-1 break-all font-mono" title={o.path}>{o.path}</span>
                 </TableCell>
-                <TableCell className="text-[12px] text-muted-foreground">
+                <TableCell className="text-body-sm text-muted-foreground">
                   {o.erro ? <span className="text-destructive">{o.erro}</span> : 'Sem tentativa registrada'}
                 </TableCell>
               </TableRow>
@@ -435,7 +436,7 @@ function AbaTitular({ podeAnonimizar }: { podeAnonimizar: boolean }) {
   return (
     <>
       <div className="space-y-4 rounded-lg border bg-card p-4">
-        <div className="max-w-[640px] space-y-1 text-[12px] text-muted-foreground">
+        <div className="max-w-[640px] space-y-1 text-body-sm text-muted-foreground">
           <p>
             Para atender um pedido de motorista (LGPD, art. 18). A busca é pelo CPF, nos cadastros da frota
             interna e dos parceiros.
@@ -454,7 +455,7 @@ function AbaTitular({ podeAnonimizar }: { podeAnonimizar: boolean }) {
 
         <div className="flex flex-wrap items-end gap-2">
           <div className="space-y-1">
-            <Label htmlFor="titular-cpf" className="text-[12px] text-muted-foreground">CPF do titular</Label>
+            <Label htmlFor="titular-cpf" className="text-body-sm text-muted-foreground">CPF do titular</Label>
             <Input
               id="titular-cpf"
               inputMode="numeric"
@@ -466,19 +467,19 @@ function AbaTitular({ podeAnonimizar }: { podeAnonimizar: boolean }) {
             />
           </div>
           <Button type="button" onClick={exportar} disabled={!cpfCompleto || exportando}>
-            {exportando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            {exportando ? <Spinner /> : <Download className="h-4 w-4" />}
             Exportar dados
           </Button>
           {podeAnonimizar && (
             <Button type="button" variant="outline" onClick={simular} disabled={!cpfCompleto || simulando}>
-              {simulando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+              {simulando ? <Spinner /> : <Search className="h-4 w-4" />}
               Anonimizar…
             </Button>
           )}
         </div>
 
         {exportacao && (
-          <div className="border-t pt-3 text-[13px]">
+          <div className="border-t pt-3 text-body">
             {exportacao.encontrado ? (
               <p>
                 Arquivo baixado: {exportacao.cadastros} {exportacao.cadastros === 1 ? 'cadastro' : 'cadastros'},{' '}
@@ -495,7 +496,7 @@ function AbaTitular({ podeAnonimizar }: { podeAnonimizar: boolean }) {
         )}
       </div>
 
-      <p className="max-w-[640px] text-[12px] text-muted-foreground">
+      <p className="max-w-[640px] text-body-sm text-muted-foreground">
         O nome e o telefone de quem pediu a solicitação são texto livre e não se ligam ao CPF. Se a pessoa também
         aparecer ali, a limpeza é manual (veja o fim da migration 0057).
       </p>
@@ -546,7 +547,7 @@ function AnonimizarDialog({
           <DialogTitle>Anonimizar o CPF {formatCpf(cpf)}?</DialogTitle>
           <DialogDescription>Não dá para desfazer. Nada foi alterado ainda.</DialogDescription>
         </DialogHeader>
-        <DialogBody className="space-y-3 text-[13px]">
+        <DialogBody className="space-y-3 text-body">
           <ul className="space-y-1">
             <li>
               {cadastros} {cadastros === 1 ? 'cadastro de motorista perde' : 'cadastros de motorista perdem'} nome,
@@ -563,7 +564,7 @@ function AnonimizarDialog({
             </li>
           </ul>
           <div className="space-y-1">
-            <Label htmlFor="anonimizar-palavra" className="text-[12px] text-muted-foreground">
+            <Label htmlFor="anonimizar-palavra" className="text-body-sm text-muted-foreground">
               Digite {PALAVRA_CONFIRMACAO} para confirmar
             </Label>
             <Input

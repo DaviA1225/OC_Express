@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils'
 import type { RealtimeStatus } from '@/features/realtime/useRealtimeSubscriptions'
 import { NotificationsBell } from '@/features/notifications/NotificationsBell'
 import { useLayoutPreferido } from '@/features/layout/useLayoutPreferido'
+import { iniciais, labelPerfil } from '@/features/auth/perfis'
 
 interface HeaderProps {
   onOpenMobileMenu: () => void
@@ -30,7 +31,6 @@ export function Header({ onOpenMobileMenu, onOpenSearch, realtimeStatus = 'conne
   const { modoErp, podeUsarErp, salvando, definir } = useLayoutPreferido()
 
   const nome = profile?.nome_completo ?? user?.email ?? 'Usuário'
-  const inicial = nome.trim().charAt(0).toUpperCase() || '?'
 
   const handleSignOut = async () => {
     await signOut()
@@ -38,7 +38,9 @@ export function Header({ onOpenMobileMenu, onOpenSearch, realtimeStatus = 'conne
   }
 
   return (
-    <header className="relative z-20 flex h-14 shrink-0 items-center gap-2 border-b border-white/10 bg-[#1D1E1B] px-3 text-white sm:gap-3 sm:px-4">
+    // Barra superior fria (token --header) nos dois temas, 48px; no escuro um
+    // hairline separa do canvas.
+    <header className="relative z-20 flex h-12 shrink-0 items-center gap-2 border-b border-white/10 bg-header px-2 text-header-foreground sm:gap-3 sm:px-3">
       {/* Esquerda: hamburger + logo */}
       <div className="flex items-center gap-2">
         <Button
@@ -48,14 +50,14 @@ export function Header({ onOpenMobileMenu, onOpenSearch, realtimeStatus = 'conne
           aria-label="Abrir menu de navegação"
           // No modo ERP a barra de módulos fica fixa ao lado no desktop; o
           // botão só sobra em tela estreita, onde a barra não cabe.
-          className={cn(modoErp && 'lg:hidden', 'h-[46px] gap-2 border border-white/30 bg-transparent px-3 text-[15px] font-semibold text-white hover:bg-white/15 hover:text-white sm:px-4')}
+          className={cn(modoErp && 'lg:hidden', 'h-9 gap-2 px-2.5 text-body font-medium text-white hover:bg-white/10 hover:text-white focus-visible:ring-white/70 focus-visible:ring-offset-0 [&_svg]:size-5')}
         >
-          <Menu className="h-[22px] w-[22px]" />
+          <Menu strokeWidth={1.75} />
           Menu
         </Button>
         <div className={cn('flex items-center gap-2', modoErp && 'lg:hidden')}>
-          <img src="/favicon.svg" alt="" aria-hidden className="h-7 w-7 shrink-0" />
-          <span className="hidden text-[15px] font-semibold text-white sm:inline">
+          <img src="/favicon.svg" alt="" aria-hidden className="h-6 w-6 shrink-0" />
+          <span className="hidden text-body-lg font-semibold text-white sm:inline">
             SisLog
           </span>
         </div>
@@ -67,7 +69,7 @@ export function Header({ onOpenMobileMenu, onOpenSearch, realtimeStatus = 'conne
           type="button"
           variant="ghost"
           size="icon"
-          className="sm:hidden text-white hover:bg-white/15 hover:text-white"
+          className="sm:hidden text-white hover:bg-white/10 hover:text-white"
           onClick={onOpenSearch}
           aria-label="Buscar (Ctrl+K)"
         >
@@ -77,13 +79,13 @@ export function Header({ onOpenMobileMenu, onOpenSearch, realtimeStatus = 'conne
           type="button"
           onClick={onOpenSearch}
           className={cn(
-            'hidden h-9 w-full max-w-md items-center gap-2 rounded-md border border-white/20 bg-white/10 px-3 text-[13px] text-white/90 transition-colors hover:bg-white/20 sm:flex',
+            'hidden h-8 w-full max-w-md items-center gap-2 rounded-md border border-white/20 bg-white/[0.06] px-3 text-body text-white/80 transition-colors duration-fast hover:bg-white/10 sm:flex',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60',
           )}
         >
           <Search className="h-4 w-4 shrink-0" />
           <span className="flex-1 truncate text-left">Buscar (Ctrl+K)</span>
-          <kbd className="hidden rounded border border-white/30 bg-white/10 px-1.5 py-0.5 text-[10px] text-white/90 sm:inline">
+          <kbd className="hidden rounded-[2px] border border-white/25 px-1.5 text-meta text-white/80 sm:inline">
             Ctrl K
           </kbd>
         </button>
@@ -102,12 +104,12 @@ export function Header({ onOpenMobileMenu, onOpenSearch, realtimeStatus = 'conne
         <DropdownMenuTrigger asChild>
           <button
             type="button"
-            className="flex items-center gap-2 rounded-md px-1.5 py-1 hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+            className="flex h-9 items-center gap-2 rounded-md px-1.5 transition-colors duration-fast hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
           >
-            <Avatar className="h-8 w-8 border border-white/30">
-              <AvatarFallback className="bg-white/15 text-white">{inicial}</AvatarFallback>
+            <Avatar className="h-7 w-7">
+              <AvatarFallback className="bg-white/15 text-body-sm text-white">{iniciais(nome)}</AvatarFallback>
             </Avatar>
-            <span className="hidden text-[13px] font-medium text-white md:inline">
+            <span className="hidden text-body font-medium text-white md:inline">
               {nome.split(' ')[0]}
             </span>
             <ChevronDown className="h-3.5 w-3.5 text-white/80" />
@@ -115,9 +117,9 @@ export function Header({ onOpenMobileMenu, onOpenSearch, realtimeStatus = 'conne
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-52">
           <div className="px-2 py-1.5">
-            <p className="truncate text-[13px] font-medium text-foreground">{nome}</p>
+            <p className="truncate text-body font-medium text-foreground">{nome}</p>
             {profile && (
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-meta text-muted-foreground">
                 {labelPerfil(profile.perfil)}
               </p>
             )}
@@ -165,7 +167,7 @@ function ThemeToggle() {
       onClick={toggle}
       aria-label={isDark ? 'Mudar para modo claro' : 'Mudar para modo escuro'}
       title={isDark ? 'Modo claro' : 'Modo escuro'}
-      className="text-white hover:bg-white/15 hover:text-white"
+      className="text-white hover:bg-white/10 hover:text-white"
     >
       {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
     </Button>
@@ -174,14 +176,16 @@ function ThemeToggle() {
 
 function RealtimeIndicator({ status }: { status: RealtimeStatus }) {
   const config: Record<RealtimeStatus, { dot: string; label: string }> = {
-    connecting: { dot: 'bg-amber-300 animate-pulse', label: 'Conectando…' },
-    live: { dot: 'bg-emerald-300', label: 'Ao vivo · sincronizado entre usuários' },
-    error: { dot: 'bg-red-300', label: 'Sem conexão em tempo real' },
+    connecting: { dot: 'bg-warning animate-pulse', label: 'Conectando…' },
+    live: { dot: 'bg-success', label: 'Ao vivo · sincronizado entre usuários' },
+    error: { dot: 'bg-danger', label: 'Sem conexão em tempo real' },
   }
   const c = config[status]
+  // `dark` no contêiner: a barra do header é escura nos dois temas, então os
+  // tokens semânticos resolvem para os tons claros do tema escuro (legíveis aqui).
   return (
     <div
-      className="hidden items-center gap-1.5 rounded-full border border-white/25 bg-white/10 px-2 py-1 text-[11px] text-white/90 sm:flex"
+      className="dark hidden items-center gap-1.5 rounded-[2px] px-2 py-1 text-meta text-white/80 sm:flex"
       title={c.label}
     >
       <span className={cn('h-1.5 w-1.5 rounded-full', c.dot)} />
@@ -190,13 +194,3 @@ function RealtimeIndicator({ status }: { status: RealtimeStatus }) {
   )
 }
 
-function labelPerfil(p: string): string {
-  switch (p) {
-    case 'admin': return 'Administrador'
-    case 'gerente': return 'Gerente'
-    case 'supervisor': return 'Supervisor'
-    case 'analista': return 'Analista'
-    case 'assistente': return 'Assistente'
-    default: return p
-  }
-}

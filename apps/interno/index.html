@@ -6,23 +6,24 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#1D1E1B" />
+    <!-- Cor da barra superior (token --header): fria nos dois temas. -->
+    <meta name="theme-color" content="#1A1F28" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0A0C0F" media="(prefers-color-scheme: dark)" />
     <title>SisLog · Sistema de Gestão de Carregamentos</title>
     <style>
       /* Splash exibido antes de o React montar — evita flash branco */
-      html, body { margin: 0; padding: 0; height: 100%; background: #1D1E1B; }
+      html, body { margin: 0; padding: 0; height: 100%; background: #0E1115; }
       body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
       #app-splash {
         position: fixed; inset: 0;
         display: flex; flex-direction: column; align-items: center; justify-content: center;
         gap: 18px;
-        background: radial-gradient(circle at 25% 25%, rgba(255,81,0,0.18), transparent 45%), #1D1E1B;
+        background: #0E1115;
         color: #fff;
       }
       #app-splash .mark {
         width: 56px; height: 56px;
         display: block;
-        filter: drop-shadow(0 8px 24px rgba(255, 81, 0, 0.25));
       }
       #app-splash .wordmark {
         font-size: 13px; letter-spacing: 2px; text-transform: uppercase;

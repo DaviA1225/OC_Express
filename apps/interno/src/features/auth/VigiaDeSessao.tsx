@@ -104,7 +104,7 @@ export function VigiaDeSessao() {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Clock className="h-4 w-4 text-muted-foreground" />
-            Sua sessão vai expirar
+            A sessão vai expirar
           </DialogTitle>
           <DialogDescription>
             Por segurança dos dados, o SisLog encerra sessões inativas.
@@ -112,14 +112,14 @@ export function VigiaDeSessao() {
         </DialogHeader>
 
         <DialogBody>
-          <p className="text-[13px] leading-relaxed text-foreground">
-            Você será desconectado em{' '}
+          <p className="text-body leading-relaxed text-foreground">
+            Desconexão automática em{' '}
             <span className="font-mono font-semibold tabular-nums">
               {formatarRestante(restanteMs ?? 0)}
             </span>
-            . Qualquer clique ou tecla mantém você conectado.
+            . Qualquer clique ou tecla mantém a sessão ativa.
           </p>
-          <p className="mt-2 text-[12px] text-muted-foreground">
+          <p className="mt-2 text-body-sm text-muted-foreground">
             Trabalho não salvo em formulários abertos se perde no logout — se estiver no meio de
             um cadastro, continue e salve antes de sair.
           </p>

@@ -2,7 +2,7 @@ import * as React from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Loader2 } from 'lucide-react'
+import { Spinner } from '@/components/shared/Spinner'
 import { CrudListPage, useCrudListState, type ColumnDef } from '@/components/shared/CrudListPage'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { Combobox, type ComboboxOption } from '@/components/shared/Combobox'
@@ -58,11 +58,11 @@ export default function CargasRetornoPage() {
     ascending: true,
   })
   const totalActive = useActiveCount('cargas_retorno')
-  const upsert = useUpsertRow('cargas_retorno', 'Carga de retorno')
-  const toggle = useToggleActive('cargas_retorno', 'Carga de retorno')
-  const remove = useDeleteRow('cargas_retorno', 'Carga de retorno')
-  const bulkToggle = useBulkToggleActive('cargas_retorno', 'Carga de retorno')
-  const bulkDelete = useBulkDeleteRows('cargas_retorno', 'Carga de retorno')
+  const upsert = useUpsertRow('cargas_retorno', { singular: 'Carga de retorno', plural: 'Cargas de retorno', genero: 'f' })
+  const toggle = useToggleActive('cargas_retorno', { singular: 'Carga de retorno', plural: 'Cargas de retorno', genero: 'f' })
+  const remove = useDeleteRow('cargas_retorno', { singular: 'Carga de retorno', plural: 'Cargas de retorno', genero: 'f' })
+  const bulkToggle = useBulkToggleActive('cargas_retorno', { singular: 'Carga de retorno', plural: 'Cargas de retorno', genero: 'f' })
+  const bulkDelete = useBulkDeleteRows('cargas_retorno', { singular: 'Carga de retorno', plural: 'Cargas de retorno', genero: 'f' })
 
   const clientes = useCrudOptions<ClienteOpt>({
     table: 'clientes',
@@ -168,9 +168,9 @@ export default function CargasRetornoPage() {
         onOpenChange={(o) => !o && setConfirmRow(null)}
         title={confirmRow?.ativo ? 'Desativar carga de retorno?' : 'Reativar carga de retorno?'}
         description={confirmRow?.ativo
-          ? 'A carga não aparecerá mais nas opções de novas solicitações de retorno. Você pode reativá-la depois.'
+          ? 'A carga não aparecerá mais nas opções de novas solicitações de retorno. A reativação pode ser feita depois.'
           : 'A carga voltará a aparecer nas opções de novas solicitações de retorno.'}
-        confirmLabel={confirmRow?.ativo ? 'Sim, desativar' : 'Sim, reativar'}
+        confirmLabel={confirmRow?.ativo ? 'Desativar' : 'Reativar'}
         destructive={confirmRow?.ativo}
         onConfirm={async () => {
           if (confirmRow) {
@@ -189,7 +189,7 @@ export default function CargasRetornoPage() {
             ? `O cadastro de "${deleteRow.local_carregamento}" será removido permanentemente. Essa ação não pode ser desfeita.`
             : ''
         }
-        confirmLabel="Sim, excluir"
+        confirmLabel="Excluir"
         destructive
         onConfirm={async () => {
           if (deleteRow) {
@@ -263,7 +263,7 @@ function CargaRetornoForm({ open, onOpenChange, editing, clienteOptions, cliente
                 allowClear={false}
               />
               {errors.cliente_id && (
-                <p className="text-[11px] text-destructive">{errors.cliente_id.message}</p>
+                <p className="text-meta text-destructive">{errors.cliente_id.message}</p>
               )}
             </div>
 
@@ -275,7 +275,7 @@ function CargaRetornoForm({ open, onOpenChange, editing, clienteOptions, cliente
                 placeholder="Ex.: Pátio do cliente, Filial Corumbá…"
               />
               {errors.local_carregamento && (
-                <p className="text-[11px] text-destructive">{errors.local_carregamento.message}</p>
+                <p className="text-meta text-destructive">{errors.local_carregamento.message}</p>
               )}
             </div>
 
@@ -289,16 +289,13 @@ function CargaRetornoForm({ open, onOpenChange, editing, clienteOptions, cliente
               />
             </div>
           </DialogBody>
-          <DialogFooter>
-            <span className="text-[11px] text-muted-foreground/80">
-              Enter para salvar · Esc para cancelar
-            </span>
+          <DialogFooter className="justify-end">
             <div className="flex items-center gap-2">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
                 Cancelar
               </Button>
               <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                {isSubmitting && <Spinner />}
                 Salvar
               </Button>
             </div>

@@ -64,12 +64,12 @@ export function ErroDaTela({ error, reset }: { error: Error; reset: () => void }
   return (
     <div className="flex min-h-[60vh] items-center justify-center px-4 py-12">
       <div className="w-full max-w-lg text-center">
-        <h1 className="text-[24px] font-semibold tracking-tight text-foreground">
+        <h1 className="font-display text-page font-medium text-foreground">
           {atualizado ? 'O sistema foi atualizado' : 'Esta tela encontrou um erro'}
         </h1>
-        <p className="mt-3 text-[14px] leading-relaxed text-muted-foreground">
+        <p className="mt-3 text-body-lg leading-relaxed text-muted-foreground">
           {atualizado
-            ? 'Uma versão nova foi publicada enquanto você usava o sistema. Recarregue a página para continuar.'
+            ? 'Uma versão nova foi publicada durante o uso do sistema. Recarregue a página para continuar.'
             : 'O restante do sistema continua funcionando: use o menu para ir a outra tela, ou tente abrir esta de novo. Se o erro se repetir, avise o suporte com os detalhes abaixo.'}
         </p>
 
@@ -77,7 +77,7 @@ export function ErroDaTela({ error, reset }: { error: Error; reset: () => void }
           {!atualizado && (
             <Button variant="outline" onClick={reset}>
               <RotateCcw className="h-4 w-4" />
-              Tentar de novo
+              Tentar novamente
             </Button>
           )}
           <Button onClick={() => window.location.reload()}>
@@ -98,18 +98,18 @@ export function ErroDaTela({ error, reset }: { error: Error; reset: () => void }
  */
 export function ErroGeral({ error }: { error: Error }) {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4 py-12">
+    <div className="flex min-h-screen items-center justify-center bg-canvas px-4 py-12">
       <div className="w-full max-w-lg text-center">
-        <h1 className="text-[24px] font-semibold tracking-tight text-foreground">
+        <h1 className="font-display text-page font-medium text-foreground">
           {ehChunkAntigo(error) ? 'O sistema foi atualizado' : 'O sistema encontrou um erro'}
         </h1>
-        <p className="mt-3 text-[14px] leading-relaxed text-muted-foreground">
+        <p className="mt-3 text-body-lg leading-relaxed text-muted-foreground">
           Recarregue a página para continuar. Nenhum dado foi perdido: o que já estava salvo
           continua no sistema.
         </p>
         <div className="mt-7 flex flex-wrap items-center justify-center gap-2">
           <Button variant="outline" onClick={() => window.location.assign('/dashboard')}>
-            Ir para o Dashboard
+            Ir para o Painel
           </Button>
           <Button onClick={() => window.location.reload()}>
             <RefreshCw className="h-4 w-4" />
@@ -125,10 +125,10 @@ export function ErroGeral({ error }: { error: Error }) {
 function DetalhesTecnicos({ error }: { error: Error }) {
   return (
     <details className="mt-8 text-left">
-      <summary className="cursor-pointer text-center text-[12px] text-muted-foreground">
+      <summary className="cursor-pointer text-center text-body-sm text-muted-foreground">
         Detalhes técnicos
       </summary>
-      <pre className="mt-3 max-h-48 overflow-auto rounded-md border bg-muted/60 p-3 text-[11px] leading-relaxed text-muted-foreground">
+      <pre className="mt-3 max-h-48 overflow-auto rounded-md border bg-muted p-3 text-meta leading-relaxed text-muted-foreground">
         {`${error.name}: ${error.message}\n${window.location.pathname}${window.location.search}`}
       </pre>
     </details>

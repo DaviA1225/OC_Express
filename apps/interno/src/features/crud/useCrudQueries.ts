@@ -4,6 +4,16 @@ import { ilikeFilter } from '@sislog/shared/postgrest'
 import { supabase } from '@/lib/supabase'
 import type { Database, Tables, TablesInsert, TablesUpdate } from '@/types/database.types'
 
+/** Nome do cadastro para as mensagens: o gênero decide a concordância ("cadastrada"/"cadastrado"). */
+export interface NomeRegistro {
+  singular: string
+  plural: string
+  genero: 'm' | 'f'
+}
+
+const sufixo = (n: NomeRegistro) => (n.genero === 'f' ? 'a' : 'o')
+const sufixoPlural = (n: NomeRegistro) => (n.genero === 'f' ? 'as' : 'os')
+
 type CrudTableName = keyof Pick<
   Database['public']['Tables'],
   'subcontratadas' | 'motoristas' | 'veiculos' | 'carretas' | 'clientes' | 'materiais' | 'cargas_retorno' | 'parceiros'
@@ -82,7 +92,7 @@ export function useActiveCount<TName extends CrudTableName>(
   })
 }
 
-export function useUpsertRow<TName extends CrudTableName>(table: TName, friendlyName: string) {
+export function useUpsertRow<TName extends CrudTableName>(table: TName, nome: NomeRegistro) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (input: { id?: string; values: TablesInsert<TName> | TablesUpdate<TName> }) => {
@@ -108,7 +118,7 @@ export function useUpsertRow<TName extends CrudTableName>(table: TName, friendly
       qc.invalidateQueries({ queryKey: ['crud', table] })
       qc.invalidateQueries({ queryKey: ['crud-count-active', table] })
       qc.invalidateQueries({ queryKey: ['crud-options', table] })
-      toast.success(vars.id ? `${friendlyName} atualizado` : `${friendlyName} criado`)
+      toast.success(`${nome.singular} ${vars.id ? 'atualizad' : 'cadastrad'}${sufixo(nome)}.`)
     },
     onError: (error: unknown) => {
       toast.error(traduzirErroBanco(error))
@@ -116,7 +126,7 @@ export function useUpsertRow<TName extends CrudTableName>(table: TName, friendly
   })
 }
 
-export function useDeleteRow<TName extends CrudTableName>(table: TName, friendlyName: string) {
+export function useDeleteRow<TName extends CrudTableName>(table: TName, nome: NomeRegistro) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async ({ id }: { id: string }) => {
@@ -127,10 +137,10 @@ export function useDeleteRow<TName extends CrudTableName>(table: TName, friendly
       qc.invalidateQueries({ queryKey: ['crud', table] })
       qc.invalidateQueries({ queryKey: ['crud-count-active', table] })
       qc.invalidateQueries({ queryKey: ['crud-options', table] })
-      toast.success(`${friendlyName} excluído`)
+      toast.success(`${nome.singular} excluíd${sufixo(nome)}.`)
     },
     onError: (error: unknown) => {
-      toast.error(traduzirErroBanco(error))
+      toast.error(traduzirErroBanco(error, { exclusao: true }))
     },
   })
 }
@@ -140,7 +150,7 @@ interface ToggleContext {
   previousCount: [unknown, unknown][]
 }
 
-export function useToggleActive<TName extends CrudTableName>(table: TName, friendlyName: string) {
+export function useToggleActive<TName extends CrudTableName>(table: TName, nome: NomeRegistro) {
   const qc = useQueryClient()
   return useMutation<void, unknown, { id: string; ativo: boolean }, ToggleContext>({
     mutationFn: async ({ id, ativo }) => {
@@ -183,7 +193,7 @@ export function useToggleActive<TName extends CrudTableName>(table: TName, frien
       toast.error(traduzirErroBanco(error))
     },
     onSuccess: (_data, vars) => {
-      toast.success(vars.ativo ? `${friendlyName} reativado` : `${friendlyName} desativado`)
+      toast.success(`${nome.singular} ${vars.ativo ? 'reativad' : 'desativad'}${sufixo(nome)}.`)
     },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ['crud', table] })
@@ -193,7 +203,7 @@ export function useToggleActive<TName extends CrudTableName>(table: TName, frien
   })
 }
 
-export function useBulkToggleActive<TName extends CrudTableName>(table: TName, friendlyName: string) {
+export function useBulkToggleActive<TName extends CrudTableName>(table: TName, nome: NomeRegistro) {
   const qc = useQueryClient()
   return useMutation<void, unknown, { ids: string[]; ativo: boolean }, ToggleContext>({
     mutationFn: async ({ ids, ativo }) => {
@@ -243,10 +253,11 @@ export function useBulkToggleActive<TName extends CrudTableName>(table: TName, f
     },
     onSuccess: (_data, vars) => {
       const n = vars.ids.length
+      const palavra = vars.ativo ? 'reativad' : 'desativad'
       toast.success(
-        vars.ativo
-          ? `${n} ${n === 1 ? `${friendlyName.toLowerCase()} reativado` : `${friendlyName.toLowerCase()}s reativados`}`
-          : `${n} ${n === 1 ? `${friendlyName.toLowerCase()} desativado` : `${friendlyName.toLowerCase()}s desativados`}`,
+        n === 1
+          ? `1 ${nome.singular.toLowerCase()} ${palavra}${sufixo(nome)}.`
+          : `${n} ${nome.plural.toLowerCase()} ${palavra}${sufixoPlural(nome)}.`,
       )
     },
     onSettled: () => {
@@ -257,7 +268,7 @@ export function useBulkToggleActive<TName extends CrudTableName>(table: TName, f
   })
 }
 
-export function useBulkDeleteRows<TName extends CrudTableName>(table: TName, friendlyName: string) {
+export function useBulkDeleteRows<TName extends CrudTableName>(table: TName, nome: NomeRegistro) {
   const qc = useQueryClient()
   return useMutation<void, unknown, { ids: string[] }>({
     mutationFn: async ({ ids }) => {
@@ -268,10 +279,12 @@ export function useBulkDeleteRows<TName extends CrudTableName>(table: TName, fri
     onSuccess: (_data, vars) => {
       const n = vars.ids.length
       toast.success(
-        `${n} ${n === 1 ? `${friendlyName.toLowerCase()} excluído` : `${friendlyName.toLowerCase()}s excluídos`}`,
+        n === 1
+          ? `1 ${nome.singular.toLowerCase()} excluíd${sufixo(nome)}.`
+          : `${n} ${nome.plural.toLowerCase()} excluíd${sufixoPlural(nome)}.`,
       )
     },
-    onError: (error) => toast.error(traduzirErroBanco(error)),
+    onError: (error) => toast.error(traduzirErroBanco(error, { exclusao: true })),
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ['crud', table] })
       qc.invalidateQueries({ queryKey: ['crud-count-active', table] })
@@ -280,19 +293,42 @@ export function useBulkDeleteRows<TName extends CrudTableName>(table: TName, fri
   })
 }
 
-export function traduzirErroBanco(error: unknown): string {
+const MSG_FALHA = 'Não foi possível concluir a operação. Tente novamente.'
+
+// SQLSTATEs que as funções do banco usam para regra de negócio (RAISE ... USING ERRCODE):
+// a mensagem já foi escrita para o usuário.
+const CODIGOS_REGRA = new Set(['P0001', '22023', '22004', '23514'])
+
+export function traduzirErroBanco(error: unknown, opts?: { exclusao?: boolean }): string {
   const e = error as { code?: string; message?: string; details?: string } | undefined
-  if (!e) return 'Algo deu errado. Tente novamente em instantes.'
-  if (e.code === '23505') {
-    if (e.message?.includes('cpf')) return 'Esse CPF já está cadastrado.'
-    if (e.message?.includes('cnpj')) return 'Esse CNPJ já está cadastrado.'
-    if (e.message?.includes('placa')) return 'Essa placa já está cadastrada.'
-    if (e.message?.includes('nome')) return 'Esse nome já está cadastrado.'
+  if (!e) return MSG_FALHA
+  const code = e.code || undefined
+  const message = e.message?.trim() || undefined
+  if (code === '23505') {
+    if (message?.includes('cpf')) return 'Esse CPF já está cadastrado.'
+    if (message?.includes('cnpj')) return 'Esse CNPJ já está cadastrado.'
+    if (message?.includes('placa')) return 'Essa placa já está cadastrada.'
+    if (message?.includes('nome')) return 'Esse nome já está cadastrado.'
     return 'Já existe um registro com esses dados.'
   }
-  if (e.code === '23503') return 'Esse registro está em uso e não pode ser removido.'
-  if (e.message?.toLowerCase().includes('failed to fetch')) {
+  if (code === '23503') {
+    return opts?.exclusao
+      ? 'Registro vinculado a solicitações. Desative em vez de excluir.'
+      : 'Registro em uso por outros cadastros.'
+  }
+  if (message?.toLowerCase().includes('failed to fetch')) {
     return 'Não foi possível conectar ao servidor. Tente novamente.'
   }
-  return e.message ?? 'Algo deu errado. Tente novamente em instantes.'
+  if (code === '42501') {
+    // Mensagem nativa do Postgres (RLS/privilégio) não serve ao usuário; a custom das RPCs serve.
+    if (!message || /row-level security|permission denied|violates/i.test(message)) {
+      return 'Sem permissão para esta ação.'
+    }
+    return message
+  }
+  if (code && (CODIGOS_REGRA.has(code) || /^PT\d{3}$/.test(code))) return message ?? MSG_FALHA
+  // Sem code: erro JS/StorageError/Edge Function ("Sessão expirada" etc.) — a mensagem é nossa.
+  if (!code) return message ?? MSG_FALHA
+  // SQLSTATE técnico (08*, 42P*, XX*, 57*, 53*…) ou desconhecido: não expor o texto cru.
+  return `${MSG_FALHA} Código: ${code}.`
 }

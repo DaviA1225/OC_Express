@@ -103,25 +103,25 @@ export function GlobalSearchDialog({ open, onOpenChange }: Props) {
             />
             <CommandList className="max-h-[420px]">
               {term.length < 2 && (
-                <div className="px-4 py-8 text-center text-[13px] text-muted-foreground">
+                <div className="px-4 py-8 text-center text-body text-muted-foreground">
                   Digite ao menos 2 caracteres para buscar.
-                  <p className="mt-1 text-[11px]">
-                    Dica: <kbd className="rounded border bg-card px-1">↑</kbd>{' '}
-                    <kbd className="rounded border bg-card px-1">↓</kbd> navegar ·{' '}
-                    <kbd className="rounded border bg-card px-1">Enter</kbd> abrir ·{' '}
-                    <kbd className="rounded border bg-card px-1">Esc</kbd> fechar
+                  <p className="mt-1 text-meta">
+                    Dica: <kbd className="rounded-[2px] border bg-accent px-1">↑</kbd>{' '}
+                    <kbd className="rounded-[2px] border bg-accent px-1">↓</kbd> navegar ·{' '}
+                    <kbd className="rounded-[2px] border bg-accent px-1">Enter</kbd> abrir ·{' '}
+                    <kbd className="rounded-[2px] border bg-accent px-1">Esc</kbd> fechar
                   </p>
                 </div>
               )}
 
               {term.length >= 2 && search.isLoading && (
-                <div className="px-4 py-6 text-center text-[12px] text-muted-foreground">
+                <div className="px-4 py-6 text-center text-body-sm text-muted-foreground">
                   Buscando…
                 </div>
               )}
 
               {term.length >= 2 && search.isError && (
-                <div className="px-4 py-6 text-center text-[12px] text-destructive">
+                <div className="px-4 py-6 text-center text-body-sm text-destructive">
                   Erro ao buscar. Verifique a conexão e tente de novo.
                 </div>
               )}
@@ -146,7 +146,7 @@ export function GlobalSearchDialog({ open, onOpenChange }: Props) {
                         <div className="min-w-0 flex-1">
                           <div className="truncate text-foreground">{item.label}</div>
                           {item.hint && (
-                            <div className="truncate text-[11px] text-muted-foreground">{item.hint}</div>
+                            <div className="truncate text-meta text-muted-foreground">{item.hint}</div>
                           )}
                         </div>
                       </CommandItem>
@@ -156,10 +156,10 @@ export function GlobalSearchDialog({ open, onOpenChange }: Props) {
               })}
             </CommandList>
 
-            <div className="flex items-center justify-between border-t px-3 py-2 text-[11px] text-muted-foreground">
+            <div className="flex items-center justify-between border-t px-3 py-2 text-meta text-muted-foreground">
               <span>Busca global</span>
               <span>
-                <kbd className="rounded border bg-card px-1">Esc</kbd> para fechar
+                <kbd className="rounded-[2px] border bg-accent px-1">Esc</kbd> para fechar
               </span>
             </div>
           </Command>

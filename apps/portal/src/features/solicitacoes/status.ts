@@ -10,7 +10,8 @@ export interface PortalStatusInfo {
   badge: string
   /** Texto completo, usado em cabeçalhos e na linha do tempo. */
   label: string
-  /** Classes Tailwind do badge. */
+  /** Classe de cor do grupo (`.pst-*` em index.css): define fundo, texto e
+   *  ponto/faixa. Mesmos matizes do interno. */
   className: string
 }
 
@@ -18,37 +19,37 @@ export const PORTAL_STATUS: Record<SolicitacaoStatus, PortalStatusInfo> = {
   recebida: {
     badge: 'Enviada',
     label: 'Enviada, aguardando a LHG',
-    className: 'bg-blue-100 text-blue-800 dark:bg-blue-950/50 dark:text-blue-300',
+    className: 'pst-enviada',
   },
   em_cadastro: {
     badge: 'Em processamento',
     label: 'Em processamento pela LHG',
-    className: 'bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300',
+    className: 'pst-em_processamento',
   },
   instrucao_emitida: {
     badge: 'Em processamento',
     label: 'Em processamento pela LHG',
-    className: 'bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300',
+    className: 'pst-em_processamento',
   },
   oc_gerada: {
     badge: 'OC pronta',
     label: 'OC pronta, baixe pelo portal',
-    className: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300',
+    className: 'pst-oc_pronta',
   },
   oc_enviada: {
     badge: 'OC pronta',
     label: 'OC pronta, baixe pelo portal',
-    className: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300',
+    className: 'pst-oc_pronta',
   },
   finalizada: {
     badge: 'Concluída',
     label: 'Concluída',
-    className: 'bg-emerald-200 text-emerald-900 dark:bg-emerald-900/50 dark:text-emerald-200',
+    className: 'pst-concluida',
   },
   cancelada: {
     badge: 'Cancelada',
     label: 'Cancelada',
-    className: 'bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300',
+    className: 'pst-cancelada',
   },
 }
 

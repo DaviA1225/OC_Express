@@ -14,6 +14,7 @@ import {
 import { podeEditar } from '@/features/solicitacoes/status'
 import { formatNumeroOC } from '@/lib/utils'
 import type { PamcardStatus, SolicitacaoTipo } from '@sislog/shared/types'
+import { PageHeader } from '@/components/layout/PageHeader'
 
 export default function EditarSolicitacaoPage() {
   const { id } = useParams<{ id: string }>()
@@ -27,7 +28,7 @@ export default function EditarSolicitacaoPage() {
   const back = (
     <Link
       to={id ? `/solicitacoes/${id}` : '/solicitacoes'}
-      className="mb-3 inline-flex items-center gap-1.5 text-[13px] font-medium text-muted-foreground hover:text-foreground"
+      className="mb-3 inline-flex items-center gap-1.5 rounded-sm text-body font-medium text-muted-foreground transition-colors duration-fast hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       <ArrowLeft className="h-4 w-4" />
       Voltar para a solicitação
@@ -48,7 +49,7 @@ export default function EditarSolicitacaoPage() {
     return (
       <div className="mx-auto w-full max-w-[720px]">
         {back}
-        <div className="rounded-lg border bg-background">
+        <div className="rounded-lg border bg-card">
           <EmptyState
             icon={AlertCircle}
             title="Solicitação não encontrada"
@@ -109,13 +110,11 @@ export default function EditarSolicitacaoPage() {
     <div className="mx-auto w-full max-w-[720px]">
       {back}
 
-      <h1 className="text-[22px] font-semibold tracking-tight text-foreground">
-        Editar solicitação {sol.numero_interno != null ? formatNumeroOC(sol.numero_interno) : ''}
-      </h1>
-      <p className="mt-1 text-[13px] text-muted-foreground">
-        Corrija os dados antes de a equipe da LHG processar. A posição na fila é
-        mantida.
-      </p>
+      <PageHeader
+        className="mb-0"
+        title={`Editar solicitação ${sol.numero_interno != null ? formatNumeroOC(sol.numero_interno) : ''}`}
+        description="Corrija os dados antes de a equipe da LHG processar. A posição na fila é mantida."
+      />
 
       <SolicitacaoForm
         defaultValues={defaultValues}

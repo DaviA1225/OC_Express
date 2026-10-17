@@ -2,7 +2,8 @@ import * as React from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Loader2, Lock, Pencil, Plus, Power, Search as SearchIcon, Users, Inbox } from 'lucide-react'
+import { Lock, Pencil, Plus, Power, Search as SearchIcon, Users, Inbox } from 'lucide-react'
+import { Spinner } from '@/components/shared/Spinner'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
@@ -40,25 +41,21 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Skeleton } from '@/components/ui/skeleton'
+import { PageHeader } from '@/components/layout/PageHeader'
+import { CadastroField } from '@/components/forms/CadastroField'
+import { PERFIL_LABELS, labelPerfil } from '@/features/auth/perfis'
+import { useDescartarAlteracoes } from '@/features/crud/useDescartarAlteracoes'
 import { cn } from '@/lib/utils'
 import type { Tables, TablesInsert, TablesUpdate, PerfilUsuario } from '@/types/database.types'
 
 type Row = Tables<'perfis_usuarios'>
 
-const PERFIS: { value: PerfilUsuario; label: string }[] = [
-  { value: 'admin', label: 'Administrador' },
-  { value: 'gerente', label: 'Gerente' },
-  { value: 'supervisor', label: 'Supervisor' },
-  { value: 'analista', label: 'Analista' },
-  { value: 'assistente', label: 'Assistente' },
-]
-
-const perfilLabel = (p: PerfilUsuario) => PERFIS.find((x) => x.value === p)?.label ?? p
+const PERFIS = Object.entries(PERFIL_LABELS).map(([value, label]) => ({ value: value as PerfilUsuario, label }))
 
 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 const schema = z.object({
-  user_id: z.string().refine((v) => uuidRegex.test(v.trim()), 'UUID inválido'),
+  user_id: z.string().refine((v) => uuidRegex.test(v.trim()), 'Identificador inválido'),
   nome_completo: z.string().min(2, 'Informe o nome completo'),
   perfil: z.enum(['admin', 'gerente', 'supervisor', 'analista', 'assistente']),
 })
@@ -121,7 +118,7 @@ export default function UsuariosPage() {
     onSuccess: (_d, vars) => {
       qc.invalidateQueries({ queryKey: ['perfis_usuarios'] })
       qc.invalidateQueries({ queryKey: ['perfis_usuarios-active-count'] })
-      toast.success(vars.id ? 'Perfil atualizado' : 'Perfil criado')
+      toast.success(vars.id ? 'Usuário atualizado.' : 'Usuário cadastrado.')
     },
     onError: (e: unknown) => toast.error(traduzirErroBanco(e)),
   })
@@ -137,7 +134,7 @@ export default function UsuariosPage() {
     onSuccess: (_d, v) => {
       qc.invalidateQueries({ queryKey: ['perfis_usuarios'] })
       qc.invalidateQueries({ queryKey: ['perfis_usuarios-active-count'] })
-      toast.success(v.ativo ? 'Usuário reativado' : 'Usuário desativado')
+      toast.success(v.ativo ? 'Usuário reativado.' : 'Usuário desativado.')
     },
     onError: (e: unknown) => toast.error(traduzirErroBanco(e)),
   })
@@ -151,18 +148,21 @@ export default function UsuariosPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-[22px] font-semibold tracking-tight text-foreground">Usuários</h1>
-          <p className="text-[12px] text-muted-foreground">
+      <PageHeader
+        className="mb-0"
+        title="Usuários"
+        meta={
+          <span className="text-body-sm tabular-nums text-muted-foreground">
             {totalActive.data ?? 0} {(totalActive.data ?? 0) === 1 ? 'ativo' : 'ativos'}
-          </p>
-        </div>
-        <Button onClick={() => { setEditing(null); setOpen(true) }}>
-          <Plus className="h-4 w-4" />
-          Novo usuário
-        </Button>
-      </div>
+          </span>
+        }
+        actions={
+          <Button onClick={() => { setEditing(null); setOpen(true) }}>
+            <Plus className="h-4 w-4" />
+            Novo usuário
+          </Button>
+        }
+      />
 
       <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-card p-3">
         <div className="relative flex-1 min-w-[220px]">
@@ -187,7 +187,7 @@ export default function UsuariosPage() {
         </Select>
         <div className="flex items-center gap-2">
           <Switch id="show-inactive-users" checked={showInactive} onCheckedChange={setShowInactive} />
-          <Label htmlFor="show-inactive-users" className="text-[12px] text-muted-foreground">
+          <Label htmlFor="show-inactive-users" className="text-body-sm text-muted-foreground">
             Mostrar inativos
           </Label>
         </div>
@@ -199,7 +199,7 @@ export default function UsuariosPage() {
             <TableRow>
               <TableHead>Nome</TableHead>
               <TableHead>Perfil</TableHead>
-              <TableHead className="text-muted-foreground">User ID</TableHead>
+              <TableHead>Identificador</TableHead>
               <TableHead className="w-[110px] text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
@@ -219,7 +219,7 @@ export default function UsuariosPage() {
                   <EmptyState
                     icon={Users}
                     title="Nenhum usuário cadastrado"
-                    description="Cadastre o perfil de cada usuário autorizado a usar o sistema."
+                    description="Cada usuário autorizado a usar o sistema precisa de um perfil."
                   />
                 </TableCell>
               </TableRow>
@@ -228,18 +228,16 @@ export default function UsuariosPage() {
             {!list.isLoading && rows?.map((row) => {
               const isSelf = currentUser?.id === row.user_id
               return (
-                <TableRow key={row.id} className={cn(!row.ativo && 'opacity-60')}>
+                <TableRow key={row.id} className={cn(!row.ativo && 'text-muted-foreground')}>
                   <TableCell>
-                    {!row.ativo && <Lock className="mr-1 inline h-3 w-3 text-muted-foreground" />}
+                    {!row.ativo && <Lock className="mr-1 inline h-3 w-3 text-tertiary" aria-label="Inativo" />}
                     {row.nome_completo}
                     {isSelf && (
-                      <span className="ml-2 text-[10px] uppercase tracking-[0.5px] text-muted-foreground">
-                        você
-                      </span>
+                      <span className="ml-2 text-meta text-muted-foreground">(você)</span>
                     )}
                   </TableCell>
-                  <TableCell>{perfilLabel(row.perfil)}</TableCell>
-                  <TableCell className="font-mono text-[11px] text-muted-foreground">
+                  <TableCell>{labelPerfil(row.perfil)}</TableCell>
+                  <TableCell className="font-mono text-meta text-muted-foreground">
                     {row.user_id}
                   </TableCell>
                   <TableCell className="text-right">
@@ -313,9 +311,9 @@ export default function UsuariosPage() {
         onOpenChange={(o) => !o && setConfirmRow(null)}
         title={confirmRow?.ativo ? 'Desativar usuário?' : 'Reativar usuário?'}
         description={confirmRow?.ativo
-          ? 'O usuário não conseguirá mais acessar o sistema. Você pode reativá-lo depois.'
+          ? 'O usuário perde o acesso ao sistema. É possível reativá-lo depois.'
           : 'O usuário voltará a ter acesso ao sistema.'}
-        confirmLabel={confirmRow?.ativo ? 'Sim, desativar' : 'Sim, reativar'}
+        confirmLabel={confirmRow?.ativo ? 'Desativar' : 'Reativar'}
         destructive={confirmRow?.ativo}
         onConfirm={async () => {
           if (confirmRow) {
@@ -355,9 +353,12 @@ function UsuarioForm({ open, onOpenChange, editing, onCreate, onUpdate }: FormPr
   }, [open, editing, createForm, editForm])
 
   const submitting = isEditing ? editForm.formState.isSubmitting : createForm.formState.isSubmitting
+  const dirty = isEditing ? editForm.formState.isDirty : createForm.formState.isDirty
+  const guarda = useDescartarAlteracoes(dirty, onOpenChange, submitting)
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <>
+    <Dialog open={open} onOpenChange={guarda.onOpenChange}>
       <DialogContent>
         <form
           noValidate
@@ -367,62 +368,54 @@ function UsuarioForm({ open, onOpenChange, editing, onCreate, onUpdate }: FormPr
             <DialogTitle>{isEditing ? 'Editar usuário' : 'Novo usuário'}</DialogTitle>
             <DialogDescription>
               {isEditing
-                ? 'Altere o nome ou o nível de acesso deste usuário.'
-                : 'O usuário precisa ter sido criado antes no painel do Supabase. Cole aqui o UUID dele para liberar o acesso.'}
+                ? 'Nome e nível de acesso do usuário.'
+                : 'O acesso é liberado para uma conta que já existe no painel de autenticação. Informe o identificador dessa conta.'}
             </DialogDescription>
           </DialogHeader>
           <DialogBody className="space-y-4">
             {!isEditing && (
-              <div className="space-y-1.5">
-                <Label htmlFor="user_id">User ID (UUID) *</Label>
+              <CadastroField
+                label="Identificador do usuário"
+                required
+                id="user_id"
+                error={createForm.formState.errors.user_id?.message}
+                hint="Fica em Authentication › Users, no painel do Supabase, depois que a conta é criada lá."
+              >
                 <Input
-                  id="user_id"
                   placeholder="00000000-0000-0000-0000-000000000000"
-                  className="font-mono text-[12px]"
+                  className="font-mono text-body-sm"
                   {...createForm.register('user_id')}
                 />
-                {createForm.formState.errors.user_id && (
-                  <p className="text-[11px] text-destructive">
-                    {createForm.formState.errors.user_id.message}
-                  </p>
-                )}
-                <p className="text-[11px] text-muted-foreground">
-                  Encontre o UUID em Authentication › Users no painel do Supabase, depois de criar o usuário lá.
-                </p>
-              </div>
+              </CadastroField>
             )}
 
-            <div className="space-y-1.5">
-              <Label htmlFor="nome_completo">Nome completo *</Label>
+            <CadastroField
+              label="Nome completo"
+              required
+              id="nome_completo"
+              error={isEditing
+                ? editForm.formState.errors.nome_completo?.message
+                : createForm.formState.errors.nome_completo?.message}
+            >
               <Input
-                id="nome_completo"
                 autoFocus={isEditing}
                 {...(isEditing
                   ? editForm.register('nome_completo')
                   : createForm.register('nome_completo'))}
               />
-              {(isEditing
-                ? editForm.formState.errors.nome_completo
-                : createForm.formState.errors.nome_completo) && (
-                <p className="text-[11px] text-destructive">
-                  {(isEditing
-                    ? editForm.formState.errors.nome_completo?.message
-                    : createForm.formState.errors.nome_completo?.message)}
-                </p>
-              )}
-            </div>
+            </CadastroField>
 
-            <div className="space-y-1.5">
-              <Label>Perfil *</Label>
+            <CadastroField label="Perfil" required id="perfil_usuario">
+              {(a11y) => (
               <Select
                 value={isEditing ? editForm.watch('perfil') : createForm.watch('perfil')}
                 onValueChange={(v) => {
                   const value = v as PerfilUsuario
-                  if (isEditing) editForm.setValue('perfil', value, { shouldValidate: true })
-                  else createForm.setValue('perfil', value, { shouldValidate: true })
+                  if (isEditing) editForm.setValue('perfil', value, { shouldValidate: true, shouldDirty: true })
+                  else createForm.setValue('perfil', value, { shouldValidate: true, shouldDirty: true })
                 }}
               >
-                <SelectTrigger>
+                <SelectTrigger {...a11y}>
                   <SelectValue placeholder="Selecionar perfil" />
                 </SelectTrigger>
                 <SelectContent>
@@ -431,18 +424,16 @@ function UsuarioForm({ open, onOpenChange, editing, onCreate, onUpdate }: FormPr
                   ))}
                 </SelectContent>
               </Select>
-            </div>
+              )}
+            </CadastroField>
           </DialogBody>
-          <DialogFooter>
-            <span className="text-[11px] text-muted-foreground/80">
-              Enter para salvar · Esc para cancelar
-            </span>
+          <DialogFooter className="justify-end">
             <div className="flex items-center gap-2">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>
+              <Button type="button" variant="outline" onClick={() => guarda.onOpenChange(false)} disabled={submitting}>
                 Cancelar
               </Button>
               <Button type="submit" disabled={submitting}>
-                {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                {submitting && <Spinner />}
                 Salvar
               </Button>
             </div>
@@ -450,5 +441,7 @@ function UsuarioForm({ open, onOpenChange, editing, onCreate, onUpdate }: FormPr
         </form>
       </DialogContent>
     </Dialog>
+    {guarda.dialog}
+    </>
   )
 }

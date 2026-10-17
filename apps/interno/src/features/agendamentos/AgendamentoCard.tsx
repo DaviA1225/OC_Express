@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { toast } from 'sonner'
-import { CalendarClock, Loader2, FileText, AlertTriangle, RotateCcw } from 'lucide-react'
+import { CalendarClock, FileText, AlertTriangle, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -39,6 +39,7 @@ import {
   tiposDaGrade,
 } from './agendamento'
 import type { SolicitacaoStatus, TipoVeiculo } from '@/types/database.types'
+import { Spinner } from '@/components/shared/Spinner'
 
 /** A NF nasce no carregamento, então o agendamento é evento POSTERIOR à saída
  *  da carga. Antes da OC enviada não há nota para levar ao terminal. */
@@ -76,7 +77,7 @@ export function AgendamentoCard({ solicitacaoId, clienteId, status }: Props) {
   return (
     <section className="rounded-lg border bg-card">
       <div className="flex items-center justify-between gap-2 border-b px-4 py-2.5">
-        <h2 className="flex items-center gap-2 text-[13px] font-medium text-foreground">
+        <h2 className="flex items-center gap-2 text-body font-medium text-foreground">
           <CalendarClock className="h-4 w-4 text-muted-foreground" />
           Agendamento
         </h2>
@@ -88,7 +89,7 @@ export function AgendamentoCard({ solicitacaoId, clienteId, status }: Props) {
       </div>
 
       <div className="space-y-2 p-4">
-        <p className="text-[12px] text-muted-foreground">
+        <p className="text-body-sm text-muted-foreground">
           {terminal.terminal_nome?.trim() || terminal.razao_social}
           {terminal.antecedencia_minima_horas != null && (
             <> · exige {terminal.antecedencia_minima_horas}h de antecedência</>
@@ -96,24 +97,24 @@ export function AgendamentoCard({ solicitacaoId, clienteId, status }: Props) {
         </p>
 
         {lista.isLoading ? (
-          <p className="text-[12px] text-muted-foreground">Carregando…</p>
+          <p className="text-body-sm text-muted-foreground">Carregando…</p>
         ) : itens.length === 0 ? (
-          <p className="text-[12px] leading-relaxed text-muted-foreground">
+          <p className="text-body-sm leading-relaxed text-muted-foreground">
             {cargaNaRua
               ? 'Nenhum agendamento pedido ainda. O parceiro pode pedir pelo portal, ou a equipe registra aqui o que chegou por WhatsApp.'
               : 'O pedido de agendamento só é liberado depois que a OC é enviada — a nota fiscal nasce no carregamento.'}
           </p>
         ) : (
-          <ul className="space-y-2">
+          <ul className="divide-y">
             {itens.map((a) => (
-              <li key={a.id} className="rounded-md border bg-background p-2.5">
+              <li key={a.id} className="py-2.5 first:pt-0 last:pb-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-mono text-[11px] text-muted-foreground">
+                  <span className="font-mono text-meta text-muted-foreground">
                     {numeroAgendamento(a.numero_interno)}
                   </span>
                   <span
                     className={cn(
-                      'rounded-full px-2 py-0.5 text-[11px] font-medium',
+                      'rounded-[2px] px-1.5 py-0.5 text-meta font-medium',
                       AGENDAMENTO_STATUS_CLASSES[a.status],
                     )}
                   >
@@ -121,7 +122,7 @@ export function AgendamentoCard({ solicitacaoId, clienteId, status }: Props) {
                   </span>
                 </div>
 
-                <dl className="mt-1.5 space-y-0.5 text-[12px]">
+                <dl className="mt-1.5 space-y-0.5 text-body-sm">
                   <div className="flex gap-2">
                     <dt className="w-[64px] shrink-0 text-muted-foreground">Pediu</dt>
                     <dd className="tabular-nums text-foreground">
@@ -135,7 +136,7 @@ export function AgendamentoCard({ solicitacaoId, clienteId, status }: Props) {
                       <dd className="tabular-nums text-foreground">
                         {dataCompleta(a.data_agendada)} · {horaCurta(a.hora_agendada)}
                         {a.hora_fora_da_grade && (
-                          <span className="ml-1.5 inline-flex items-center gap-1 text-amber-700">
+                          <span className="ml-1.5 inline-flex items-center gap-1 text-warning">
                             <AlertTriangle className="h-3 w-3" />
                             fora da grade
                           </span>
@@ -160,7 +161,7 @@ export function AgendamentoCard({ solicitacaoId, clienteId, status }: Props) {
                 {/* Fora da <dl> de propósito: é uma frase, não um campo de duas
                     colunas — e o rótulo precisa dizer que o parceiro já leu. */}
                 {a.observacoes_para_parceiro && (
-                  <p className="mt-1.5 text-[12px] leading-relaxed text-muted-foreground">
+                  <p className="mt-1.5 text-body-sm leading-relaxed text-muted-foreground">
                     <span className="font-medium text-foreground">Observação ao parceiro: </span>
                     {a.observacoes_para_parceiro}
                   </p>
@@ -229,7 +230,7 @@ function LinkDocumento({ path, rotulo }: { path: string; rotulo: string }) {
   return (
     <button
       type="button"
-      className="inline-flex items-center gap-1 text-[11px] text-primary-strong underline-offset-2 hover:underline"
+      className="inline-flex items-center gap-1 text-meta text-primary-strong underline-offset-2 hover:underline"
       onClick={async () => {
         setAbrindo(true)
         try {
@@ -242,7 +243,7 @@ function LinkDocumento({ path, rotulo }: { path: string; rotulo: string }) {
         }
       }}
     >
-      {abrindo ? <Loader2 className="h-3 w-3 animate-spin" /> : <FileText className="h-3 w-3" />}
+      {abrindo ? <Spinner className="h-3 w-3" /> : <FileText className="h-3 w-3" />}
       {rotulo}
     </button>
   )
@@ -344,7 +345,7 @@ function NovoAgendamentoForm({
                   onClick={() => escolherTipo(t)}
                   aria-pressed={tipo === t}
                   className={cn(
-                    'rounded-md border px-2.5 py-1.5 text-[12px] font-medium transition-colors',
+                    'rounded-control border px-2.5 py-1.5 text-body-sm font-medium transition-colors',
                     tipo === t
                       ? 'border-primary bg-primary text-primary-foreground'
                       : 'border-border bg-card text-foreground hover:border-primary/40 hover:bg-accent',
@@ -354,9 +355,9 @@ function NovoAgendamentoForm({
                 </button>
               ))}
             </div>
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-meta text-muted-foreground">
               Este terminal descarrega cada tipo em horários diferentes. Sem o tipo, a grade
-              aparece inteira e você escolhe o horário na mão.
+              aparece inteira e o horário é escolhido na mão.
             </p>
           </div>
         )}
@@ -405,7 +406,7 @@ function NovoAgendamentoForm({
               onOpenChange(false)
             }}
           >
-            {criar.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+            {criar.isPending && <Spinner />}
             Registrar
           </Button>
         </div>

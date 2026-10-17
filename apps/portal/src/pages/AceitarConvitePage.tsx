@@ -3,15 +3,16 @@ import { useNavigate, Navigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Eye, EyeOff, Loader2, ShieldCheck } from 'lucide-react'
+import { Eye, EyeOff, ShieldCheck } from 'lucide-react'
 import type { EmailOtpType } from '@supabase/supabase-js'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/lib/supabase'
 import { PortalLoader } from '@/components/PortalLoader'
+import { Spinner } from '@/components/shared/Spinner'
+import { CadastroField } from '@/components/forms/CadastroField'
 
 const schema = z
   .object({
@@ -91,7 +92,7 @@ export default function AceitarConvitePage() {
   // Token inválido/expirado/já usado.
   if (verifyState === 'failed') return <ConviteInvalido />
 
-  // Verificou com sucesso, mas o vínculo ainda está chegando — segura no loader.
+  // Verificou, mas o vínculo ainda está chegando — segura no loader.
   if (verifyState === 'ok' && !parceiroUsuario && !graceExpired) return <PortalLoader />
 
   // Sem sessão = o link expirou ou nunca foi clicado de fato.
@@ -119,7 +120,7 @@ export default function AceitarConvitePage() {
     // falhar). Cliente nunca escreve direto em parceiro_usuarios.convite_aceito_em:
     // a RPC SECURITY DEFINER deriva o user_id de auth.uid() e ignora qualquer arg.
     void supabase.rpc('marcar_meu_convite_aceito')
-    toast.success('Senha definida, bem-vindo ao portal!')
+    toast.success('Senha definida.')
     navigate('/solicitacoes', { replace: true })
   }
 
@@ -127,54 +128,44 @@ export default function AceitarConvitePage() {
     <div className="grid min-h-full grid-cols-1 lg:grid-cols-[1.1fr_1fr]">
       <BrandPanel parceiroNome={parceiro?.razao_social} />
 
-      <div className="flex items-center justify-center bg-background px-4 py-10 sm:px-8">
+      <div className="flex items-center justify-center bg-canvas px-4 py-10 sm:px-8">
         <div className="w-full max-w-[400px]">
           <div className="mb-8 lg:hidden">
             <img src="/favicon.svg" alt="" aria-hidden className="h-10 w-10" />
           </div>
 
-          <h1 className="font-display text-[26px] font-semibold tracking-tight text-foreground">
-            Defina sua senha
+          <h1 className="font-display text-page font-medium text-foreground">
+            Definir senha
           </h1>
-          <p className="mt-1 text-[13px] text-muted-foreground">
+          <p className="mt-1 text-body text-muted-foreground">
             {parceiroUsuario.nome_completo} ({user?.email}), crie uma senha forte para
             acessar o portal.
           </p>
 
           <form onSubmit={handleSubmit(onSubmit)} className="mt-8 space-y-4" noValidate>
-            <div className="space-y-1.5">
-              <Label htmlFor="senha">Nova senha</Label>
+            <CadastroField label="Nova senha" required id="senha" error={errors.senha?.message}>
               <PasswordInput
-                id="senha"
                 show={showSenha}
                 onToggle={() => setShowSenha((v) => !v)}
                 autoFocus
                 {...register('senha')}
               />
-              {errors.senha && (
-                <p className="text-[11px] text-destructive">{errors.senha.message}</p>
-              )}
-            </div>
+            </CadastroField>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="confirmar">Confirmar senha</Label>
+            <CadastroField label="Confirmar senha" required id="confirmar" error={errors.confirmar?.message}>
               <PasswordInput
-                id="confirmar"
                 show={showConf}
                 onToggle={() => setShowConf((v) => !v)}
                 {...register('confirmar')}
               />
-              {errors.confirmar && (
-                <p className="text-[11px] text-destructive">{errors.confirmar.message}</p>
-              )}
-            </div>
+            </CadastroField>
 
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-body-sm text-muted-foreground">
               Use no mínimo 12 caracteres. Combine letras, números e símbolos.
             </p>
 
             <Button type="submit" className="h-10 w-full" disabled={isSubmitting}>
-              {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+              {isSubmitting && <Spinner />}
               {isSubmitting ? 'Salvando…' : 'Definir senha e entrar'}
             </Button>
           </form>
@@ -185,7 +176,7 @@ export default function AceitarConvitePage() {
 }
 
 interface PasswordInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
-  id: string
+  id?: string
   show: boolean
   onToggle: () => void
 }
@@ -205,7 +196,7 @@ const PasswordInput = React.forwardRef<HTMLInputElement, PasswordInputProps>(
         <button
           type="button"
           onClick={onToggle}
-          className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+          className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground transition-colors duration-fast hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
           aria-label={show ? 'Ocultar senha' : 'Mostrar senha'}
           tabIndex={-1}
         >
@@ -218,43 +209,31 @@ const PasswordInput = React.forwardRef<HTMLInputElement, PasswordInputProps>(
 
 function BrandPanel({ parceiroNome }: { parceiroNome?: string | null }) {
   return (
-    <aside className="relative hidden flex-col justify-between overflow-hidden bg-gradient-to-br from-[#1E40AF] from-0% via-[#1E3A8A] via-40% to-[#172554] to-100% p-10 text-white lg:flex">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-20"
-        style={{
-          backgroundImage:
-            'radial-gradient(circle at 20% 20%, rgba(255,255,255,0.15), transparent 40%), radial-gradient(circle at 80% 80%, rgba(255,255,255,0.08), transparent 35%)',
-        }}
-      />
-
+    // Painel de marca chapado (azul escuro do portal, sempre escuro): sem
+    // gradiente, brilho nem vidro — essas exceções ficam só no login.
+    <aside className="relative hidden flex-col justify-between overflow-hidden bg-[var(--brand-panel)] p-10 text-white lg:flex">
       <header className="relative">
-        <div className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-white/10 backdrop-blur-sm ring-1 ring-white/20">
-          <img src="/favicon.svg" alt="" aria-hidden className="h-7 w-7" />
-        </div>
+        <img src="/favicon.svg" alt="" aria-hidden className="h-9 w-9" />
       </header>
 
       <div className="relative space-y-6">
-        <p className="text-[11px] font-medium uppercase tracking-[2px] text-white/70">
-          Bem-vindo
-        </p>
-        <h2 className="max-w-md font-display text-[30px] font-semibold leading-[1.15] tracking-tight">
-          Você foi convidado{parceiroNome ? ` pela ${parceiroNome}` : ''} para o
-          Portal Parceiros LHG.
+        <h2 className="max-w-md font-display text-kpi font-medium">
+          Convite{parceiroNome ? ` da ${parceiroNome}` : ''} para o Portal
+          Parceiros LHG.
         </h2>
-        <p className="max-w-md text-[14px] leading-relaxed text-white/80">
-          Defina uma senha para começar a usar o portal e enviar suas solicitações
-          de carregamento.
+        <p className="max-w-md text-body-lg leading-relaxed text-white/80">
+          Com a senha definida, o portal fica liberado para enviar e acompanhar as
+          solicitações de carregamento.
         </p>
 
-        <ul className="grid max-w-md gap-3 text-[13px] text-white/85">
+        <ul className="grid max-w-md gap-3 text-body text-white/85">
           <Feature icon={ShieldCheck}>
-            Sua conta enxerga apenas os dados da sua transportadora
+            Cada conta enxerga apenas os dados da própria transportadora.
           </Feature>
         </ul>
       </div>
 
-      <footer className="relative text-[11px] text-white/60">
+      <footer className="relative text-meta text-white/75">
         © {new Date().getFullYear()} LHG, Portal de Parceiros.
       </footer>
     </aside>
@@ -270,9 +249,7 @@ function Feature({
 }) {
   return (
     <li className="flex items-start gap-3">
-      <span className="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-white/10 ring-1 ring-white/15">
-        <Icon className="h-3.5 w-3.5" />
-      </span>
+      <Icon className="mt-0.5 h-4 w-4 shrink-0 text-white/80" aria-hidden />
       <span>{children}</span>
     </li>
   )
@@ -280,12 +257,12 @@ function Feature({
 
 function ConviteInvalido() {
   return (
-    <div className="flex min-h-full items-center justify-center bg-muted px-4 py-16">
-      <div className="w-full max-w-md rounded-xl border bg-background p-6 text-center shadow-overlay">
-        <h2 className="text-[18px] font-medium text-foreground">Convite inválido ou expirado</h2>
-        <p className="mt-2 text-[13px] text-muted-foreground">
-          Este link de convite não é mais válido. Peça ao administrador da sua
-          transportadora para enviar um novo convite, ou procure o suporte da LHG.
+    <div className="flex min-h-full items-center justify-center bg-canvas px-4 py-16">
+      <div className="w-full max-w-md rounded-lg border bg-card p-6 text-center">
+        <h2 className="text-title font-semibold text-foreground">Convite inválido ou expirado</h2>
+        <p className="mt-2 text-body text-muted-foreground">
+          Este link de convite não é mais válido. Peça um novo convite ao administrador
+          da transportadora ou procure o suporte da LHG.
         </p>
         <Button variant="outline" className="mt-4" onClick={() => (window.location.href = '/')}>
           Voltar para o login

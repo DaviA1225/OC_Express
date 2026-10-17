@@ -3,7 +3,8 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Loader2, Mail, Shield, ShieldCheck, User as UserIcon, Eye, EyeOff, Check } from 'lucide-react'
+import { Mail, Shield, ShieldCheck, User as UserIcon, Eye, EyeOff, Check } from 'lucide-react'
+import { Spinner } from '@/components/shared/Spinner'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { toast } from 'sonner'
@@ -18,16 +19,11 @@ import { traduzirErroBanco } from '@/features/crud/useCrudQueries'
 import {
   listVerifiedTotp, enrollTotp, verifyTotp, unenroll, traduzirErroMfa, type EnrollResult,
 } from '@/features/auth/mfa'
+import { labelPerfil, iniciais } from '@/features/auth/perfis'
+import { PageHeader } from '@/components/layout/PageHeader'
+import { CadastroField } from '@/components/forms/CadastroField'
 import { cn } from '@/lib/utils'
 import type { PerfilUsuario } from '@/types/database.types'
-
-const PERFIL_LABEL: Record<PerfilUsuario, string> = {
-  admin: 'Administrador',
-  gerente: 'Gerente',
-  supervisor: 'Supervisor',
-  analista: 'Analista',
-  assistente: 'Assistente',
-}
 
 const PERFIL_CLASSES: Record<PerfilUsuario, string> = {
   admin: 'cat-clay',
@@ -68,12 +64,7 @@ export default function PerfilPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-[22px] font-semibold tracking-tight text-foreground">Meu perfil</h1>
-        <p className="text-[12px] text-muted-foreground">
-          Gerencie seus dados pessoais e segurança da conta.
-        </p>
-      </div>
+      <PageHeader title="Meu perfil" description="Dados pessoais e segurança da conta." className="mb-0" />
 
       <PerfilHeader />
 
@@ -165,20 +156,21 @@ function TwoFactorCard() {
         <Skeleton className="h-10 w-full" />
       ) : enroll ? (
         <form onSubmit={confirmar} className="space-y-4" noValidate>
-          <p className="text-[13px] text-muted-foreground">
-            Escaneie o QR no seu app autenticador (Google Authenticator, Authy, 1Password…) e
+          <p className="text-body text-muted-foreground">
+            Escaneie o QR no app autenticador (Google Authenticator, Authy, 1Password…) e
             digite o código de 6 dígitos para confirmar.
           </p>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
             <div
               className="h-40 w-40 shrink-0 rounded-md border bg-white p-2 [&>svg]:h-full [&>svg]:w-full"
               // QR vem do Supabase como SVG inline (origem confiável, self-contained).
+              // Fundo branco fixo de propósito: o leitor precisa de contraste no tema escuro.
               dangerouslySetInnerHTML={{ __html: enroll.qrSvg }}
             />
             <div className="min-w-0 flex-1 space-y-3">
               <div>
-                <Label className="text-[11px]">Ou digite a chave manualmente</Label>
-                <code className="mt-1 block break-all rounded bg-muted px-2 py-1.5 text-[12px] tabular-nums text-foreground">
+                <Label className="text-meta">Ou digite a chave manualmente</Label>
+                <code className="mt-1 block break-all rounded bg-muted px-2 py-1.5 text-body-sm tabular-nums text-foreground">
                   {enroll.secret}
                 </code>
               </div>
@@ -191,9 +183,9 @@ function TwoFactorCard() {
                   inputMode="numeric"
                   autoComplete="one-time-code"
                   placeholder="000000"
-                  className="max-w-[160px] text-center text-[16px] tracking-[0.3em] tabular-nums"
+                  className="max-w-[160px] text-center text-title-sm tracking-[0.3em] tabular-nums"
                 />
-                {erro && <p className="text-[11px] text-destructive">{erro}</p>}
+                {erro && <p role="alert" className="text-body-sm text-destructive">{erro}</p>}
               </div>
             </div>
           </div>
@@ -202,31 +194,29 @@ function TwoFactorCard() {
               Cancelar
             </Button>
             <Button type="submit" disabled={busy || code.length < 6}>
-              {busy && <Loader2 className="h-4 w-4 animate-spin" />}
+              {busy && <Spinner />}
               Ativar
             </Button>
           </div>
         </form>
       ) : ativo ? (
         <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2 text-[13px]">
-            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-success/15 text-success">
-              <Check className="h-3.5 w-3.5" />
-            </span>
-            <span className="text-foreground">Ativa. Seu login pede o código do app.</span>
+          <div className="flex items-center gap-2 text-body">
+            <Check className="h-4 w-4 shrink-0 text-success" aria-hidden />
+            <span className="text-foreground">Ativa. O login pede o código do app autenticador.</span>
           </div>
           <Button variant="outline" onClick={desativar} disabled={busy}>
-            {busy && <Loader2 className="h-4 w-4 animate-spin" />}
+            {busy && <Spinner />}
             Desativar
           </Button>
         </div>
       ) : (
         <div className="flex items-center justify-between gap-4">
-          <p className="text-[13px] text-muted-foreground">
-            Não ativada. Recomendada para proteger sua conta contra acesso indevido.
+          <p className="text-body text-muted-foreground">
+            Não ativada. Recomendada para proteger a conta contra acesso indevido.
           </p>
           <Button onClick={iniciar} disabled={busy}>
-            {busy && <Loader2 className="h-4 w-4 animate-spin" />}
+            {busy && <Spinner />}
             Ativar 2FA
           </Button>
         </div>
@@ -238,30 +228,29 @@ function TwoFactorCard() {
 function PerfilHeader() {
   const { profile, user } = useAuth()
   const nome = profile?.nome_completo ?? user?.email ?? 'Usuário'
-  const inicial = nome.trim().charAt(0).toUpperCase() || '?'
   return (
     <section className="flex items-center gap-4 rounded-lg border bg-card p-4">
       <Avatar className="h-14 w-14">
-        <AvatarFallback className="text-[18px]">{inicial}</AvatarFallback>
+        <AvatarFallback className="text-title">{iniciais(nome)}</AvatarFallback>
       </Avatar>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[16px] font-medium text-foreground">{nome}</p>
-        <p className="truncate text-[12px] text-muted-foreground">{user?.email}</p>
+        <p className="truncate text-title-sm font-medium text-foreground">{nome}</p>
+        <p className="truncate text-body-sm text-muted-foreground">{user?.email}</p>
         {profile && (
           <span
             className={cn(
-              'mt-1 inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium',
+              'mt-1 inline-flex items-center rounded-[2px] px-1.5 py-0.5 text-meta font-medium',
               PERFIL_CLASSES[profile.perfil],
             )}
           >
-            {PERFIL_LABEL[profile.perfil]}
+            {labelPerfil(profile.perfil)}
           </span>
         )}
       </div>
       {profile?.created_at && (
         <div className="hidden text-right md:block">
-          <p className="text-[10px] uppercase tracking-[0.5px] text-muted-foreground">Cadastrado em</p>
-          <p className="text-[12px] text-foreground">
+          <p className="text-meta text-muted-foreground">Cadastrado em</p>
+          <p className="text-body-sm text-foreground">
             {format(new Date(profile.created_at), 'dd/MM/yyyy', { locale: ptBR })}
           </p>
         </div>
@@ -305,14 +294,14 @@ function InformacoesCard({ nomeAtual, onSaved }: InformacoesProps) {
       if (error) throw error
     },
     onSuccess: async () => {
-      toast.success('Nome atualizado')
+      toast.success('Nome atualizado.')
       await onSaved()
     },
     onError: (e) => toast.error(traduzirErroBanco(e)),
   })
 
   return (
-    <Card icon={<UserIcon className="h-4 w-4" />} title="Informações pessoais" subtitle="Seu nome aparece em listas e na auditoria.">
+    <Card icon={<UserIcon className="h-4 w-4" />} title="Informações pessoais" subtitle="Nome exibido nas listas e na auditoria.">
       <form onSubmit={handleSubmit((v) => update.mutateAsync(v))} className="space-y-4" noValidate>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div className="space-y-1.5">
@@ -321,17 +310,13 @@ function InformacoesCard({ nomeAtual, onSaved }: InformacoesProps) {
               E-mail
             </Label>
             <Input id="email" value={user?.email ?? ''} disabled />
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-body-sm text-muted-foreground">
               Para alterar o e-mail, peça ao administrador.
             </p>
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="nome">Nome completo *</Label>
-            <Input id="nome" {...register('nome_completo')} />
-            {errors.nome_completo && (
-              <p className="text-[11px] text-destructive">{errors.nome_completo.message}</p>
-            )}
-          </div>
+          <CadastroField label="Nome completo" required error={errors.nome_completo?.message} id="nome">
+            <Input {...register('nome_completo')} />
+          </CadastroField>
         </div>
         <div className="flex items-center justify-end gap-2">
           <Button
@@ -343,7 +328,7 @@ function InformacoesCard({ nomeAtual, onSaved }: InformacoesProps) {
             Descartar
           </Button>
           <Button type="submit" disabled={!isDirty || isSubmitting}>
-            {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+            {isSubmitting && <Spinner />}
             Salvar nome
           </Button>
         </div>
@@ -375,7 +360,7 @@ function SegurancaCard({ email }: SegurancaProps) {
       if (error) throw error
     },
     onSuccess: () => {
-      toast.success('Senha atualizada')
+      toast.success('Senha atualizada.')
       reset({ nova: '', confirmar: '' })
       setShowNova(false)
       setShowConf(false)
@@ -392,7 +377,7 @@ function SegurancaCard({ email }: SegurancaProps) {
       <form onSubmit={handleSubmit((v) => change.mutateAsync(v))} className="space-y-4" noValidate>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div className="space-y-1.5">
-            <Label htmlFor="nova">Nova senha *</Label>
+            <Label htmlFor="nova">Nova senha <span className="font-normal text-tertiary">(obrigatório)</span></Label>
             <PasswordInput
               id="nova"
               show={showNova}
@@ -401,11 +386,11 @@ function SegurancaCard({ email }: SegurancaProps) {
               autoComplete="new-password"
             />
             {errors.nova && (
-              <p className="text-[11px] text-destructive">{errors.nova.message}</p>
+              <p role="alert" className="text-body-sm text-destructive">{errors.nova.message}</p>
             )}
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="confirmar">Confirmar senha *</Label>
+            <Label htmlFor="confirmar">Confirmar senha <span className="font-normal text-tertiary">(obrigatório)</span></Label>
             <PasswordInput
               id="confirmar"
               show={showConf}
@@ -414,16 +399,16 @@ function SegurancaCard({ email }: SegurancaProps) {
               autoComplete="new-password"
             />
             {errors.confirmar && (
-              <p className="text-[11px] text-destructive">{errors.confirmar.message}</p>
+              <p role="alert" className="text-body-sm text-destructive">{errors.confirmar.message}</p>
             )}
           </div>
         </div>
-        <p className="text-[11px] text-muted-foreground">
-          Sua próxima sessão em {email || 'sua conta'} usará a nova senha. Sessões já abertas continuam ativas até expirarem.
+        <p className="text-meta text-muted-foreground">
+          A próxima sessão em {email || 'esta conta'} usará a nova senha. Sessões já abertas continuam ativas até expirarem.
         </p>
         <div className="flex items-center justify-end gap-2">
           <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+            {isSubmitting && <Spinner />}
             Alterar senha
           </Button>
         </div>
@@ -473,13 +458,13 @@ interface CardProps {
 function Card({ icon, title, subtitle, children }: CardProps) {
   return (
     <section className="rounded-lg border bg-card">
-      <header className="flex items-center gap-2 border-b px-4 py-3">
-        <span className="flex h-7 w-7 items-center justify-center rounded-md bg-muted text-foreground/80">
+      <header className="flex items-start gap-2 border-b px-4 py-3">
+        <span className="mt-0.5 text-tertiary" aria-hidden>
           {icon}
         </span>
         <div>
-          <h2 className="text-[14px] font-medium text-foreground">{title}</h2>
-          {subtitle && <p className="text-[11px] text-muted-foreground">{subtitle}</p>}
+          <h2 className="text-body-lg font-medium text-foreground">{title}</h2>
+          {subtitle && <p className="text-body-sm text-muted-foreground">{subtitle}</p>}
         </div>
       </header>
       <div className="p-4">{children}</div>

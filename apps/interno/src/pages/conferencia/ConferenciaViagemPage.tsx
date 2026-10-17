@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Search as SearchIcon, Inbox, Download, Loader2, AlertTriangle, RefreshCw, ChevronLeft, ChevronRight, ClipboardCheck, Eraser } from 'lucide-react'
+import { Search as SearchIcon, Inbox, Download, AlertTriangle, RefreshCw, ChevronLeft, ChevronRight, ClipboardCheck, Eraser } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -7,6 +7,9 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/shared/EmptyState'
+import { Spinner } from '@/components/shared/Spinner'
+import { PageHeader } from '@/components/layout/PageHeader'
+import { fmtInt } from '@/lib/format'
 import { useDebounce } from '@/hooks/useDebounce'
 import {
   useSolicitacoesList,
@@ -36,20 +39,7 @@ function composicaoDaViagem(row: SolicitacaoListRow) {
 // tabulares para as colunas alinharem entre si.
 function Placa({ value }: { value: string | null }) {
   if (!value) return <span className="text-muted-foreground/60">{VAZIO}</span>
-  return <span className="font-medium tabular-nums tracking-[0.3px] text-foreground">{value}</span>
-}
-
-// Converte o yyyy-mm-dd do <input type="date"> em limites de dia no fuso local
-// (mesma convenção do periodoToISO). Fim de dia é inclusivo.
-function inicioDoDiaISO(d: string): string | null {
-  const [y, m, day] = d.split('-').map(Number)
-  if (!y || !m || !day) return null
-  return new Date(y, m - 1, day, 0, 0, 0, 0).toISOString()
-}
-function fimDoDiaISO(d: string): string | null {
-  const [y, m, day] = d.split('-').map(Number)
-  if (!y || !m || !day) return null
-  return new Date(y, m - 1, day, 23, 59, 59, 999).toISOString()
+  return <span className="font-medium tabular-nums text-foreground">{value}</span>
 }
 
 const PAGE_SIZE = 50
@@ -88,8 +78,10 @@ export function ConferenciaViagemPage() {
   const [page, setPage] = React.useState(inicial.page ?? 1)
   const debouncedSearch = useDebounce(search, 300)
 
-  const dataInicio = dataDe ? inicioDoDiaISO(dataDe) : null
-  const dataFim = dataAte ? fimDoDiaISO(dataAte) : null
+  // O yyyy-mm-dd do <input type="date"> segue direto: a lista converte em
+  // limites de dia no fuso da operação (MS) (fim inclusivo).
+  const dataInicio = dataDe || null
+  const dataFim = dataAte || null
 
   // Volta para a 1ª página quando um filtro muda — mas NÃO na montagem, para não
   // sobrescrever a página restaurada do storage.
@@ -170,13 +162,11 @@ export function ConferenciaViagemPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-[22px] font-semibold tracking-tight text-foreground">Conferência de Viagem</h1>
-          <p className="text-[12px] text-muted-foreground">
-            {total} {total === 1 ? 'viagem finalizada' : 'viagens finalizadas'}
-          </p>
-        </div>
+      <PageHeader
+        className="mb-0"
+        title="Conferência de viagem"
+        description={`${fmtInt(total)} ${total === 1 ? 'viagem finalizada' : 'viagens finalizadas'}`}
+        actions={
         <Button
           type="button"
           variant="outline"
@@ -184,14 +174,15 @@ export function ConferenciaViagemPage() {
           disabled={exporting || list.isLoading}
           title="Exportar a conferência filtrada em CSV"
         >
-          {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+          {exporting ? <Spinner /> : <Download className="h-4 w-4" />}
           <span className="hidden sm:inline">Exportar CSV</span>
         </Button>
-      </div>
+        }
+      />
 
       <div className="flex flex-wrap items-end gap-3 rounded-lg border bg-card p-3">
         <div className="relative min-w-[220px] flex-1">
-          <label className="mb-1 block text-[10px] uppercase tracking-[0.5px] text-muted-foreground">Buscar</label>
+          <label className="mb-1 block text-body-sm text-muted-foreground">Buscar</label>
           <SearchIcon className="pointer-events-none absolute left-3 top-[30px] h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={search}
@@ -201,7 +192,7 @@ export function ConferenciaViagemPage() {
           />
         </div>
         <div>
-          <label htmlFor="conf-data-de" className="mb-1 block text-[10px] uppercase tracking-[0.5px] text-muted-foreground">De</label>
+          <label htmlFor="conf-data-de" className="mb-1 block text-body-sm text-muted-foreground">De</label>
           <Input
             id="conf-data-de"
             type="date"
@@ -212,7 +203,7 @@ export function ConferenciaViagemPage() {
           />
         </div>
         <div>
-          <label htmlFor="conf-data-ate" className="mb-1 block text-[10px] uppercase tracking-[0.5px] text-muted-foreground">Até</label>
+          <label htmlFor="conf-data-ate" className="mb-1 block text-body-sm text-muted-foreground">Até</label>
           <Input
             id="conf-data-ate"
             type="date"
@@ -246,7 +237,7 @@ export function ConferenciaViagemPage() {
             description="Houve um erro ao buscar as viagens finalizadas. Verifique a conexão e tente novamente."
             action={
               <Button variant="outline" onClick={() => { void list.refetch() }}>
-                <RefreshCw className="h-4 w-4" /> Tentar de novo
+                <RefreshCw className="h-4 w-4" /> Tentar novamente
               </Button>
             }
           />
@@ -257,7 +248,7 @@ export function ConferenciaViagemPage() {
         <div className="rounded-lg border bg-card py-2">
           <EmptyState
             icon={temFiltro ? Inbox : ClipboardCheck}
-            title={temFiltro ? 'Nada encontrado com esses filtros' : 'Nenhuma viagem finalizada ainda'}
+            title={temFiltro ? 'Nada encontrado com esses filtros' : 'Nenhuma viagem finalizada'}
             description={temFiltro ? 'Ajuste a busca ou o intervalo de datas.' : 'Assim que uma solicitação for finalizada, ela aparece aqui para conferência.'}
           />
         </div>
@@ -267,8 +258,8 @@ export function ConferenciaViagemPage() {
         <div className="overflow-x-auto rounded-lg border bg-card">
           {/* Filete vertical entre todas as colunas (menos a última) — cada campo
               da conferência fica isolado na sua própria célula. */}
-          <table className="w-full border-collapse text-[13px] [&_td]:border-r [&_td]:border-border [&_td:last-child]:border-r-0 [&_th]:border-r [&_th]:border-border [&_th:last-child]:border-r-0">
-            <thead className="text-[10px] uppercase tracking-[0.5px] text-muted-foreground">
+          <table className="w-full border-collapse text-body [&_td]:border-r [&_td]:border-border [&_td:last-child]:border-r-0 [&_th]:border-r [&_th]:border-border [&_th:last-child]:border-r-0">
+            <thead className="text-meta text-muted-foreground">
               <tr className="border-b border-border bg-muted/60 text-left">
                 <th className="px-3 py-2 font-medium">Número</th>
                 <th className="px-3 py-2 font-medium">Data</th>
@@ -289,7 +280,7 @@ export function ConferenciaViagemPage() {
                 return (
                   <tr
                     key={row.id}
-                    className="border-b border-border transition-colors last:border-b-0 even:bg-muted/20 hover:bg-accent/60"
+                    className="border-b border-border transition-colors duration-fast last:border-b-0 even:bg-muted/40 hover:bg-row-hover"
                   >
                     <td className="whitespace-nowrap px-3 py-2 font-medium text-primary-strong">{formatNumeroOC(row.numero_interno)}</td>
                     <td className="whitespace-nowrap px-3 py-2 tabular-nums text-muted-foreground">
@@ -326,8 +317,8 @@ export function ConferenciaViagemPage() {
       )}
 
       {total > PAGE_SIZE && (
-        <div className="flex items-center justify-between text-[12px] text-muted-foreground">
-          <span>Página {page} de {totalPages} · {total} viagens</span>
+        <div className="flex items-center justify-between text-body-sm text-muted-foreground">
+          <span>Página {page} de {totalPages} · {fmtInt(total)} viagens</span>
           <div className="flex items-center gap-1">
             <Button variant="outline" size="sm" onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1}>
               <ChevronLeft className="h-4 w-4" /> Anterior

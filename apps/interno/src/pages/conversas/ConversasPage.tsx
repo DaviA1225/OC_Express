@@ -11,7 +11,6 @@ import {
   Hand,
   ImageIcon,
   Loader2,
-  MessageSquare,
   Mic,
   Search,
   Send,
@@ -43,6 +42,7 @@ import {
 } from '@/features/agente/useConversas'
 import type { AgenteModo } from '@/types/database.types'
 import { cn } from '@/lib/utils'
+import { PageHeader } from '@/components/layout/PageHeader'
 
 /**
  * Conversas do WhatsApp atendidas pelo agente de IA (docs/SPEC-AGENTE-IA.md).
@@ -119,21 +119,15 @@ export default function ConversasPage() {
 
   return (
     <div className="flex h-[calc(100dvh-10.5rem)] min-h-[520px] flex-col gap-3">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="flex items-center gap-2 text-[18px] font-medium text-foreground">
-            <MessageSquare className="h-5 w-5 text-muted-foreground" />
-            Conversas
-          </h1>
-          <p className="mt-0.5 text-[13px] text-muted-foreground">
-            WhatsApp atendido pelo agente de IA. Assuma uma conversa para responder pela equipe.
-          </p>
-        </div>
-        <SeletorModo modo={modo.data} carregando={modo.isPending} falhou={modo.isError} />
-      </div>
+      <PageHeader
+        className="mb-0"
+        title="Conversas"
+        description="WhatsApp atendido pelo agente de IA. Assuma uma conversa para responder pela equipe."
+        actions={<SeletorModo modo={modo.data} carregando={modo.isPending} falhou={modo.isError} />}
+      />
 
       {modo.data && modo.data !== 'autonomo' && (
-        <div className="flex items-start gap-2 rounded-md border bg-muted/40 px-3 py-2 text-[13px] text-foreground">
+        <div className="flex items-start gap-2 rounded-md border bg-muted/40 px-3 py-2 text-body text-foreground">
           <Bot className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
           <span>
             <strong className="font-medium">Agente {modo.data === 'sombra' ? 'em modo sombra' : 'desligado'}.</strong>{' '}
@@ -156,7 +150,7 @@ export default function ConversasPage() {
                 onChange={(e) => setBusca(e.target.value)}
                 placeholder="Nome ou telefone"
                 aria-label="Buscar conversa"
-                className="h-8 pl-8 text-[13px]"
+                className="h-8 pl-8 text-body"
               />
             </div>
             <div className="flex gap-1" role="tablist" aria-label="Filtrar conversas">
@@ -184,12 +178,12 @@ export default function ConversasPage() {
                 </li>
               ))}
             {conversas.isError && (
-              <li className="flex items-center gap-2 px-3 py-4 text-[13px] text-destructive">
+              <li className="flex items-center gap-2 px-3 py-4 text-body text-destructive">
                 <TriangleAlert className="h-4 w-4" /> Não foi possível carregar as conversas.
               </li>
             )}
             {conversas.isSuccess && lista.length === 0 && (
-              <li className="px-3 py-8 text-center text-[13px] text-muted-foreground">
+              <li className="px-3 py-8 text-center text-body text-muted-foreground">
                 {conversas.data?.length ? 'Nenhuma conversa neste filtro.' : 'Nenhuma conversa ainda. Elas aparecem aqui quando alguém escreve no WhatsApp do agente.'}
               </li>
             )}
@@ -205,23 +199,23 @@ export default function ConversasPage() {
                   )}
                 >
                   <div className="flex items-baseline justify-between gap-2">
-                    <span className="truncate text-[13px] font-medium text-foreground">
+                    <span className="truncate text-body font-medium text-foreground">
                       {c.nome_contato ?? telefoneFmt(c.telefone)}
                     </span>
-                    <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
+                    <span className="shrink-0 text-meta tabular-nums text-muted-foreground">
                       {horaCurta(c.ultima_atividade_em)}
                     </span>
                   </div>
-                  <div className="mt-0.5 truncate text-[12px] text-muted-foreground">{previa(c.ultimaMensagem)}</div>
+                  <div className="mt-0.5 truncate text-body-sm text-muted-foreground">{previa(c.ultimaMensagem)}</div>
                   <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                     <EstadoBadge estado={c.estado} />
                     {c.pendentes > 0 && c.estado === 'humano' && (
-                      <span className="rounded-sm border px-1.5 text-[11px] font-medium text-foreground">
+                      <span className="rounded-sm border px-1.5 text-meta font-medium text-foreground">
                         {c.pendentes} sem resposta
                       </span>
                     )}
                     {c.rascunhos > 0 && (
-                      <span className="cat-brass rounded-sm border px-1.5 text-[11px] font-medium">
+                      <span className="cat-brass rounded-sm border px-1.5 text-meta font-medium">
                         {c.rascunhos} rascunho{c.rascunhos > 1 ? 's' : ''}
                       </span>
                     )}
@@ -237,7 +231,7 @@ export default function ConversasPage() {
           {selecionada ? (
             <PainelConversa id={selecionada} modo={modo.data ?? 'desligado'} onVoltar={() => selecionar(null)} />
           ) : (
-            <div className="flex flex-1 items-center justify-center p-6 text-center text-[13px] text-muted-foreground">
+            <div className="flex flex-1 items-center justify-center p-6 text-center text-body text-muted-foreground">
               Escolha uma conversa na lista.
             </div>
           )}
@@ -265,7 +259,7 @@ function BotaoFiltro({
       aria-selected={ativo}
       onClick={onClick}
       className={cn(
-        'flex items-center gap-1 rounded px-2 py-1 text-[12px] font-medium transition-colors',
+        'flex items-center gap-1 rounded px-2 py-1 text-body-sm font-medium transition-colors',
         ativo ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground',
       )}
     >
@@ -277,11 +271,11 @@ function BotaoFiltro({
 
 function EstadoBadge({ estado }: { estado: 'agente' | 'humano' }) {
   return estado === 'humano' ? (
-    <span className="cat-clay inline-flex items-center gap-1 rounded-sm border px-1.5 text-[11px] font-medium">
+    <span className="cat-clay inline-flex items-center gap-1 rounded-sm border px-1.5 text-meta font-medium">
       <Hand className="h-3 w-3" aria-hidden /> Com a equipe
     </span>
   ) : (
-    <span className="cat-steel inline-flex items-center gap-1 rounded-sm border px-1.5 text-[11px] font-medium">
+    <span className="cat-steel inline-flex items-center gap-1 rounded-sm border px-1.5 text-meta font-medium">
       <Bot className="h-3 w-3" aria-hidden /> Agente
     </span>
   )
@@ -292,12 +286,12 @@ function SeletorModo({ modo, carregando, falhou }: { modo: AgenteModo | undefine
   const definir = useDefinirModo()
   const podeAlterar = canAlterarModoAgente(profile)
 
-  if (falhou) return <span className="text-[12px] text-muted-foreground">Modo do agente indisponível</span>
+  if (falhou) return <span className="text-body-sm text-muted-foreground">Modo do agente indisponível</span>
   if (carregando || !modo) return <Skeleton className="h-8 w-56" />
 
   return (
     <div className="flex items-center gap-2">
-      <span className="text-[12px] text-muted-foreground">Modo do agente</span>
+      <span className="text-body-sm text-muted-foreground">Modo do agente</span>
       <div className="flex items-center gap-0.5 rounded-md border bg-card p-0.5" role="radiogroup" aria-label="Modo do agente">
         {MODOS.map((m) => (
           <button
@@ -309,7 +303,7 @@ function SeletorModo({ modo, carregando, falhou }: { modo: AgenteModo | undefine
             title={podeAlterar ? m.descricao : 'Só administradores trocam o modo'}
             onClick={() => modo !== m.valor && definir.mutate(m.valor)}
             className={cn(
-              'rounded px-2.5 py-1 text-[12px] font-medium transition-colors disabled:cursor-not-allowed',
+              'rounded px-2.5 py-1 text-body-sm font-medium transition-colors disabled:cursor-not-allowed',
               modo === m.valor ? 'bg-foreground text-background' : 'text-muted-foreground enabled:hover:text-foreground',
             )}
           >
@@ -356,7 +350,7 @@ function PainelConversa({ id, modo, onVoltar }: { id: string; modo: AgenteModo; 
   }
   if (isError || !data) {
     return (
-      <div className="flex items-center gap-2 p-4 text-[13px] text-destructive">
+      <div className="flex items-center gap-2 p-4 text-body text-destructive">
         <TriangleAlert className="h-4 w-4" /> Não foi possível abrir a conversa.
       </div>
     )
@@ -374,10 +368,10 @@ function PainelConversa({ id, modo, onVoltar }: { id: string; modo: AgenteModo; 
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div className="min-w-0">
-            <div className="truncate text-[14px] font-medium text-foreground">
+            <div className="truncate text-body-lg font-medium text-foreground">
               {conversa.nome_contato ?? telefoneFmt(conversa.telefone)}
             </div>
-            <div className="text-[12px] tabular-nums text-muted-foreground">
+            <div className="text-body-sm tabular-nums text-muted-foreground">
               {telefoneFmt(conversa.telefone)}
               {comEquipe && conversa.assumida_por && ` · com ${nomes[conversa.assumida_por] ?? 'a equipe'}`}
             </div>
@@ -398,7 +392,7 @@ function PainelConversa({ id, modo, onVoltar }: { id: string; modo: AgenteModo; 
       </header>
 
       <div className="min-h-0 flex-1 space-y-2 overflow-y-auto bg-muted/30 px-3 py-3">
-        {linha.length === 0 && <p className="py-8 text-center text-[13px] text-muted-foreground">Sem mensagens.</p>}
+        {linha.length === 0 && <p className="py-8 text-center text-body text-muted-foreground">Sem mensagens.</p>}
         {linha.map((item) =>
           item.tipo === 'mensagem' ? (
             <Balao key={item.m.id} m={item.m} nomes={nomes} conversaId={conversa.id} podeEnviarSugestao={modo === 'sombra' && !foraDaJanela} />
@@ -443,19 +437,19 @@ function Balao({
     <div className={cn('flex', saida ? 'justify-end' : 'justify-start')}>
       <div
         className={cn(
-          'max-w-[min(560px,85%)] rounded-md border px-3 py-2 text-[13px] leading-relaxed text-foreground',
+          'max-w-[min(560px,85%)] rounded-md border px-3 py-2 text-body leading-relaxed text-foreground',
           saida ? 'bg-card' : 'bg-background',
           m.envio === 'sombra' && 'border-dashed',
         )}
       >
         {autor && (
-          <div className="mb-0.5 flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
+          <div className="mb-0.5 flex items-center gap-1 text-meta font-medium text-muted-foreground">
             {m.autor === 'agente' ? <Bot className="h-3 w-3" aria-hidden /> : <Hand className="h-3 w-3" aria-hidden />}
             {autor}
           </div>
         )}
         <ConteudoMensagem m={m} />
-        <div className="mt-1 flex flex-wrap items-center justify-end gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
+        <div className="mt-1 flex flex-wrap items-center justify-end gap-x-2 gap-y-1 text-meta text-muted-foreground">
           {m.envio === 'sombra' && <span>sugestão · não enviada</span>}
           {m.envio === 'falhou' && (
             <span className="text-destructive" title={m.erro ?? undefined}>
@@ -510,7 +504,7 @@ function Midia({ m }: { m: MensagemAgente }) {
   const Icone = m.tipo === 'audio' ? Mic : m.tipo === 'imagem' ? ImageIcon : FileText
   if (!m.midia_path || isLoading || !url) {
     return (
-      <div className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
+      <div className="flex items-center gap-1.5 text-body-sm text-muted-foreground">
         <Icone className="h-3.5 w-3.5" aria-hidden />
         {m.tipo === 'audio' ? 'Áudio' : m.tipo === 'imagem' ? 'Foto' : (m.midia_nome ?? 'Documento')}
         {!m.midia_path && (m.erro ? ' · falha ao baixar' : ' · baixando…')}
@@ -526,7 +520,7 @@ function Midia({ m }: { m: MensagemAgente }) {
     )
   }
   return (
-    <a href={url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-[13px] text-primary-strong underline-offset-4 hover:underline">
+    <a href={url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-body text-primary-strong underline-offset-4 hover:underline">
       <FileText className="h-4 w-4" aria-hidden />
       {m.midia_nome ?? 'Abrir documento'}
     </a>
@@ -591,11 +585,11 @@ function LinhaAcao({ a, nomes }: { a: AcaoAgente; nomes: Record<string, string> 
             : { rotulo: 'Feito pelo agente', classe: 'cat-steel' }
 
   return (
-    <div className="mx-auto max-w-[620px] rounded-md border border-dashed bg-card px-3 py-2 text-[12px]">
+    <div className="mx-auto max-w-[620px] rounded-md border border-dashed bg-card px-3 py-2 text-body-sm">
       <div className="flex flex-wrap items-center gap-2">
         <Wrench className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
         <span className="font-medium text-foreground">{FERRAMENTAS[a.ferramenta] ?? a.ferramenta}</span>
-        <span className={cn('rounded-sm border px-1.5 text-[11px] font-medium', situacao.classe)}>{situacao.rotulo}</span>
+        <span className={cn('rounded-sm border px-1.5 text-meta font-medium', situacao.classe)}>{situacao.rotulo}</span>
         <span className="ml-auto tabular-nums text-muted-foreground">{horaCurta(a.created_at)}</span>
       </div>
       {campos.length > 0 && (
@@ -657,7 +651,7 @@ function Compositor({ conversaId, habilitado, motivo }: { conversaId: string; ha
   }
 
   if (!habilitado) {
-    return <div className="border-t px-3 py-2.5 text-[12px] text-muted-foreground">{motivo}</div>
+    return <div className="border-t px-3 py-2.5 text-body-sm text-muted-foreground">{motivo}</div>
   }
 
   return (
@@ -675,7 +669,7 @@ function Compositor({ conversaId, habilitado, motivo }: { conversaId: string; ha
         aria-label="Mensagem para o contato"
         rows={2}
         maxLength={4000}
-        className="min-h-[60px] resize-none text-[13px]"
+        className="min-h-[60px] resize-none text-body"
       />
       <Button onClick={mandar} disabled={!texto.trim() || enviar.isPending} title="Enviar (Ctrl+Enter)">
         {enviar.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}

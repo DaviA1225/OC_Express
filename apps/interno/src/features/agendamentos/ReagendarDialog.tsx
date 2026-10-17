@@ -1,5 +1,4 @@
 import * as React from 'react'
-import { Loader2 } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -16,6 +15,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { GradeSlots } from '@/features/agendamentos/GradeSlots'
 import { useOcupacaoSlots } from '@/features/agendamentos/useTerminais'
 import { useReagendarAgendamento, type AgendamentoRow } from '@/features/agendamentos/useAgendamentos'
+import { Spinner } from '@/components/shared/Spinner'
 import {
   dataCompleta,
   dataMinima,
@@ -101,7 +101,7 @@ function Conteudo({
             onChange={(e) => setNovaData(e.target.value)}
           />
           {antecedencia != null && (
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-meta text-muted-foreground">
               Este terminal exige {antecedencia}h de antecedência.
             </p>
           )}
@@ -124,7 +124,7 @@ function Conteudo({
           />
         </div>
 
-        <p className="rounded-md border bg-card px-3 py-2 text-[12px] leading-relaxed text-muted-foreground">
+        <p className="rounded-surface border px-3 py-2 text-body-sm text-muted-foreground">
           O agendamento atual passa a constar como reagendado e o novo pedido entra na fila
           para ser confirmado no sistema do terminal.
         </p>
@@ -148,7 +148,7 @@ function Conteudo({
               onOpenChange(false)
             }}
           >
-            {reagendar.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+            {reagendar.isPending && <Spinner />}
             Reagendar
           </Button>
         </div>

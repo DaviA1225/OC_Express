@@ -120,7 +120,8 @@ export interface ListFilters {
   // simplesmente esquecia de passá-lo e baixava mais linhas do que a tela
   // mostrava. Com o campo obrigatório o compilador cobra quem monta o filtro.
   apenasAtrasadas: boolean
-  // Intervalo explícito por created_at (ISO). Independente de `periodo` — se
+  // Intervalo explícito por created_at, em DIAS (yyyy-mm-dd) no fuso de São
+  // Paulo; os dois extremos são inclusivos. Independente de `periodo` — se
   // ambos vierem, os dois se aplicam (AND). Usado no filtro De/Até.
   dataInicio?: string | null
   dataFim?: string | null
@@ -238,6 +239,44 @@ function applyOrigemPamcardFilters<T>(
   return q as T
 }
 
+/**
+ * A operação central fica em Mato Grosso do Sul (America/Campo_Grande, UTC-4).
+ * O Brasil não tem horário de verão desde 2019, então o offset é fixo.
+ */
+const OFFSET_OPERACAO_H = 4
+
+/**
+ * Início (00:00) do dia `yyyy-mm-dd` no fuso da operação, como ISO em UTC.
+ * Independe do fuso do navegador. Retorna null se a data for inválida.
+ */
+export function inicioDoDiaOperacao(dia: string, somarDias = 0): string | null {
+  const [y, m, d] = dia.split('-').map(Number)
+  if (!y || !m || !d || m > 12) return null
+  // Rejeita dia inexistente (ex.: 2026-02-30) antes de somar dias.
+  const base = new Date(Date.UTC(y, m - 1, d))
+  if (base.getUTCMonth() !== m - 1 || base.getUTCDate() !== d) return null
+  // 00:00 em MS = 04:00 UTC; Date.UTC normaliza a virada de mês/ano.
+  return new Date(Date.UTC(y, m - 1, d + somarDias, OFFSET_OPERACAO_H, 0, 0, 0)).toISOString()
+}
+
+/** "Hoje" (yyyy-mm-dd) no fuso da operação, independente do fuso do navegador. */
+export function hojeOperacao(agora: Date = new Date()): string {
+  return new Date(agora.getTime() - OFFSET_OPERACAO_H * 3_600_000).toISOString().slice(0, 10)
+}
+
+/** Aplica o intervalo De/Até (dias no fuso da operação): gte no início de `de`, lt no dia seguinte a `ate`. */
+function aplicarIntervaloDias<T extends { gte: (c: string, v: string) => T; lt: (c: string, v: string) => T }>(
+  query: T,
+  de?: string | null,
+  ate?: string | null,
+): T {
+  const ini = de ? inicioDoDiaOperacao(de) : null
+  const fim = ate ? inicioDoDiaOperacao(ate, 1) : null
+  if (ini) query = query.gte('created_at', ini)
+  if (fim) query = query.lt('created_at', fim)
+  return query
+}
+
 function slaThresholdISO(): string {
   return new Date(Date.now() - SLA_ALERT_HOURS * 3_600_000).toISOString()
 }
@@ -280,8 +319,7 @@ export async function fetchSolicitacoesParaExport(
   }
   const since = periodoToISO(filters.periodo)
   if (since) query = query.gte('created_at', since)
-  if (filters.dataInicio) query = query.gte('created_at', filters.dataInicio)
-  if (filters.dataFim) query = query.lte('created_at', filters.dataFim)
+  query = aplicarIntervaloDias(query, filters.dataInicio, filters.dataFim)
 
   if (filters.search.trim()) {
     const t = filters.search.trim()
@@ -323,8 +361,7 @@ export function useSolicitacoesList(filters: ListFilters) {
       }
       const since = periodoToISO(filters.periodo)
       if (since) query = query.gte('created_at', since)
-      if (filters.dataInicio) query = query.gte('created_at', filters.dataInicio)
-      if (filters.dataFim) query = query.lte('created_at', filters.dataFim)
+      query = aplicarIntervaloDias(query, filters.dataInicio, filters.dataFim)
 
       if (filters.search.trim()) {
         const t = filters.search.trim()
@@ -387,6 +424,83 @@ export function useRecebidasCount() {
   })
 }
 
+/**
+ * Etapas que formam a fila de trabalho: o que ainda depende da equipe. A OC
+ * enviada já está com o motorista e só espera a finalização — fica fora da
+ * fila e acessível pelo chip "OC enviada" (Davi, 2026-10-16).
+ */
+export const FILA_STATUSES: SolicitacaoStatus[] = ['recebida', 'em_cadastro', 'instrucao_emitida', 'oc_gerada']
+/** Chips da fila: as etapas dela + OC enviada (filtrável, fora do padrão). */
+export const FILA_CHIPS: SolicitacaoStatus[] = [...FILA_STATUSES, 'oc_enviada']
+
+/**
+ * A próxima da fila depois da solicitação atual, na MESMA ordem da lista (mais
+ * recentes no topo, então a "próxima" é a anterior em chegada), voltando ao
+ * topo quando a atual é a última. Uma consulta só, no clique — percorrer a
+ * fila sem voltar à lista.
+ */
+export async function fetchProximaDaFila(atual: { id: string; created_at: string }): Promise<string | null> {
+  const depois = await supabase
+    .from('solicitacoes')
+    .select('id')
+    .in('status', FILA_STATUSES)
+    .lt('created_at', atual.created_at)
+    .order('created_at', { ascending: false })
+    .order('id', { ascending: false })
+    .limit(1)
+  if (depois.error) throw depois.error
+  const prox = (depois.data ?? []) as { id: string }[]
+  if (prox[0]) return prox[0].id
+  const inicio = await supabase
+    .from('solicitacoes')
+    .select('id')
+    .in('status', FILA_STATUSES)
+    .neq('id', atual.id)
+    .order('created_at', { ascending: false })
+    .limit(1)
+  if (inicio.error) throw inicio.error
+  return ((inicio.data ?? []) as { id: string }[])[0]?.id ?? null
+}
+
+/**
+ * Quantas solicitações há em cada etapa da fila, com os MESMOS filtros da lista
+ * (menos etapa, busca e página) — senão o chip diria "Recebida 12" com a lista
+ * mostrando 3. UMA requisição (só a coluna status das abertas, poucas dezenas
+ * de linhas) em vez de um count por etapa; a chave fica sob `['solicitacoes']`
+ * para o realtime invalidá-la junto com a lista, e só roda com a fila na tela
+ * (`ativo`) — cada requisição a mais por evento pesa na cota de logs.
+ * O PostgREST corta em 1000 linhas: acima disso o total vira "1000+".
+ */
+export function useContagemFila(
+  // Sem De/Até de propósito: a lista não os usa, e quando usar, a contagem tem
+  // que cortar o dia igual a ela (aplicarIntervaloDias, PR #110).
+  filters: Pick<ListFilters, 'periodo' | 'materialId' | 'tipo' | 'origem' | 'pamcard' | 'apenasAtrasadas'>,
+  ativo: boolean,
+) {
+  return useQuery({
+    enabled: ativo,
+    queryKey: ['solicitacoes', 'contagem-fila', filters],
+    queryFn: async () => {
+      let query = supabase.from('solicitacoes').select('status').in('status', FILA_CHIPS)
+      if (filters.materialId) query = query.eq('material_id', filters.materialId)
+      if (filters.tipo !== 'todos') query = query.eq('tipo', filters.tipo)
+      query = applyOrigemPamcardFilters(query, filters)
+      if (filters.apenasAtrasadas) query = query.in('status', SLA_PENDING_STATUSES).lt('created_at', slaThresholdISO())
+      const since = periodoToISO(filters.periodo)
+      if (since) query = query.gte('created_at', since)
+      const { data, error } = await query.range(0, 999)
+      if (error) throw error
+      const porEtapa = Object.fromEntries(FILA_CHIPS.map((st) => [st, 0])) as Record<SolicitacaoStatus, number>
+      const linhas = (data ?? []) as { status: SolicitacaoStatus }[]
+      for (const r of linhas) porEtapa[r.status] += 1
+      // O total do botão "Fila de trabalho" é só a fila (sem as OCs enviadas).
+      const total = linhas.filter((r) => FILA_STATUSES.includes(r.status)).length
+      return { porEtapa, total, truncado: linhas.length >= 1000 }
+    },
+    staleTime: 30_000,
+  })
+}
+
 export function useCreateSolicitacao() {
   const qc = useQueryClient()
   return useMutation({
@@ -403,7 +517,7 @@ export function useCreateSolicitacao() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['solicitacoes'] })
-      toast.success('Solicitação criada')
+      toast.success('Solicitação criada.')
     },
     onError: (e: unknown) => toast.error(traduzirErroBanco(e)),
   })
@@ -601,7 +715,7 @@ export function useTransitStatus() {
       toast.error(traduzirErroBanco(e))
     },
     onSuccess: () => {
-      toast.success('Status atualizado')
+      toast.success('Status atualizado.')
     },
     onSettled: (_data, _err, vars) => {
       qc.invalidateQueries({ queryKey: ['solicitacoes'] })

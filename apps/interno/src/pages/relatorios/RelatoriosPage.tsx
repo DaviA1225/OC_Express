@@ -14,7 +14,7 @@ import {
   ComposedChart,
   Area,
 } from 'recharts'
-import { ClipboardCheck, ClipboardList, Hourglass, Percent, Download, Loader2, AlertTriangle, RotateCcw, Handshake, Trophy, Timer } from 'lucide-react'
+import { ClipboardCheck, ClipboardList, Hourglass, Percent, Download, AlertTriangle, RotateCcw, Handshake, Timer } from 'lucide-react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { toast } from 'sonner'
@@ -22,6 +22,11 @@ import { useAuth } from '@/hooks/useAuth'
 import { canViewAuditoria } from '@/features/auth/permissions'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { PageHeader } from '@/components/layout/PageHeader'
+import { KpiTile } from '@/components/shared/KpiTile'
+import { Spinner } from '@/components/shared/Spinner'
+import { ChartTooltip } from '@/components/charts/ChartTooltip'
+import { CHART_VARS, axisProps, gridProps, seriesColor } from '@/components/charts/chartTheme'
 import {
   useRelatorioDataset,
   useStatusTransitions,
@@ -51,10 +56,11 @@ import {
 } from '@/features/relatorios/useRelatorios'
 import { IntervaloDatas } from '@/features/relatorios/IntervaloDatas'
 import { useIntervaloPersistido } from '@/features/relatorios/useIntervaloPersistido'
-import { formatHoras } from '@/features/relatorios/useRelatoriosInternos'
+import { formatHoras, formatHorasCsv } from '@/features/relatorios/useRelatoriosInternos'
 import { STATUS_LABELS } from '@/features/solicitacoes/status'
 import { buildCsv, downloadCsv, type CsvColumn } from '@/lib/csv'
 import { cn } from '@/lib/utils'
+import { fmtDurHoras, fmtInt, fmtPct } from '@/lib/format'
 
 // Intervalo inicial: os últimos 30 dias, recorte equivalente ao preset padrão
 // anterior ("Mês corrente"). "Limpar" volta para cá.
@@ -68,9 +74,9 @@ const ORIGENS: { value: OrigemFiltro; label: string }[] = [
 const VALID_ORIGENS = ORIGENS.map((o) => o.value)
 const CHAVE_ORIGEM = 'relatorios:origem'
 
-// Paleta de séries harmonizada à LHG — laranja de marca + tons industriais foscos
-// (aço, ocre, oliva, violeta-grafite, terracota, grafite), em vez dos brights genéricos.
-const MATERIAL_COLORS = ['#FF5100', '#4E6986', '#9A6A3B', '#5E7A52', '#6E6594', '#C44612', '#3E4A5B', '#A6552F']
+// Séries do volume diário: criadas no acento (chart-1), finalizadas em aço (chart-2).
+const COR_CRIADAS = seriesColor(0)
+const COR_FINALIZADAS = seriesColor(1)
 
 export default function RelatoriosPage() {
   const [params, setParams] = useSearchParams()
@@ -210,7 +216,7 @@ export default function RelatoriosPage() {
             titulo: 'TMA emissão→finalização (geral)',
             valor:
               tmaParceirosGeral.avgHours != null
-                ? `média ${formatHoras(tmaParceirosGeral.avgHours)} · mediana ${formatHoras(tmaParceirosGeral.medianHours)} · n=${tmaParceirosGeral.count}`
+                ? `média ${formatHorasCsv(tmaParceirosGeral.avgHours)} · mediana ${formatHorasCsv(tmaParceirosGeral.medianHours)} · n=${tmaParceirosGeral.count}`
                 : '—',
           })
         }
@@ -228,7 +234,7 @@ export default function RelatoriosPage() {
             titulo: p.label,
             valor:
               p.resumo.avgHours != null
-                ? `média ${formatHoras(p.resumo.avgHours)} · mediana ${formatHoras(p.resumo.medianHours)} · n=${p.resumo.count}`
+                ? `média ${formatHorasCsv(p.resumo.avgHours)} · mediana ${formatHorasCsv(p.resumo.medianHours)} · n=${p.resumo.count}`
                 : '—',
           })
         }
@@ -249,16 +255,13 @@ export default function RelatoriosPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-[22px] font-semibold tracking-tight text-foreground">Relatórios</h1>
-          <p className="text-[12px] text-muted-foreground">{periodo.label}</p>
-          <div className="mt-2">
-            <OrigemTabs value={origem} onChange={setOrigem} />
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
+    <div className="space-y-4">
+      <PageHeader
+        title="Relatórios"
+        description={periodo.label}
+        meta={<OrigemTabs value={origem} onChange={setOrigem} />}
+        actions={
+          <>
           <IntervaloDatas
             idPrefix="rel"
             de={deCampo}
@@ -274,19 +277,20 @@ export default function RelatoriosPage() {
             disabled={exporting || ds.isLoading}
             title="Exportar relatório em CSV"
           >
-            {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            {exporting ? <Spinner /> : <Download className="h-4 w-4" />}
             <span className="hidden sm:inline">Exportar</span>
           </Button>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       {ds.isError && (
         <div className="flex flex-col items-center justify-center gap-2 rounded-lg border bg-card py-16 text-center">
-          <AlertTriangle className="h-6 w-6 text-red-500" />
-          <p className="text-[14px] font-semibold text-foreground">Não foi possível carregar os relatórios</p>
-          <p className="max-w-sm text-[13px] text-muted-foreground">Verifique a conexão e tente novamente.</p>
+          <AlertTriangle className="h-6 w-6 text-danger" />
+          <p className="text-body-lg font-semibold text-foreground">Não foi possível carregar os relatórios</p>
+          <p className="max-w-sm text-body text-muted-foreground">Verifique a conexão e tente novamente.</p>
           <Button variant="outline" size="sm" onClick={() => { void ds.refetch() }} className="mt-1">
-            <RotateCcw className="h-4 w-4" /> Tentar de novo
+            <RotateCcw className="h-4 w-4" /> Tentar novamente
           </Button>
         </div>
       )}
@@ -294,33 +298,26 @@ export default function RelatoriosPage() {
       {!ds.isError && (
       <>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <KpiCard
+        <KpiTile
           label="Total de OCs"
-          value={kpis?.total ?? 0}
-          icon={<ClipboardList className="h-4 w-4" />}
-          accent="text-foreground/70"
-          isLoading={ds.isLoading}
+          value={ds.isLoading ? <KpiSkeleton /> : fmtInt(kpis?.total ?? 0)}
+          icon={ClipboardList}
         />
-        <KpiCard
+        <KpiTile
           label="Finalizadas"
-          value={kpis?.finalizadas ?? 0}
-          icon={<ClipboardCheck className="h-4 w-4" />}
-          accent="text-foreground/70"
-          isLoading={ds.isLoading}
+          value={ds.isLoading ? <KpiSkeleton /> : fmtInt(kpis?.finalizadas ?? 0)}
+          icon={ClipboardCheck}
         />
-        <KpiCard
+        <KpiTile
           label="Taxa de finalização"
-          value={kpis ? `${(kpis.taxaFinalizacao * 100).toFixed(1)}%` : '—'}
-          icon={<Percent className="h-4 w-4" />}
-          accent="text-foreground/70"
-          isLoading={ds.isLoading}
+          value={ds.isLoading ? <KpiSkeleton /> : kpis ? fmtPct(kpis.taxaFinalizacao) : '—'}
+          icon={Percent}
         />
-        <KpiCard
-          label="Tempo médio (criada → finalizada)"
-          value={kpis?.tempoMedioHoras != null ? `${kpis.tempoMedioHoras.toFixed(1)} h` : '—'}
-          icon={<Hourglass className="h-4 w-4" />}
-          accent="text-foreground/70"
-          isLoading={ds.isLoading}
+        <KpiTile
+          label="Tempo médio"
+          value={ds.isLoading ? <KpiSkeleton /> : fmtDurHoras(kpis?.tempoMedioHoras)}
+          hint="Criada → finalizada"
+          icon={Hourglass}
         />
       </div>
 
@@ -393,7 +390,7 @@ export default function RelatoriosPage() {
 
 function OrigemTabs({ value, onChange }: { value: OrigemFiltro; onChange: (v: OrigemFiltro) => void }) {
   return (
-    <div className="inline-flex rounded-lg border bg-card p-1" role="tablist" aria-label="Recorte por origem">
+    <div className="inline-flex rounded-surface border bg-card p-0.5" role="tablist" aria-label="Recorte por origem">
       {ORIGENS.map((o) => (
         <button
           key={o.value}
@@ -403,10 +400,10 @@ function OrigemTabs({ value, onChange }: { value: OrigemFiltro; onChange: (v: Or
           onClick={() => onChange(o.value)}
           title={o.value === 'interno' ? 'Solicitações que não vieram do portal de parceiros' : undefined}
           className={cn(
-            'rounded-md px-2.5 py-1 text-[12px] font-medium transition-colors',
+            'rounded-control px-2.5 py-1 text-body-sm font-medium transition-colors duration-fast',
             value === o.value
-              ? 'bg-primary text-primary-foreground'
-              : 'text-foreground/70 hover:bg-muted hover:text-foreground',
+              ? 'bg-primary/[0.08] text-primary-strong'
+              : 'text-muted-foreground hover:bg-row-hover hover:text-foreground',
           )}
         >
           {o.label}
@@ -416,38 +413,10 @@ function OrigemTabs({ value, onChange }: { value: OrigemFiltro; onChange: (v: Or
   )
 }
 
-interface KpiCardProps {
-  label: string
-  value: number | string
-  icon: React.ReactNode
-  accent: string
-  isLoading: boolean
-}
-
-// Mesmo cartão de KPI do Dashboard (DashboardPage.tsx): chip do ícone no tom
-// do acento e número de 28px — as duas telas mostram os mesmos indicadores e
-// não podiam parecer de sistemas diferentes.
-function KpiCard({ label, value, icon, accent, isLoading }: KpiCardProps) {
-  return (
-    <div className="rounded-lg border bg-card p-4">
-      <div className="flex items-start justify-between gap-2">
-        <p className="min-w-0 text-[11px] font-medium uppercase tracking-[0.5px] text-muted-foreground">{label}</p>
-        <span
-          className={cn(
-            'flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-primary/15 bg-gradient-to-br from-primary/15 to-primary/[0.04] dark:from-primary/20 dark:to-primary/5',
-            accent,
-          )}
-        >
-          {icon}
-        </span>
-      </div>
-      {isLoading ? (
-        <Skeleton className="mt-3 h-9 w-24" />
-      ) : (
-        <p className="mt-2 text-[28px] font-medium leading-none tabular-nums text-foreground">{value}</p>
-      )}
-    </div>
-  )
+// Valor do <KpiTile> enquanto carrega (mesmo KPI do Painel — as duas telas
+// mostram os mesmos indicadores e não podem parecer de sistemas diferentes).
+function KpiSkeleton() {
+  return <Skeleton className="inline-block h-8 w-24 align-middle" />
 }
 
 interface CardProps {
@@ -460,8 +429,8 @@ function Card({ title, subtitle, children }: CardProps) {
   return (
     <section className="rounded-lg border bg-card">
       <header className="border-b px-4 py-3">
-        <h2 className="text-[14px] font-medium text-foreground">{title}</h2>
-        {subtitle && <p className="text-[11px] text-muted-foreground">{subtitle}</p>}
+        <h2 className="text-body-lg font-medium text-foreground">{title}</h2>
+        {subtitle && <p className="text-meta text-muted-foreground">{subtitle}</p>}
       </header>
       <div className="p-4">{children}</div>
     </section>
@@ -477,7 +446,7 @@ function VolumeChart({ data, isLoading }: VolumeChartProps) {
   if (isLoading) return <Skeleton className="h-[260px] w-full" />
   if (data.length === 0) {
     return (
-      <div className="flex h-[260px] items-center justify-center text-[13px] text-muted-foreground">
+      <div className="flex h-[260px] items-center justify-center text-body text-muted-foreground">
         Sem dados no período.
       </div>
     )
@@ -490,24 +459,26 @@ function VolumeChart({ data, isLoading }: VolumeChartProps) {
     <div className="h-[260px] w-full" role="group" aria-label="Volume diário de OCs criadas e finalizadas no período">
       <ResponsiveContainer>
         <LineChart accessibilityLayer data={formatted} margin={{ top: 8, right: 16, left: -10, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-          <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-          <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+          <CartesianGrid {...gridProps} />
+          <XAxis dataKey="label" {...axisProps} />
+          <YAxis {...axisProps} allowDecimals={false} />
           <Tooltip
-            contentStyle={{ fontSize: 12, borderRadius: 6 }}
-            labelFormatter={(_, p) => {
-              const item = p?.[0]?.payload as { dia: string } | undefined
-              return item?.dia ? format(parseDayKey(item.dia), "dd 'de' MMMM", { locale: ptBR }) : ''
-            }}
-            formatter={(value, name) => [
-              `${value ?? 0}`,
-              String(name) === 'total' ? 'Total criadas' : 'Finalizadas',
-            ]}
+            cursor={{ stroke: 'var(--chart-grid)' }}
+            content={(p) => (
+              <ChartTooltip
+                {...p}
+                formatLabel={() => {
+                  const item = p.payload?.[0]?.payload as { dia: string } | undefined
+                  return item?.dia ? format(parseDayKey(item.dia), "dd 'de' MMMM", { locale: ptBR }) : ''
+                }}
+              />
+            )}
           />
           <Line
             type="monotone"
             dataKey="total"
-            stroke="#FF5100"
+            name="Total criadas"
+            stroke={COR_CRIADAS}
             strokeWidth={2}
             dot={{ r: 2 }}
             activeDot={{ r: 4 }}
@@ -515,19 +486,20 @@ function VolumeChart({ data, isLoading }: VolumeChartProps) {
           <Line
             type="monotone"
             dataKey="finalizadas"
-            stroke="#10b981"
+            name="Finalizadas"
+            stroke={COR_FINALIZADAS}
             strokeWidth={2}
             dot={{ r: 2 }}
             activeDot={{ r: 4 }}
           />
         </LineChart>
       </ResponsiveContainer>
-      <div className="mt-2 flex items-center justify-center gap-4 text-[11px] text-muted-foreground">
+      <div className="mt-2 flex items-center justify-center gap-4 text-meta text-muted-foreground">
         <span className="flex items-center gap-1.5">
-          <span className="h-1.5 w-3 rounded-full bg-[#FF5100]" /> Total criadas
+          <span className="h-0.5 w-3" style={{ backgroundColor: COR_CRIADAS }} /> Total criadas
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="h-1.5 w-3 rounded-full bg-[#10b981]" /> Finalizadas
+          <span className="h-0.5 w-3" style={{ backgroundColor: COR_FINALIZADAS }} /> Finalizadas
         </span>
       </div>
     </div>
@@ -552,32 +524,17 @@ function TopList({ items, isLoading, emptyText }: TopListProps) {
   }
   if (items.length === 0) {
     return (
-      <div className="flex h-[150px] items-center justify-center text-[13px] text-muted-foreground">
+      <div className="flex h-[150px] items-center justify-center text-body text-muted-foreground">
         {emptyText}
       </div>
     )
   }
   const max = items[0]?.total ?? 1
   return (
-    <ul className="space-y-1.5">
-      {items.map((it, i) => {
-        const pct = (it.total / max) * 100
-        return (
-          <li key={it.id} className="flex items-center gap-2 text-[12px]">
-            <span className="w-5 text-right tabular-nums text-muted-foreground">{i + 1}.</span>
-            <div className="relative min-w-0 flex-1 rounded bg-muted">
-              <div
-                className="h-6 rounded bg-gradient-to-r from-primary/30 to-primary/[0.08]"
-                style={{ width: `${pct}%` }}
-              />
-              <span className="absolute inset-0 flex items-center px-2 text-foreground">
-                <span className="truncate">{it.label}</span>
-              </span>
-            </div>
-            <span className="w-10 text-right tabular-nums font-medium text-foreground">{it.total}</span>
-          </li>
-        )
-      })}
+    <ul className="space-y-2">
+      {items.map((it, i) => (
+        <RankRow key={it.id} posicao={i + 1} label={it.label} valor={fmtInt(it.total)} pct={(it.total / max) * 100} />
+      ))}
     </ul>
   )
 }
@@ -602,38 +559,34 @@ function ParceiroRanking({
   }
   if (items.length === 0) {
     return (
-      <div className="flex h-[150px] flex-col items-center justify-center gap-1 text-center text-[13px] text-muted-foreground">
-        <Handshake className="h-5 w-5 text-muted-foreground/60" />
+      <div className="flex h-[150px] flex-col items-center justify-center gap-1 text-center text-body text-muted-foreground">
+        <Handshake className="h-5 w-5 text-tertiary" />
         Nenhuma solicitação de parceiro no período.
       </div>
     )
   }
   const max = items[0]?.total ?? 1
   return (
-    <ul className="space-y-1.5">
-      {items.map((p, i) => {
-        const pct = (p.total / max) * 100
-        const share = total > 0 ? Math.round((p.total / total) * 100) : 0
-        return (
-          <li key={p.id} className="flex items-center gap-2 text-[12px]">
-            <span className="flex w-5 shrink-0 items-center justify-end gap-0.5 text-right tabular-nums text-muted-foreground">
-              {i === 0 ? <Trophy className="h-3.5 w-3.5 text-amber-500" aria-label="Mais enviou" /> : `${i + 1}.`}
-            </span>
-            <div className="relative min-w-0 flex-1 rounded bg-muted">
-              <div className="h-6 rounded bg-gradient-to-r from-primary/30 to-primary/[0.08]" style={{ width: `${pct}%` }} />
-              <span className="absolute inset-0 flex items-center px-2 text-foreground">
-                <span className="truncate">{p.label}</span>
+    <ul className="space-y-2">
+      {items.map((p, i) => (
+        <RankRow
+          key={p.id}
+          posicao={i + 1}
+          label={p.label}
+          pct={(p.total / max) * 100}
+          valor={
+            <>
+              <span className="mr-3 font-normal text-muted-foreground">
+                {fmtInt(p.finalizadas)}/{fmtInt(p.total)} fin.
               </span>
-            </div>
-            <span className="w-24 shrink-0 text-right text-[11px] text-muted-foreground tabular-nums">
-              {p.finalizadas}/{p.total} fin.
-            </span>
-            <span className="w-14 shrink-0 text-right font-medium text-foreground tabular-nums">
-              {p.total} <span className="text-[10px] text-muted-foreground">({share}%)</span>
-            </span>
-          </li>
-        )
-      })}
+              {fmtInt(p.total)}{' '}
+              <span className="font-normal text-muted-foreground">
+                ({fmtPct(total > 0 ? p.total / total : 0, { casas: 0 })})
+              </span>
+            </>
+          }
+        />
+      ))}
     </ul>
   )
 }
@@ -650,43 +603,43 @@ function TmaEmissaoFinal({
   if (isLoading) return <Skeleton className="h-[200px] w-full" />
   if (!geral || geral.count === 0) {
     return (
-      <div className="flex h-[180px] flex-col items-center justify-center gap-1 text-center text-[13px] text-muted-foreground">
-        <Timer className="h-5 w-5 text-muted-foreground/60" />
+      <div className="flex h-[180px] flex-col items-center justify-center gap-1 text-center text-body text-muted-foreground">
+        <Timer className="h-5 w-5 text-tertiary" />
         Sem solicitações de parceiro finalizadas no período.
       </div>
     )
   }
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-end gap-x-8 gap-y-2 rounded-md border bg-muted/40 px-4 py-3">
+      <div className="flex flex-wrap items-end gap-x-8 gap-y-2 border-b pb-3">
         <div>
-          <p className="text-[10px] font-medium uppercase tracking-[0.5px] text-muted-foreground">Tempo médio</p>
-          <p className="text-[24px] font-medium leading-tight text-foreground tabular-nums">
+          <p className="label-uppercase">Tempo médio</p>
+          <p className="font-display text-kpi font-medium text-foreground tabular-nums">
             {formatHoras(geral.avgHours)}
           </p>
         </div>
         <div>
-          <p className="text-[10px] font-medium uppercase tracking-[0.5px] text-muted-foreground">Mediana</p>
-          <p className="text-[18px] font-medium leading-tight text-foreground tabular-nums">
+          <p className="label-uppercase">Mediana</p>
+          <p className="text-title font-medium text-foreground tabular-nums">
             {formatHoras(geral.medianHours)}
           </p>
         </div>
         <div>
-          <p className="text-[10px] font-medium uppercase tracking-[0.5px] text-muted-foreground">Finalizadas</p>
-          <p className="text-[18px] font-medium leading-tight text-foreground tabular-nums">{geral.count}</p>
+          <p className="label-uppercase">Finalizadas</p>
+          <p className="text-title font-medium text-foreground tabular-nums">{fmtInt(geral.count)}</p>
         </div>
       </div>
 
       {porParceiro.length > 0 && (
         <div>
-          <p className="mb-1.5 text-[11px] font-medium uppercase tracking-[0.4px] text-muted-foreground">
-            Por parceiro · do mais rápido ao mais lento
+          <p className="mb-1.5 text-body-sm font-medium text-muted-foreground">
+            Por parceiro, do mais rápido ao mais lento
           </p>
           <ul className="divide-y">
             {porParceiro.map((p) => (
-              <li key={p.id} className="flex items-center gap-2 py-1.5 text-[12px]">
+              <li key={p.id} className="flex items-center gap-2 py-1.5 text-body-sm">
                 <span className="min-w-0 flex-1 truncate text-foreground">{p.label}</span>
-                <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">n={p.resumo.count}</span>
+                <span className="shrink-0 text-meta text-muted-foreground tabular-nums">n={p.resumo.count}</span>
                 <span className="w-16 shrink-0 text-right font-medium text-foreground tabular-nums">
                   {formatHoras(p.resumo.avgHours)}
                 </span>
@@ -708,7 +661,7 @@ interface TmaChartProps {
 // isto o painel ficava vazio, indistinguível de "não há dados no período".
 function TmaSemAcesso() {
   return (
-    <div className="flex h-[200px] items-center justify-center px-6 text-center text-[13px] text-muted-foreground">
+    <div className="flex h-[200px] items-center justify-center px-6 text-center text-body text-muted-foreground">
       O TMA é calculado a partir do log de auditoria, restrito aos perfis de
       gestão. Os demais números desta página não dependem dele.
     </div>
@@ -719,15 +672,15 @@ function TmaChart({ entries, isLoading }: TmaChartProps) {
   if (isLoading) return <Skeleton className="h-[260px] w-full" />
   if (entries.length === 0) {
     return (
-      <div className="flex h-[200px] items-center justify-center text-[13px] text-muted-foreground">
+      <div className="flex h-[200px] items-center justify-center text-body text-muted-foreground">
         Sem transições suficientes para calcular TMA. Aumente o período.
       </div>
     )
   }
   const data = entries.map((e) => ({
     label: STATUS_LABELS[e.status as keyof typeof STATUS_LABELS] ?? e.status,
-    media: Number(e.avgHours.toFixed(2)),
-    mediana: Number(e.medianHours.toFixed(2)),
+    media: Math.round(e.avgHours * 100) / 100,
+    mediana: Math.round(e.medianHours * 100) / 100,
     count: e.count,
   }))
   return (
@@ -735,30 +688,32 @@ function TmaChart({ entries, isLoading }: TmaChartProps) {
       <div className="h-[240px] w-full" role="group" aria-label="Tempo médio até sair de cada status (média e mediana, em horas)">
         <ResponsiveContainer>
           <ComposedChart accessibilityLayer data={data} margin={{ top: 8, right: 16, left: -10, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-            <XAxis dataKey="label" tick={{ fontSize: 11 }} interval={0} />
+            <CartesianGrid {...gridProps} />
+            <XAxis dataKey="label" {...axisProps} interval={0} />
             <YAxis
-              tick={{ fontSize: 11 }}
-              label={{ value: 'horas', angle: -90, position: 'insideLeft', fontSize: 11, fill: '#6B7280' }}
+              {...axisProps}
+              label={{ value: 'horas', angle: -90, position: 'insideLeft', fontSize: 11, fill: CHART_VARS.axis }}
             />
             <Tooltip
-              contentStyle={{ fontSize: 12, borderRadius: 6 }}
-              formatter={(value, name) => [`${Number(value).toFixed(1)} h`, name === 'media' ? 'Média' : 'Mediana']}
+              cursor={{ stroke: 'var(--chart-grid)' }}
+              content={<ChartTooltip formatValue={(v) => fmtDurHoras(v)} />}
             />
             <Area
               type="monotone"
               dataKey="media"
-              stroke="#FF5100"
+              name="Média"
+              stroke={seriesColor(0)}
               strokeWidth={2}
-              fill="#FF5100"
-              fillOpacity={0.12}
-              dot={{ r: 2, fill: '#FF5100' }}
+              fill={seriesColor(0)}
+              fillOpacity={0.1}
+              dot={{ r: 2, fill: seriesColor(0) }}
               activeDot={{ r: 4 }}
             />
             <Line
               type="monotone"
               dataKey="mediana"
-              stroke="#6B7280"
+              name="Mediana"
+              stroke={CHART_VARS.ref}
               strokeWidth={2}
               strokeDasharray="4 3"
               dot={{ r: 2 }}
@@ -767,15 +722,15 @@ function TmaChart({ entries, isLoading }: TmaChartProps) {
           </ComposedChart>
         </ResponsiveContainer>
       </div>
-      <div className="flex items-center justify-center gap-4 text-[11px] text-muted-foreground">
+      <div className="flex items-center justify-center gap-4 text-meta text-muted-foreground">
         <span className="flex items-center gap-1.5">
-          <span className="h-1.5 w-3 rounded-full bg-[#FF5100]" /> Média
+          <span className="h-0.5 w-3" style={{ backgroundColor: seriesColor(0) }} /> Média
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="h-1.5 w-3 rounded-full bg-[#6B7280]" /> Mediana
+          <span className="h-0.5 w-3" style={{ backgroundColor: CHART_VARS.ref }} /> Mediana
         </span>
       </div>
-      <ul className="grid grid-cols-1 gap-1 text-[11px] text-muted-foreground sm:grid-cols-2 md:grid-cols-3">
+      <ul className="grid grid-cols-1 gap-1 text-meta text-muted-foreground sm:grid-cols-2 md:grid-cols-3">
         {entries.map((e) => (
           <li key={e.status} className="truncate">
             <span className="text-foreground">
@@ -799,7 +754,7 @@ function MaterialDonut({ data, isLoading }: MaterialDonutProps) {
   if (isLoading) return <Skeleton className="h-[220px] w-full" />
   if (data.length === 0) {
     return (
-      <div className="flex h-[220px] items-center justify-center text-[13px] text-muted-foreground">
+      <div className="flex h-[220px] items-center justify-center text-body text-muted-foreground">
         Sem dados de material no período.
       </div>
     )
@@ -811,38 +766,49 @@ function MaterialDonut({ data, isLoading }: MaterialDonutProps) {
       <div className="relative h-[200px]" role="img" aria-label="Distribuição de OCs por material; detalhada na legenda ao lado">
         <ResponsiveContainer>
           <PieChart>
-            <Pie data={chartData} dataKey="value" nameKey="name" innerRadius={55} outerRadius={85} paddingAngle={2} stroke="none">
+            <Pie data={chartData} dataKey="value" nameKey="name" innerRadius={55} outerRadius={85} paddingAngle={1} stroke="hsl(var(--card))">
               {chartData.map((_e, i) => (
-                <Cell key={i} fill={MATERIAL_COLORS[i % MATERIAL_COLORS.length]} />
+                <Cell key={i} fill={seriesColor(i)} />
               ))}
             </Pie>
-            <Tooltip
-              formatter={(value, name) => [`${value ?? 0}`, String(name ?? '')]}
-              contentStyle={{ fontSize: 12, borderRadius: 6 }}
-            />
+            <Tooltip content={<ChartTooltip />} />
           </PieChart>
         </ResponsiveContainer>
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-[10px] uppercase tracking-[0.5px] text-muted-foreground">Total</span>
-          <span className="text-[20px] font-medium tabular-nums text-foreground">{total}</span>
+          <span className="text-meta text-muted-foreground">Total</span>
+          <span className="font-display text-title font-medium tabular-nums text-foreground">{fmtInt(total)}</span>
         </div>
       </div>
       <ul className="space-y-1.5">
         {chartData.map((d, i) => {
-          const pct = total > 0 ? Math.round((d.value / total) * 100) : 0
           return (
-            <li key={d.name} className="flex items-center justify-between text-[12px]">
+            <li key={d.name} className="flex items-center justify-between text-body-sm">
               <div className="flex min-w-0 items-center gap-2">
-                <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: MATERIAL_COLORS[i % MATERIAL_COLORS.length] }} />
+                <span className="h-2 w-2 shrink-0 rounded-[1px]" style={{ backgroundColor: seriesColor(i) }} />
                 <span className="truncate text-foreground">{d.name}</span>
               </div>
               <span className="ml-2 shrink-0 text-muted-foreground tabular-nums">
-                {d.value} <span className="text-[10px]">({pct}%)</span>
+                {fmtInt(d.value)} <span className="text-meta">({fmtPct(total > 0 ? d.value / total : 0, { casas: 0 })})</span>
               </span>
             </li>
           )
         })}
       </ul>
     </div>
+  )
+}
+
+// Linha de ranking: posição tabular, rótulo, valor e barra sólida fina (chart-1,
+// cantos 2px) — sem gradiente, sem troféu.
+function RankRow({ posicao, label, valor, pct }: { posicao: number; label: string; valor: React.ReactNode; pct: number }) {
+  return (
+    <li className="grid grid-cols-[1.25rem_minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1 text-body-sm">
+      <span className="text-right tabular-nums text-muted-foreground">{posicao}</span>
+      <span className="truncate text-foreground">{label}</span>
+      <span className="text-right font-medium tabular-nums text-foreground">{valor}</span>
+      <div className="col-start-2 h-1.5 rounded-[2px] bg-muted">
+        <div className="h-full rounded-[2px] bg-chart-1" style={{ width: `${pct}%` }} />
+      </div>
+    </li>
   )
 }

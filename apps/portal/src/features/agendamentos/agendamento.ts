@@ -17,11 +17,11 @@ export const AGENDAMENTO_STATUS_LABELS: Record<AgendamentoStatus, string> = {
 }
 
 export const AGENDAMENTO_STATUS_CLASSES: Record<AgendamentoStatus, string> = {
-  solicitado: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
-  em_andamento: 'bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300',
-  agendado: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300',
-  substituido: 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
-  cancelado: 'bg-red-100 text-red-800 dark:bg-red-950/60 dark:text-red-300',
+  solicitado: 'bg-muted text-muted-foreground',
+  em_andamento: 'bg-info-subtle text-info',
+  agendado: 'bg-success-subtle text-success',
+  substituido: 'bg-accent text-muted-foreground',
+  cancelado: 'bg-danger-subtle text-danger',
 }
 
 export const TIPO_VEICULO_LABELS: Record<TipoVeiculo, string> = {

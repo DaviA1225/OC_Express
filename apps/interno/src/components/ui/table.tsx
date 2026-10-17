@@ -6,7 +6,7 @@ const Table = React.forwardRef<HTMLTableElement, React.HTMLAttributes<HTMLTableE
     <div className="relative w-full overflow-auto">
       <table
         ref={ref}
-        className={cn('w-full caption-bottom border-collapse text-[13px]', className)}
+        className={cn('w-full caption-bottom border-collapse text-body', className)}
         {...props}
       />
     </div>
@@ -18,7 +18,7 @@ const TableHeader = React.forwardRef<
   HTMLTableSectionElement,
   React.HTMLAttributes<HTMLTableSectionElement>
 >(({ className, ...props }, ref) => (
-  <thead ref={ref} className={cn('bg-muted/60 [&_tr]:border-b', className)} {...props} />
+  <thead ref={ref} className={cn('bg-muted [&_tr]:border-b', className)} {...props} />
 ))
 TableHeader.displayName = 'TableHeader'
 
@@ -36,7 +36,12 @@ const TableRow = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <tr
     ref={ref}
-    className={cn('border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted', className)}
+    className={cn(
+      // hover só cor; selecionada = acento 8% + barra 2px à esquerda.
+      'border-b transition-colors duration-fast hover:bg-row-hover',
+      'data-[state=selected]:bg-primary/[0.08] data-[state=selected]:shadow-[inset_2px_0_0_hsl(var(--primary))]',
+      className,
+    )}
     {...props}
   />
 ))
@@ -49,7 +54,8 @@ const TableHead = React.forwardRef<
   <th
     ref={ref}
     className={cn(
-      'h-10 whitespace-nowrap px-3 text-left align-middle text-[10px] font-medium uppercase tracking-[0.5px] text-muted-foreground',
+      // 11px peso 500, sem maiúsculas (Carbon/Fluent) — texto 2.
+      'h-9 whitespace-nowrap px-3 text-left align-middle text-meta font-medium text-muted-foreground',
       className,
     )}
     {...props}
@@ -63,7 +69,7 @@ const TableCell = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <td
     ref={ref}
-    className={cn('h-11 px-3 align-middle text-[13px] text-foreground', className)}
+    className={cn('h-10 px-3 align-middle text-body tabular-nums text-foreground', className)}
     {...props}
   />
 ))

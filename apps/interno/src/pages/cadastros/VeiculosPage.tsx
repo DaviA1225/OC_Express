@@ -2,7 +2,7 @@ import * as React from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Loader2 } from 'lucide-react'
+import { Spinner } from '@/components/shared/Spinner'
 import { CrudListPage, useCrudListState, type ColumnDef } from '@/components/shared/CrudListPage'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { useCrudList, useActiveCount, useUpsertRow, useToggleActive, useDeleteRow, useBulkToggleActive, useBulkDeleteRows } from '@/features/crud/useCrudQueries'
@@ -16,7 +16,6 @@ import {
   DialogBody,
   DialogFooter,
   DialogTitle,
-  DialogDescription,
 } from '@/components/ui/dialog'
 import {
   Select,
@@ -27,12 +26,13 @@ import {
 } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Combobox, type ComboboxOption } from '@/components/shared/Combobox'
 import { isValidPlaca } from '@/lib/validators'
 import { formatPlaca } from '@/lib/utils'
 import type { Tables } from '@/types/database.types'
+import { CadastroField } from '@/components/forms/CadastroField'
+import { useDescartarAlteracoes } from '@/features/crud/useDescartarAlteracoes'
 
 type Row = Tables<'veiculos'>
 type Subcontratada = Pick<Tables<'subcontratadas'>, 'id' | 'razao_social'>
@@ -62,11 +62,11 @@ export default function VeiculosPage() {
     ascending: true,
   })
   const totalActive = useActiveCount('veiculos')
-  const upsert = useUpsertRow('veiculos', 'Veículo')
-  const toggle = useToggleActive('veiculos', 'Veículo')
-  const remove = useDeleteRow('veiculos', 'Veículo')
-  const bulkToggle = useBulkToggleActive('veiculos', 'Veículo')
-  const bulkDelete = useBulkDeleteRows('veiculos', 'Veículo')
+  const upsert = useUpsertRow('veiculos', { singular: 'Veículo', plural: 'Veículos', genero: 'm' })
+  const toggle = useToggleActive('veiculos', { singular: 'Veículo', plural: 'Veículos', genero: 'm' })
+  const remove = useDeleteRow('veiculos', { singular: 'Veículo', plural: 'Veículos', genero: 'm' })
+  const bulkToggle = useBulkToggleActive('veiculos', { singular: 'Veículo', plural: 'Veículos', genero: 'm' })
+  const bulkDelete = useBulkDeleteRows('veiculos', { singular: 'Veículo', plural: 'Veículos', genero: 'm' })
 
   const subOptions = useCrudOptions<Subcontratada>({
     table: 'subcontratadas',
@@ -163,9 +163,9 @@ export default function VeiculosPage() {
         onOpenChange={(o) => !o && setConfirmRow(null)}
         title={confirmRow?.ativo ? 'Desativar veículo?' : 'Reativar veículo?'}
         description={confirmRow?.ativo
-          ? 'O veículo não aparecerá nas listas ativas. Você pode reativá-lo depois.'
+          ? 'O veículo não aparecerá nas listas ativas. É possível reativá-lo depois.'
           : 'O veículo voltará a aparecer nas listas ativas.'}
-        confirmLabel={confirmRow?.ativo ? 'Sim, desativar' : 'Sim, reativar'}
+        confirmLabel={confirmRow?.ativo ? 'Desativar' : 'Reativar'}
         destructive={confirmRow?.ativo}
         onConfirm={async () => {
           if (confirmRow) {
@@ -184,7 +184,7 @@ export default function VeiculosPage() {
             ? `O cadastro da placa "${deleteRow.placa}" será removido permanentemente. Essa ação não pode ser desfeita. Se houver solicitações vinculadas, a exclusão será bloqueada.`
             : ''
         }
-        confirmLabel="Sim, excluir"
+        confirmLabel="Excluir"
         destructive
         onConfirm={async () => {
           if (deleteRow) {
@@ -213,7 +213,7 @@ function VeiculoForm({ open, onOpenChange, editing, subOptions, subLoading, onSu
     setValue,
     watch,
     register,
-    formState: { errors, isSubmitting },
+    formState: { errors, isSubmitting, isDirty },
   } = useForm<FormValues>({ resolver: zodResolver(schema) })
 
   React.useEffect(() => {
@@ -236,38 +236,33 @@ function VeiculoForm({ open, onOpenChange, editing, subOptions, subLoading, onSu
     label: s.razao_social,
   }))
 
+  const guarda = useDescartarAlteracoes(isDirty, onOpenChange, isSubmitting)
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+    <>
+    <Dialog open={open} onOpenChange={guarda.onOpenChange}>
+      <DialogContent aria-describedby={undefined}>
         <form onSubmit={handleSubmit(onSubmit)} noValidate>
           <DialogHeader>
             <DialogTitle>{editing ? 'Editar veículo' : 'Novo veículo'}</DialogTitle>
-            <DialogDescription>
-              Cadastre os cavalos mecânicos que poderão ser usados nas solicitações.
-            </DialogDescription>
           </DialogHeader>
           <DialogBody className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="placa">Placa *</Label>
+              <CadastroField label="Placa" required id="placa" error={errors.placa?.message}>
                 <Input
-                  id="placa"
                   autoFocus
                   value={placa}
-                  onChange={(e) => setValue('placa', formatPlaca(e.target.value), { shouldValidate: true })}
+                  onChange={(e) => setValue('placa', formatPlaca(e.target.value), { shouldValidate: true, shouldDirty: true })}
                   placeholder="ABC1D23"
                 />
-                {errors.placa && (
-                  <p className="text-[11px] text-destructive">{errors.placa.message}</p>
-                )}
-              </div>
-              <div className="space-y-1.5">
-                <Label>Tipo</Label>
+              </CadastroField>
+              <CadastroField label="Tipo" id="veiculo-tipo">
+                {(a11y) => (
                 <Select
                   value={tipo || undefined}
-                  onValueChange={(v) => setValue('tipo', v, { shouldValidate: true })}
+                  onValueChange={(v) => setValue('tipo', v, { shouldValidate: true, shouldDirty: true })}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger {...a11y}>
                     <SelectValue placeholder="Selecionar tipo" />
                   </SelectTrigger>
                   <SelectContent>
@@ -276,37 +271,33 @@ function VeiculoForm({ open, onOpenChange, editing, subOptions, subLoading, onSu
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
+                )}
+              </CadastroField>
             </div>
 
-            <div className="space-y-1.5">
-              <Label>Subcontratada</Label>
+            <CadastroField label="Subcontratada" id="subcontratada_id" error={errors.subcontratada_id?.message}>
               <Combobox
                 options={options}
                 value={subId}
-                onChange={(v) => setValue('subcontratada_id', v, { shouldValidate: true })}
+                onChange={(v) => setValue('subcontratada_id', v, { shouldValidate: true, shouldDirty: true })}
                 placeholder="Selecionar subcontratada"
                 searchPlaceholder="Buscar subcontratada"
                 emptyMessage="Nenhuma subcontratada ativa."
                 loading={subLoading}
               />
-            </div>
+            </CadastroField>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="observacoes">Observações</Label>
-              <Textarea id="observacoes" rows={2} {...register('observacoes')} />
-            </div>
+            <CadastroField label="Observações" id="observacoes">
+              <Textarea rows={2} {...register('observacoes')} />
+            </CadastroField>
           </DialogBody>
-          <DialogFooter>
-            <span className="text-[11px] text-muted-foreground/80">
-              Enter para salvar · Esc para cancelar
-            </span>
+          <DialogFooter className="justify-end">
             <div className="flex items-center gap-2">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
+              <Button type="button" variant="outline" onClick={() => guarda.onOpenChange(false)} disabled={isSubmitting}>
                 Cancelar
               </Button>
               <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                {isSubmitting && <Spinner />}
                 Salvar
               </Button>
             </div>
@@ -314,5 +305,7 @@ function VeiculoForm({ open, onOpenChange, editing, subOptions, subLoading, onSu
         </form>
       </DialogContent>
     </Dialog>
+    {guarda.dialog}
+    </>
   )
 }

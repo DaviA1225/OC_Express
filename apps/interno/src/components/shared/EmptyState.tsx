@@ -8,32 +8,21 @@ interface EmptyStateProps {
   size?: 'sm' | 'md'
 }
 
+/**
+ * Estado vazio sóbrio: ícone 24px solto em texto 3 (sem círculo/caixa), título
+ * e uma linha do que fazer. Texto no guia de voz: "Nenhuma solicitação
+ * registrada.", não "Que tal criar a primeira?".
+ */
 export function EmptyState({ icon: Icon, title, description, action, size = 'md' }: EmptyStateProps) {
-  const isCompact = size === 'sm'
+  const compacto = size === 'sm'
   return (
-    <div className={isCompact ? 'flex flex-col items-center justify-center py-8 text-center' : 'flex flex-col items-center justify-center py-16 text-center'}>
-      <div
-        aria-hidden
-        className={
-          isCompact
-            ? 'mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-muted ring-1 ring-border'
-            : 'mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-muted ring-1 ring-border'
-        }
-      >
-        <Icon
-          className={isCompact ? 'h-6 w-6 text-muted-foreground' : 'h-9 w-9 text-muted-foreground'}
-          strokeWidth={1.5}
-        />
-      </div>
-      <p className={isCompact ? 'text-[14px] font-semibold text-foreground' : 'text-[15px] font-semibold tracking-tight text-foreground'}>
-        {title}
-      </p>
+    <div className={compacto ? 'flex flex-col items-center justify-center py-8 text-center' : 'flex flex-col items-center justify-center py-12 text-center'}>
+      <Icon aria-hidden className="mb-3 h-6 w-6 text-tertiary" strokeWidth={1.75} />
+      <p className={compacto ? 'text-body font-medium text-foreground' : 'text-body-lg font-medium text-foreground'}>{title}</p>
       {description && (
-        <p className={isCompact ? 'mt-1 max-w-xs text-[12px] leading-relaxed text-muted-foreground' : 'mt-1.5 max-w-sm text-[13px] leading-relaxed text-muted-foreground'}>
-          {description}
-        </p>
+        <p className="mt-1 max-w-sm text-body-sm text-muted-foreground">{description}</p>
       )}
-      {action && <div className="mt-5">{action}</div>}
+      {action && <div className="mt-4">{action}</div>}
     </div>
   )
 }

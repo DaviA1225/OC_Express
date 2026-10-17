@@ -8,7 +8,7 @@ export function BrandedLoader() {
       role="status"
       aria-live="polite"
       aria-label="Carregando"
-      className="flex min-h-full flex-col items-center justify-center gap-4 bg-background"
+      className="flex min-h-full flex-col items-center justify-center gap-4 bg-canvas"
     >
       <img src="/favicon.svg" alt="" aria-hidden className="h-12 w-12" />
       <div className="flex items-center gap-1.5" aria-hidden>

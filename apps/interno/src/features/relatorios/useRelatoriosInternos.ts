@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import type { SolicitacaoStatus } from '@/types/database.types'
 import type { PeriodoRelatorio } from './useRelatorios'
+import { fmtDur } from '@/lib/format'
 
 /**
  * Relatório de PRODUTIVIDADE da equipe interna (diferente de /relatorios, que é
@@ -371,7 +372,16 @@ export function useRelatorioInterno(periodo: PeriodoRelatorio) {
 
 // ── Formatação de duração (compartilhada com a página) ──────────────────────
 
+// "45 min", "3 h 40 min", "1 d 3 h" (lib/format, pt-BR). Piso de 1 min para
+// não mostrar "0 min" num intervalo que existiu.
 export function formatHoras(h: number | null): string {
+  if (h == null) return '—'
+  return fmtDur(Math.max(1, h * 60))
+}
+
+/** Formato do CSV exportado (o de antes do reskin): planilhas e quem já consome
+ *  o arquivo esperam "3.7h" / "45min" / "2d 5h". `formatHoras` (fmtDur) é só da tela. */
+export function formatHorasCsv(h: number | null): string {
   if (h == null) return '—'
   if (h < 1) return `${Math.max(1, Math.round(h * 60))}min`
   if (h < 24) return `${h.toFixed(1)}h`

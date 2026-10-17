@@ -1,7 +1,6 @@
 import * as React from 'react'
 import {
   CalendarClock,
-  Loader2,
   RefreshCw,
   Clock,
   UserCheck,
@@ -20,6 +19,7 @@ import { EmptyState } from '@/components/shared/EmptyState'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
+import { useCascataInicial } from '@/hooks/useMovimento'
 import { PainelAgendamento } from '@/features/agendamentos/PainelAgendamento'
 import { ReagendarDialog } from '@/features/agendamentos/ReagendarDialog'
 import { useTerminais, useGradesAtivas } from '@/features/agendamentos/useTerminais'
@@ -50,6 +50,8 @@ import {
   tiposDaGrade,
 } from '@/features/agendamentos/agendamento'
 import type { AgendamentoStatus, TipoVeiculoSlot } from '@/types/database.types'
+import { Spinner } from '@/components/shared/Spinner'
+import { PageHeader } from '@/components/layout/PageHeader'
 
 type Aba = 'fila' | 'agendados' | 'historico'
 
@@ -124,6 +126,9 @@ export default function AgendamentosPage() {
 
   const grades = useGradesAtivas(grupos.map((g) => g.clienteId).filter((id) => id !== 'sem-terminal'))
 
+  // Cascata só no 1º paint com dados; polling/realtime/filtro não re-animam.
+  const cascata = useCascataInicial(!fila.isLoading && !fila.isError && grupos.length > 0)
+
   const opcoesTerminal = (terminais.data ?? []).map((t) => ({
     value: t.id,
     label: t.terminal_nome?.trim() || t.razao_social,
@@ -132,16 +137,10 @@ export default function AgendamentosPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="flex items-center gap-2 text-[18px] font-medium text-foreground">
-            <CalendarClock className="h-5 w-5 text-muted-foreground" />
-            Agendamentos
-          </h1>
-          <p className="mt-0.5 text-[13px] text-muted-foreground">
-            Pedidos de agendamento de descarga, agrupados pelo terminal onde a equipe agenda.
-          </p>
-        </div>
+      <PageHeader
+        title="Agendamentos"
+        description="Pedidos de agendamento de descarga, agrupados pelo terminal onde a equipe agenda."
+        actions={
         <Button
           variant="outline"
           size="sm"
@@ -149,26 +148,28 @@ export default function AgendamentosPage() {
           disabled={fila.isFetching}
         >
           {fila.isFetching ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
+            <Spinner />
           ) : (
             <RefreshCw className="h-4 w-4" />
           )}
           Atualizar
         </Button>
-      </div>
+        }
+      />
 
       <div className="flex flex-wrap items-center gap-2">
-        <div className="flex items-center gap-1 rounded-md border bg-card p-0.5">
+        <div className="flex items-center gap-0.5 rounded-surface border bg-card p-0.5" role="group" aria-label="Situação">
           {ABAS.map((a) => (
             <button
               key={a.valor}
               type="button"
               onClick={() => setAba(a.valor)}
+              aria-pressed={aba === a.valor}
               className={cn(
-                'rounded px-2.5 py-1 text-[12px] font-medium transition-colors',
+                'rounded-control px-2.5 py-1 text-body-sm font-medium transition-colors duration-fast',
                 aba === a.valor
-                  ? 'bg-primary/10 text-primary-strong'
-                  : 'text-muted-foreground hover:text-foreground',
+                  ? 'bg-primary/[0.08] text-primary-strong'
+                  : 'text-muted-foreground hover:bg-row-hover hover:text-foreground',
               )}
             >
               {a.label}
@@ -194,10 +195,10 @@ export default function AgendamentosPage() {
           onClick={() => setSoAtrasados((v) => !v)}
           aria-pressed={soAtrasados}
           className={cn(
-            'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[12px] font-medium transition-colors',
+            'inline-flex items-center gap-1.5 rounded-control border px-2.5 py-1.5 text-body-sm font-medium transition-colors duration-fast',
             soAtrasados
-              ? 'border-amber-300 bg-amber-50 text-amber-800'
-              : 'bg-card text-muted-foreground hover:text-foreground',
+              ? 'border-warning-border bg-warning-subtle text-warning'
+              : 'bg-card text-muted-foreground hover:border-input hover:bg-row-hover hover:text-foreground',
           )}
         >
           <Clock className="h-3.5 w-3.5" />
@@ -212,9 +213,9 @@ export default function AgendamentosPage() {
         </div>
       ) : fila.isError ? (
         <div className="rounded-lg border bg-card p-6 text-center">
-          <p className="text-[13px] text-foreground">Não foi possível carregar os agendamentos.</p>
+          <p className="text-body text-foreground">Não foi possível carregar os agendamentos.</p>
           <Button variant="outline" size="sm" className="mt-3" onClick={() => void fila.refetch()}>
-            Tentar de novo
+            Tentar novamente
           </Button>
         </div>
       ) : grupos.length === 0 ? (
@@ -237,7 +238,7 @@ export default function AgendamentosPage() {
                 grupo={grupo}
                 grade={grades.data?.get(grupo.clienteId) ?? []}
               />
-              <div className="grid gap-4 lg:grid-cols-2">
+              <div className={cn('grid gap-4 lg:grid-cols-2', cascata && 'cascata')}>
                 {grupo.itens.map((item) => (
                   <CardAgendamento
                     key={item.id}
@@ -277,7 +278,7 @@ export default function AgendamentosPage() {
             ? `O pedido ${numeroAgendamento(cancelar.numero_interno)} sai da fila. Se o terminal já confirmou a janela, prefira reagendar — assim o histórico fica encadeado.`
             : ''
         }
-        confirmLabel="Sim, cancelar"
+        confirmLabel="Cancelar"
         destructive
         onConfirm={async () => {
           if (!cancelar) return
@@ -322,13 +323,13 @@ function CabecalhoGrupo({
 
   return (
     <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b pb-1.5">
-      <h2 className="text-[14px] font-medium text-foreground">{grupo.titulo}</h2>
-      <span className="text-[12px] tabular-nums text-muted-foreground">
+      <h2 className="text-body-lg font-medium text-foreground">{grupo.titulo}</h2>
+      <span className="text-body-sm tabular-nums text-muted-foreground">
         {grupo.itens.length} pendente{grupo.itens.length === 1 ? '' : 's'}
       </span>
-      <span className="text-[11px] tabular-nums text-muted-foreground">{resumoGrade}</span>
+      <span className="text-meta tabular-nums text-muted-foreground">{resumoGrade}</span>
       {antecedencia != null && (
-        <span className="text-[11px] text-muted-foreground">
+        <span className="text-meta text-muted-foreground">
           exige {antecedencia}h de antecedência
         </span>
       )}
@@ -379,28 +380,22 @@ function CardAgendamento({
   return (
     <article
       className={cn(
-        // `border-slate-300` e não a borda padrão: a do token quase some contra
-        // o fundo do card e os vizinhos ficam grudados. Mesmo par de tons dos
-        // cards de solicitação, para as duas telas lerem igual.
-        'relative flex flex-col gap-2 rounded-lg border border-slate-300 bg-card p-3 dark:border-slate-700',
-        // Mesmo gesto dos cards de solicitação: a caixa inteira cresce sob o
-        // ponteiro, então texto, borda e selos ampliam na mesma proporção. O
-        // hover:z-10 mantém o card ampliado por cima dos vizinhos da grade.
-        // Sem guarda `motion-reduce` — por decisão de produto o efeito roda
-        // mesmo para quem liga "reduzir movimento" no sistema.
-        'transition-transform duration-300 ease-out hover:z-10 hover:scale-[1.03]',
+        // Card sobre o canvas: hairline + superfície. Hover = elevação sutil
+        // (DESIGN.md §Cards): sobe 2px + realce de borda e fundo, sem ampliar.
+        'relative flex flex-col gap-2 rounded-lg border bg-card p-3',
+        'transition-[transform,background-color,border-color] duration-fast ease-out hover:-translate-y-0.5 hover:border-input hover:bg-row-hover',
       )}
     >
       <div className="flex flex-wrap items-center gap-2">
-        <span className="font-mono text-[12px] text-muted-foreground">
+        <span className="font-mono text-body-sm text-muted-foreground">
           {numeroAgendamento(item.numero_interno)}
         </span>
-        <span className="text-[13px] font-medium text-foreground">
+        <span className="text-body font-medium text-foreground">
           {item.parceiro?.razao_social ?? 'Solicitação interna'}
         </span>
         <span
           className={cn(
-            'rounded-full px-2 py-0.5 text-[11px] font-medium',
+            'rounded-[2px] px-1.5 py-0.5 text-meta font-medium',
             AGENDAMENTO_STATUS_CLASSES[item.status],
           )}
         >
@@ -409,11 +404,11 @@ function CardAgendamento({
         {(item.status === 'solicitado' || emAndamento) && (
           <span
             className={cn(
-              'ml-auto inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium tabular-nums',
+              'ml-auto inline-flex items-center gap-1 rounded-[2px] px-1.5 py-0.5 text-meta font-medium tabular-nums',
               espera.severidade === 'critico'
-                ? 'bg-red-100 text-red-800'
+                ? 'bg-danger-subtle text-danger'
                 : espera.severidade === 'atencao'
-                  ? 'bg-amber-100 text-amber-800'
+                  ? 'bg-warning-subtle text-warning'
                   : 'text-muted-foreground',
             )}
             title="Tempo desde o pedido"
@@ -424,7 +419,7 @@ function CardAgendamento({
         )}
       </div>
 
-      <dl className="grid grid-cols-2 gap-x-3 gap-y-1 text-[12px] sm:grid-cols-4">
+      <dl className="grid grid-cols-2 gap-x-3 gap-y-1 text-body-sm sm:grid-cols-4">
         <Campo rotulo="Motorista" valor={dados.motoristaNome} />
         <Campo rotulo="Cavalo" valor={dados.placaCavalo} mono />
         <Campo rotulo="Nota fiscal" valor={item.nota_fiscal} mono />
@@ -440,8 +435,8 @@ function CardAgendamento({
       </dl>
 
       {item.status === 'agendado' && (
-        <div className="flex flex-wrap items-center gap-2 rounded-md border bg-background px-2.5 py-1.5 text-[12px]">
-          <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
+        <div className="flex flex-wrap items-center gap-2 border-t pt-2 text-body-sm">
+          <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-success" />
           <span className="text-foreground">
             Agendado {dataCompleta(item.data_agendada)} às {horaCurta(item.hora_agendada)}
           </span>
@@ -452,7 +447,7 @@ function CardAgendamento({
             </span>
           )}
           {item.hora_fora_da_grade && (
-            <span className="inline-flex items-center gap-1 text-amber-700">
+            <span className="inline-flex items-center gap-1 text-warning">
               <AlertTriangle className="h-3 w-3" />
               fora da grade
             </span>
@@ -469,7 +464,7 @@ function CardAgendamento({
       )}
 
       {!item.nota_fiscal && item.status !== 'agendado' && (
-        <p className="inline-flex items-center gap-1.5 text-[11px] text-amber-700">
+        <p className="inline-flex items-center gap-1.5 text-meta text-warning">
           <AlertTriangle className="h-3 w-3" />
           NF ainda não importada — buscar no Corporate
         </p>
@@ -479,7 +474,7 @@ function CardAgendamento({
         {item.solicitacao && (
           <Link
             to={`/solicitacoes/${item.solicitacao.id}`}
-            className="inline-flex items-center gap-1 text-[11px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+            className="inline-flex items-center gap-1 text-meta text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
           >
             <ExternalLink className="h-3 w-3" />
             Solicitação #{item.solicitacao.numero_interno}
@@ -507,7 +502,7 @@ function CardAgendamento({
           )}
 
           {emAndamento && !meu && !expirado && (
-            <span className="inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] text-muted-foreground">
+            <span className="inline-flex items-center gap-1.5 rounded-control border px-2 py-1 text-meta text-muted-foreground">
               <UserCheck className="h-3 w-3" />
               {quem} está agendando
             </span>
@@ -539,8 +534,8 @@ function CardAgendamento({
 function Campo({ rotulo, valor, mono = false }: { rotulo: string; valor: string | null; mono?: boolean }) {
   return (
     <div className="min-w-0">
-      <dt className="text-[10px] uppercase tracking-[0.5px] text-muted-foreground">{rotulo}</dt>
-      <dd className={cn('truncate text-foreground', mono && 'font-mono text-[12px]')}>
+      <dt className="text-meta text-muted-foreground">{rotulo}</dt>
+      <dd className={cn('truncate text-foreground', mono && 'font-mono text-body-sm')}>
         {valor || <span className="text-muted-foreground">—</span>}
       </dd>
     </div>
@@ -552,7 +547,7 @@ function BotaoDocumento({ path, rotulo }: { path: string; rotulo: string }) {
   return (
     <button
       type="button"
-      className="inline-flex items-center gap-1 text-[11px] text-primary-strong underline-offset-2 hover:underline"
+      className="inline-flex items-center gap-1 text-meta text-primary-strong underline-offset-2 hover:underline"
       onClick={async () => {
         setAbrindo(true)
         try {
@@ -565,7 +560,7 @@ function BotaoDocumento({ path, rotulo }: { path: string; rotulo: string }) {
         }
       }}
     >
-      {abrindo ? <Loader2 className="h-3 w-3 animate-spin" /> : <FileText className="h-3 w-3" />}
+      {abrindo ? <Spinner className="h-3 w-3" /> : <FileText className="h-3 w-3" />}
       {rotulo}
     </button>
   )

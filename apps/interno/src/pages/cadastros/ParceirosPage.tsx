@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Loader2, Lock, Unlock, Users } from 'lucide-react'
+import { Lock, Unlock, Users } from 'lucide-react'
+import { Spinner } from '@/components/shared/Spinner'
 import { CrudListPage, useCrudListState, type ColumnDef } from '@/components/shared/CrudListPage'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { useCrudList, useActiveCount, useUpsertRow, useToggleActive, useDeleteRow, useBulkToggleActive, useBulkDeleteRows } from '@/features/crud/useCrudQueries'
@@ -20,11 +21,12 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { isValidDocumento, isValidTelefone, tipoPessoa } from '@/lib/validators'
 import { formatDocumento, formatTelefone } from '@/lib/utils'
 import type { Tables } from '@/types/database.types'
+import { CadastroField } from '@/components/forms/CadastroField'
+import { useDescartarAlteracoes } from '@/features/crud/useDescartarAlteracoes'
 
 type Row = Tables<'parceiros'>
 
@@ -67,11 +69,11 @@ export default function ParceirosPage() {
     ascending: true,
   })
   const totalActive = useActiveCount('parceiros')
-  const upsert = useUpsertRow('parceiros', 'Parceiro')
-  const toggle = useToggleActive('parceiros', 'Parceiro')
-  const remove = useDeleteRow('parceiros', 'Parceiro')
-  const bulkToggle = useBulkToggleActive('parceiros', 'Parceiro')
-  const bulkDelete = useBulkDeleteRows('parceiros', 'Parceiro')
+  const upsert = useUpsertRow('parceiros', { singular: 'Parceiro', plural: 'Parceiros', genero: 'm' })
+  const toggle = useToggleActive('parceiros', { singular: 'Parceiro', plural: 'Parceiros', genero: 'm' })
+  const remove = useDeleteRow('parceiros', { singular: 'Parceiro', plural: 'Parceiros', genero: 'm' })
+  const bulkToggle = useBulkToggleActive('parceiros', { singular: 'Parceiro', plural: 'Parceiros', genero: 'm' })
+  const bulkDelete = useBulkDeleteRows('parceiros', { singular: 'Parceiro', plural: 'Parceiros', genero: 'm' })
 
   const [editing, setEditing] = React.useState<Row | null>(null)
   const [open, setOpen] = React.useState(false)
@@ -81,7 +83,7 @@ export default function ParceirosPage() {
 
   const columns: ColumnDef<Row>[] = [
     { header: 'Razão social', accessor: (r) => r.razao_social },
-    { header: 'CPF / CNPJ', accessor: (r) => r.documento, className: 'text-muted-foreground' },
+    { header: 'CPF/CNPJ', accessor: (r) => r.documento, className: 'text-muted-foreground' },
     { header: 'Código interno', accessor: (r) => r.codigo_interno ?? '—', className: 'text-muted-foreground' },
     { header: 'Contato', accessor: (r) => r.contato_principal_nome ?? '—' },
   ]
@@ -89,7 +91,7 @@ export default function ParceirosPage() {
   return (
     <>
       <CrudListPage<Row>
-        title="Parceiros"
+        title="Parceiros e acessos"
         newButtonLabel={canEdit ? 'Novo parceiro' : undefined}
         onNew={canEdit ? () => { setEditing(null); setOpen(true) } : undefined}
         rows={list.data?.data}
@@ -139,7 +141,7 @@ export default function ParceirosPage() {
           </>
         ) : undefined}
         emptyTitle="Nenhum parceiro cadastrado"
-        emptyDescription="Cadastre as transportadoras parceiras que terão acesso ao portal externo."
+        emptyDescription="Transportadoras parceiras com acesso ao portal externo."
         page={state.page}
         pageSize={state.pageSize}
         totalCount={list.data?.count ?? 0}
@@ -179,7 +181,7 @@ export default function ParceirosPage() {
         description={confirmRow?.ativo
           ? 'O parceiro não aparecerá nas listas ativas. Os usuários dele continuam existindo, mas convém desativá-los também para bloquear o acesso ao portal.'
           : 'O parceiro voltará a aparecer nas listas ativas.'}
-        confirmLabel={confirmRow?.ativo ? 'Sim, desativar' : 'Sim, reativar'}
+        confirmLabel={confirmRow?.ativo ? 'Desativar' : 'Reativar'}
         destructive={confirmRow?.ativo}
         onConfirm={async () => {
           if (confirmRow) {
@@ -198,7 +200,7 @@ export default function ParceirosPage() {
         description={bloqueioRow?.solicitacoes_bloqueadas
           ? `O parceiro "${bloqueioRow?.razao_social}" voltará a conseguir criar solicitações pelo portal.`
           : `O parceiro "${bloqueioRow?.razao_social}" deixará de conseguir criar novas solicitações pelo portal. As solicitações já enviadas continuam visíveis e o parceiro segue conseguindo baixar os arquivos.`}
-        confirmLabel={bloqueioRow?.solicitacoes_bloqueadas ? 'Sim, liberar' : 'Sim, bloquear'}
+        confirmLabel={bloqueioRow?.solicitacoes_bloqueadas ? 'Liberar' : 'Bloquear'}
         destructive={!bloqueioRow?.solicitacoes_bloqueadas}
         onConfirm={async () => {
           if (bloqueioRow) {
@@ -224,7 +226,7 @@ export default function ParceirosPage() {
             ? `O cadastro de "${deleteRow.razao_social}" será removido permanentemente, junto com seus usuários, motoristas, veículos, carretas e subcontratadas. Essa ação não pode ser desfeita. Se houver solicitações vinculadas, a exclusão será bloqueada, desative o parceiro nesse caso.`
             : ''
         }
-        confirmLabel="Sim, excluir"
+        confirmLabel="Excluir"
         destructive
         onConfirm={async () => {
           if (deleteRow) {
@@ -251,7 +253,7 @@ function ParceiroForm({ open, onOpenChange, editing, onSubmit }: FormProps) {
     reset,
     setValue,
     watch,
-    formState: { errors, isSubmitting },
+    formState: { errors, isSubmitting, isDirty },
   } = useForm<FormValues>({ resolver: zodResolver(schema) })
 
   React.useEffect(() => {
@@ -271,101 +273,75 @@ function ParceiroForm({ open, onOpenChange, editing, onSubmit }: FormProps) {
   const documento = watch('documento') ?? ''
   const tel = watch('contato_principal_telefone') ?? ''
 
+  const guarda = useDescartarAlteracoes(isDirty, onOpenChange, isSubmitting)
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <>
+    <Dialog open={open} onOpenChange={guarda.onOpenChange}>
       <DialogContent>
         <form onSubmit={handleSubmit(onSubmit)} noValidate>
           <DialogHeader>
             <DialogTitle>{editing ? 'Editar parceiro' : 'Novo parceiro'}</DialogTitle>
             <DialogDescription>
-              Transportadoras parceiras com acesso ao portal externo. Os usuários
-              de login são gerenciados em uma etapa separada.
+              Transportadora com acesso ao portal externo. Os usuários de acesso são
+              gerenciados à parte, no ícone de usuários da lista.
             </DialogDescription>
           </DialogHeader>
           <DialogBody className="space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="razao_social">Razão social *</Label>
-              <Input id="razao_social" autoFocus {...register('razao_social')} />
-              {errors.razao_social && (
-                <p className="text-[11px] text-destructive">{errors.razao_social.message}</p>
-              )}
-            </div>
+            <CadastroField label="Razão social" required id="razao_social" error={errors.razao_social?.message}>
+              <Input autoFocus {...register('razao_social')} />
+            </CadastroField>
 
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="documento">CPF / CNPJ *</Label>
+              <CadastroField label="CPF/CNPJ" required id="documento" error={errors.documento?.message}>
                 <Input
-                  id="documento"
                   value={documento}
-                  onChange={(e) => setValue('documento', formatDocumento(e.target.value), { shouldValidate: true })}
+                  onChange={(e) => setValue('documento', formatDocumento(e.target.value), { shouldValidate: true, shouldDirty: true })}
                   placeholder="CPF ou CNPJ"
                   inputMode="numeric"
                 />
-                {errors.documento && (
-                  <p className="text-[11px] text-destructive">{errors.documento.message}</p>
-                )}
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="codigo_interno">Código interno</Label>
-                <Input id="codigo_interno" {...register('codigo_interno')} placeholder="Opcional" />
-                {errors.codigo_interno && (
-                  <p className="text-[11px] text-destructive">{errors.codigo_interno.message}</p>
-                )}
-              </div>
+              </CadastroField>
+              <CadastroField label="Código interno" id="codigo_interno" error={errors.codigo_interno?.message}>
+                <Input {...register('codigo_interno')} placeholder="Opcional" />
+              </CadastroField>
             </div>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="contato_principal_nome">Contato principal</Label>
-              <Input id="contato_principal_nome" {...register('contato_principal_nome')} placeholder="Nome do responsável" />
-            </div>
+            <CadastroField label="Contato principal" id="contato_principal_nome">
+              <Input {...register('contato_principal_nome')} placeholder="Nome do responsável" />
+            </CadastroField>
 
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="contato_principal_telefone">Telefone do contato</Label>
+              <CadastroField label="Telefone do contato" id="contato_principal_telefone" error={errors.contato_principal_telefone?.message}>
                 <Input
-                  id="contato_principal_telefone"
                   value={tel}
-                  onChange={(e) => setValue('contato_principal_telefone', formatTelefone(e.target.value), { shouldValidate: true })}
+                  onChange={(e) => setValue('contato_principal_telefone', formatTelefone(e.target.value), { shouldValidate: true, shouldDirty: true })}
                   placeholder="(00) 00000-0000"
                 />
-                {errors.contato_principal_telefone && (
-                  <p className="text-[11px] text-destructive">{errors.contato_principal_telefone.message}</p>
-                )}
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="contato_principal_email">E-mail do contato</Label>
+              </CadastroField>
+              <CadastroField label="E-mail do contato" id="contato_principal_email" error={errors.contato_principal_email?.message}>
                 <Input
-                  id="contato_principal_email"
                   type="email"
                   {...register('contato_principal_email')}
                   placeholder="contato@empresa.com"
                 />
-                {errors.contato_principal_email && (
-                  <p className="text-[11px] text-destructive">{errors.contato_principal_email.message}</p>
-                )}
-              </div>
+              </CadastroField>
             </div>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="observacoes_internas">Observações internas</Label>
+            <CadastroField label="Observações internas" id="observacoes_internas">
               <Textarea
-                id="observacoes_internas"
                 rows={2}
                 {...register('observacoes_internas')}
                 placeholder="Visível apenas para a equipe LHG, o parceiro não vê este campo."
               />
-            </div>
+            </CadastroField>
           </DialogBody>
-          <DialogFooter>
-            <span className="text-[11px] text-muted-foreground/80">
-              Enter para salvar · Esc para cancelar
-            </span>
+          <DialogFooter className="justify-end">
             <div className="flex items-center gap-2">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
+              <Button type="button" variant="outline" onClick={() => guarda.onOpenChange(false)} disabled={isSubmitting}>
                 Cancelar
               </Button>
               <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                {isSubmitting && <Spinner />}
                 Salvar
               </Button>
             </div>
@@ -373,5 +349,7 @@ function ParceiroForm({ open, onOpenChange, editing, onSubmit }: FormProps) {
         </form>
       </DialogContent>
     </Dialog>
+    {guarda.dialog}
+    </>
   )
 }

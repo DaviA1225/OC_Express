@@ -3,15 +3,18 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useMutation } from '@tanstack/react-query'
-import { Loader2, Shield, Eye, EyeOff } from 'lucide-react'
+import { Shield, Eye, EyeOff } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/lib/supabase'
 import { registrarEvento } from '@/lib/eventos'
+import { Spinner } from '@/components/shared/Spinner'
+import { iniciais } from '@/features/auth/perfis'
+import { PageHeader } from '@/components/layout/PageHeader'
+import { CadastroField } from '@/components/forms/CadastroField'
 
 const senhaSchema = z
   .object({
@@ -24,36 +27,24 @@ const senhaSchema = z
   })
 type SenhaForm = z.infer<typeof senhaSchema>
 
-function iniciais(nome: string): string {
-  const partes = nome.trim().split(/\s+/).filter(Boolean)
-  if (partes.length === 0) return '?'
-  if (partes.length === 1) return partes[0].slice(0, 2).toUpperCase()
-  return (partes[0][0] + partes[partes.length - 1][0]).toUpperCase()
-}
-
 export default function MinhaContaPage() {
   const { parceiroUsuario, user } = useAuth()
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <div>
-        <h1 className="text-[22px] font-semibold tracking-tight text-foreground">Minha conta</h1>
-        <p className="text-[12px] text-muted-foreground">
-          Gerencie a senha de acesso ao portal.
-        </p>
-      </div>
+      <PageHeader className="mb-0" title="Minha conta" description="Dados de acesso e senha do portal." />
 
-      <section className="flex items-center gap-4 rounded-lg border bg-background p-4">
+      <section className="flex items-center gap-4 rounded-lg border bg-card p-4">
         <Avatar className="h-12 w-12">
-          <AvatarFallback className="bg-primary/10 text-[14px] font-medium text-primary">
+          <AvatarFallback className="bg-accent text-body-lg font-medium text-foreground">
             {iniciais(parceiroUsuario?.nome_completo ?? '')}
           </AvatarFallback>
         </Avatar>
         <div className="min-w-0">
-          <p className="truncate text-[15px] font-medium text-foreground">
+          <p className="truncate text-title-sm font-medium text-foreground">
             {parceiroUsuario?.nome_completo ?? 'Usuário'}
           </p>
-          <p className="truncate text-[12px] text-muted-foreground">{user?.email}</p>
+          <p className="truncate text-body-sm text-muted-foreground">{user?.email}</p>
         </div>
       </section>
 
@@ -81,7 +72,7 @@ function SegurancaCard() {
       if (error) throw error
     },
     onSuccess: () => {
-      toast.success('Senha atualizada')
+      toast.success('Senha atualizada.')
       reset({ nova: '', confirmar: '' })
       setShowNova(false)
       setShowConf(false)
@@ -91,14 +82,12 @@ function SegurancaCard() {
   })
 
   return (
-    <section className="rounded-lg border bg-background">
-      <header className="flex items-center gap-2 border-b px-4 py-3">
-        <span className="flex h-7 w-7 items-center justify-center rounded-md bg-muted text-foreground/80">
-          <Shield className="h-4 w-4" />
-        </span>
+    <section className="rounded-lg border bg-card">
+      <header className="flex items-start gap-2 border-b px-4 py-3">
+        <Shield className="mt-0.5 h-4 w-4 shrink-0 text-tertiary" aria-hidden />
         <div>
-          <h2 className="text-[14px] font-medium text-foreground">Segurança</h2>
-          <p className="text-[11px] text-muted-foreground">
+          <h2 className="text-body-lg font-medium text-foreground">Segurança</h2>
+          <p className="text-meta text-muted-foreground">
             Senha com no mínimo 12 caracteres. Combine letras, números e símbolos.
           </p>
         </div>
@@ -109,37 +98,33 @@ function SegurancaCard() {
         noValidate
       >
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <div className="space-y-1.5">
-            <Label htmlFor="nova">Nova senha *</Label>
-            <PasswordInput
-              id="nova"
-              show={showNova}
-              onToggle={() => setShowNova((v) => !v)}
-              register={register('nova')}
-            />
-            {errors.nova && (
-              <p className="text-[11px] text-destructive">{errors.nova.message}</p>
+          <CadastroField label="Nova senha" required id="nova" error={errors.nova?.message}>
+            {(a11y) => (
+              <PasswordInput
+                a11y={a11y}
+                show={showNova}
+                onToggle={() => setShowNova((v) => !v)}
+                register={register('nova')}
+              />
             )}
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="confirmar">Confirmar senha *</Label>
-            <PasswordInput
-              id="confirmar"
-              show={showConf}
-              onToggle={() => setShowConf((v) => !v)}
-              register={register('confirmar')}
-            />
-            {errors.confirmar && (
-              <p className="text-[11px] text-destructive">{errors.confirmar.message}</p>
+          </CadastroField>
+          <CadastroField label="Confirmar senha" required id="confirmar" error={errors.confirmar?.message}>
+            {(a11y) => (
+              <PasswordInput
+                a11y={a11y}
+                show={showConf}
+                onToggle={() => setShowConf((v) => !v)}
+                register={register('confirmar')}
+              />
             )}
-          </div>
+          </CadastroField>
         </div>
-        <p className="text-[11px] text-muted-foreground">
-          Sessões já abertas continuam ativas até expirarem. Sua próxima sessão usará a nova senha.
+        <p className="text-body-sm text-muted-foreground">
+          Sessões já abertas continuam ativas até expirarem. A próxima sessão usará a nova senha.
         </p>
         <div className="flex justify-end">
           <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+            {isSubmitting && <Spinner />}
             Alterar senha
           </Button>
         </div>
@@ -149,17 +134,17 @@ function SegurancaCard() {
 }
 
 interface PasswordInputProps {
-  id: string
+  a11y: React.ComponentProps<typeof Input>
   show: boolean
   onToggle: () => void
   register: ReturnType<ReturnType<typeof useForm<SenhaForm>>['register']>
 }
 
-function PasswordInput({ id, show, onToggle, register }: PasswordInputProps) {
+function PasswordInput({ a11y, show, onToggle, register }: PasswordInputProps) {
   return (
     <div className="relative">
       <Input
-        id={id}
+        {...a11y}
         type={show ? 'text' : 'password'}
         autoComplete="new-password"
         className="pr-10"
@@ -168,7 +153,7 @@ function PasswordInput({ id, show, onToggle, register }: PasswordInputProps) {
       <button
         type="button"
         onClick={onToggle}
-        className="absolute right-2 top-1/2 -translate-y-1/2 rounded-sm p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+        className="absolute right-2 top-1/2 -translate-y-1/2 rounded-sm p-1 text-muted-foreground transition-colors duration-fast hover:bg-accent hover:text-foreground"
         aria-label={show ? 'Ocultar senha' : 'Mostrar senha'}
         tabIndex={-1}
       >
