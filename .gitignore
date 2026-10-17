@@ -38,6 +38,10 @@ supabase/.claude/
 # não devem entrar no repositório.
 .claude/skills/*
 !.claude/skills/impeccable/
+# Destino real das skills instaladas pela CLI `npx skills add` (o .claude/skills/
+# só guarda symlinks para cá) + o lockfile que ela gera. Mesma regra: pessoal.
+.agents/
+skills-lock.json
 
 # Pasta de trabalho do backfill de PDFs (originais/processados/previews)
 backfill/

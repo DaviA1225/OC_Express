@@ -4,6 +4,7 @@ import { SISLOG_VERSAO } from '@sislog/shared/versao'
 import {
   LayoutDashboard,
   Inbox,
+  MessageSquare,
   CalendarClock,
   RotateCcw,
   ClipboardCheck,
@@ -40,6 +41,7 @@ import {
 import { iniciais, labelPerfil } from '@/features/auth/perfis'
 import { useRecebidasCount } from '@/features/solicitacoes/useSolicitacoes'
 import { useAgendamentosPendentesCount } from '@/features/agendamentos/useAgendamentos'
+import { useConversasAtencaoCount } from '@/features/agente/useConversas'
 
 interface NavItem {
   to: string
@@ -70,6 +72,8 @@ export function SidebarContent({ collapsed, onToggleCollapse, onNavigate, onClos
   const { profile } = useAuth()
   const recebidasCount = useRecebidasCount().data ?? 0
   const agendamentosCount = useAgendamentosPendentesCount().data ?? 0
+  const atencaoAgente = useConversasAtencaoCount()
+  const atencaoCount = (atencaoAgente.data?.comHumano ?? 0) + (atencaoAgente.data?.rascunhos ?? 0)
 
   // Menu em 4 seções (Operação / Cadastros / Análise / Administração). Rotas e
   // guardas de permissão são as mesmas de antes; só mudaram rótulos e agrupamento.
@@ -79,6 +83,7 @@ export function SidebarContent({ collapsed, onToggleCollapse, onNavigate, onClos
       itens: [
         { to: '/dashboard', label: 'Painel', icon: LayoutDashboard },
         { to: '/solicitacoes', label: 'Solicitações', icon: Inbox },
+        { to: '/conversas', label: 'Conversas', icon: MessageSquare },
         { to: '/agendamentos', label: 'Agendamentos', icon: CalendarClock },
         { to: '/conferencia-viagem', label: 'Conferência de viagem', icon: ClipboardCheck },
       ],
@@ -116,11 +121,16 @@ export function SidebarContent({ collapsed, onToggleCollapse, onNavigate, onClos
   ]
 
   // Contadores por rota: o badge é sempre "o que está esperando a equipe" —
-  // solicitações recebidas e agendamentos ainda não concluídos.
+  // solicitações recebidas, conversas que o agente passou para a equipe (ou
+  // rascunhos dele a decidir) e agendamentos ainda não concluídos.
   const badges: Record<string, { count: number; title: string }> = {
     '/solicitacoes': {
       count: recebidasCount,
       title: plural(recebidasCount, 'solicitação recebida', 'solicitações recebidas'),
+    },
+    '/conversas': {
+      count: atencaoCount,
+      title: `${atencaoAgente.data?.comHumano ?? 0} conversa(s) com a equipe · ${atencaoAgente.data?.rascunhos ?? 0} rascunho(s) do agente`,
     },
     '/agendamentos': {
       count: agendamentosCount,

@@ -31,6 +31,9 @@ export interface ContextoFerramenta {
   telefone: string
   nomeContato: string | null
   modo: ModoAgente
+  /** Quem fica como atendente da solicitação: o agente, ou o humano que
+   *  aprovou o rascunho. */
+  usuarioId: string | null
   /** wamid da última mensagem recebida: chave de idempotência da solicitação. */
   ultimoWamid: string | null
   /** O agente pediu transferência para humano neste turno. */
@@ -483,7 +486,7 @@ const criarSolicitacao = ferramenta({
       additionalProperties: false,
     },
   },
-  async executar(e, { db, telefone, ultimoWamid }) {
+  async executar(e, { db, telefone, ultimoWamid, usuarioId }) {
     // Regras do formulário do interno (NovaSolicitacaoDialog), replicadas.
     if (e.tipo === 'carregamento') {
       if (!e.cliente_id) return erro('Falta o destino (cliente_id).')
@@ -535,7 +538,6 @@ const criarSolicitacao = ferramenta({
       }
     }
 
-    const { data: sessao } = await db.auth.getUser()
     const { data, error } = await db
       .from('solicitacoes')
       .insert({
@@ -543,7 +545,7 @@ const criarSolicitacao = ferramenta({
         status: 'recebida',
         origem: 'whatsapp',
         external_msg_id: e.confirmar_duplicada || !ultimoWamid ? null : ultimoWamid,
-        atendente_id: sessao.user?.id ?? null,
+        atendente_id: usuarioId,
         solicitante_nome: e.solicitante_nome,
         solicitante_telefone: telefoneCadastro(telefone),
         motorista_id: e.motorista_id,
@@ -614,6 +616,23 @@ const POR_NOME = new Map(TODAS.map((f) => [f.definicao.name, f]))
 /** Definições na ordem fixa: a lista de ferramentas faz parte do prefixo do
  *  cache de prompt, e qualquer mudança de ordem invalida o cache. */
 export const DEFINICOES: Anthropic.Beta.BetaTool[] = TODAS.map((f) => f.definicao)
+
+/**
+ * Executa uma ferramenta de ESCRITA sem passar pelo modo sombra nem gravar em
+ * `agente_acoes` — quem chama registra. Usado ao aprovar um rascunho na tela de
+ * Conversas: a mesma validação e as mesmas regras que o agente usaria.
+ */
+export async function executarDireto(nome: string, entrada: unknown, ctx: ContextoFerramenta): Promise<Resultado> {
+  const f = POR_NOME.get(nome)
+  if (!f || !f.escrita) return erro(`Ferramenta de escrita desconhecida: ${nome}`)
+  const parsed = f.schema.safeParse(entrada)
+  if (!parsed.success) return erro('Entrada do rascunho inválida.')
+  try {
+    return await f.executar(parsed.data, ctx)
+  } catch (e) {
+    return erro(`Falha inesperada: ${e instanceof Error ? e.message : String(e)}`)
+  }
+}
 
 /** Executa uma chamada de ferramenta. Nunca lança: erro vira resultado para o
  *  modelo ler e corrigir (is_error). */

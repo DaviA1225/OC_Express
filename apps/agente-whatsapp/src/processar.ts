@@ -139,6 +139,7 @@ async function umaRodada(db: Db, conversaId: string): Promise<boolean> {
     conversaId: conversa.id,
     telefone: conversa.telefone,
     nomeContato: conversa.nome_contato,
+    usuarioId: (await db.auth.getUser()).data.user?.id ?? null,
     modo: modo === 'sombra' ? 'sombra' : 'autonomo',
     ultimoWamid: pendentes[pendentes.length - 1]?.wamid ?? null,
     transferido: false,

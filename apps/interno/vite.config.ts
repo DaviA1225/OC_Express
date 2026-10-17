@@ -14,6 +14,17 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['@sislog/shared'],
   },
+  // Tela Conversas: em produção o vercel.json reescreve /api/agente para o
+  // servidor do agente. No dev, o mesmo caminho vai ao `vercel dev` local dele.
+  server: {
+    proxy: {
+      '/api/agente': {
+        target: process.env.AGENTE_DEV_URL ?? 'http://localhost:3000',
+        changeOrigin: true,
+        rewrite: () => '/api/painel',
+      },
+    },
+  },
   build: {
     target: 'es2020',
     cssCodeSplit: true,
