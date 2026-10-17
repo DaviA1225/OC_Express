@@ -1,5 +1,4 @@
 import * as React from 'react'
-import { DADOS_SIMULADOS } from '@/features/metricas/fonte'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
@@ -25,14 +24,13 @@ import { IntervaloDatas } from '@/features/relatorios/IntervaloDatas'
 import { useIntervaloPersistido } from '@/features/relatorios/useIntervaloPersistido'
 import { intervaloPadrao, rotuloIntervalo } from '@/features/relatorios/intervalo'
 import { exportarDados, exportarResumo, exportarSerie } from '@/features/relatorios/exportacao'
-import { FaixaSimulacaoProducao, SeloSimulado } from '@/features/metricas/SeloSimulado'
 import {
   buscarRelatorioRanking,
   buscarRelatorioResumo,
   buscarRelatorioSerie,
   buscarRelatorioTempoEtapas,
 } from '@/features/metricas/fonte'
-import { DRILL_ATIVO, MSG_DRILL_INATIVO, drillTo, linkSolicitacoes } from '@/features/metricas/links'
+import { linkSolicitacoes } from '@/features/metricas/links'
 import { useAgora } from '@/features/metricas/useAgora'
 import { LinkDrill } from '@/components/painel/LinkDrill'
 import { granularidadePara, isoDia, lerBalde, textoComparador } from '@/features/metricas/periodo'
@@ -154,10 +152,8 @@ export default function RelatoriosPage() {
 
   return (
     <div className="space-y-4">
-      <FaixaSimulacaoProducao />
       <PageHeader
         title="Relatórios"
-        meta={<SeloSimulado />}
         description={rotuloIntervalo(intervalo.de, intervalo.ate)}
         actions={
           <>
@@ -184,7 +180,7 @@ export default function RelatoriosPage() {
                 {/* Com dados simulados, nada de CSV: o arquivo sairia do sistema
                     sem a faixa de aviso e ainda registraria export_csv no log de
                     acesso (LGPD) por uma exportação falsa. */}
-                <Button type="button" variant="outline" disabled={exportando || DADOS_SIMULADOS} title={DADOS_SIMULADOS ? 'Exportação liberada quando os dados reais estiverem ligados' : undefined}>
+                <Button type="button" variant="outline" disabled={exportando}>
                   {exportando ? <Spinner /> : <Download className="h-4 w-4" />}
                   <span className="hidden sm:inline">Exportar</span>
                   <ChevronDown className="h-4 w-4" />
@@ -308,8 +304,7 @@ function Kpis({ p, resumo, onIrFluxo }: { p: FiltrosPeriodo; resumo: ResumoQuery
         icon={Inbox}
         value={v((x) => fmtInt(x.entradas))}
         delta={a && b ? deltaNum(a.entradas, b.entradas, comp, true) : undefined}
-        to={drillTo(linkSolicitacoes({ data: 'criada', ...per }, p))}
-        title={DRILL_ATIVO ? undefined : MSG_DRILL_INATIVO}
+        to={(linkSolicitacoes({ data: 'criada', ...per }, p))}
       />
       <KpiTile
         label="Finalizadas"
@@ -317,8 +312,7 @@ function Kpis({ p, resumo, onIrFluxo }: { p: FiltrosPeriodo; resumo: ResumoQuery
         value={v((x) => fmtInt(x.finalizadas))}
         delta={a && b ? deltaNum(a.finalizadas, b.finalizadas, comp, true) : undefined}
         hint="Finalizadas no período, qualquer que seja a data de entrada"
-        to={drillTo(linkSolicitacoes({ status: 'finalizada', data: 'finalizada', ...per }, p))}
-        title={DRILL_ATIVO ? undefined : MSG_DRILL_INATIVO}
+        to={(linkSolicitacoes({ status: 'finalizada', data: 'finalizada', ...per }, p))}
       />
       <KpiTile
         label="Canceladas"
@@ -326,8 +320,7 @@ function Kpis({ p, resumo, onIrFluxo }: { p: FiltrosPeriodo; resumo: ResumoQuery
         value={v((x) => fmtInt(x.canceladas))}
         delta={a && b ? deltaNum(a.canceladas, b.canceladas, comp, false) : undefined}
         hint={a && <span className="tabular-nums">{fmtPct(a.cancelamento_pct)} das entradas</span>}
-        to={drillTo(linkSolicitacoes({ data: 'cancelada', ...per }, p))}
-        title={DRILL_ATIVO ? undefined : MSG_DRILL_INATIVO}
+        to={(linkSolicitacoes({ data: 'cancelada', ...per }, p))}
       />
       <KpiTile
           label="Concluídas em 48 h"
@@ -342,8 +335,7 @@ function Kpis({ p, resumo, onIrFluxo }: { p: FiltrosPeriodo; resumo: ResumoQuery
               </span>
             )
           }
-          to={drillTo(linkSolicitacoes({ drill: 'conclusao48', ...per }, p))}
-          title={DRILL_ATIVO ? undefined : MSG_DRILL_INATIVO}
+          to={(linkSolicitacoes({ drill: 'conclusao48', ...per }, p))}
         />
       <KpiTile
         label="Lead time"
@@ -359,8 +351,7 @@ function Kpis({ p, resumo, onIrFluxo }: { p: FiltrosPeriodo; resumo: ResumoQuery
         value={v((x) => fmtPct(x.dentro_sla_pct))}
         delta={a && b ? deltaPp(a.dentro_sla_pct, b.dentro_sla_pct, comp, true) : undefined}
         hint="Finalizadas sem nenhuma etapa acima do alerta"
-        to={drillTo(linkSolicitacoes({ drill: 'sla_estourou', ...per }, p))}
-        title={DRILL_ATIVO ? undefined : MSG_DRILL_INATIVO}
+        to={(linkSolicitacoes({ drill: 'sla_estourou', ...per }, p))}
       />
     </div>
   )
@@ -379,7 +370,7 @@ function VisaoGeral({ p, gran, resumo, onIrFluxo }: { p: FiltrosPeriodo; gran: G
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
         <Bloco
           titulo="Entradas × finalizadas"
-          subtitulo={`Por ${gran}; tracejado = período anterior.${DRILL_ATIVO ? ' Clique num ponto para ver a lista.' : ''}`}
+          subtitulo={`Por ${gran}; tracejado = período anterior. Clique num ponto para ver a lista.`}
           className="xl:col-span-2"
           carregando={serie.isLoading}
           erro={serie.isError}
@@ -438,11 +429,10 @@ function GraficoSerie({ serie, gran, p }: { serie: SerieLinha[]; gran: Granulari
             data={dados}
             margin={{ top: 8, right: 12, left: -16, bottom: 0 }}
             onClick={(e) => {
-              if (!DRILL_ATIVO) return
               const i = Number((e as { activeIndex?: number | string | null } | null)?.activeIndex)
               if (Number.isInteger(i)) abrir(i)
             }}
-            className={DRILL_ATIVO ? 'cursor-pointer' : undefined}
+            className="cursor-pointer"
           >
             <CartesianGrid {...gridProps} />
             <XAxis dataKey="rotulo" {...axisProps} interval="preserveStartEnd" minTickGap={16} />

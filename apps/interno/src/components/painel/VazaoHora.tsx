@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Bar, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { ChartTooltip } from '@/components/charts/ChartTooltip'
 import { animacaoSerie, axisProps, gridProps } from '@/components/charts/chartTheme'
-import { DRILL_ATIVO, linkSolicitacoes } from '@/features/metricas/links'
+import { linkSolicitacoes } from '@/features/metricas/links'
 import { hojeOperacao } from '@/lib/datasOperacao'
 import type { FiltrosComuns, PainelHora } from '@/features/metricas/tipos'
 import { fmtDec, fmtInt } from '@/lib/format'
@@ -55,7 +55,7 @@ export const VazaoHora = memo(function VazaoHora({ porHora, filtros, tv, horaAtu
   }, [porHora, horaAtual])
   const altura = tv ? 360 : 240
   const abrirHora = useCallback((hora: number) => {
-    if (!filtros || !DRILL_ATIVO) return
+    if (!filtros) return
     const hoje = hojeOperacao()
     navigate(linkSolicitacoes({ status: 'finalizada', data: 'finalizada', de: hoje, ate: hoje, hora }, filtros))
   }, [filtros, navigate])
@@ -98,7 +98,7 @@ export const VazaoHora = memo(function VazaoHora({ porHora, filtros, tv, horaAtu
                 fill={COR_FINALIZADAS}
                 radius={[2, 2, 0, 0]}
                 maxBarSize={28}
-                cursor={filtros && !tv && DRILL_ATIVO ? 'pointer' : undefined}
+                cursor={filtros && !tv ? 'pointer' : undefined}
                 onClick={aoClicarBarra}
                 {...animacaoSerie}
               />

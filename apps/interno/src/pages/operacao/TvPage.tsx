@@ -7,7 +7,6 @@ import { IdadeFila } from '@/components/painel/IdadeFila'
 import { MaisAtrasadas } from '@/components/painel/MaisAtrasadas'
 import { Pendencias } from '@/components/painel/Pendencias'
 import { VazaoHora } from '@/components/painel/VazaoHora'
-import { FaixaSimulacaoProducao, SeloSimulado } from '@/features/metricas/SeloSimulado'
 import { fmtHoraMin, projetarRitmo, rotuloHorario, rotuloOrigem } from '@/features/metricas/rotulos'
 import { useAgora } from '@/features/metricas/useAgora'
 import { useFiltrosAnalise } from '@/features/metricas/useFiltrosAnalise'
@@ -99,7 +98,6 @@ export default function TvPage() {
 
   return (
     <div className="dark flex min-h-screen flex-col bg-canvas text-foreground">
-      <FaixaSimulacaoProducao />
       <header className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-b bg-header px-6 py-3 text-header-foreground">
         <div className="flex min-w-0 items-center gap-3">
           <img src="/favicon.svg" alt="" aria-hidden className="h-7 w-7 shrink-0" />
@@ -107,7 +105,6 @@ export default function TvPage() {
             <p className="tv-titulo truncate">Operação SisLog</p>
             <p className="tv-meta truncate text-muted-foreground">{recorte}</p>
           </div>
-          <SeloSimulado />
         </div>
         <nav aria-label="Painéis" className="flex items-center gap-1">
           {PAINEIS.map((p, i) => (

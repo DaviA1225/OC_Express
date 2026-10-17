@@ -16,8 +16,7 @@ import { MaisAtrasadas } from '@/components/painel/MaisAtrasadas'
 import { Pendencias } from '@/components/painel/Pendencias'
 import { PorLocal } from '@/components/painel/PorLocal'
 import { VazaoHora } from '@/components/painel/VazaoHora'
-import { FaixaSimulacaoProducao, SeloSimulado } from '@/features/metricas/SeloSimulado'
-import { DRILL_ATIVO, MSG_DRILL_INATIVO, drillTo, linkSolicitacoes } from '@/features/metricas/links'
+import { linkSolicitacoes } from '@/features/metricas/links'
 import { LinkDrill } from '@/components/painel/LinkDrill'
 import { diaOperacao, relogioOperacao } from '@/lib/datasOperacao'
 import { fmtHoraMin, projetarRitmo, rotuloHorario } from '@/features/metricas/rotulos'
@@ -66,10 +65,8 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-4">
-      <FaixaSimulacaoProducao />
       <PageHeader
         title="Painel"
-        meta={<SeloSimulado />}
         actions={
           <>
             <AtualizadoAs
@@ -97,8 +94,7 @@ export default function DashboardPage() {
           icon={Inbox}
           value={valor(estado.isLoading, estado.isError, e?.fila.total)}
           hint={e && <span className="tabular-nums">{fmtInt(e.fila.aguardando_finalizacao)} aguardando finalização</span>}
-          to={e ? drillTo(linkSolicitacoes({ status: ETAPAS_FILA.join(','), ordem: 'antiga' }, filtros)) : undefined}
-          title={DRILL_ATIVO ? undefined : MSG_DRILL_INATIVO}
+          to={e ? (linkSolicitacoes({ status: ETAPAS_FILA.join(','), ordem: 'antiga' }, filtros)) : undefined}
         />
         <KpiTile
           label="Fora do SLA"
@@ -106,8 +102,7 @@ export default function DashboardPage() {
           tone={e && e.fila.fora_sla > 0 ? 'alert' : 'default'}
           value={valor(estado.isLoading, estado.isError, e?.fila.fora_sla)}
           hint={e && <span className="tabular-nums">{fmtInt(e.fila.aviso)} em aviso</span>}
-          to={e ? drillTo(linkSolicitacoes({ sla: 'fora', ordem: 'antiga' }, filtros)) : undefined}
-          title={DRILL_ATIVO ? undefined : MSG_DRILL_INATIVO}
+          to={e ? (linkSolicitacoes({ sla: 'fora', ordem: 'antiga' }, filtros)) : undefined}
         />
         <KpiTile
           label="Finalizadas hoje"
@@ -115,8 +110,7 @@ export default function DashboardPage() {
           value={valor(hoje.isLoading, hoje.isError, h?.finalizadas)}
           delta={h ? deltaPct(h.finalizadas, h.finalizadas_ref, `vs. ontem até ${fmtHoraMin(agora).replace(':', 'h')}`, true) : undefined}
           hint={h && <Ritmo finalizadas={h.finalizadas} projecao={projetarRitmo(h, expediente, new Date(agora))} meta={metaVisivel(h.meta, filtros)} fim={expediente.expediente_fim} />}
-          to={h ? drillTo(linkSolicitacoes({ status: 'finalizada', data: 'finalizada', de: diaOperacao(agora), ate: diaOperacao(agora) }, filtros)) : undefined}
-          title={DRILL_ATIVO ? undefined : MSG_DRILL_INATIVO}
+          to={h ? (linkSolicitacoes({ status: 'finalizada', data: 'finalizada', de: diaOperacao(agora), ate: diaOperacao(agora) }, filtros)) : undefined}
         />
         <KpiTile
           label="Lead time 7 dias"
@@ -139,8 +133,7 @@ export default function DashboardPage() {
               </span>
             )
           }
-          to={e ? drillTo(linkSolicitacoes({ validade: 'vencendo' }, filtros)) : undefined}
-          title={DRILL_ATIVO ? undefined : MSG_DRILL_INATIVO}
+          to={e ? (linkSolicitacoes({ validade: 'vencendo' }, filtros)) : undefined}
         />
       </div>
 

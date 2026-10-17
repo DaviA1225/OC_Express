@@ -1,7 +1,7 @@
 // Drill-down: cada número do Painel/Relatórios vira um link para a lista de
 // Solicitações com os parâmetros da §4 do plano (sla, data, de/ate, validade,
 // idade, hora, pendencia, drill, ordem, origem, cliente, local). A lista passa
-// a entender os parâmetros novos no PR-B1; os links já saem no formato final.
+// os entende (recorteLista.ts).
 //
 // CONTRATO `origem` na lista: `parceiro` | `nao_parceiro` (tudo que não é
 // parceiro: interno, e-mail e WhatsApp) | valores crus de `solicitacoes.origem`.
@@ -9,18 +9,10 @@
 // `origem=interno` filtraria só a origem crua 'interno' e o número da lista não
 // bateria com o do tile.
 
-import { DADOS_SIMULADOS } from './fonte'
 import type { FiltrosComuns, OrigemFiltro } from './tipos'
 
 type Valor = string | number | null | undefined
 
-/**
- * Enquanto os números são simulados, nenhum drill-down abre a lista: ela
- * mostraria dados reais que não batem com o tile (e ids de mentira dão 404).
- */
-export const DRILL_ATIVO = !DADOS_SIMULADOS
-
-export const MSG_DRILL_INATIVO = 'Disponível quando os dados reais estiverem ligados'
 
 /** Recorte de origem das telas → valor do parâmetro `origem` da lista. */
 export function origemParaLista(o: OrigemFiltro | string): string | null {
@@ -52,9 +44,4 @@ export function linkSolicitacoes(params: Record<string, Valor>, filtros?: Filtro
 
 export function linkSolicitacao(id: string): string {
   return `/solicitacoes/${id}`
-}
-
-/** `to` de um KpiTile: some (tile não clicável) enquanto o drill está desligado. */
-export function drillTo(url: string): string | undefined {
-  return DRILL_ATIVO ? url : undefined
 }

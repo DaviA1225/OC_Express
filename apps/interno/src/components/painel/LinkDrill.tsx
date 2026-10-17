@@ -1,6 +1,5 @@
 import * as React from 'react'
 import { Link } from 'react-router-dom'
-import { DRILL_ATIVO, MSG_DRILL_INATIVO } from '@/features/metricas/links'
 
 interface Props {
   to: string
@@ -10,29 +9,14 @@ interface Props {
   tabIndex?: number
 }
 
-// Sem o link, o elemento não pode parecer clicável: saem hover, transição e foco.
-function semInteracao(className?: string): string | undefined {
-  return className
-    ?.split(/\s+/)
-    .filter((c) => !/^(hover:|group-hover:|focus-visible:|transition|duration-|ease-)/.test(c))
-    .join(' ')
-}
-
 /**
- * Link de drill-down para a lista de Solicitações. Com os dados simulados
- * (DRILL_ATIVO falso) vira texto, com a explicação no `title`.
+ * Link de drill-down para a lista de Solicitações: o número do Painel/Relatórios
+ * abre a lista com o mesmo recorte (recorteLista.ts).
  */
 export function LinkDrill({ to, className, children, ...rest }: Props) {
-  if (DRILL_ATIVO) {
-    return (
-      <Link to={to} className={className} {...rest}>
-        {children}
-      </Link>
-    )
-  }
   return (
-    <span className={semInteracao(className)} title={MSG_DRILL_INATIVO}>
+    <Link to={to} className={className} {...rest}>
       {children}
-    </span>
+    </Link>
   )
 }

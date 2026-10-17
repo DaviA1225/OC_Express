@@ -60,9 +60,6 @@ export const SLA_PENDING_STATUSES: SolicitacaoStatus[] = [
   'oc_gerada',
 ]
 
-export const SLA_WARNING_HOURS = 2
-export const SLA_ALERT_HOURS = 8
-
 export type SlaSeverity = 'warning' | 'alert'
 
 export interface SlaInfo {

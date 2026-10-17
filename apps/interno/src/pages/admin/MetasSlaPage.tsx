@@ -1,5 +1,4 @@
 import * as React from 'react'
-import { DADOS_SIMULADOS } from '@/features/metricas/fonte'
 import { toast } from 'sonner'
 import { Save, Undo2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -16,7 +15,6 @@ import { canEditMetasSla } from '@/features/auth/permissions'
 import { useDescartarAlteracoes } from '@/features/crud/useDescartarAlteracoes'
 import { intervaloPadrao } from '@/features/relatorios/intervalo'
 import { STATUS_LABELS } from '@/features/solicitacoes/status'
-import { FaixaSimulacaoProducao, SeloSimulado } from '@/features/metricas/SeloSimulado'
 import { classificarSla, ETAPAS_SLA, mapaSla } from '@/features/metricas/sla'
 import { useFilaPrevia, useMetasSla, useSalvarMetasSla } from '@/features/metricas/useMetasSla'
 import { useRelatorioTempoEtapas } from '@/features/metricas/useRelatorioMetricas'
@@ -36,14 +34,12 @@ export default function MetasSlaPage() {
 
   return (
     <div className="space-y-4">
-      <FaixaSimulacaoProducao />
       <PageHeader
         title="Metas e SLA"
         breadcrumb={[{ label: 'Administração' }, { label: 'Metas e SLA' }]}
         description="Limites de SLA por etapa e metas do dia. O relógio do SLA conta horas corridas, inclusive noite e fim de semana."
         meta={
           <>
-            <SeloSimulado />
             {!podeEditar && (
               <span className="inline-flex items-center rounded-[2px] border px-1.5 py-0.5 text-meta font-medium text-muted-foreground">
                 Somente leitura
@@ -247,8 +243,7 @@ function Formulario({ config, podeEditar }: { config: ConfigMetasSla; podeEditar
             {/* Simulado: a config vive só na memória da aba — "salvou" seria mentira. */}
             <Button
               type="submit"
-              disabled={!alterado || salvar.isPending || DADOS_SIMULADOS}
-              title={DADOS_SIMULADOS ? 'Salvar fica disponível quando os dados reais estiverem ligados' : undefined}
+              disabled={!alterado || salvar.isPending}
             >
               {salvar.isPending ? <Spinner /> : <Save className="h-4 w-4" />}
               Salvar

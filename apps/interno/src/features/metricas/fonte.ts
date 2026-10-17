@@ -33,9 +33,6 @@ import type {
 /** Fonte dos dados: sempre o banco (o modo simulado saiu com a 0080). */
 export const FONTE = 'rpc' as const
 
-/** Mantido para as telas que escondiam ações no modo simulado: agora sempre falso. */
-export const DADOS_SIMULADOS = false
-
 // Chamada sem tipo enquanto as RPCs não estão em database.types.ts.
 type RpcSemTipo = (fn: string, args?: Record<string, unknown>) => PromiseLike<{ data: unknown; error: { message: string } | null }>
 
