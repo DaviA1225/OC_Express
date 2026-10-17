@@ -1,7 +1,9 @@
-// Tipos do banco SisLog (espelha as migrations em supabase/migrations,
-// até 0061 — módulo de agendamentos).
-// Para regenerar a partir do banco real, instale Docker Desktop e rode:
-//   npx supabase gen types typescript --db-url "<DB_URL>" --schema public
+// Tipos do banco SisLog, mantidos À MÃO (espelham supabase/migrations até a
+// 0080). Não substituir pela saída do `supabase gen types`: os apps importam
+// daqui os aliases (PerfilUsuario, SolicitacaoStatus, …), que o gerador não cria.
+//
+// Toda tabela/view precisa de `Relationships` (mesmo vazio): sem ele o
+// supabase-js 2.x não reconhece o schema e tipa tudo como `undefined`/`null`.
 
 export type Json =
   | string
@@ -13,6 +15,17 @@ export type Json =
 
 /** `painel_tv` (0079): conta da TV da sala, que só lê o Painel. */
 export type PerfilUsuario = 'admin' | 'gerente' | 'supervisor' | 'analista' | 'assistente' | 'painel_tv'
+
+/** 0079 — etapas com SLA configurável (oc_enviada existe, mas fica inativa). */
+export type SlaEtapaStatus = 'recebida' | 'em_cadastro' | 'instrucao_emitida' | 'oc_gerada' | 'oc_enviada'
+
+/** 0080 — filtros comuns das RPCs dos dashboards. */
+type DashFiltros = {
+  p_origem?: 'todas' | 'interno' | 'parceiro'
+  p_cliente_id?: string | null
+  p_local?: string | null
+}
+type DashPeriodo = { p_de: string; p_ate: string }
 
 /** 0074 — layout do sistema interno escolhido pelo usuário (modo ERP opt-in). */
 export type LayoutPreferido = 'classico' | 'erp'
@@ -111,6 +124,7 @@ export interface Database {
           layout_preferido?: LayoutPreferido
         }
         Update: Partial<Database['public']['Tables']['perfis_usuarios']['Insert']>
+        Relationships: []
       }
       subcontratadas: {
         Row: {
@@ -135,6 +149,7 @@ export interface Database {
           created_by?: string | null
         }
         Update: Partial<Database['public']['Tables']['subcontratadas']['Insert']>
+        Relationships: []
       }
       motoristas: {
         Row: {
@@ -161,6 +176,7 @@ export interface Database {
           created_by?: string | null
         }
         Update: Partial<Database['public']['Tables']['motoristas']['Insert']>
+        Relationships: []
       }
       veiculos: {
         Row: {
@@ -186,6 +202,7 @@ export interface Database {
           created_by?: string | null
         }
         Update: Partial<Database['public']['Tables']['veiculos']['Insert']>
+        Relationships: []
       }
       carretas: {
         Row: {
@@ -213,6 +230,7 @@ export interface Database {
           created_by?: string | null
         }
         Update: Partial<Database['public']['Tables']['carretas']['Insert']>
+        Relationships: []
       }
       clientes: {
         Row: {
@@ -273,6 +291,7 @@ export interface Database {
           created_by?: string | null
         }
         Update: Partial<Database['public']['Tables']['clientes']['Insert']>
+        Relationships: []
       }
       materiais: {
         Row: {
@@ -305,6 +324,7 @@ export interface Database {
           created_by?: string | null
         }
         Update: Partial<Database['public']['Tables']['materiais']['Insert']>
+        Relationships: []
       }
       solicitacoes: {
         Row: {
@@ -410,6 +430,7 @@ export interface Database {
           created_by?: string | null
         }
         Update: Partial<Database['public']['Tables']['solicitacoes']['Insert']>
+        Relationships: []
       }
       cargas_retorno: {
         Row: {
@@ -433,6 +454,7 @@ export interface Database {
           created_by?: string | null
         }
         Update: Partial<Database['public']['Tables']['cargas_retorno']['Insert']>
+        Relationships: []
       }
       solicitacao_anexos: {
         Row: {
@@ -458,6 +480,7 @@ export interface Database {
           updated_at?: string
         }
         Update: Partial<Database['public']['Tables']['solicitacao_anexos']['Insert']>
+        Relationships: []
       }
       solicitacao_pendencias: {
         Row: {
@@ -492,6 +515,7 @@ export interface Database {
           vista_equipe_em?: string | null
         }
         Update: Partial<Database['public']['Tables']['solicitacao_pendencias']['Insert']>
+        Relationships: []
       }
       // 0061 — grade de slots de cada terminal. Uma linha por horário: os dois
       // padrões (9 slots de 1h × 3 janelas de 6h) não cabem em janela_inicio/fim.
@@ -524,6 +548,7 @@ export interface Database {
           created_by?: string | null
         }
         Update: Partial<Database['public']['Tables']['terminal_janelas']['Insert']>
+        Relationships: []
       }
       agendamentos: {
         Row: {
@@ -599,6 +624,7 @@ export interface Database {
           contrato_frete_path?: string | null
           motivo_reagendamento?: string | null
         }
+        Relationships: []
       }
       // 0078 — agente de IA do WhatsApp (docs/SPEC-AGENTE-IA.md).
       agente_config: {
@@ -610,6 +636,7 @@ export interface Database {
         }
         Insert: { id?: number; modo?: AgenteModo; updated_by?: string | null }
         Update: { modo?: AgenteModo; updated_at?: string; updated_by?: string | null }
+        Relationships: []
       }
       agente_conversas: {
         Row: {
@@ -646,6 +673,7 @@ export interface Database {
           processando_ate?: string | null
           updated_at?: string
         }
+        Relationships: []
       }
       agente_mensagens: {
         Row: {
@@ -699,6 +727,7 @@ export interface Database {
           envio?: 'enviada' | 'sombra' | 'falhou' | null
           erro?: string | null
         }
+        Relationships: []
       }
       agente_historico: {
         Row: {
@@ -719,6 +748,7 @@ export interface Database {
         }
         // Append-only: sem UPDATE pela RLS.
         Update: Record<string, never>
+        Relationships: []
       }
       agente_acoes: {
         Row: {
@@ -746,6 +776,7 @@ export interface Database {
           decidido_por?: string | null
           decidido_em?: string | null
         }
+        Relationships: []
       }
       // 0070 — aceite do Termo de Uso e Confidencialidade. Escrita só pela RPC
       // `registrar_aceite_termos`; o app lê a própria linha para saber se ainda
@@ -760,6 +791,7 @@ export interface Database {
         }
         Insert: Record<string, never>
         Update: Record<string, never>
+        Relationships: []
       }
       eventos_portal: {
         Row: {
@@ -779,6 +811,7 @@ export interface Database {
         // valido (vs. `never`) para nao quebrar a inferencia do supabase-js.
         Insert: Record<string, never>
         Update: Record<string, never>
+        Relationships: []
       }
       log_auditoria: {
         Row: {
@@ -802,6 +835,7 @@ export interface Database {
           created_at?: string
         }
         Update: Partial<Database['public']['Tables']['log_auditoria']['Insert']>
+        Relationships: []
       }
       // 0059 — acesso a dado pessoal. Só `registrar_acesso` escreve.
       log_acesso: {
@@ -818,6 +852,7 @@ export interface Database {
         }
         Insert: Record<string, never>
         Update: Record<string, never>
+        Relationships: []
       }
       // 0060 — fila de arquivos cujo anexo foi apagado. Baixa só por
       // `marcar_storage_removido`.
@@ -834,6 +869,7 @@ export interface Database {
         }
         Insert: Record<string, never>
         Update: Record<string, never>
+        Relationships: []
       }
       parceiros: {
         Row: {
@@ -871,6 +907,7 @@ export interface Database {
           created_by?: string | null
         }
         Update: Partial<Database['public']['Tables']['parceiros']['Insert']>
+        Relationships: []
       }
       parceiro_usuarios: {
         Row: {
@@ -900,6 +937,7 @@ export interface Database {
           created_by?: string | null
         }
         Update: Partial<Database['public']['Tables']['parceiro_usuarios']['Insert']>
+        Relationships: []
       }
       parceiro_subcontratadas: {
         Row: {
@@ -928,6 +966,7 @@ export interface Database {
           created_by?: string | null
         }
         Update: Partial<Database['public']['Tables']['parceiro_subcontratadas']['Insert']>
+        Relationships: []
       }
       parceiro_motoristas: {
         Row: {
@@ -957,6 +996,7 @@ export interface Database {
           created_by?: string | null
         }
         Update: Partial<Database['public']['Tables']['parceiro_motoristas']['Insert']>
+        Relationships: []
       }
       parceiro_veiculos: {
         Row: {
@@ -984,6 +1024,7 @@ export interface Database {
           created_by?: string | null
         }
         Update: Partial<Database['public']['Tables']['parceiro_veiculos']['Insert']>
+        Relationships: []
       }
       parceiro_carretas: {
         Row: {
@@ -1014,6 +1055,7 @@ export interface Database {
           created_by?: string | null
         }
         Update: Partial<Database['public']['Tables']['parceiro_carretas']['Insert']>
+        Relationships: []
       }
       parceiro_pamcards: {
         Row: {
@@ -1037,6 +1079,7 @@ export interface Database {
           created_by?: string | null
         }
         Update: Partial<Database['public']['Tables']['parceiro_pamcards']['Insert']>
+        Relationships: []
       }
       // 0045 — linha única do kill switch / modo manutenção compartilhado.
       system_status: {
@@ -1053,6 +1096,70 @@ export interface Database {
           updated_at?: string
         }
         Update: Partial<Database['public']['Tables']['system_status']['Insert']>
+        Relationships: []
+      }
+      // 0079 — limites de SLA por etapa (Metas e SLA). Escrita só pela RPC
+      // salvar_metas_sla; o trigger carimba atualizado_em/por.
+      sla_etapas: {
+        Row: {
+          id: string
+          status: SlaEtapaStatus
+          aviso_min: number
+          alerta_min: number
+          ativo: boolean
+          atualizado_em: string
+          atualizado_por: string | null
+        }
+        Insert: {
+          id?: string
+          status: SlaEtapaStatus
+          aviso_min: number
+          alerta_min: number
+          ativo?: boolean
+        }
+        Update: Partial<Database['public']['Tables']['sla_etapas']['Insert']>
+        Relationships: []
+      }
+      // 0079 — linha única com as metas do dia e o expediente.
+      metas_operacao: {
+        Row: {
+          id: string
+          singleton: boolean
+          meta_finalizadas_dia: number | null
+          meta_lead_time_p90_min: number | null
+          alerta_validade_h: number
+          /** `time` do Postgres: chega como `HH:MM:SS`. */
+          expediente_inicio: string
+          expediente_fim: string
+          atualizado_em: string
+          atualizado_por: string | null
+        }
+        Insert: {
+          id?: string
+          meta_finalizadas_dia?: number | null
+          meta_lead_time_p90_min?: number | null
+          alerta_validade_h?: number
+          expediente_inicio?: string
+          expediente_fim?: string
+        }
+        Update: Partial<Database['public']['Tables']['metas_operacao']['Insert']>
+        Relationships: []
+      }
+      // 0079 — uma linha por mudança de status (trigger), mais o backfill do
+      // log_auditoria. Só leitura para a equipe interna.
+      solicitacao_transicoes: {
+        Row: {
+          id: number
+          solicitacao_id: string
+          de_status: SolicitacaoStatus | null
+          para_status: SolicitacaoStatus
+          em: string
+          usuario_id: string | null
+          fonte: 'trigger' | 'backfill'
+        }
+        Insert: never
+        Update: never
+        Relationships: []
       }
     }
     Views: {
@@ -1076,6 +1183,7 @@ export interface Database {
           cliente_minerio: boolean | null
           cliente_retorno: boolean | null
         }
+        Relationships: []
       }
       // 0075 — cargas de retorno ativas para o seletor de retorno do portal.
       // `observacoes` NÃO entra: texto livre da equipe (mesma regra da 0062).
@@ -1088,6 +1196,7 @@ export interface Database {
           cidade: string | null
           uf: string | null
         }
+        Relationships: []
       }
       portal_solicitacoes: {
         Row: {
@@ -1114,6 +1223,7 @@ export interface Database {
           // 0075 — carga de retorno escolhida (cliente + local).
           local_carregamento: string | null
         }
+        Relationships: []
       }
     }
     Functions: {
@@ -1263,6 +1373,106 @@ export interface Database {
       anonimizar_titular: {
         Args: { p_cpf: string; p_confirmar?: boolean }
         Returns: Json
+      }
+      // 0080 — dashboards (Painel, TV, Relatórios, Metas e SLA). Datas `p_de`/
+      // `p_ate` em `YYYY-MM-DD`, dias de America/Campo_Grande. O formato dos
+      // jsonb está em apps/interno/src/features/metricas/tipos.ts.
+      painel_estado_atual: {
+        Args: DashFiltros
+        Returns: Json
+      }
+      painel_hoje: {
+        Args: DashFiltros
+        Returns: Json
+      }
+      relatorio_resumo: {
+        Args: DashPeriodo & DashFiltros
+        Returns: Json
+      }
+      relatorio_serie: {
+        Args: DashPeriodo & DashFiltros & { p_granularidade?: 'hora' | 'dia' | 'semana' }
+        Returns: {
+          balde: string
+          entradas: number
+          finalizadas: number
+          canceladas: number
+          entradas_ant: number
+          finalizadas_ant: number
+        }[]
+      }
+      relatorio_tempo_etapas: {
+        Args: DashPeriodo & DashFiltros
+        Returns: {
+          status: SlaEtapaStatus
+          n: number
+          p50_min: number | null
+          p90_min: number | null
+          acima_alerta_pct: number | null
+        }[]
+      }
+      relatorio_ranking: {
+        Args: DashPeriodo & DashFiltros & { p_dimensao?: string; p_limite?: number }
+        Returns: {
+          chave: string | null
+          rotulo: string
+          entradas: number
+          finalizadas: number
+          lead_p50_min: number | null
+          emissao_p50_min: number | null
+          emissao_p90_min: number | null
+        }[]
+      }
+      relatorio_locais: {
+        Args: DashPeriodo
+        Returns: { local: string | null; qtd: number }[]
+      }
+      relatorio_mapa_calor: {
+        Args: DashPeriodo & DashFiltros
+        Returns: { dow: number; hora: number; entradas: number }[]
+      }
+      relatorio_produtividade: {
+        Args: DashPeriodo
+        Returns: Json
+      }
+      ids_para_drill: {
+        Args: DashPeriodo & DashFiltros & { p_tipo: string }
+        Returns: string[]
+      }
+      // Devolve linhas de solicitacoes: aceita select/embed/count/range.
+      solicitacoes_drill: {
+        Args: DashPeriodo & DashFiltros & { p_tipo: string }
+        Returns: Database['public']['Tables']['solicitacoes']['Row'][]
+        SetofOptions: {
+          from: '*'
+          to: 'solicitacoes'
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      exportar_solicitacoes_periodo: {
+        Args: DashPeriodo & DashFiltros & { p_offset?: number; p_limite?: number }
+        Returns: {
+          numero_interno: number
+          origem: string
+          parceiro: string | null
+          cliente: string | null
+          material: string | null
+          local: string | null
+          status: SolicitacaoStatus
+          criada_em: string
+          finalizada_em: string | null
+          lead_min: number | null
+          min_recebida: number | null
+          min_em_cadastro: number | null
+          min_instrucao_emitida: number | null
+          min_oc_gerada: number | null
+          min_oc_enviada: number | null
+        }[]
+      }
+      // Só admin (42501 'forbidden' para os demais); grava tudo numa transação.
+      salvar_metas_sla: {
+        Args: { p: Json }
+        Returns: undefined
       }
     }
     Enums: Record<string, never>

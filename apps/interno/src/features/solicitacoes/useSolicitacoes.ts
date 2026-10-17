@@ -290,7 +290,7 @@ async function montarConsulta(filters: Omit<ListFilters, 'page' | 'pageSize'>, c
   const opts = count ? { count: 'exact' as const } : undefined
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let query: any = r?.drill && r.de && r.ate
-    ? (supabase.rpc as unknown as (fn: string, a: Record<string, unknown>, o?: { count: 'exact' }) => { select: (s: string) => unknown })(
+    ? supabase.rpc(
         'solicitacoes_drill',
         // Filtros DENTRO da RPC: ids_para_drill corta em 1000 — filtrar depois
         // perderia linhas que o tile conta.

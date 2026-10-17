@@ -2,11 +2,10 @@
 // Produtividade, Metas e SLA). As telas e os hooks só falam com este arquivo.
 //
 // Dados reais: RPCs da migration 0080 (supabase/migrations/0080_rpcs_dashboards.sql)
-// e as tabelas sla_etapas/metas_operacao da 0079. Os retornos seguem tipos.ts.
-// As RPCs ainda não estão nos tipos gerados (packages/shared/src/database.types.ts):
-// por isso `rpc()` faz a chamada sem tipo — regenerar os tipos e trocar por
-// `supabase.rpc` tipado quando a 0080 estiver no remoto.
+// e as tabelas sla_etapas/metas_operacao da 0079. Nomes e argumentos são
+// conferidos por database.types.ts; o formato dos retornos jsonb segue tipos.ts.
 
+import type { Json } from '@/types/database.types'
 import { supabase } from '@/lib/supabase'
 import type {
   ConfigMetasSla,
@@ -33,67 +32,65 @@ import type {
 /** Fonte dos dados: sempre o banco (o modo simulado saiu com a 0080). */
 export const FONTE = 'rpc' as const
 
-// Chamada sem tipo enquanto as RPCs não estão em database.types.ts.
-type RpcSemTipo = (fn: string, args?: Record<string, unknown>) => PromiseLike<{ data: unknown; error: { message: string } | null }>
-
-async function rpc<T>(nome: string, args: Record<string, unknown>): Promise<T> {
-  const { data, error } = await (supabase.rpc as unknown as RpcSemTipo)(nome, args)
+/** Desembrulha a resposta; o jsonb das RPCs chega como `Json` e vira o tipo da tela. */
+async function dados<T>(consulta: PromiseLike<{ data: unknown; error: { message: string } | null }>): Promise<T> {
+  const { data, error } = await consulta
   if (error) throw error
   return data as T
 }
 
-function argsF(f: FiltrosComuns): Record<string, unknown> {
+function argsF(f: FiltrosComuns) {
   return { p_origem: f.origem, p_cliente_id: f.clienteId, p_local: f.local }
 }
 
-function argsP(p: FiltrosPeriodo): Record<string, unknown> {
+function argsP(p: FiltrosPeriodo) {
   return { p_de: p.de, p_ate: p.ate, ...argsF(p) }
 }
 
 // ── Painel / TV ─────────────────────────────────────────────────────────────
 
 export function buscarPainelEstadoAtual(f: FiltrosComuns): Promise<PainelEstadoAtual> {
-  return rpc('painel_estado_atual', argsF(f))
+  return dados(supabase.rpc('painel_estado_atual', argsF(f)))
 }
 
 export function buscarPainelHoje(f: FiltrosComuns): Promise<PainelHoje> {
-  return rpc('painel_hoje', argsF(f))
+  return dados(supabase.rpc('painel_hoje', argsF(f)))
 }
 
 // ── Relatórios ──────────────────────────────────────────────────────────────
 
 export function buscarRelatorioResumo(p: FiltrosPeriodo): Promise<RelatorioResumo> {
-  return rpc('relatorio_resumo', argsP(p))
+  return dados(supabase.rpc('relatorio_resumo', argsP(p)))
 }
 
 export function buscarRelatorioSerie(p: FiltrosPeriodo, granularidade: Granularidade): Promise<SerieLinha[]> {
-  return rpc('relatorio_serie', { ...argsP(p), p_granularidade: granularidade })
+  return dados(supabase.rpc('relatorio_serie', { ...argsP(p), p_granularidade: granularidade }))
 }
 
 export function buscarRelatorioTempoEtapas(p: FiltrosPeriodo): Promise<TempoEtapaLinha[]> {
-  return rpc('relatorio_tempo_etapas', argsP(p))
+  return dados(supabase.rpc('relatorio_tempo_etapas', argsP(p)))
 }
 
 export function buscarRelatorioRanking(p: FiltrosPeriodo, dimensao: DimensaoRanking, limite = 50): Promise<RankingLinha[]> {
-  return rpc('relatorio_ranking', { ...argsP(p), p_dimensao: dimensao, p_limite: limite })
+  return dados(supabase.rpc('relatorio_ranking', { ...argsP(p), p_dimensao: dimensao, p_limite: limite }))
 }
 
 export function buscarRelatorioLocais(p: Periodo): Promise<LocalLinha[]> {
-  return rpc('relatorio_locais', { p_de: p.de, p_ate: p.ate })
+  return dados(supabase.rpc('relatorio_locais', { p_de: p.de, p_ate: p.ate }))
 }
 
 export function buscarMapaCalor(p: FiltrosPeriodo): Promise<MapaCalorCelula[]> {
-  return rpc('relatorio_mapa_calor', argsP(p))
+  return dados(supabase.rpc('relatorio_mapa_calor', argsP(p)))
 }
 
 export function buscarProdutividade(p: Periodo): Promise<Produtividade> {
-  return rpc('relatorio_produtividade', { p_de: p.de, p_ate: p.ate })
+  return dados(supabase.rpc('relatorio_produtividade', { p_de: p.de, p_ate: p.ate }))
 }
 
 /** Uma página (≤ 1000 linhas) do CSV de dados tidy (§5). */
 export function buscarExportacaoPagina(p: FiltrosPeriodo, offset: number, limite = 1000): Promise<ExportLinha[]> {
   const lim = Math.min(limite, 1000)
-  return rpc('exportar_solicitacoes_periodo', { ...argsP(p), p_offset: offset, p_limite: lim })
+  return dados(supabase.rpc('exportar_solicitacoes_periodo', { ...argsP(p), p_offset: offset, p_limite: lim }))
 }
 
 // ── Opções dos filtros ──────────────────────────────────────────────────────
@@ -118,10 +115,9 @@ const METAS_PADRAO: ConfigMetasSla['metas'] = {
 }
 
 export async function buscarConfigMetasSla(): Promise<ConfigMetasSla> {
-  const sb = supabase as unknown as { from: (t: string) => { select: (c: string) => PromiseLike<{ data: unknown; error: { message: string } | null }> } }
   const [et, me] = await Promise.all([
-    sb.from('sla_etapas').select('*'),
-    sb.from('metas_operacao').select('*'),
+    supabase.from('sla_etapas').select('*'),
+    supabase.from('metas_operacao').select('*'),
   ])
   if (et.error) throw et.error
   if (me.error) throw me.error
@@ -144,16 +140,13 @@ export async function buscarConfigMetasSla(): Promise<ConfigMetasSla> {
 export async function salvarConfigMetasSla(entrada: ConfigMetasSlaEntrada): Promise<ConfigMetasSla> {
   // Uma transação só no banco (salvar_metas_sla, 0080): ou grava tudo, ou nada.
   // Só admin; o banco devolve 'forbidden' (42501) para os demais.
-  await rpc<null>('salvar_metas_sla', { p: entrada })
+  await dados<null>(supabase.rpc('salvar_metas_sla', { p: entrada as unknown as Json }))
   return buscarConfigMetasSla()
 }
 
 /** Fila atual (status + status_desde) para a prévia da tela de Metas. */
 export async function buscarFilaPrevia(): Promise<ItemFilaPrevia[]> {
-  const sb = supabase as unknown as {
-    from: (t: string) => { select: (c: string) => { in: (c: string, v: string[]) => { range: (a: number, b: number) => PromiseLike<{ data: unknown; error: { message: string } | null }> } } }
-  }
-  const { data, error } = await sb
+  const { data, error } = await supabase
     .from('solicitacoes')
     .select('status, status_desde')
     .in('status', ['recebida', 'em_cadastro', 'instrucao_emitida', 'oc_gerada', 'oc_enviada'])
