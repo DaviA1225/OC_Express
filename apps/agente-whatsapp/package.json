@@ -10,9 +10,12 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.40.0",
+    "@anthropic-ai/sdk": "0.129.0",
     "@sislog/shared": "*",
-    "@supabase/supabase-js": "^2.105.1"
+    "@supabase/supabase-js": "^2.105.1",
+    "@vercel/functions": "3.9.9",
+    "openai": "7.25.0",
+    "zod": "4.3.6"
   },
   "devDependencies": {
     "@types/node": "^24.12.2",

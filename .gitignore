@@ -43,5 +43,5 @@ supabase/.claude/
 backfill/
 
 # Impeccable — cache de runtime do hook (não versionar)
-.impeccable/hook.cache.json
+**/.impeccable/hook.cache.json
 .impeccable/config.local.json
