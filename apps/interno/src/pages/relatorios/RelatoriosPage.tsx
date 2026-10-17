@@ -557,12 +557,13 @@ const DIAS_SEMANA = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 function MapaCalor({ celulas }: { celulas: MapaCalorCelula[] }) {
   const max = Math.max(0, ...celulas.map((c) => c.entradas))
   if (max === 0) return <Vazio>Sem entradas no período.</Vazio>
-  const horas = Array.from({ length: 17 }, (_v, i) => i + 5) // 5h–21h
+  // As 24 horas: a operação tem entradas de madrugada e à noite.
+  const horas = Array.from({ length: 24 }, (_v, i) => i)
   const valor = (dow: number, hora: number) => celulas.find((c) => c.dow === dow && c.hora === hora)?.entradas ?? 0
   const ordem = [1, 2, 3, 4, 5, 6, 0]
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[560px] table-fixed border-separate border-spacing-[2px] text-meta" aria-label="Entradas por dia da semana e hora">
+      <table className="w-full min-w-[760px] table-fixed border-separate border-spacing-[2px] text-meta" aria-label="Entradas por dia da semana e hora">
         <thead>
           <tr>
             <th scope="col" className="w-10" />

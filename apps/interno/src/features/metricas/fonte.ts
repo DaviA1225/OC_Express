@@ -130,7 +130,8 @@ export async function buscarConfigMetasSla(): Promise<ConfigMetasSla> {
   // valores do seed (D3: sem meta) e a primeira gravação revela o problema.
   const metas = (me.data as ConfigMetasSla['metas'][] | null)?.[0] ?? METAS_PADRAO
   const ultima = [metas, ...etapas]
-    .filter((x) => x !== METAS_PADRAO).sort((a, b) => b.atualizado_em.localeCompare(a.atualizado_em))[0]
+    // Sem autor = valores do seed da 0079 (nunca alterados pela tela).
+    .filter((x) => x !== METAS_PADRAO && x.atualizado_por).sort((a, b) => b.atualizado_em.localeCompare(a.atualizado_em))[0]
   let porNome: string | null = null
   if (ultima?.atualizado_por) {
     const { data } = await supabase.from('perfis_usuarios').select('nome_completo').eq('user_id', ultima.atualizado_por).maybeSingle()
