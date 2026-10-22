@@ -4,6 +4,13 @@
     "ignoreFiles": [
       "apps/interno/src/features/pdf-generator/OCDocument.tsx"
     ],
-    "ignoreValues": []
+    "ignoreValues": [
+      {
+        "rule": "design-system-font",
+        "value": "theme('fontfamily.display')",
+        "createdAt": "2026-10-21T05:08:34.635Z",
+        "reason": "Claude: theme('fontFamily.display') resolve para Kanit (tailwind.config.js:35), fonte de display documentada no DESIGN.md; detector não resolve theme()"
+      }
+    ]
   }
 }

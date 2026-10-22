@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-07-23T12:00:00.000Z",
+  "generatedAt": "2026-10-22T12:00:00.000Z",
   "title": "Design System: SisLog LHG",
   "extensions": {
     "colorMeta": {
@@ -8,127 +8,209 @@
         "role": "primary",
         "displayName": "Laranja LHG",
         "canonical": "#FF5100",
-        "tonalRamp": ["#3A1300", "#5E2100", "#8A3100", "#C24300", "#FF5100", "#FF7A3D", "#FFA375", "#FFD2B8"]
+        "tonalRamp": [
+          "#3A1300",
+          "#5E2100",
+          "#8A3100",
+          "#C24300",
+          "#FF5100",
+          "#FF7A3D",
+          "#FFA375",
+          "#FFD2B8"
+        ]
       },
-      "orange-deep": {
+      "orange-fill": {
         "role": "primary",
-        "displayName": "Laranja Queimado",
-        "canonical": "#D3641A",
-        "tonalRamp": ["#2E1305", "#4A1F08", "#6E2F0C", "#9B4413", "#D3641A", "#E38845", "#EDAE7E", "#F6D4BC"]
+        "displayName": "Fill de Acento (AA com branco)",
+        "canonical": "#CC4100"
       },
-      "orange-strong": {
+      "orange-fill-hover": {
         "role": "primary",
-        "displayName": "Laranja Texto (AA)",
-        "canonical": "#CC4100",
-        "tonalRamp": ["#2E0F00", "#4D1900", "#742600", "#9E3300", "#CC4100", "#FF5100", "#FF7A3D", "#FFA375"]
+        "displayName": "Fill de Acento — hover",
+        "canonical": "#AD3700"
       },
-      "orange-tint": {
+      "orange-text": {
         "role": "primary",
-        "displayName": "Laranja Tom-Claro (fim do gradiente escuro)",
-        "canonical": "#FFB37A"
-      },
-      "ink": {
-        "role": "neutral",
-        "displayName": "Grafite Tinta",
-        "canonical": "#1A1F28",
-        "tonalRamp": ["#0E1118", "#1A1F28", "#2B303B", "#3D4350", "#565D6B", "#6B7280", "#9097A1", "#C3C8CF"]
-      },
-      "graphite-bar": {
-        "role": "neutral",
-        "displayName": "Grafite Barra",
-        "canonical": "#1D1E1B"
-      },
-      "slate-500": {
-        "role": "neutral",
-        "displayName": "Ardósia 500",
-        "canonical": "#6B7280"
-      },
-      "accent-gray": {
-        "role": "neutral",
-        "displayName": "Cinza Acento",
-        "canonical": "#EDEFF2"
-      },
-      "canvas": {
-        "role": "neutral",
-        "displayName": "Canvas Ardósia",
-        "canonical": "#F5F7F9",
-        "tonalRamp": ["#6B7280", "#8A929C", "#B4BAC2", "#D5D9DE", "#E1E4EA", "#EDEFF2", "#F5F7F9", "#FFFFFF"]
-      },
-      "border": {
-        "role": "neutral",
-        "displayName": "Borda Hairline",
-        "canonical": "#E1E4EA"
-      },
-      "surface": {
-        "role": "neutral",
-        "displayName": "Superfície",
-        "canonical": "#FFFFFF"
+        "displayName": "Acento como Texto",
+        "canonical": "#B23C0B"
       },
       "portal-blue": {
         "role": "primary",
         "displayName": "Azul Portal",
         "canonical": "#1E40AF",
-        "tonalRamp": ["#0C193F", "#122356", "#18316F", "#1E40AF", "#3457C9", "#5B79DB", "#8FA4E9", "#C3D0F5"]
+        "tonalRamp": [
+          "#0C193F",
+          "#122356",
+          "#18316F",
+          "#1E40AF",
+          "#3457C9",
+          "#5B79DB",
+          "#8FA4E9",
+          "#C3D0F5"
+        ]
       },
       "portal-blue-deep": {
         "role": "primary",
         "displayName": "Azul Portal Escuro",
         "canonical": "#1E3A8A"
       },
-      "portal-blue-tint": {
-        "role": "primary",
-        "displayName": "Azul Tom-Claro (fim do gradiente escuro)",
-        "canonical": "#93B4FF"
+      "ink": {
+        "role": "neutral",
+        "displayName": "Grafite Tinta",
+        "canonical": "#1A1F28",
+        "tonalRamp": [
+          "#0E1115",
+          "#1A1F28",
+          "#2A303B",
+          "#5B6472",
+          "#7D8696",
+          "#DCE1E8",
+          "#EEF1F4",
+          "#FFFFFF"
+        ]
+      },
+      "header": {
+        "role": "neutral",
+        "displayName": "Barra Superior Fria",
+        "canonical": "#1A1F28"
+      },
+      "canvas": {
+        "role": "neutral",
+        "displayName": "Canvas Ardósia Fria",
+        "canonical": "#EEF1F4"
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Superfície",
+        "canonical": "#FFFFFF"
+      },
+      "border": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "#DCE1E8"
+      },
+      "border-strong": {
+        "role": "neutral",
+        "displayName": "Contorno de Controle (≥3:1)",
+        "canonical": "#7D8696"
       },
       "canvas-dark": {
         "role": "neutral",
         "displayName": "Canvas Escuro",
-        "canonical": "#14171D",
-        "tonalRamp": ["#0B0E14", "#14171D", "#1A1F28", "#232833", "#2E3540", "#40485570", "#6B7280", "#94A3B8"]
+        "canonical": "#0E1115",
+        "tonalRamp": [
+          "#0A0C0F",
+          "#0E1115",
+          "#161A20",
+          "#1E232B",
+          "#262C35",
+          "#343B45",
+          "#6A7280",
+          "#E6E9EE"
+        ]
       },
       "surface-dark": {
         "role": "neutral",
         "displayName": "Superfície Escura",
-        "canonical": "#1A1F28"
+        "canonical": "#161A20"
       },
-      "elevated-dark": {
+      "raised-dark": {
         "role": "neutral",
-        "displayName": "Superfície Escura Elevada",
-        "canonical": "#232833"
-      },
-      "border-dark": {
-        "role": "neutral",
-        "displayName": "Hairline Escuro",
-        "canonical": "rgba(255,255,255,0.08)"
-      },
-      "glow-orange": {
-        "role": "primary",
-        "displayName": "Glow Laranja",
-        "canonical": "rgba(255,81,0,0.18)"
-      },
-      "glow-blue": {
-        "role": "primary",
-        "displayName": "Glow Azul",
-        "canonical": "rgba(30,64,175,0.18)"
+        "displayName": "Elevado Escuro",
+        "canonical": "#1E232B"
       }
     },
     "typographyMeta": {
-      "display": { "displayName": "Display (Kanit)", "purpose": "Títulos de tela e números grandes; peso industrial, teto 600." },
-      "body": { "displayName": "Corpo (Wanted Sans)", "purpose": "Conteúdo, formulários e células de tabela; 13–14px." },
-      "label": { "displayName": "Label", "purpose": "Rótulos UPPERCASE 11px de KPI e seções de cadastro — única situação de maiúsculas." }
+      "page": {
+        "displayName": "Página (Kanit 500)",
+        "purpose": "h1 de página via <PageHeader>; também o título do login."
+      },
+      "kpi": {
+        "displayName": "KPI (Kanit 500)",
+        "purpose": "Número de KPI, tabular-nums (via <KpiTile>)."
+      },
+      "title": {
+        "displayName": "Título",
+        "purpose": "h2 de seção (600)."
+      },
+      "title-sm": {
+        "displayName": "Título pequeno",
+        "purpose": "Título de diálogo / card (600)."
+      },
+      "body-lg": {
+        "displayName": "Corpo destaque",
+        "purpose": "Texto de destaque, título de estado vazio."
+      },
+      "body": {
+        "displayName": "Corpo (Wanted Sans)",
+        "purpose": "Corpo, célula, formulário, botão, item de menu."
+      },
+      "body-sm": {
+        "displayName": "Corpo pequeno",
+        "purpose": "Dica, descrição de diálogo, legenda, rótulo de seção do menu (600)."
+      },
+      "meta": {
+        "displayName": "Meta",
+        "purpose": "Cabeçalho de tabela (500, sem maiúsculas), data/hora, contadores, badge."
+      }
     },
     "shadows": [
-      { "name": "overlay", "value": "0 4px 12px rgba(0,0,0,0.08)", "purpose": "Única sombra do modo claro: apenas modais, popovers e dropdowns. Cards são planos." },
-      { "name": "overlay-dark", "value": "0 24px 60px -12px rgba(0,0,0,0.75)", "purpose": "Elevação de overlay no tema escuro (login, dropdowns sobre canvas-dark)." }
+      {
+        "name": "shadow-overlay",
+        "value": "0 4px 12px rgba(0,0,0,0.08)",
+        "purpose": "Única sombra das telas de trabalho: nível 2 (diálogo, popover, dropdown, barra de ação flutuante). Cards são planos."
+      }
     ],
     "motion": [
-      { "name": "color-200", "value": "color 200ms ease-out", "purpose": "Transição padrão de cor (hover, foco, mudança de status). Sem bounce/elastic." },
-      { "name": "shadow-200", "value": "box-shadow 200ms ease-out", "purpose": "Elevação por sombra no hover de cards (SolicitacaoCard) — sem transform, que borra o texto." }
+      {
+        "name": "duration-fast",
+        "value": "120ms",
+        "purpose": "Hover de cor/borda/fundo e elevação de 2px (sem scale, sem guarda motion-reduce)."
+      },
+      {
+        "name": "ease-firme",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Entradas e transições de estado (formulário do login, barras de gráfico, ponteiros da cena)."
+      },
+      {
+        "name": "entrada-formulario",
+        "value": "240ms ease-firme",
+        "purpose": "O bloco do login entra uma vez."
+      },
+      {
+        "name": "tremor-erro",
+        "value": "300ms",
+        "purpose": "Tremor do bloco do formulário no erro de credencial."
+      },
+      {
+        "name": "saida-formulario",
+        "value": "150ms",
+        "purpose": "O bloco sai antes de o app entrar embaixo da barra."
+      },
+      {
+        "name": "inicio-foto",
+        "value": "escala 1,06 → 1 em 2,4s (cubic-bezier(0.16, 1, 0.3, 1)), uma vez",
+        "purpose": "Primeira tela pública: a foto assenta ao abrir."
+      },
+      {
+        "name": "inicio-subir",
+        "value": "fade + 14px em 700ms, atrasos 0/90/180/260ms",
+        "purpose": "Primeira tela pública: título, frase e botões sobem em cascata curta."
+      }
     ],
     "breakpoints": [
-      { "name": "sm", "value": "640px" },
-      { "name": "md", "value": "768px" },
-      { "name": "lg", "value": "1024px" }
+      {
+        "name": "sm",
+        "value": "640px"
+      },
+      {
+        "name": "md",
+        "value": "768px"
+      },
+      {
+        "name": "lg",
+        "value": "1024px"
+      }
     ]
   },
   "components": [
@@ -136,95 +218,112 @@
       "name": "Primary Button",
       "kind": "button",
       "refersTo": "button-primary",
-      "description": "Ação primária. Único uso do acento cheio; cantos retos. No modo ESCURO o texto é escuro sobre o acento claro (inversão WCAG AA — branco sobre o laranja/azul luminoso falha).",
+      "description": "Ação primária: fill de acento com texto branco (4.86:1), raio 2px, 36px; afunda 1px ao pressionar.",
       "html": "<button class=\"ds-btn-primary\">Nova solicitação</button>",
-      "css": ".ds-btn-primary { display:inline-flex; align-items:center; gap:8px; height:36px; padding:0 12px; background:#FF5100; color:#231005; font-family:'Wanted Sans',system-ui,sans-serif; font-size:13px; font-weight:500; border:none; border-radius:2px; cursor:pointer; transition:background 200ms ease-out; } .ds-btn-primary:hover { background:#D3641A; } .ds-btn-primary:focus-visible { outline:none; box-shadow:0 0 0 1px #FFFFFF, 0 0 0 3px #FF5100; }"
+      "css": ".ds-btn-primary { display:inline-flex; align-items:center; gap:8px; height:36px; padding:0 12px; background:#CC4100; color:#FFFFFF; font-family:'Wanted Sans',system-ui,sans-serif; font-size:13px; font-weight:500; border:none; border-radius:2px; cursor:pointer; transition:background-color 120ms ease-out, transform 120ms ease-out; } .ds-btn-primary:hover { background:#AD3700; } .ds-btn-primary:active { transform:translateY(1px); } .ds-btn-primary:focus-visible { outline:none; box-shadow:0 0 0 2px #FFFFFF, 0 0 0 4px #D64400; }"
     },
     {
       "name": "Outline Button",
       "kind": "button",
       "refersTo": "button-outline",
-      "description": "Ação secundária. Borda hairline sobre branco, hover cinza neutro.",
+      "description": "Ação secundária: contorno de controle (≥3:1) sobre superfície, hover accent.",
       "html": "<button class=\"ds-btn-outline\">Cancelar</button>",
-      "css": ".ds-btn-outline { display:inline-flex; align-items:center; gap:8px; height:36px; padding:0 12px; background:#FFFFFF; color:#1A1F28; font-family:'Wanted Sans',system-ui,sans-serif; font-size:13px; font-weight:500; border:1px solid #E1E4EA; border-radius:2px; cursor:pointer; transition:background 200ms ease-out; } .ds-btn-outline:hover { background:#EDEFF2; } .ds-btn-outline:focus-visible { outline:none; box-shadow:0 0 0 1px #FFFFFF, 0 0 0 3px #FF5100; }"
+      "css": ".ds-btn-outline { display:inline-flex; align-items:center; gap:8px; height:36px; padding:0 12px; background:#FFFFFF; color:#1A1F28; font-family:'Wanted Sans',system-ui,sans-serif; font-size:13px; font-weight:500; border:1px solid #7D8696; border-radius:2px; cursor:pointer; transition:background-color 120ms ease-out; } .ds-btn-outline:hover { background:#E8ECF1; } .ds-btn-outline:focus-visible { outline:none; box-shadow:0 0 0 2px #FFFFFF, 0 0 0 4px #D64400; }"
     },
     {
       "name": "Text Input",
       "kind": "input",
       "refersTo": "input",
-      "description": "Campo de formulário. Borda hairline, foco com ring laranja.",
-      "html": "<input class=\"ds-input\" type=\"text\" placeholder=\"Buscar…\" />",
-      "css": ".ds-input { height:36px; width:240px; padding:0 12px; background:#FFFFFF; color:#1A1F28; font-family:'Wanted Sans',system-ui,sans-serif; font-size:14px; border:1px solid #E1E4EA; border-radius:2px; } .ds-input::placeholder { color:#6B7280; } .ds-input:focus-visible { outline:none; box-shadow:0 0 0 1px #FFFFFF, 0 0 0 3px #FF5100; }"
+      "description": "Campo: borda de controle (≥3:1), raio 2px, 36px; erro = borda destructive + mensagem ligada por aria-describedby.",
+      "html": "<input class=\"ds-input\" type=\"text\" placeholder=\"nome@empresa.com.br\" />",
+      "css": ".ds-input { height:36px; width:260px; padding:0 12px; background:#FFFFFF; color:#1A1F28; font-family:'Wanted Sans',system-ui,sans-serif; font-size:13px; border:1px solid #7D8696; border-radius:2px; } .ds-input::placeholder { color:#5F6777; } .ds-input:focus-visible { outline:none; box-shadow:0 0 0 2px #FFFFFF, 0 0 0 4px #D64400; } .ds-input[aria-invalid='true'] { border-color:#C8312B; }"
     },
     {
       "name": "Surface Card",
       "kind": "card",
       "refersTo": "card",
-      "description": "Container plano: hairline + canvas atrás, sem sombra em repouso.",
-      "html": "<div class=\"ds-card\"><p class=\"ds-card-label\">TOTAL DE OCs</p><p class=\"ds-card-value\">128</p></div>",
-      "css": ".ds-card { background:#FFFFFF; border:1px solid #E1E4EA; border-radius:4px; padding:16px; font-family:'Wanted Sans',system-ui,sans-serif; } .ds-card-label { margin:0; font-size:11px; font-weight:500; letter-spacing:0.5px; text-transform:uppercase; color:#6B7280; } .ds-card-value { margin:8px 0 0; font-size:28px; line-height:1; color:#1A1F28; font-variant-numeric:tabular-nums; }"
+      "description": "Seção plana: bg-card + hairline + raio 4px, sem sombra; clicável sobe 2px no hover.",
+      "html": "<div class=\"ds-card\"><p class=\"ds-card-label\">OCS HOJE</p><p class=\"ds-card-value\">128</p></div>",
+      "css": ".ds-card { background:#FFFFFF; border:1px solid #DCE1E8; border-radius:4px; padding:16px; font-family:'Wanted Sans',system-ui,sans-serif; transition:transform 120ms ease-out, background-color 120ms ease-out, border-color 120ms ease-out; } .ds-card:hover { transform:translateY(-2px); border-color:#7D8696; background:#F1F4F7; } .ds-card-label { margin:0; font-size:11px; font-weight:500; text-transform:uppercase; color:#5B6472; } .ds-card-value { margin:8px 0 0; font-family:Kanit,'Wanted Sans',system-ui,sans-serif; font-size:28px; line-height:32px; font-weight:500; color:#1A1F28; font-variant-numeric:tabular-nums; }"
     },
     {
       "name": "Status Badge",
       "kind": "chip",
       "refersTo": "status-badge",
-      "description": "Componente assinatura: par fundo-claro/texto-escuro do mesmo tom; cor nunca é o único sinal. No escuro, fundo = cor-do-texto a 12%, borda a 30%.",
-      "html": "<span class=\"ds-status\">OC enviada</span>",
-      "css": ".ds-status { display:inline-flex; align-items:center; padding:2px 8px; border-radius:9999px; background:#D1FAE5; color:#065F46; font-family:'Wanted Sans',system-ui,sans-serif; font-size:12px; font-weight:500; transition:background 200ms ease-out, color 200ms ease-out; }"
+      "description": "Componente assinatura: retângulo 2px (não pílula), ponto de 8px + rótulo; cor nunca é o único sinal.",
+      "html": "<span class=\"ds-status\"><span class=\"ds-status-dot\"></span>OC enviada</span>",
+      "css": ".ds-status { display:inline-flex; align-items:center; gap:6px; padding:2px 8px; border-radius:2px; background:#EEE8FA; color:#4E2F9E; font-family:'Wanted Sans',system-ui,sans-serif; font-size:11px; line-height:16px; font-weight:500; } .ds-status-dot { width:8px; height:8px; border-radius:9999px; background:#7352C7; }"
     },
     {
       "name": "Drawer Nav Item (active)",
       "kind": "nav",
       "refersTo": "nav-item-active",
-      "description": "Item ativo do drawer (interno): fundo ACCENT CINZA NEUTRO (não a cor de marca) + barra vertical 3px laranja à esquerda via ::before. A cor de marca fica reservada à barra-indicador, não ao fundo.",
+      "description": "Item ativo do menu: fundo accent neutro + barra de 2px do acento à esquerda.",
       "html": "<a class=\"ds-nav-active\">Solicitações</a>",
-      "css": ".ds-nav-active { position:relative; display:flex; align-items:center; gap:8px; height:36px; padding:0 12px; border-radius:8px; background:#EDEFF2; color:#1A1F28; font-family:'Wanted Sans',system-ui,sans-serif; font-size:13px; font-weight:500; text-decoration:none; } .ds-nav-active::before { content:''; position:absolute; left:0; top:50%; transform:translateY(-50%); width:3px; height:20px; border-radius:0 9999px 9999px 0; background:#FF5100; }"
+      "css": ".ds-nav-active { position:relative; display:flex; align-items:center; gap:8px; height:36px; padding:0 12px; border-radius:2px; background:#E8ECF1; color:#1A1F28; font-family:'Wanted Sans',system-ui,sans-serif; font-size:13px; font-weight:500; text-decoration:none; } .ds-nav-active::before { content:''; position:absolute; left:0; top:0; bottom:0; width:2px; background:#FF5100; }"
     },
     {
-      "name": "Menu Button (header)",
-      "kind": "button",
-      "refersTo": "button-menu",
-      "description": "Entrada da navegação no header grafite: outline BRANCO (borda e texto brancos, fundo transparente). Não usa o acento — preserva a Voz Única para ações primárias.",
-      "html": "<button class=\"ds-btn-menu\">☰ Menu</button>",
-      "css": ".ds-btn-menu { display:inline-flex; align-items:center; gap:8px; height:36px; padding:0 12px; background:transparent; color:#FFFFFF; font-family:'Wanted Sans',system-ui,sans-serif; font-size:13px; font-weight:500; border:1px solid rgba(255,255,255,0.4); border-radius:2px; cursor:pointer; transition:background 200ms ease-out; } .ds-btn-menu:hover { background:rgba(255,255,255,0.1); }"
+      "name": "CTA em pílula (primeira tela)",
+      "refersTo": "inicio-pilula",
+      "description": "Botão principal da primeira tela pública: pílula no fill de acento (#CC4100, branco AA 4,86:1), caixa alta 14px 600, seta à direita; hover escurece (#AD3700) e sobe 2px. Só existe nesta tela.",
+      "html": "<a class=\"ds-inicio-pilula\" href=\"/login\">Entrar no SisLog <span aria-hidden>→</span></a>",
+      "css": ".ds-inicio-pilula { display:inline-flex; align-items:center; gap:10px; height:52px; padding:0 28px; border-radius:9999px; background:#CC4100; color:#fff; font:600 14px/1 'Wanted Sans', sans-serif; letter-spacing:.04em; text-transform:uppercase; text-decoration:none; } .ds-inicio-pilula:hover { background:#AD3700; transform:translateY(-2px); }"
     }
   ],
   "narrative": {
     "northStar": "A Sala de Controle",
-    "overview": "O SisLog não é um produto de vitrine — é o painel onde uma operação de transporte roda. A estética é a de uma sala de controle industrial: estrutura grafite neutra, densidade alta, informação legível à distância de um relance, e um único sinal quente — o laranja LHG #FF5100 — usado com parcimônia. O sistema rejeita o look de IA/template SaaS (gradientes, chips pastel, cards aninhados, saudação consumer, Inter-para-tudo, ícone em quadradinho, eyebrow uppercase) e também o extremo oposto, a planilha disfarçada. Uma extensão de MODO ESCURO (SPEC-NOVA-UI v3) relaxa a regra do plano-por-padrão só em pontos escassos e posicionados (glow/gradiente), sempre tom-claro→sólido do mesmo acento.",
+    "overview": "O SisLog não é um produto de vitrine — é o painel onde uma operação de transporte roda. A estética é a de uma sala de controle industrial: estrutura grafite neutra, densidade alta, informação legível à distância de um relance, e um único sinal quente — o laranja LHG #FF5100 — usado com parcimônia para dizer \"aqui, agora, esta é a ação\". Tudo o que não é dado ou ação primária recua para tons de grafite e ardósia. A interface trabalha para o atendente que processa até 30 OCs por dia; cada pixel de espaço morto removido é tempo devolvido à operação.\n\nReferência de acabamento (2026-10-15): software corporativo de grande porte — Fluent 2, IBM Carbon, SAP Fiori Horizon. Sóbrio, previsível, denso, com a mesma gramática nos dois temas.\n\nO sistema rejeita explicitamente o \"look de IA / template SaaS\": nada de gradientes, glow ou vidro fosco em tela de trabalho, nada de chips pastel coloridos competindo entre si, nada de cards aninhados, nada de saudação consumer (\"Boa tarde, fulano\") numa tela de trabalho. A fonte não é Inter-para-tudo; o ícone não vive num quadradinho colorido acima de cada título; não há eyebrow uppercase sobre cada seção. O extremo oposto também é proibido: a \"planilha disfarçada\" (grades de células sem fluxo) é justamente o que este sistema veio substituir.",
     "keyCharacteristics": [
-      "Estrutura grafite neutra; laranja como acento único (≤10% da tela).",
-      "Densidade alta a serviço da velocidade: padding 12–16px, corpo 13–14px.",
-      "Plano por padrão; separação por hairline, não por sombra.",
-      "Cantos retos (2–4px); institucional, não fofo.",
-      "Tipografia industrial (Kanit display + Wanted Sans corpo).",
-      "Status nunca só por cor; sempre rótulo + tom.",
-      "Acento como TEXTO usa tom mais escuro (orange-strong #CC4100) para WCAG AA; como FILL preserva #FF5100 com tinta escura no botão."
+      "Estrutura grafite FRIA (H≈215); laranja como acento único (≤10% da tela).",
+      "Densidade alta a serviço da velocidade: padding 12–16px, corpo 13px.",
+      "Plano por padrão; profundidade por CAMADAS de superfície + hairline, não sombra.",
+      "Cantos retos (2px controle, 4px superfície); institucional, não \"fofo\".",
+      "Tipografia industrial (Kanit em título de página e KPI + Wanted Sans no resto).",
+      "Status nunca só por cor; sempre rótulo + ponto + tom.",
+      "Tokens únicos (index.css + tailwind.config.js); contrato de uso em `.omc/handoffs/tokens-contract.md`."
     ],
     "rules": [
-      { "name": "A Regra da Voz Única", "body": "O laranja (azul no portal) aparece em no máximo ~10% de qualquer tela. Sua raridade é o que o torna um sinal de ação.", "section": "colors" },
-      { "name": "A Regra do Tinte Frio", "body": "Neutros levam um leve toque na direção H220 (frio), nunca para o quente por default. O calor vem do acento, da tipografia e do conteúdo — nunca do fundo.", "section": "colors" },
-      { "name": "A Regra do Peso-Teto", "body": "Nada acima de 600. O peso institucional vem do tracking apertado e da estrutura, não de 700/800.", "section": "typography" },
-      { "name": "A Regra do Plano-Por-Padrão", "body": "Superfícies são planas em repouso. Sombra só quando algo está literalmente sobreposto (modal/dropdown). Relaxada só no modo escuro, em pontos escassos (glow/gradiente).", "section": "elevation" }
+      {
+        "name": "A Regra da Voz Única",
+        "body": "O laranja (e, no portal, o azul) aparece em no máximo ~10% de qualquer tela. Sua raridade é o que o torna um sinal de ação.",
+        "section": "colors"
+      },
+      {
+        "name": "A Regra do Tinte Frio",
+        "body": "Neutros levam um leve toque na direção H215 (frio), nunca para o quente \"porque a marca é laranja\". O calor vem do acento — nunca do fundo. (A antiga barra #1D1E1B, quente, foi aposentada.)",
+        "section": "colors"
+      },
+      {
+        "name": "A Regra do Peso-Teto",
+        "body": "Nada acima de 600 (Kanit 700 removido do @import).",
+        "section": "typography"
+      },
+      {
+        "name": "A Regra da Luz Contida",
+        "body": "Degradê, vinheta e luz de cor existem SÓ no véu da foto da primeira tela pública, e a pílula só nos botões dela. Login, /sobre e todas as telas de trabalho seguem planos e de cantos retos — se a luz vaza para fora da foto, está errado.",
+        "section": "elevation"
+      }
     ],
     "dos": [
-      "Do reservar o laranja #FF5100 (azul #1E40AF no portal) para ação primária, estado ativo e foco — ≤10% da tela.",
-      "Do separar superfícies com hairline 1px (#E1E4EA) e o contraste canvas×branco.",
-      "Do manter densidade alta: padding 12–16px, corpo 13–14px, sem espaço morto.",
-      "Do usar cantos retos (2px controles, 4px superfícies) e tabular-nums em números.",
-      "Do acompanhar todo status de rótulo + ícone, nunca só de cor (WCAG AA, corpo ≥ 4.5:1).",
-      "Do usar o acento COMO TEXTO no tom escuro (orange-strong) e tinta escura no botão de acento — o #FF5100 puro falha AA como texto/branco.",
-      "Do dar alternativa prefers-reduced-motion a toda animação."
+      "**Do** reservar o laranja para ação primária, estado ativo e foco — ≤10% da tela.",
+      "**Do** separar camadas com canvas × superfície × hairline.",
+      "**Do** manter densidade alta: padding 12–16px, corpo 13px, linha de tabela 40px.",
+      "**Do** usar cantos retos (2px controles, 4px superfícies) e `tabular-nums`.",
+      "**Do** acompanhar todo status de rótulo + ponto, nunca só de cor (AA é o piso).",
+      "**Do** usar os tokens (`text-body`, `bg-warning-subtle`, `var(--chart-n)`) e os componentes base (`PageHeader`, `KpiTile`, `ChartTooltip`, `Spinner`, `EmptyState`, `CadastroField`)."
     ],
     "donts": [
-      "Don't usar gradientes em superfícies grandes nem de duas cores diferentes. Exceção única: modo escuro, device pontual tom-claro→sólido do MESMO acento (wordmark do login, número hero de KPI).",
-      "Don't usar chips de ícone pastel coloridos competindo entre si — ícones de KPI são monocromáticos.",
-      "Don't aninhar card dentro de card, nem repetir grades de cards idênticos sem fim.",
-      "Don't colocar saudação consumer ('Boa tarde, fulano') em tela de operação.",
-      "Don't usar Inter para tudo, ícone em quadradinho acima de cada título, ou eyebrow UPPERCASE sobre cada seção.",
-      "Don't usar border-left/right > 1px como stripe colorido em cards, itens de lista ou callouts.",
-      "Don't dar sombra decorativa a cards (plano por padrão; sombra só em modal/dropdown).",
-      "Don't virar planilha disfarçada: toda tela tem fluxo e foco."
+      "**Don't** usar gradiente, glow, `backdrop-blur` ou texto em gradiente — em nenhuma tela e em nenhum dos temas. Única exceção: a luz cinematográfica DENTRO da cena do login (grading, faróis, vinheta, brilho do para-brisa), decisão do Davi em 2026-10-22; o painel do formulário e todas as telas de trabalho seguem planos.",
+      "**Don't** usar scale, translate-x ou sombra colorida no hover (cards, itens de menu, ícones). O único movimento aceito é a elevação de 2px (`-translate-y-0.5`).",
+      "**Don't** pôr ícone em caixa colorida (KPI, título, aviso) — ícone vai solto.",
+      "**Don't** usar pílula `rounded-full` em status/tag — retângulo 2px.",
+      "**Don't** usar cores cruas do Tailwind (amber/red/emerald/slate-*) nem hex soltos em componente; use os tokens semânticos.",
+      "**Don't** aninhar card dentro de card, nem repetir grades de cards idênticos sem fim.",
+      "**Don't** colocar saudação consumer em tela de operação.",
+      "**Don't** usar Inter para tudo, eyebrow UPPERCASE sobre seção, ou `text-[Npx]`.",
+      "**Don't** usar `border-left`/`border-right` > 1px como stripe decorativo (a faixa de status de 3px e a barra de 2px do item ativo são indicadores, não decoração).",
+      "**Don't** dar sombra a cards (sombra só no nível 2).",
+      "**Don't** virar \"planilha disfarçada\": toda tela tem fluxo e foco."
     ]
   }
 }
