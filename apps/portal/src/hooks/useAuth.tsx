@@ -54,20 +54,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [parceiro, setParceiro] = React.useState<Parceiro | null>(null)
   const [loading, setLoading] = React.useState(true)
 
+  // Consulta em andamento, por usuário. O login (signIn) e o onAuthStateChange
+  // pedem o mesmo vínculo quase juntos: com duas consultas, a que falhasse por
+  // último zerava o vínculo que a outra tinha carregado ("acesso não autorizado").
+  const perfilEmAndamento = React.useRef<{ userId: string; promessa: Promise<void> } | null>(null)
+
   const loadPerfil = React.useCallback(async (currentSession: Session | null) => {
     if (!currentSession?.user) {
       setParceiroUsuario(null)
       setParceiro(null)
       return
     }
-    try {
-      const result = await fetchParceiroUsuario(currentSession.user.id)
-      setParceiroUsuario(result?.parceiroUsuario ?? null)
-      setParceiro(result?.parceiro ?? null)
-    } catch {
-      setParceiroUsuario(null)
-      setParceiro(null)
-    }
+    const userId = currentSession.user.id
+    if (perfilEmAndamento.current?.userId === userId) return perfilEmAndamento.current.promessa
+    const promessa = (async () => {
+      try {
+        const result = await fetchParceiroUsuario(userId)
+        setParceiroUsuario(result?.parceiroUsuario ?? null)
+        setParceiro(result?.parceiro ?? null)
+      } catch {
+        setParceiroUsuario(null)
+        setParceiro(null)
+      }
+    })()
+    perfilEmAndamento.current = { userId, promessa }
+    // A promessa nunca rejeita (o catch acima absorve), então o finally também não.
+    void promessa.finally(() => {
+      if (perfilEmAndamento.current?.promessa === promessa) perfilEmAndamento.current = null
+    })
+    return promessa
   }, [])
 
   React.useEffect(() => {
@@ -108,7 +123,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [loadPerfil])
 
   const signIn: AuthContextValue['signIn'] = async (email, password, captchaToken) => {
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
       options: captchaToken ? { captchaToken } : undefined,
@@ -118,6 +133,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { error: traduzirErroAuth(error.message) }
     }
     void registrarEvento('portal_login')
+    // Vínculo do parceiro carregado ANTES de devolver: o login navega logo em
+    // seguida, e o ProtectedRoute sem vínculo mostrava "acesso não autorizado"
+    // por um instante. O onAuthStateChange reaproveita esta mesma consulta.
+    await loadPerfil(data.session)
     return { error: null }
   }
 

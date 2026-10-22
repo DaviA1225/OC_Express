@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route } from 'react-router-dom'
 import { AuthProvider } from '@/hooks/useAuth'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { ProtectedRoute } from '@/components/shared/ProtectedRoute'
@@ -8,6 +8,7 @@ import { AppLayout } from '@/components/layout/AppLayout'
 import { VigiaDeSessao } from '@/features/auth/VigiaDeSessao'
 import { TermosDialog } from '@/features/termos/TermosDialog'
 import LoginPage from '@/pages/auth/LoginPage'
+import InicioPage from '@/pages/publico/InicioPage'
 
 // O Dashboard entra em lazy junto com as demais páginas. Importado direto, ele
 // arrastava o recharts (~107 kB gzip, chunk `charts`) para o modulepreload do
@@ -43,6 +44,9 @@ const PerfilPage = lazy(() => import('@/pages/perfil/PerfilPage'))
 const NotFoundPage = lazy(() => import('@/pages/errors/NotFoundPage'))
 const TvPage = lazy(() => import('@/pages/operacao/TvPage'))
 const MetasSlaPage = lazy(() => import('@/pages/admin/MetasSlaPage'))
+// Página pública de apresentação + apoio por PIX. Lazy: quem só vai logar não
+// baixa as reproduções das telas junto com o login.
+const ApresentacaoPage = lazy(() => import('@/pages/publico/ApresentacaoPage'))
 
 function PageFallback() {
   return (
@@ -62,6 +66,10 @@ export default function App() {
         <TermosDialog />
         <Suspense fallback={<PageFallback />}>
           <Routes>
+            {/* Fora do ProtectedRoute de propósito: são para quem ainda não
+                entrou (a primeira tela manda quem tem sessão para o Painel). */}
+            <Route path="/" element={<InicioPage />} />
+            <Route path="/sobre" element={<ApresentacaoPage />} />
             <Route path="/login" element={<LoginPage />} />
 
             <Route element={<ProtectedRoute />}>
@@ -69,7 +77,6 @@ export default function App() {
                   `painel_tv` só chega aqui — o ProtectedRoute a manda para cá. */}
               <Route path="/operacao/tv" element={<TvPage />} />
               <Route element={<AppLayout />}>
-                <Route path="/" element={<Navigate to="/dashboard" replace />} />
                 <Route path="/dashboard" element={<DashboardPage />} />
                 <Route path="/solicitacoes" element={<SolicitacoesListPage />} />
                 <Route path="/solicitacoes/:id" element={<SolicitacaoDetailPage />} />
