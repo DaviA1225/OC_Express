@@ -91,8 +91,11 @@ export function JanelasErp() {
   const endereco = location.pathname + location.search
 
   // A rota manda: abrir uma solicitação cria (ou ativa) a aba dela; qualquer
-  // outra tela passa a ser a área de trabalho.
-  React.useEffect(() => {
+  // outra tela passa a ser a área de trabalho. Ajuste durante o render, como a
+  // troca de usuário acima — num efeito, cada navegação renderizava duas vezes.
+  const [rotaVista, setRotaVista] = React.useState<string | null>(null)
+  if (rotaVista !== endereco) {
+    setRotaVista(endereco)
     setEstado((e) => {
       if (docAtual) {
         if (e.documentos.includes(docAtual)) return e
@@ -102,7 +105,7 @@ export function JanelasErp() {
       }
       return e.trabalho === endereco ? e : { ...e, trabalho: endereco }
     })
-  }, [docAtual, endereco])
+  }
 
   React.useEffect(() => {
     if (!userId) return
