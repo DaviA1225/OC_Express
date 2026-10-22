@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 import { TurnstileWidget, type TurnstileHandle } from '@/components/TurnstileWidget'
 import { useAuth } from '@/hooks/useAuth'
+import { useTheme } from '@/hooks/useTheme'
 import { emailLembrado, esquecerEmail, lembrarEmail } from '@sislog/shared/cookies'
 import { TermosLeitura } from '@/features/termos/TermosLeitura'
 import { lerMotivoSaida, limparMotivoSaida } from '@sislog/shared/sessao'
@@ -32,6 +33,7 @@ type Step = 'welcome' | 'credentials'
 
 export default function LoginPage() {
   const { signIn, session, loading } = useAuth()
+  const { theme } = useTheme()
   const navigate = useNavigate()
 
   // Cookie de conveniência com o e-mail — nunca a senha (ver
@@ -52,6 +54,14 @@ export default function LoginPage() {
   const [captchaToken, setCaptchaToken] = React.useState<string | null>(null)
   const turnstileRef = React.useRef<TurnstileHandle>(null)
   const captchaEnabled = Boolean(TURNSTILE_SITE_KEY)
+
+  // Trocar o tema recria o widget do Turnstile: o token do widget antigo deixa
+  // de valer (e o aviso de expiração dele nunca chegaria).
+  const [temaDoCaptcha, setTemaDoCaptcha] = React.useState(theme)
+  if (temaDoCaptcha !== theme) {
+    setTemaDoCaptcha(theme)
+    setCaptchaToken(null)
+  }
 
   // Movimento (hooks/useMovimento + index.css): entrada coreografada só na
   // abertura; troca de etapa desliza; erro do submit faz o card tremer.
@@ -109,17 +119,20 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="relative flex min-h-full items-center justify-center overflow-hidden bg-canvas px-4 py-10">
-      {/* Glow orb azul atrás do card — "hero" da entrada do parceiro (SPEC-NOVA-UI §4).
-          Exceção de marca (DESIGN.md §7): gradiente e brilho só aqui no login. */}
-      <div
+    <div className="relative isolate flex min-h-full items-center justify-center overflow-hidden bg-[#0B0D10] px-4 py-10">
+      {/* O cartão de sempre sobre a foto da caçamba sendo carregada na mina, sob
+          um véu escuro (bloco "Fundo do login" do index.css; Pexels 29506742,
+          marcas de terceiros desfocadas). */}
+      <img
+        src="/inicio/mina-1920.webp"
+        srcSet="/inicio/mina-1280.webp 1280w, /inicio/mina-1920.webp 1920w"
+        sizes="100vw"
+        alt=""
         aria-hidden
-        className="pointer-events-none absolute inset-0 m-auto h-[440px] w-[440px] rounded-full bg-[rgba(30,64,175,0.10)] blur-[130px] dark:bg-[var(--glow-blue)]"
+        className="login-fundo"
+        decoding="async"
       />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_100%_70%_at_50%_-10%,rgba(30,64,175,0.06),transparent_55%)]"
-      />
+      <div className="login-veu" aria-hidden />
       <div className="relative w-full max-w-[380px]">
         <div ref={cardRef} className="relative isolate p-8">
           {/* Superfície do card numa camada própria: entra depois do wordmark
@@ -128,12 +141,13 @@ export default function LoginPage() {
             aria-hidden
             className={cn('absolute inset-0 -z-10 rounded-surface border bg-card shadow-overlay', ent)} style={ordem(2)}
           />
-          {/* Wordmark — destaque tipográfico único: gradiente tom-claro→sólido do azul. */}
+          {/* Wordmark no azul do portal (sólido: o degradê de antes usava tokens
+              que saíram com o visual corporativo). */}
           <div className={cn('mb-6 flex items-center gap-2.5', ent)} style={ordem(0)}>
             <div className="inline-flex h-9 w-9 items-center justify-center rounded-surface bg-primary text-body font-semibold text-primary-foreground">
               LHG
             </div>
-            <span className="bg-gradient-to-r from-[#1E40AF] to-[#1E3A8A] bg-clip-text font-display text-title-sm font-semibold leading-tight tracking-tight text-transparent dark:from-[var(--portal-blue-tint)] dark:to-[#1E40AF]">
+            <span className="font-display text-title-sm font-semibold leading-tight tracking-tight text-[#1E40AF] dark:text-[#8DB4E0]">
               Portal Parceiros LHG
             </span>
           </div>
@@ -251,6 +265,9 @@ export default function LoginPage() {
                     <TurnstileWidget
                       ref={turnstileRef}
                       siteKey={TURNSTILE_SITE_KEY!}
+                      // Tema do portal, não o do sistema operacional: com `auto` o
+                      // widget saía escuro sobre o cartão claro.
+                      theme={theme}
                       onVerify={setCaptchaToken}
                       onExpire={() => setCaptchaToken(null)}
                       onError={() => setCaptchaToken(null)}
@@ -278,11 +295,13 @@ export default function LoginPage() {
           )}
         </div>
 
-        <div className={cn('mt-5 space-y-1 text-center', ent)} style={ordem(9)}>
+        {/* Rodapé sobre a foto: `dark` faz os tokens resolverem para os tons
+            claros do tema escuro, legíveis sobre o véu nos dois temas. */}
+        <div className={cn('dark mt-5 space-y-1 text-center', ent)} style={ordem(9)}>
           <p className="text-meta text-muted-foreground">
             Acesso restrito a transportadoras parceiras · sessões registradas
           </p>
-          <p className="text-meta text-tertiary">
+          <p className="text-meta text-muted-foreground">
             © {new Date().getFullYear()} LHG Logística, Portal de Parceiros ·{' '}
             <button
               type="button"

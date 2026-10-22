@@ -132,11 +132,6 @@ colors:
   chart-dark-bad: "#F07167"
   cat-partner-dark-bg: "#2949C4"
   cat-partner-dark-border: "#3A5AD6"
-  login-canvas-dark: "#14171D"
-  login-surface-dark: "#1A1F28"
-  login-elevated-dark: "#232833"
-  orange-tint: "#FFB37A"
-  portal-blue-tint: "#93B4FF"
 typography:
   page:
     fontFamily: "Kanit, 'Wanted Sans', ui-sans-serif, system-ui, sans-serif"
@@ -361,7 +356,9 @@ O sistema é **plano por padrão**. A profundidade vem das CAMADAS (canvas → s
 - **Nível 2** — sobreposto: diálogo, popover, dropdown, barra de ação flutuante —
   `bg-popover` + `border` + `shadow-overlay` (`0 4px 12px rgba(0,0,0,0.08)`).
 
-Sem glow, sem `backdrop-blur`/vidro, sem sombra decorativa em card.
+Sem glow, sem `backdrop-blur`/vidro, sem sombra decorativa em card. A única
+exceção de luz é o véu sobre a foto da mina — primeira tela e fundo do login
+(§5, A Regra da Luz Contida).
 
 ## 5. Components
 
@@ -434,6 +431,62 @@ Sem glow, sem `backdrop-blur`/vidro, sem sombra decorativa em card.
   centro; rede + tema + notificações + usuário à direita. Não repete o título da página.
 - **Top nav (portal):** horizontal, item ativo = texto azul + sublinhado azul de 2px.
 
+### Login — o cartão de produção sobre a foto (2026-10-22)
+Histórico curto: o cartão centralizado (produção até out/2026) deu lugar, nesta
+branch, à "barra de controle" (2026-10-21), depois a uma cena 2D e a uma cena
+cinematográfica da cabine. O Davi descartou tudo e pediu o formulário "como era
+antes" (sislog.vercel.app/login), agora com a foto da primeira tela de fundo.
+
+- **Fundo:** a mesma foto da primeira tela (caçamba sendo carregada na mina,
+  WebP 1280/1920 com `srcset`), sob um véu escuro (`.login-fundo` +
+  `.login-veu`, bloco "Fundo do login" do `index.css`). Nos dois apps.
+- **Cartão:** igual ao de produção — 380px, `bg-card` + hairline +
+  `shadow-overlay`, raio 4px, padding 32px; símbolo + wordmark no acento (agora
+  sólido: o degradê usava tokens removidos), selo de ambiente no canto (só
+  interno, fora de produção), aviso de inatividade, título `text-page` Kanit,
+  e-mail, senha (com "Esqueci minha senha" no interno), lembrar e-mail, CAPTCHA
+  centralizado no tema do app, Entrar. Erro = tremor do cartão + toast.
+  Entrada coreografada (`.entrada-login`, `--ordem` × 40ms).
+- **Etapas:** o **interno** vai direto ao formulário e o "← Voltar" leva à
+  primeira tela (`/`), que faz o papel da antiga boas-vindas; o **portal**
+  mantém as duas etapas de produção ("Acessar o portal" → formulário).
+- **Rodapé** sob o cartão, sobre a foto: o contêiner leva a classe `dark` para
+  os tokens resolverem nos tons claros (legíveis no véu nos dois temas).
+- Ao entrar, o interno pré-carrega o Painel junto com a autenticação (teto de
+  2,5s) para não sobrar moldura vazia.
+
+### Primeira tela (`/`) e apresentação (`/sobre`) — só no interno (2026-10-22)
+`pages/publico/InicioPage.tsx` + bloco "Primeira tela" do `index.css`. Pedido do
+Davi: reproduzir a primeira dobra do trizy.com.br, com um caminhão caçamba sendo
+carregado de minério no lugar do baú. É uma superfície de **apresentação**, não
+de trabalho; quem tem sessão vai direto ao Painel, e quem não tem vê sempre esta
+tela antes do login (decisão dele, mesmo para os atendentes).
+
+- **Foto em tela cheia:** escavadeira carregando um Scania 8x4 na mina (Pexels
+  29506742, licença livre para uso comercial; nome de empresa, número de frota e
+  placa desfocados — o SisLog não tem ligação com quem aparece). WebP de 1280 e
+  1920px (220 e 475 KB, `srcset`), `object-position` 50% 62%, assenta uma vez
+  (escala 1,06 → 1 em 2,4s).
+- **Véu:** degradê escuro (forte em cima e embaixo, mais aberto no meio) +
+  vinheta radial + luz quente de fim de tarde em soft-light.
+- **Barra:** símbolo + "SisLog" à esquerda; à direita "O que é o SisLog",
+  "Apoiar" e a pílula "Entrar".
+- **Centro:** título Kanit 600 em caixa alta, `clamp(38px, 6.4vw, 96px)`,
+  centralizado, com a marca no acento ("Acabou a planilha, carregue com o
+  SisLog."); uma frase do que o sistema faz; CTA em **pílula** no fill de acento
+  (#CC4100 — o #FF5100 com texto branco não passa AA) "Entrar no SisLog →" e, ao
+  lado, o link "O que é o SisLog →". Texto sobe em cascata curta depois da foto.
+- **`/sobre`** é a página de apresentação de set/2026 restaurada como era (o que
+  existia antes, como funciona, as telas reproduzidas com dados fictícios, o que
+  muda, por onde a carga entra) e o bloco **"Ajude a manter o SisLog no ar"** com
+  o QR do PIX (`public/pix-sislog.jpeg`). Só os tokens do tema escuro removidos
+  em out/2026 foram trocados pelos atuais.
+
+**A Regra da Luz Contida.** Degradê, vinheta e luz de cor existem SÓ nos véus
+sobre a foto da mina (primeira tela e fundo do login), e a pílula só nos botões
+da primeira tela. O cartão do login, `/sobre` e todas as telas de trabalho
+seguem planos e de cantos retos — se a luz vaza para fora da foto, está errado.
+
 ## 6. Do's and Don'ts
 
 ### Do:
@@ -447,12 +500,15 @@ Sem glow, sem `backdrop-blur`/vidro, sem sombra decorativa em card.
   `EmptyState`, `CadastroField`).
 
 ### Don't:
-- **Don't** usar gradiente, glow, `backdrop-blur` ou texto em gradiente em tela de
-  trabalho — em nenhum dos temas. **Exceção única: a tela de login** (é marca; ver §7).
+- **Don't** usar gradiente, glow, `backdrop-blur` ou texto em gradiente — em
+  nenhuma tela e em nenhum dos temas. Única exceção: o véu sobre a foto da
+  mina (primeira tela pública e fundo do login), decisão do Davi em 2026-10-22;
+  o cartão do login, `/sobre` e todas as telas de trabalho seguem planos.
 - **Don't** usar scale, translate-x ou sombra colorida no hover (cards, itens de menu,
   ícones). O único movimento aceito é a elevação de 2px (`-translate-y-0.5`).
 - **Don't** pôr ícone em caixa colorida (KPI, título, aviso) — ícone vai solto.
-- **Don't** usar pílula `rounded-full` em status/tag — retângulo 2px.
+- **Don't** usar pílula `rounded-full` em status/tag — retângulo 2px. (Pílula só
+  nos botões da primeira tela pública.)
 - **Don't** usar cores cruas do Tailwind (amber/red/emerald/slate-*) nem hex soltos
   em componente; use os tokens semânticos.
 - **Don't** aninhar card dentro de card, nem repetir grades de cards idênticos sem fim.
@@ -485,10 +541,15 @@ Fills claros com **tinta escura** (branco sobre laranja/verde/vermelho claros nu
 passa AA): primary #FF6A1F/#1A0A02, destructive #F2706A/#1F0606, success
 #3DD68C/#06210F. Texto de acento #FF8A4C.
 
-### Onde gradiente/glow AINDA entram (e só aqui)
-- **Tela de login** (marca): orb de glow atrás do card e wordmark em gradiente
-  tom-claro→sólido do acento (`--orange-tint` → #FF5100). Tokens fixos de login:
-  `--canvas-dark` #14171D, `--surface-dark` #1A1F28, `--elevated-dark` #232833,
-  `--glow-orange`, `--orange-tint` (e os equivalentes azuis no portal).
-- Nada mais. Número de KPI, caixa de ícone, barra de ranking, nó da linha do tempo
-  e card "Atrasadas" são planos (o alerta é borda + cor do número, não glow).
+### Gradiente e glow: só no véu sobre a foto da mina
+A exceção antiga — o login, com orb de glow atrás do card e wordmark em
+gradiente — caiu em 2026-10-21, quando o login virou a "barra de controle".
+Em 2026-10-22 o Davi reabriu UMA exceção, restrita: o véu sobre a foto da mina,
+na primeira tela pública e no fundo do login (§5, A Regra da Luz Contida). O
+cartão do login e todas as telas de trabalho continuam planos. (A cena cinematográfica da cabine no login, do mesmo
+dia, saiu.)
+Os tokens que só ele usava (`--canvas-dark`, `--surface-dark`, `--elevated-dark`,
+`--border-dark`, `--glow-orange`, `--orange-tint`, `--glow-blue`,
+`--portal-blue-tint`) foram removidos. Número de KPI, caixa de ícone, barra de
+ranking, nó da linha do tempo e card "Atrasadas" são planos (o alerta é borda +
+cor do número, não glow).

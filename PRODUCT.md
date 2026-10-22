@@ -51,9 +51,10 @@ que é fornecedor, não funcionário), com a mesma linguagem corporativa.
 
 **Não pode parecer "gerado por IA / template SaaS genérico".** Especificamente,
 evitar os tells que já foram removidos no reskin:
-- Gradientes chamativos em superfícies grandes ou de duas cores diferentes.
-  (O **tema escuro** — `DESIGN.md` §7 — admite gradiente/glow como device
-  escasso e posicionado, sempre tom-claro→sólido do MESMO acento; não é "em tudo".)
+- Gradientes e glow, em qualquer tela e nos dois temas. Única exceção: o véu
+  sobre a foto da mina — primeira tela pública e fundo do login (decisão do
+  Davi, 2026-10-22 — `DESIGN.md` §5 e §7); o cartão do login e as telas de
+  trabalho seguem planos.
 - Chips de ícone pastel coloridos (esmeralda/âmbar/roxo) competindo entre si.
 - Cards aninhados dentro de cards; grades de cards idênticos repetidos sem fim.
 - Saudação consumer ("Boa tarde, fulano") em tela de operação.

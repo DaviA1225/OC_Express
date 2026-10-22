@@ -116,17 +116,6 @@
     --chart-grid: #E9ECF1;
     --chart-axis: #5B6472;
     --chart-tooltip-bg: #FFFFFF;
-
-    /* Superfícies "marca" do LOGIN (sempre escuras; gradiente/glow permitidos
-       SÓ lá — DESIGN.md §7). Não usar em tela de trabalho. */
-    --canvas-dark: #14171D;
-    --surface-dark: #1A1F28;
-    --elevated-dark: #232833;
-    --border-dark: rgba(255, 255, 255, 0.08);
-    --orange-tint: #FFB37A;
-    --glow-orange: rgba(255, 81, 0, 0.18);
-    --portal-blue-tint: #93B4FF;
-    --glow-blue: rgba(30, 64, 175, 0.18);
   }
 
   .dark {
@@ -461,6 +450,196 @@ body.density-compact ul.divide-y > li {
   .cascata > :nth-child(11) { animation-delay: 250ms; }
   .cascata > :nth-child(12) { animation-delay: 275ms; }
   .cascata > :nth-child(n+13) { animation-delay: 300ms; }
+}
+
+/* ── Primeira tela (pages/publico/InicioPage.tsx) ─────────────────────────
+   Só no interno, rota `/`, para quem não entrou. Referência pedida pelo Davi
+   (2026-10-22): a primeira dobra do trizy.com.br — foto em tela cheia sob um
+   véu escuro, título enorme em caixa alta centralizado com uma palavra no
+   acento, CTA em pílula e um link ao lado. É a ÚNICA tela com degradê (o véu
+   sobre a foto) e botão em pílula; o resto do sistema segue plano e de cantos
+   retos. A foto assenta uma vez (escala 1,06 → 1) e o texto sobe em seguida. */
+@keyframes inicio-foto {
+  from { transform: scale(1.06); }
+}
+@keyframes inicio-subir {
+  from { opacity: 0; transform: translateY(14px); }
+}
+
+@layer components {
+  .inicio {
+    position: relative;
+    isolation: isolate;
+    display: flex;
+    flex-direction: column;
+    min-height: 100%;
+    overflow: hidden;
+    background: #0B0D10;
+    color: #FFFFFF;
+  }
+  .inicio-foto {
+    position: absolute;
+    inset: 0;
+    z-index: -2;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: 50% 62%;
+    animation: inicio-foto 2.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  /* Véu: escuro em cima (barra) e embaixo, mais aberto no meio, com vinheta. */
+  .inicio-veu {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background:
+      linear-gradient(180deg, rgb(8 10 14 / 0.72) 0%, rgb(8 10 14 / 0.42) 24%, rgb(8 10 14 / 0.6) 54%, rgb(8 10 14 / 0.94) 100%),
+      radial-gradient(ellipse 90% 70% at 50% 48%, transparent 40%, rgb(8 10 14 / 0.55) 100%);
+  }
+  /* Luz de fim de tarde sobre a foto do meio-dia. */
+  .inicio-veu::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(200deg, rgb(255 140 60 / 0.35), rgb(255 90 20 / 0.1) 45%, transparent 70%);
+    mix-blend-mode: soft-light;
+  }
+
+  .inicio-barra {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+  @media (min-width: 640px) {
+    .inicio-barra { padding: 22px 32px; }
+  }
+  .inicio-nav {
+    font-size: 14px;
+    line-height: 20px;
+    font-weight: 500;
+    color: rgb(255 255 255 / 0.86);
+    transition: color 120ms ease-out;
+  }
+  .inicio-nav:hover { color: #FFFFFF; }
+
+  .inicio-centro {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 24px 20px 72px;
+    text-align: center;
+  }
+  .inicio-titulo {
+    font-family: theme('fontFamily.display');
+    font-weight: 600;
+    font-size: clamp(38px, 6.4vw, 96px);
+    line-height: 0.98;
+    letter-spacing: -0.01em;
+    text-transform: uppercase;
+    text-wrap: balance;
+    text-shadow: 0 2px 24px rgb(0 0 0 / 0.35);
+  }
+  .inicio-linha {
+    display: block;
+    animation: inicio-subir 700ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  .inicio-sub {
+    max-width: 640px;
+    margin-top: 22px;
+    font-size: clamp(15px, 1.25vw, 18px);
+    line-height: 1.55;
+    color: rgb(255 255 255 / 0.9);
+    text-wrap: pretty;
+    text-shadow: 0 1px 12px rgb(0 0 0 / 0.55);
+    animation: inicio-subir 700ms cubic-bezier(0.16, 1, 0.3, 1) 180ms both;
+  }
+  .inicio-acoes {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 18px 28px;
+    margin-top: 36px;
+    animation: inicio-subir 700ms cubic-bezier(0.16, 1, 0.3, 1) 260ms both;
+  }
+  @media (min-width: 640px) {
+    .inicio-acoes { flex-direction: row; }
+  }
+
+  /* CTA em pílula no fill de acento do SisLog (#CC4100: branco passa AA,
+     4,86:1 — o #FF5100 puro com texto branco não passa). */
+  .inicio-pilula {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    height: 52px;
+    padding: 0 28px;
+    border-radius: 9999px;
+    background: #CC4100;
+    color: #FFFFFF;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    transition: background-color 120ms ease-out, transform 120ms ease-out;
+  }
+  .inicio-pilula:hover { background: #AD3700; transform: translateY(-2px); }
+  .inicio-pilula:active { transform: translateY(1px); }
+  .inicio-pilula-sm {
+    height: 38px;
+    padding: 0 18px;
+    font-size: 13px;
+  }
+  .inicio-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border-radius: 2px;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #FFFFFF;
+    text-underline-offset: 6px;
+  }
+  .inicio-link:hover { text-decoration: underline; }
+  :is(.inicio-pilula, .inicio-link, .inicio-nav):focus-visible {
+    outline: 2px solid #FFFFFF;
+    outline-offset: 3px;
+  }
+}
+
+/* ── Fundo do login (pages/LoginPage) ──────────────────────────────────────
+   O cartão de sempre (produção até out/2026) sobre a foto da primeira tela — a
+   caçamba sendo carregada na mina —, escurecida por um véu para o cartão e o
+   rodapé lerem nos dois temas. Pedido do Davi em 2026-10-22; é o único lugar,
+   além da primeira tela, com degradê (o véu sobre a foto). */
+@layer components {
+  .login-fundo {
+    position: absolute;
+    inset: 0;
+    z-index: -2;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: 50% 62%;
+  }
+  .login-veu {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background:
+      radial-gradient(ellipse 55% 60% at 50% 50%, rgb(8 10 14 / 0.3), transparent 75%),
+      linear-gradient(180deg, rgb(8 10 14 / 0.66) 0%, rgb(8 10 14 / 0.48) 45%, rgb(8 10 14 / 0.8) 100%);
+  }
 }
 
 @layer components {

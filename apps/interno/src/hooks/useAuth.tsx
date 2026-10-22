@@ -133,12 +133,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [loadProfile, refreshAal])
 
   const signIn: AuthContextValue['signIn'] = async (email, password, captchaToken) => {
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
       options: captchaToken ? { captchaToken } : undefined,
     })
     if (error) return { error: traduzirErroAuth(error.message) }
+    // Perfil e AAL carregados ANTES de devolver: o login navega logo em seguida,
+    // e o ProtectedRoute sem perfil mostrava "Aguardando liberação" por um
+    // instante. O onAuthStateChange carrega de novo (consulta repetida, inofensiva).
+    await Promise.all([loadProfile(data.session), refreshAal(data.session)]).catch((err) =>
+      console.error('[useAuth] load (signIn) failed', err),
+    )
     return { error: null }
   }
 
