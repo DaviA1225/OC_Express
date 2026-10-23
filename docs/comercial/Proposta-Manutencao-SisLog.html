@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<title>Proposta de Manutenção Mensal — SisLog LHG</title>
+<style>
+  /* Para gerar o PDF: abrir no navegador → Imprimir → Salvar como PDF,
+     A4, margens padrão, "Gráficos de fundo" LIGADO. */
+
+  :root {
+    --laranja: #FF5100;
+    --grafite: #1D1E1B;
+    --texto: #1F2430;
+    --suave: #5B6472;
+    --linha: #E1E4EA;
+    --faixa: #FFF3EC;
+    --verde: #157347;
+  }
+
+  @page { size: A4; margin: 18mm 16mm; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 10.5pt;
+    line-height: 1.5;
+    color: var(--texto);
+  }
+
+  /* ---------- capa ---------- */
+  .capa {
+    height: 247mm;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    page-break-after: always;
+  }
+  .capa .kicker {
+    font-size: 10pt; color: var(--suave); letter-spacing: 1px;
+    text-transform: uppercase; margin-bottom: 14px;
+  }
+  .capa h1 { font-size: 30pt; color: var(--grafite); margin: 0 0 6px; letter-spacing: -0.5px; }
+  .capa .sub { font-size: 14pt; color: var(--suave); margin-bottom: 22px; }
+  .capa .regua { width: 120px; height: 3px; background: var(--laranja); margin-bottom: 40px; }
+  .capa .partes { font-size: 11pt; line-height: 1.9; }
+  .capa .partes strong { color: var(--grafite); }
+  .capa .data { margin-top: 90px; font-size: 10.5pt; color: var(--suave); }
+
+  /* ---------- cabeçalho / rodapé de página ---------- */
+  .faixa-topo {
+    background: var(--grafite); color: #fff; font-size: 8.5pt; font-weight: bold;
+    padding: 7px 12px; display: flex; justify-content: space-between; margin-bottom: 26px;
+  }
+  .faixa-topo .dir { font-weight: normal; color: #d7d7d5; }
+  .pagina { page-break-after: always; }
+  .pagina:last-child { page-break-after: auto; }
+  .rodape-pagina {
+    border-top: 1px solid var(--linha); margin-top: 28px; padding-top: 7px;
+    font-size: 8pt; color: var(--suave); display: flex; justify-content: space-between;
+  }
+
+  /* ---------- tipografia ---------- */
+  h2 {
+    font-size: 16pt; color: var(--grafite); margin: 24px 0 4px;
+    padding-bottom: 8px; border-bottom: 2px solid var(--laranja);
+  }
+  h2:first-of-type { margin-top: 0; }
+  h3 { font-size: 12pt; color: var(--grafite); margin: 18px 0 6px; }
+  p { margin: 10px 0; text-align: justify; }
+  ul { margin: 10px 0; padding-left: 18px; }
+  li { margin: 5px 0; }
+  strong { color: var(--grafite); }
+  .nota { font-size: 8.5pt; color: var(--suave); }
+  .ph { color: var(--laranja); font-weight: bold; } /* placeholder p/ preencher */
+
+  .destaque { background: var(--faixa); border-left: 3px solid var(--laranja); padding: 12px 14px; margin: 14px 0; }
+  .destaque p { margin: 0; }
+
+  /* ---------- tabelas ---------- */
+  table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 9.5pt; }
+  th { background: var(--grafite); color: #fff; text-align: left; padding: 8px 10px; }
+  td { padding: 9px 10px; vertical-align: top; border-bottom: 1px solid var(--linha); }
+  tbody tr:nth-child(even) { background: #FAFAF9; }
+  .incl td:first-child { color: var(--verde); font-weight: bold; width: 24px; text-align: center; }
+  .excl td:first-child { color: var(--suave); font-weight: bold; width: 24px; text-align: center; }
+
+  /* ---------- investimento ---------- */
+  .valor-box {
+    border: 1px solid var(--linha); border-radius: 4px; padding: 18px 20px; margin: 16px 0;
+    display: flex; align-items: baseline; justify-content: space-between;
+  }
+  .valor-box .label { font-size: 11pt; color: var(--suave); }
+  .valor-box .valor { font-size: 26pt; font-weight: bold; color: var(--grafite); }
+  .valor-box .valor span { font-size: 12pt; color: var(--suave); font-weight: normal; }
+
+  /* ---------- assinaturas ---------- */
+  .assinaturas { display: flex; gap: 40px; margin-top: 48px; }
+  .assinaturas .bloco { flex: 1; text-align: center; }
+  .assinaturas .linha-assina { border-top: 1px solid var(--grafite); margin-bottom: 6px; height: 40px; }
+  .assinaturas .nome { font-size: 10pt; font-weight: bold; color: var(--grafite); }
+  .assinaturas .cargo { font-size: 9pt; color: var(--suave); }
+</style>
+</head>
+<body>
+
+<!-- ======================= CAPA ======================= -->
+<section class="capa">
+  <div class="kicker">Proposta comercial</div>
+  <h1>Contrato de Manutenção Mensal</h1>
+  <div class="sub">SisLog LHG — Sistema de Ordens de Carregamento</div>
+  <div class="regua"></div>
+  <div class="partes">
+    <strong>Apresentada a:</strong> Diretoria da LHG Logística / OC Express Transportes<br />
+    <strong>Por:</strong> <span class="ph">[Nome do responsável técnico / razão social]</span><br />
+    <strong>Objeto:</strong> Sustentação, hospedagem e suporte do sistema SisLog em produção
+  </div>
+  <div class="data">
+    Julho de 2026 · Versão 1.0 · <span class="ph">[cidade]</span><br />
+    Documento confidencial — proposta comercial
+  </div>
+</section>
+
+<!-- ======================= PÁGINA 2 ======================= -->
+<section class="pagina">
+  <div class="faixa-topo">
+    <span>Proposta de Manutenção — SisLog LHG</span>
+    <span class="dir">LHG Logística / OC Express Transportes</span>
+  </div>
+
+  <h2>1. Contexto</h2>
+  <p>
+    O <strong>SisLog</strong> substituiu o preenchimento manual das Ordens de Carregamento por um fluxo
+    integrado (cadastros reutilizáveis, geração automática do PDF da OC, envio por WhatsApp e painel de
+    acompanhamento) sobre três aplicações (sistema interno, portal de parceiros e o agente de WhatsApp) e uma
+    base de dados única. O sistema encontra-se <strong>em produção</strong>, com o endurecimento de segurança
+    recomendado já concluído (ver o Relatório de Segurança, versão 2.1).
+  </p>
+  <p>
+    Um sistema em operação exige manutenção contínua: correção de defeitos, acompanhamento da infraestrutura,
+    atualizações de segurança e suporte à equipe. Esta proposta formaliza esse serviço em um contrato mensal,
+    dando previsibilidade de custo à LHG e continuidade garantida ao sistema.
+  </p>
+
+  <h2>2. Escopo dos serviços</h2>
+  <p>O plano de manutenção mensal compreende as atividades abaixo.</p>
+
+  <h3>Incluído</h3>
+  <table>
+    <tbody class="incl">
+      <tr><td>✓</td><td><strong>Correção de defeitos (sustentação).</strong> Diagnóstico e correção de falhas do sistema em produção, sem custo adicional.</td></tr>
+      <tr><td>✓</td><td><strong>Monitoramento da infraestrutura.</strong> Acompanhamento da base de dados e da hospedagem (Supabase e Vercel): disponibilidade, capacidade e alertas.</td></tr>
+      <tr><td>✓</td><td><strong>Backups e recuperação.</strong> Verificação periódica das cópias de segurança e do procedimento de restauração.</td></tr>
+      <tr><td>✓</td><td><strong>Atualizações de segurança.</strong> Aplicação de correções de segurança e atualização de dependências; acompanhamento da postura descrita no Relatório de Segurança.</td></tr>
+      <tr><td>✓</td><td><strong>Suporte à equipe.</strong> Atendimento a dúvidas operacionais e incidentes em horário comercial (ver Nível de Serviço).</td></tr>
+      <tr><td>✓</td><td><strong>Pequenos ajustes de configuração.</strong> Cadastros-mestre, parâmetros e ajustes de textos/rótulos que não constituam nova funcionalidade.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Não incluído (orçado à parte)</h3>
+  <table>
+    <tbody class="excl">
+      <tr><td>—</td><td><strong>Novas funcionalidades e novos módulos.</strong> Evoluções do sistema são orçadas separadamente, sob demanda.</td></tr>
+      <tr><td>—</td><td><strong>Novas integrações</strong> (ERP, transportadoras, APIs de terceiros).</td></tr>
+      <tr><td>—</td><td><strong>Custos de terceiros</strong> (planos pagos de hospedagem/base de dados, domínio, e-mail), quando aplicáveis, repassados ao contratante.</td></tr>
+      <tr><td>—</td><td><strong>Treinamentos extensos</strong> e consultorias fora do escopo de suporte operacional.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="rodape-pagina">
+    <span>LHG Logística — confidencial</span>
+    <span>Página 2</span>
+  </div>
+</section>
+
+<!-- ======================= PÁGINA 3 ======================= -->
+<section class="pagina">
+  <div class="faixa-topo">
+    <span>Proposta de Manutenção — SisLog LHG</span>
+    <span class="dir">LHG Logística / OC Express Transportes</span>
+  </div>
+
+  <h2>3. Nível de serviço (SLA)</h2>
+  <p>Atendimento em <strong>horário comercial</strong> (segunda a sexta, 8h às 18h, exceto feriados). Tempos de resposta por criticidade:</p>
+  <table>
+    <thead>
+      <tr><th>Criticidade</th><th>Situação</th><th>Tempo de resposta</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Crítica</strong></td><td>Sistema indisponível ou impedindo a operação.</td><td>até <span class="ph">4 horas úteis</span></td></tr>
+      <tr><td><strong>Alta</strong></td><td>Falha relevante com contorno possível.</td><td>até <span class="ph">1 dia útil</span></td></tr>
+      <tr><td><strong>Normal</strong></td><td>Ajustes, dúvidas e defeitos menores.</td><td>até <span class="ph">3 dias úteis</span></td></tr>
+    </tbody>
+  </table>
+  <p class="nota">
+    Tempo de resposta é o prazo para o início do atendimento; o prazo de solução depende da natureza do
+    problema e é comunicado no diagnóstico. Canal de atendimento: <span class="ph">[e-mail / WhatsApp]</span>.
+  </p>
+
+  <h2>4. Investimento</h2>
+  <div class="valor-box">
+    <span class="label">Mensalidade do plano de manutenção</span>
+    <span class="valor">R$ 2.800,00 <span>/ mês</span></span>
+  </div>
+  <ul>
+    <li><strong>Forma de pagamento:</strong> mensal, com vencimento em <span class="ph">[dia]</span> de cada mês, mediante <span class="ph">[nota fiscal / boleto / transferência]</span>.</li>
+    <li><strong>Reajuste:</strong> anual, pela variação do <span class="ph">[IPCA]</span> acumulado no período.</li>
+    <li>Valores de terceiros (planos de plataforma, domínio) que venham a ser contratados são informados e repassados à parte, mediante aprovação prévia.</li>
+  </ul>
+
+  <h2>5. Vigência</h2>
+  <p>
+    O contrato tem vigência de <strong>12 (doze) meses</strong> a partir da assinatura, renovando-se
+    automaticamente por períodos iguais, salvo manifestação de qualquer das partes com <span class="ph">30
+    (trinta) dias</span> de antecedência. A rescisão antecipada observa o aviso prévio de <span class="ph">30
+    dias</span>, sem multa quando cumprido o aviso.
+  </p>
+
+  <h2>6. Condições gerais</h2>
+  <ul>
+    <li>O código-fonte e os dados permanecem de titularidade da <strong>LHG</strong>; a manutenção não transfere a propriedade a terceiros.</li>
+    <li>As atividades são registradas e podem ser auditadas mediante solicitação.</li>
+    <li>Confidencialidade recíproca sobre dados de operação e informações comerciais.</li>
+    <li>Esta proposta tem validade de <span class="ph">30 dias</span> a contar da data de emissão.</li>
+  </ul>
+
+  <div class="destaque">
+    <p>
+      <strong>Resumo.</strong> Sustentação, infraestrutura, segurança e suporte do SisLog em produção por
+      <strong>R$ 2.800,00/mês</strong>, com nível de serviço definido e vigência de 12 meses renovável. Novas
+      funcionalidades seguem orçadas sob demanda, preservando a previsibilidade da mensalidade.
+    </p>
+  </div>
+
+  <div class="assinaturas">
+    <div class="bloco">
+      <div class="linha-assina"></div>
+      <div class="nome"><span class="ph">[Responsável técnico / Fornecedor]</span></div>
+      <div class="cargo">Manutenção e suporte — SisLog</div>
+    </div>
+    <div class="bloco">
+      <div class="linha-assina"></div>
+      <div class="nome"><span class="ph">[Nome do diretor]</span></div>
+      <div class="cargo">Diretoria — LHG Logística / OC Express Transportes</div>
+    </div>
+  </div>
+
+  <p class="nota" style="margin-top:24px">
+    Documento de natureza comercial. Recomenda-se revisão jurídica das cláusulas de vigência, reajuste e
+    rescisão antes da assinatura. Os campos em <span class="ph">laranja</span> devem ser preenchidos conforme a
+    negociação.
+  </p>
+
+  <div class="rodape-pagina">
+    <span>LHG Logística — confidencial</span>
+    <span>Página 3</span>
+  </div>
+</section>
+
+</body>
+</html>

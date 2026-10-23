@@ -134,10 +134,10 @@
   <h1>Relatório de Segurança</h1>
   <div class="sub">SisLog LHG — Sistema de Ordens de Carregamento</div>
   <div class="regua"></div>
-  <div class="linha2">Auditoria, achados e correções aplicadas</div>
+  <div class="linha2">Auditoria, correções aplicadas e hardening de go-live</div>
   <div class="rodape">
     LHG Logística / OC Express Transportes<br />
-    Julho de 2026 · Versão 2.0
+    Julho de 2026 · Versão 2.1
   </div>
   <div class="conf">Documento confidencial — apoio à due diligence de TI</div>
 </section>
@@ -188,13 +188,16 @@
       hardening), <strong>todos corrigidos e em produção</strong>. A revisão de julho identificou
       <strong>1 item adicional</strong>, de severidade média e natureza de integridade (não de vazamento de
       dados), <strong>corrigido e validado</strong> por cenários de regressão incorporados à suíte
-      automatizada. Permanecem itens de
-      <strong>configuração de plataforma</strong> (senha mínima no servidor, MFA), detalhados no item 6.
+      automatizada. Os itens de <strong>configuração de plataforma</strong> que restavam do ciclo anterior
+      (senha mínima no servidor, captcha, limite de requisições, política de conteúdo em bloqueio e
+      autenticação em dois fatores) foram <strong>implementados e ativados na entrada em produção</strong> —
+      detalhados no item 6.
     </p>
   </div>
   <p>
     O ciclo de julho é, em si, um indicador relevante para esta avaliação: a revisão foi motivada pela entrega
-    de novas funcionalidades, e não por incidente. O processo de revisão recorrente está estabelecido.
+    de novas funcionalidades, e não por incidente. O processo de revisão recorrente está estabelecido, e o
+    endurecimento recomendado foi concluído antes da disponibilização do sistema.
   </p>
 
   <h2>3. Controles de segurança existentes</h2>
@@ -233,8 +236,20 @@
       consegue acioná-lo.
     </li>
     <li>
-      <strong>Cabeçalhos de segurança HTTP</strong> nas duas aplicações web, incluindo política de conteúdo
-      (CSP) em modo de monitoramento.
+      <strong>CAPTCHA no login</strong> (Cloudflare Turnstile) validado no servidor de autenticação, ativo nas
+      duas aplicações — defesa contra tentativas automatizadas de força-bruta.
+    </li>
+    <li>
+      <strong>Autenticação em dois fatores (2FA/TOTP)</strong> disponível aos usuários internos; quem a ativa
+      passa a exigir o código do aplicativo autenticador no login.
+    </li>
+    <li>
+      <strong>Política de senha no servidor</strong> (mínimo de 12 caracteres) e <strong>limite de requisições
+      de autenticação</strong>, ambos impostos pela plataforma, não apenas pelo cliente.
+    </li>
+    <li>
+      <strong>Cabeçalhos de segurança HTTP</strong> nas duas aplicações web (HSTS, anti-clickjacking, nosniff,
+      Referrer-Policy, Permissions-Policy, COOP) e <strong>política de conteúdo (CSP) em modo de bloqueio</strong>.
     </li>
   </ul>
 
@@ -361,10 +376,11 @@
     <span class="dir">OC Express Transportes</span>
   </div>
 
-  <h2>6. Itens pendentes — configuração de plataforma</h2>
+  <h2>6. Endurecimento concluído na entrada em produção</h2>
   <p>
-    Itens que dependem de configuração no painel da plataforma (não de código) e são recomendados antes da
-    disponibilização final:
+    Os itens de configuração de plataforma que o ciclo anterior deixou em aberto foram <strong>implementados e
+    ativados na disponibilização do sistema</strong> (julho de 2026). Todos foram verificados em ambiente
+    controlado antes de valerem em produção:
   </p>
   <table>
     <thead>
@@ -376,47 +392,57 @@
     </thead>
     <tbody>
       <tr>
-        <td>Tamanho mínimo de senha (12) imposto no servidor + bloqueio de senhas vazadas</td>
-        <td>Fecha a validação que hoje é só no cliente.</td>
-        <td class="pend">Pendente</td>
+        <td>Tamanho mínimo de senha (12) imposto no servidor</td>
+        <td>Fecha a validação que antes era só no cliente.</td>
+        <td class="ok">Ativo</td>
       </tr>
       <tr>
-        <td>Autenticação em dois fatores (MFA) para usuários internos</td>
-        <td>Padrão de segurança corporativo.</td>
-        <td class="pend">Pendente</td>
-      </tr>
-      <tr>
-        <td>Captcha no login</td>
+        <td>CAPTCHA no login (Cloudflare Turnstile), validado no servidor</td>
         <td>Mitigação de força-bruta automatizada.</td>
-        <td class="pend">Implementado, aguarda ativação</td>
+        <td class="ok">Ativo</td>
       </tr>
       <tr>
-        <td>Limite de requisições por IP/minuto</td>
+        <td>Limite de requisições de autenticação</td>
         <td>Defesa adicional contra abuso.</td>
-        <td class="pend">Planejado</td>
+        <td class="ok">Ativo</td>
       </tr>
       <tr>
         <td>Política de conteúdo (CSP) em modo de bloqueio</td>
         <td>Mitiga injeção de script e carregamento de recurso não autorizado.</td>
-        <td class="pend">Em monitoramento</td>
+        <td class="ok">Ativo</td>
+      </tr>
+      <tr>
+        <td>Autenticação em dois fatores (2FA/TOTP) para usuários internos</td>
+        <td>Padrão de segurança corporativo.</td>
+        <td class="ok">Disponível</td>
       </tr>
     </tbody>
   </table>
   <p class="nota">
-    A CSP foi publicada primeiro em <strong>modo de monitoramento</strong>: as violações são registradas sem
-    bloquear o recurso, o que permite validar a política contra o uso real das duas aplicações antes de
-    promovê-la a bloqueio efetivo. É a prática recomendada para aplicações em operação.
+    A CSP foi publicada primeiro em modo de monitoramento e só então promovida a bloqueio, após validação
+    contra o uso real das duas aplicações — a prática recomendada para aplicações em operação. O 2FA entrou em
+    modelo de adesão: está disponível a todos os internos e, uma vez ativado, é exigido no login.
   </p>
+
+  <h3>Evoluções de segurança planejadas</h3>
+  <p>Itens de reforço adicional, sem impacto na postura atual, previstos para os próximos ciclos:</p>
+  <ul>
+    <li><strong>2FA obrigatório</strong> para os perfis internos, após a adesão inicial da equipe.</li>
+    <li>
+      <strong>Bloqueio de senhas vazadas</strong> (verificação contra bases públicas de vazamento) — recurso
+      disponível no plano superior da plataforma de autenticação; adoção sujeita a avaliação comercial.
+    </li>
+    <li><strong>Domínio próprio</strong> com certificado dedicado, no lugar do subdomínio da plataforma de hospedagem.</li>
+  </ul>
 
   <h2>7. Conclusão</h2>
   <div class="destaque">
     <p>
-      O sistema apresenta uma base de segurança robusta e testada. Os achados das duas revisões foram tratados
-      no código e os itens remanescentes são ajustes de configuração de baixo esforço. Tão relevante quanto os
-      achados individuais é o processo: o SisLog passou por duas revisões de segurança em dois meses, a segunda
-      motivada por entrega de funcionalidade e não por incidente, com correção desenvolvida no mesmo ciclo da
-      identificação. Com a implementação das recomendações do item 6, a postura de segurança atende aos
-      requisitos esperados para operação com dados sensíveis em ambiente corporativo.
+      O sistema apresenta uma base de segurança robusta e testada, e entrou em produção com o endurecimento
+      recomendado <strong>concluído</strong>, não pendente. Tão relevante quanto os achados individuais é o
+      processo: o SisLog passou por revisões de segurança recorrentes, motivadas por entrega de funcionalidade e
+      não por incidente, com correções desenvolvidas e verificadas no mesmo ciclo da identificação. A postura de
+      segurança atende aos requisitos esperados para operação com dados sensíveis em ambiente corporativo.
     </p>
   </div>
 
