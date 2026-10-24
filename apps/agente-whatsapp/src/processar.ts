@@ -2,8 +2,8 @@
  * Orquestração de uma conversa: espera a rajada de mensagens acabar, pega o
  * cadeado da conversa, prepara a mídia, roda o agente e responde.
  *
- * Roda depois que o webhook já respondeu 200 à Meta (via `waitUntil`), então o
- * tempo aqui não conta contra os 5 s da Meta.
+ * Roda depois que o webhook já respondeu 200 à UAZAPI (via `waitUntil`), então
+ * o tempo aqui não segura a fila de webhooks dela.
  *
  * Garantias:
  *   - Uma conversa é processada por uma execução por vez (cadeado no banco).
@@ -18,7 +18,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database, Json } from '@sislog/shared/types'
 import { config } from './config'
 import { getAgentClient } from './supabase'
-import { baixarMidia, enviarTexto } from './meta'
+import { baixarMidia, enviarTexto, marcarLidas } from './uazapi'
 import { ehImagemSuportada, ehPdf, guardarNoBucket, mimeBase, subirParaAnthropic, transcrever } from './midia'
 import { rodarCiclo, type Mensagem } from './agente/loop'
 import type { ContextoFerramenta } from './agente/ferramentas'
@@ -104,6 +104,25 @@ async function umaRodada(db: Db, conversaId: string): Promise<boolean> {
   // a conversa ao agente, ele recebe tudo junto com o que o atendente disse.
   if (conversaAtual.estado === 'humano') return false
 
+  // Robô do outro lado (atendimento automático de transportadora que responde
+  // tudo): as mensagens dele chegam como de contato e nenhum filtro pega. Passou
+  // do teto, a conversa vai para a equipe e o agente para de responder.
+  if (modo === 'autonomo' && (await respostasRecentes(db, conversaId)) >= config.agente.maxRespostas10Min) {
+    await db.from('agente_conversas').update({ estado: 'humano' }).eq('id', conversaId)
+    await db.from('agente_acoes').insert({
+      conversa_id: conversaId,
+      ferramenta: 'transferir_para_humano',
+      entrada: { motivo: `${config.agente.maxRespostas10Min} respostas em 10 min: pode ser outro robô respondendo.` },
+      status: 'executada',
+    })
+    return false
+  }
+
+  // Tique azul só quando o próprio agente vai responder. Com ele desligado, em
+  // sombra ou com a conversa na equipe, quem atende pelo celular precisa ver a
+  // mensagem como não lida.
+  if (modo === 'autonomo') await marcarLidas(pendentes.flatMap((m) => (m.wamid ? [m.wamid] : [])))
+
   const conversa = await talvezNovaSessao(db, conversaAtual)
 
   for (const m of pendentes) await prepararMidia(db, m)
@@ -174,6 +193,17 @@ async function umaRodada(db: Db, conversaId: string): Promise<boolean> {
   return true
 }
 
+async function respostasRecentes(db: Db, conversaId: string): Promise<number> {
+  const { count } = await db
+    .from('agente_mensagens')
+    .select('id', { count: 'exact', head: true })
+    .eq('conversa_id', conversaId)
+    .eq('autor', 'agente')
+    .eq('envio', 'enviada')
+    .gte('created_at', new Date(Date.now() - 10 * 60_000).toISOString())
+  return count ?? 0
+}
+
 /** Conversa parada há horas começa sessão nova: histórico curto, cache barato,
  *  e o modelo não arrasta o contexto da viagem de ontem. */
 async function talvezNovaSessao(db: Db, c: ConversaRow): Promise<ConversaRow> {
@@ -219,7 +249,9 @@ function fecharFerramentasPendentes(historico: Mensagem[]): Anthropic.Beta.BetaT
 }
 
 async function cabecalho(db: Db, c: ConversaRow, inicioSessao: boolean): Promise<string> {
-  const agora = new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'full', timeStyle: 'short' })
+  // Relógio da sala de operação (MS), não o de Brasília: "hoje" e "agora"
+  // têm de bater com o que a equipe vê no SisLog.
+  const agora = new Date().toLocaleString('pt-BR', { timeZone: 'America/Campo_Grande', dateStyle: 'full', timeStyle: 'short' })
   // O que a equipe respondeu direto (tela de Conversas) desde a última volta
   // do agente, para ele não repetir nem contradizer.
   const { data: ultimaVolta } = await db
@@ -241,7 +273,7 @@ async function cabecalho(db: Db, c: ConversaRow, inicioSessao: boolean): Promise
     .order('created_at')
   const linhas = [
     '[Contexto do sistema]',
-    `Agora: ${agora} (horário de Brasília).`,
+    `Agora: ${agora} (horário de Mato Grosso do Sul).`,
     `Contato: ${c.nome_contato ?? 'nome não informado'} — WhatsApp ${c.telefone}.`,
   ]
   if (inicioSessao) linhas.push('Início de conversa (ou retomada depois de horas).')
@@ -281,7 +313,7 @@ function blocosDaMensagem(m: MensagemRow): Anthropic.Beta.BetaContentBlockParam[
   }
 }
 
-/** Baixa da Meta, guarda no bucket e deixa pronta para o modelo. Idempotente:
+/** Baixa da UAZAPI, guarda no bucket e deixa pronta para o modelo. Idempotente:
  *  o que já foi feito numa tentativa anterior não se refaz. */
 async function prepararMidia(db: Db, m: MensagemRow): Promise<void> {
   if (!m.meta_media_id || (m.midia_path && (m.transcricao || m.anthropic_file_id))) return

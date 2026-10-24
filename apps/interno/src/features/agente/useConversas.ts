@@ -8,7 +8,7 @@ import type { AgenteModo, Tables } from '@/types/database.types'
  *
  * Leitura e as ações simples (assumir, rejeitar rascunho, trocar o modo) vão
  * direto ao banco pela RLS. Responder, devolver ao agente e aprovar rascunho
- * passam pelo servidor do agente (`/api/agente`), que tem o token da Meta.
+ * passam pelo servidor do agente (`/api/agente`), que tem o token da UAZAPI.
  *
  * Atualização por consulta periódica, e só com a tela aberta e a aba visível
  * (o react-query não consulta em segundo plano por padrão): conversa é ao vivo,
@@ -121,12 +121,12 @@ export interface ConversaDetalhe {
   mensagens: MensagemAgente[]
   acoes: AcaoAgente[]
   nomes: Record<string, string>
-  /** Dentro das 24 h da Meta para texto livre? Calculado na consulta (que se
+  /** Dentro das 24 h desde a última mensagem do contato? Calculado na consulta (que se
    *  repete a cada poucos segundos), não na renderização. */
   janelaAberta: boolean
 }
 
-const JANELA_META_MS = 24 * 3_600_000
+const JANELA_RESPOSTA_MS = 24 * 3_600_000
 
 export function useConversa(id: string | null) {
   return useQuery({
@@ -160,7 +160,7 @@ export function useConversa(id: string | null) {
         for (const p of (perfis ?? []) as { user_id: string; nome_completo: string }[]) nomes[p.user_id] = p.nome_completo
       }
       const janelaAberta =
-        !!conversa.ultima_entrada_em && Date.now() - new Date(conversa.ultima_entrada_em).getTime() < JANELA_META_MS
+        !!conversa.ultima_entrada_em && Date.now() - new Date(conversa.ultima_entrada_em).getTime() < JANELA_RESPOSTA_MS
       return { conversa, mensagens, acoes, nomes, janelaAberta }
     },
   })

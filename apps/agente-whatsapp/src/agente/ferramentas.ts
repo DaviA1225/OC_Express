@@ -72,10 +72,30 @@ const semAcento = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '')
 /** Termo seguro para `ilike`: sem curingas nem vírgula/parênteses do `or()`. */
 const termoBusca = (s: string) => semAcento(s).replace(/[%_,()*]/g, ' ').trim()
 
-/** Telefone do WhatsApp (55 + DDD + número) no formato do cadastro. */
+/** Número do WhatsApp (sempre com DDI) é brasileiro? 55 + DDD + 8 ou 9 dígitos. */
+const ehBrasileiroWa = (d: string) => d.startsWith('55') && (d.length === 12 || d.length === 13)
+
+/** Telefone do WhatsApp no formato do cadastro. Estrangeiro (MS faz fronteira
+ *  com Paraguai e Bolívia) fica com o DDI, sem cortar dígito. */
 function telefoneCadastro(telefoneWa: string): string {
   const d = so(telefoneWa)
-  return formatTelefone(d.startsWith('55') && d.length > 11 ? d.slice(2) : d)
+  return ehBrasileiroWa(d) ? formatTelefone(d.slice(2)) : `+${d}`
+}
+
+/** Chave para comparar telefones. Brasileiro vira DDD + 8 últimos dígitos (o
+ *  WhatsApp de contas antigas vem sem o 9 da frente, o cadastro vem com);
+ *  estrangeiro só casa com todos os dígitos iguais. */
+function chaveTelefone(valor: string | null | undefined, origem: 'whatsapp' | 'cadastro'): string | null {
+  const d = so(valor ?? '')
+  const comDdi = origem === 'whatsapp' || (valor ?? '').trim().startsWith('+')
+  const local = ehBrasileiroWa(d) ? d.slice(2) : !comDdi && (d.length === 10 || d.length === 11) ? d : null
+  if (local) return local.slice(0, 2) + local.slice(-8)
+  return comDdi && d.length >= 8 ? `+${d}` : null
+}
+
+function mesmoTelefone(cadastro: string | null | undefined, telefoneWa: string): boolean {
+  const x = chaveTelefone(telefoneWa, 'whatsapp')
+  return x !== null && x === chaveTelefone(cadastro, 'cadastro')
 }
 
 function erro(mensagem: string, extra?: Resultado): Resultado {
@@ -264,13 +284,14 @@ const consultarSolicitacoes = ferramenta({
     description:
       'Consulta solicitações recentes (últimos 15 dias) e o status de cada uma. Filtre pelo número da ' +
       'OC, por uma placa de cavalo, ou pelas solicitações abertas por este contato. Use para responder ' +
-      '"cadê minha OC?" e para não criar duplicada.',
+      '"cadê minha OC?". Só voltam com detalhes as solicitações deste contato (ele pediu, ou é o ' +
+      'motorista); as de outras pessoas voltam só contadas em de_outros_contatos.',
     input_schema: {
       type: 'object',
       properties: {
         numero: { type: 'integer', description: 'Número da OC, ex.: 1234 para #1234.' },
         placa: { type: 'string', description: 'Placa do cavalo.' },
-        deste_contato: { type: 'boolean', description: 'true = só as pedidas por este número de WhatsApp.' },
+        deste_contato: { type: 'boolean', description: 'true = só as deste contato. Sem número nem placa, é o padrão.' },
       },
       additionalProperties: false,
     },
@@ -279,25 +300,54 @@ const consultarSolicitacoes = ferramenta({
     const desde = new Date(Date.now() - 15 * 86_400_000).toISOString()
     let q = db
       .from('solicitacoes')
-      .select('id, numero_interno, tipo, status, created_at, enviada_em, motorista:motorista_id(nome_completo), veiculo:veiculo_id(placa), cliente:cliente_id(razao_social)')
+      .select('id, numero_interno, tipo, status, created_at, enviada_em, solicitante_telefone, motorista:motorista_id(nome_completo, telefone), veiculo:veiculo_id(placa), cliente:cliente_id(razao_social)')
       .gte('created_at', desde)
       .order('created_at', { ascending: false })
-      .limit(10)
+      // Folga antes de separar as do contato: cortar em 10 antes esconderia as dele.
+      .limit(50)
     if (e.numero) q = q.eq('numero_interno', e.numero)
-    if (e.deste_contato) q = q.eq('solicitante_telefone', telefoneCadastro(telefone))
     if (e.placa) {
       const { data: v } = await db.from('veiculos').select('id').eq('placa', formatPlaca(e.placa)).maybeSingle()
       if (!v) return { solicitacoes: [], aviso: 'Placa de cavalo não cadastrada.' }
       q = q.eq('veiculo_id', v.id)
     }
+    // Sem número nem placa, a pergunta só pode ser sobre o próprio contato. O
+    // banco filtra pelo final do número (pedidas por ele ou com ele de
+    // motorista); a comparação exata vem depois, em `mesmoTelefone`.
+    if (e.deste_contato || (!e.numero && !e.placa)) {
+      const d = so(telefone)
+      const [ini, fim] = [d.slice(-8, -4), d.slice(-4)]
+      const { data: mots } = await db.from('motoristas').select('id').ilike('telefone', `%${ini}%${fim}%`).limit(50)
+      const ids = (mots ?? []).map((m: { id: string }) => m.id)
+      q = q.or([`solicitante_telefone.ilike.*${ini}*${fim}*`, ...(ids.length ? [`motorista_id.in.(${ids.join(',')})`] : [])].join(','))
+    }
     const { data, error } = await q
     if (error) return erroBanco(error)
+    // A regra "não passar dado de OC de outra pessoa" fica no código, não só no
+    // prompt: o que não é deste contato nem chega ao modelo para ser vazado.
+    // Sem `Relationships` nos tipos, o embed vem tipado como lista; em runtime
+    // é um objeto (motorista_id aponta para uma linha).
+    const linhas = (data ?? []).map(({ motorista, ...s }) => ({
+      ...s,
+      motorista: motorista as unknown as { nome_completo: string; telefone: string | null } | null,
+    }))
+    const doContato = linhas.filter(
+      (s) => mesmoTelefone(s.solicitante_telefone, telefone) || mesmoTelefone(s.motorista?.telefone, telefone),
+    )
+    const deOutros = linhas.length - doContato.length
     return {
-      solicitacoes: (data ?? []).map((s) => ({
+      solicitacoes: doContato.slice(0, 10).map(({ solicitante_telefone: _s, motorista, ...s }) => ({
         ...s,
+        motorista: motorista ? { nome_completo: motorista.nome_completo } : null,
         numero: `#${String(s.numero_interno).padStart(4, '0')}`,
         status: STATUS_LABEL[s.status] ?? s.status,
       })),
+      ...(deOutros > 0
+        ? {
+            de_outros_contatos: deOutros,
+            aviso: 'Há solicitações que não são deste contato. Não informe status nem dados delas: oriente a procurar quem pediu (a transportadora) ou transfira para um atendente.',
+          }
+        : {}),
     }
   },
 })
