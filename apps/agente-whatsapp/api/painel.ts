@@ -1,7 +1,7 @@
 /**
  * Ações da tela "Conversas" do sistema interno que precisam do servidor.
  *
- * O navegador do atendente não tem (nem deve ter) o token da Meta, então
+ * O navegador do atendente não tem (nem deve ter) o token da UAZAPI, então
  * responder pelo WhatsApp passa por aqui. O interno chama `/api/agente`, que o
  * `vercel.json` dele reescreve para esta função: mesmo domínio, sem CORS.
  *
@@ -24,11 +24,14 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 import type { Json } from '@sislog/shared/types'
 import { config } from '../src/config'
-import { enviarTexto } from '../src/meta'
+import { enviarTexto } from '../src/uazapi'
 import { processarConversa } from '../src/processar'
 import { executarDireto } from '../src/agente/ferramentas'
 
-const JANELA_META_MS = 24 * 3_600_000
+/** Regra nossa, herdada da Meta: só responder até 24 h depois da última
+ *  mensagem do contato. Num número não oficial, puxar conversa fria é o que
+ *  mais leva a banimento. */
+const JANELA_MS = 24 * 3_600_000
 
 const Corpo = z.discriminatedUnion('acao', [
   z.object({ acao: z.literal('enviar'), conversa_id: z.string().uuid(), texto: z.string().trim().min(1).max(4000) }),
@@ -93,8 +96,8 @@ async function enviar(db: SupabaseClient, userId: string, conversaId: string, te
   if (c.estado !== 'humano' && cfg?.modo !== 'sombra') {
     throw new ErroPainel(409, 'Assuma a conversa antes de responder')
   }
-  if (!c.ultima_entrada_em || Date.now() - new Date(c.ultima_entrada_em).getTime() > JANELA_META_MS) {
-    throw new ErroPainel(409, 'Passaram 24 h desde a última mensagem do contato: o WhatsApp só aceita modelo aprovado')
+  if (!c.ultima_entrada_em || Date.now() - new Date(c.ultima_entrada_em).getTime() > JANELA_MS) {
+    throw new ErroPainel(409, 'Passaram 24 h desde a última mensagem do contato: para proteger o número, só respondemos depois que ele escrever de novo')
   }
 
   const base = { conversa_id: c.id, sessao: c.sessao, direcao: 'saida', autor: 'humano', tipo: 'texto', texto, enviada_por: userId }

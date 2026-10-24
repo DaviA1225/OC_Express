@@ -410,7 +410,7 @@ function PainelConversa({ id, modo, onVoltar }: { id: string; modo: AgenteModo; 
         habilitado={(comEquipe || modo === 'sombra') && !foraDaJanela}
         motivo={
           foraDaJanela
-            ? 'Passaram 24 h desde a última mensagem do contato: o WhatsApp só aceita modelo de mensagem aprovado.'
+            ? 'Passaram 24 h desde a última mensagem do contato. Para proteger o número, só respondemos depois que ele escrever de novo.'
             : 'Assuma a conversa para responder. Enquanto o agente atende, duas vozes confundiriam o contato.'
         }
       />

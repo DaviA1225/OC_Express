@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "description": "Agente de IA que recebe mensagens de WhatsApp via Meta Cloud API e cria solicitações no SisLog usando Claude Haiku para extração estruturada.",
+  "description": "Agente de IA que atende o WhatsApp (via UAZAPI) e opera o SisLog com Claude.",
   "scripts": {
     "dev": "vercel dev",
     "build": "tsc --noEmit",

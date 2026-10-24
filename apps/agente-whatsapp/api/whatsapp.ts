@@ -1,125 +1,123 @@
 /**
- * Webhook do Meta Cloud API (WhatsApp).
+ * Webhook da UAZAPI (WhatsApp).
  *
- * - GET  /api/whatsapp  → handshake de verificação (Meta envia `hub.challenge`)
- * - POST /api/whatsapp  → entrega de mensagens (com assinatura HMAC no header)
+ * POST /api/whatsapp → um evento por chamada (`EventType` + `message`).
  *
- * O POST faz só o mínimo dentro dos 5 s que a Meta espera: valida a
- * assinatura, grava cada mensagem (idempotente pelo `wamid`) e responde 200.
- * O atendimento em si roda depois da resposta, em `waitUntil`.
+ * A UAZAPI não assina o webhook como a Meta fazia. A prova de origem é o
+ * `token` da instância que vem no corpo: só a UAZAPI e nós o conhecemos. Sem
+ * essa conferência, quem descobrisse a URL mandaria "mensagens" com o telefone
+ * de qualquer motorista.
+ *
+ * O POST faz só o mínimo: confere o token, grava a mensagem (idempotente pelo
+ * `wamid`) e responde 200. O atendimento em si roda depois, em `waitUntil`.
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { waitUntil } from '@vercel/functions'
-import { createHmac, timingSafeEqual } from 'node:crypto'
+import { createHash, timingSafeEqual } from 'node:crypto'
 import { config } from '../src/config'
-import { lerWebhook, marcarLida, type MensagemEntrada } from '../src/meta'
+import { lerWebhook, type MensagemEntrada, type WebhookPayload } from '../src/uazapi'
 import { getAgentClient } from '../src/supabase'
 import { processarConversa } from '../src/processar'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method === 'GET') return handleVerify(req, res)
-  if (req.method === 'POST') return handleInbound(req, res)
-  res.setHeader('Allow', 'GET, POST')
-  return res.status(405).send('Method Not Allowed')
-}
-
-// ── GET: handshake de verificação ───────────────────────────────────────────
-function handleVerify(req: VercelRequest, res: VercelResponse) {
-  const mode = req.query['hub.mode']
-  const token = req.query['hub.verify_token']
-  const challenge = req.query['hub.challenge']
-
-  if (mode === 'subscribe' && token === config.meta.verifyToken && typeof challenge === 'string') {
-    res.setHeader('Content-Type', 'text/plain')
-    return res.status(200).send(challenge)
+  if (req.method !== 'POST') {
+    res.setHeader('Allow', 'POST')
+    return res.status(405).send('Method Not Allowed')
   }
 
-  return res.status(403).send('Forbidden')
-}
+  const payload = lerCorpo(req.body)
+  if (!payload || !tokenConfere(payload.token)) return res.status(401).send('Unauthorized')
 
-// ── POST: entrega de eventos ────────────────────────────────────────────────
-async function handleInbound(req: VercelRequest, res: VercelResponse) {
-  const raw = await readRawBody(req)
-
-  if (!verifySignature(raw, req.headers['x-hub-signature-256'])) {
-    return res.status(401).send('Invalid signature')
+  const leitura = lerWebhook(payload)
+  if ('ignorado' in leitura) {
+    if (leitura.ignorado.includes('@lid')) console.warn('[webhook] mensagem ignorada: contato sem telefone (@lid)')
+    return res.status(200).json({ ok: true, ignorado: leitura.ignorado })
   }
 
-  let mensagens: MensagemEntrada[]
+  // Se gravar falhar, devolvemos 500: a falha aparece em /webhook/errors da
+  // UAZAPI. Ela não garante reentrega como a Meta; o `wamid` único segura a
+  // duplicata se reentregar.
+  const m = leitura.mensagem
+  const atrasoMin = m.enviadaEm ? (Date.now() - m.enviadaEm.getTime()) / 60_000 : 0
+  const atrasada = atrasoMin > config.agente.maxAtrasoMin
+
+  let conversaId: string
   try {
-    mensagens = lerWebhook(JSON.parse(raw.toString('utf8')))
-  } catch {
-    return res.status(200).json({ ok: true, ignorado: 'payload ilegível' })
-  }
-  if (mensagens.length === 0) return res.status(200).json({ ok: true })
-
-  // Se gravar falhar, devolvemos 500 para a Meta reentregar: perder mensagem é
-  // pior que recebê-la duas vezes (o `wamid` único segura a duplicata).
-  let conversas: Set<string>
-  try {
-    conversas = await gravarEntradas(mensagens)
+    conversaId = await gravarEntrada(m, atrasada)
   } catch (e) {
     console.error('[webhook] falha ao gravar', e)
     return res.status(500).json({ ok: false })
   }
 
-  for (const id of conversas) waitUntil(processarConversa(id).catch((e) => console.error('[agente]', id, e)))
-  for (const m of mensagens) waitUntil(marcarLida(m.wamid))
-
-  return res.status(200).json({ ok: true })
+  // Atrasada: fica guardada (a equipe vê) e entra junto quando o contato
+  // escrever de novo, mas não dispara resposta agora.
+  if (atrasada) console.warn(`[webhook] mensagem com ${formatarAtraso(atrasoMin)} de atraso: guardada sem resposta`)
+  else waitUntil(processarConversa(conversaId).catch((e) => console.error('[agente]', conversaId, e)))
+  return res.status(200).json({ ok: true, ...(atrasada ? { atrasada: true } : {}) })
 }
 
-async function gravarEntradas(mensagens: MensagemEntrada[]): Promise<Set<string>> {
+async function gravarEntrada(m: MensagemEntrada, atrasada: boolean): Promise<string> {
   const db = await getAgentClient()
-  const conversas = new Set<string>()
-  for (const m of mensagens) {
-    const agora = new Date().toISOString()
-    const { data: conversa, error: eC } = await db
-      .from('agente_conversas')
-      .upsert(
-        // Sem nome no payload, não apaga o nome que já temos.
-        { telefone: m.telefone, ...(m.nome ? { nome_contato: m.nome } : {}), ultima_entrada_em: agora, ultima_atividade_em: agora },
-        { onConflict: 'telefone' },
-      )
-      .select('id, sessao')
-      .single()
-    if (eC || !conversa) throw new Error(`conversa ${m.telefone}: ${eC?.message}`)
+  const agora = new Date().toISOString()
+  const { data: conversa, error: eC } = await db
+    .from('agente_conversas')
+    .upsert(
+      // Sem nome no payload, não apaga o nome que já temos. Mensagem atrasada
+      // marca a hora em que foi escrita: a janela de 24 h conta dali.
+      {
+        telefone: m.telefone,
+        ...(m.nome ? { nome_contato: m.nome } : {}),
+        ...(atrasada
+          ? { ultima_entrada_em: (m.enviadaEm ?? new Date()).toISOString() }
+          : { ultima_entrada_em: agora, ultima_atividade_em: agora }),
+      },
+      { onConflict: 'telefone' },
+    )
+    .select('id, sessao')
+    .single()
+  if (eC || !conversa) throw new Error(`conversa ${m.telefone}: ${eC?.message}`)
 
-    const { error: eM } = await db.from('agente_mensagens').insert({
-      conversa_id: conversa.id,
-      sessao: conversa.sessao,
-      direcao: 'entrada',
-      autor: 'contato',
-      wamid: m.wamid,
-      tipo: m.tipo,
-      texto: m.texto,
-      meta_media_id: m.midia?.id ?? null,
-      midia_mime: m.midia?.mime ?? null,
-      midia_nome: m.midia?.nome ?? null,
-    })
-    // 23505 = a Meta reentregou uma mensagem que já temos. Tudo certo.
-    if (eM && eM.code !== '23505') throw new Error(`mensagem ${m.wamid}: ${eM.message}`)
-    conversas.add(conversa.id)
-  }
-  return conversas
+  const { error: eM } = await db.from('agente_mensagens').insert({
+    conversa_id: conversa.id,
+    sessao: conversa.sessao,
+    direcao: 'entrada',
+    autor: 'contato',
+    wamid: m.wamid,
+    tipo: m.tipo,
+    texto: m.texto,
+    // A coluna nasceu com a Meta; guarda o id que o provedor pede para baixar a mídia.
+    meta_media_id: m.midia?.id ?? null,
+    midia_mime: m.midia?.mime ?? null,
+    midia_nome: m.midia?.nome ?? null,
+  })
+  // 23505 = reentrega de uma mensagem que já temos. Tudo certo.
+  if (eM && eM.code !== '23505') throw new Error(`mensagem ${m.wamid}: ${eM.message}`)
+  return conversa.id
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
-function readRawBody(req: VercelRequest): Promise<Buffer> {
-  return new Promise((resolve, reject) => {
-    const chunks: Buffer[] = []
-    req.on('data', (chunk: Buffer) => chunks.push(chunk))
-    req.on('end', () => resolve(Buffer.concat(chunks)))
-    req.on('error', reject)
-  })
+function formatarAtraso(min: number): string {
+  if (min < 120) return `${Math.round(min)} min`
+  if (min < 48 * 60) return `${Math.round(min / 60)} h`
+  return `${Math.round(min / 1440)} dias`
 }
 
-function verifySignature(raw: Buffer, header: string | string[] | undefined): boolean {
-  if (typeof header !== 'string' || !header.startsWith('sha256=')) return false
-  const expected = createHmac('sha256', config.meta.appSecret).update(raw).digest('hex')
-  const received = header.slice('sha256='.length)
-  if (expected.length !== received.length) return false
-  return timingSafeEqual(Buffer.from(expected, 'hex'), Buffer.from(received, 'hex'))
+function lerCorpo(body: unknown): WebhookPayload | null {
+  try {
+    if (typeof body === 'string') return JSON.parse(body) as WebhookPayload
+    if (Buffer.isBuffer(body)) return JSON.parse(body.toString('utf8')) as WebhookPayload
+    return typeof body === 'object' && body !== null ? (body as WebhookPayload) : null
+  } catch {
+    return null
+  }
+}
+
+/** Compara pelo hash: mesmo tamanho sempre, e o tempo não denuncia o token. */
+function tokenConfere(recebido: unknown): boolean {
+  if (typeof recebido !== 'string' || recebido === '') return false
+  const a = createHash('sha256').update(recebido).digest()
+  const b = createHash('sha256').update(config.uazapi.token).digest()
+  return timingSafeEqual(a, b)
 }

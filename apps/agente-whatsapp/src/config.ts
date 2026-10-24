@@ -13,12 +13,11 @@ function required(name: string): string {
 }
 
 export const config = {
-  meta: {
-    verifyToken: required('META_VERIFY_TOKEN'),
-    appSecret: required('META_APP_SECRET'),
-    waToken: required('META_WA_TOKEN'),
-    phoneNumberId: required('META_PHONE_NUMBER_ID'),
-    graphVersion: process.env.META_GRAPH_VERSION ?? 'v23.0',
+  uazapi: {
+    /** Server URL da instância, sem barra no fim. */
+    url: required('UAZAPI_URL').replace(/\/+$/, ''),
+    /** Token da instância: autentica as chamadas e prova a origem do webhook. */
+    token: required('UAZAPI_TOKEN'),
   },
   anthropic: {
     apiKey: required('ANTHROPIC_API_KEY'),
@@ -43,5 +42,12 @@ export const config = {
     horasNovaSessao: Number(process.env.AGENTE_HORAS_NOVA_SESSAO ?? 8),
     /** Teto de voltas do ciclo de ferramentas por resposta. */
     maxVoltas: Number(process.env.AGENTE_MAX_VOLTAS ?? 16),
+    /** Mensagem que chega com mais atraso que isso (chip desconectado, fila
+     *  da UAZAPI) não dispara resposta: responder em rajada a conversas de
+     *  dias atrás é o padrão que derruba número. Fica para a próxima volta. */
+    maxAtrasoMin: Number(process.env.AGENTE_MAX_ATRASO_MIN ?? 60),
+    /** Teto de respostas enviadas por conversa em 10 min. Passou disso, é
+     *  quase certo um robô do outro lado: a conversa vai para a equipe. */
+    maxRespostas10Min: Number(process.env.AGENTE_MAX_RESPOSTAS_10MIN ?? 8),
   },
 } as const
